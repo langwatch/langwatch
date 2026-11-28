@@ -1,6 +1,7 @@
 /**
  * @vitest-environment node
  * @see specs/identity/signin-router.feature
+ * @see specs/auth/sign-up-disposable-email.feature
  */
 import type { RoutingDecision, SignInMethod } from "@langwatch/identity-contract";
 import { describe, expect, it } from "vitest";
@@ -26,7 +27,8 @@ function enrollment({
   taken?: boolean;
   defaults?: readonly SignInMethod[];
   passwordAllowed?: boolean;
-  signUpRefused?: boolean;
+  /** `true` refuses as invite-only; a reason refuses with that reason. */
+  signUpRefused?: boolean | "disposable_email";
 }) {
   const asked: { routed: (string | null)[]; takenFor: string[]; policyFor: string[] } = {
     routed: [],
@@ -48,6 +50,7 @@ function enrollment({
     passwordIsAllowed: async () => passwordAllowed,
     checkSignUp: async ({ email }) => {
       asked.policyFor.push(email);
+      if (signUpRefused === "disposable_email") return { allowed: false, reason: signUpRefused };
       return signUpRefused
         ? { allowed: false, reason: "invite_only" }
         : { allowed: true, via: "open" };
@@ -106,6 +109,30 @@ describe("SignUpEnrollmentService", () => {
 
       await expect(
         service.getEnrollment({ email: "sam@example.com", addressProof: "proof" }),
+      ).resolves.toMatchObject({ outcome: "existing_account" });
+      expect(asked.policyFor).toEqual([]);
+    });
+  });
+
+  describe("when the sign-up policy would refuse the address as a disposable one", () => {
+    it("refuses a proven new address by the disposable code", async () => {
+      const { service } = enrollment({ decision: UNKNOWN, signUpRefused: "disposable_email" });
+
+      await expect(
+        service.getEnrollment({ email: "sam@mailinator.com", addressProof: "proof" }),
+      ).rejects.toMatchObject({ code: "auth_sign_up_disposable_email" });
+    });
+
+    /** @scenario "An existing account on a disposable domain is sent to sign in" */
+    it("sends an address that already has an account to sign in, without asking the policy", async () => {
+      const { service, asked } = enrollment({
+        decision: UNKNOWN,
+        taken: true,
+        signUpRefused: "disposable_email",
+      });
+
+      await expect(
+        service.getEnrollment({ email: "sam@mailinator.com", addressProof: "proof" }),
       ).resolves.toMatchObject({ outcome: "existing_account" });
       expect(asked.policyFor).toEqual([]);
     });

@@ -694,6 +694,24 @@ describe("given the sign-up screen", () => {
       });
     });
 
+    /** @scenario "A refusal after the address is confirmed does not say the address is confirmed" */
+    it("shows the sign-up refusal without saying the address is confirmed", async () => {
+      enrollmentMock.mockRejectedValueOnce({
+        data: {
+          error: { code: "auth_sign_up_disposable_email", httpStatus: 403, fault: "customer" },
+        },
+      });
+      renderScreen();
+
+      expect(await screen.findByTestId("post-link-routing-failure")).toBeTruthy();
+      expect(await screen.findByText("Please use a permanent email address")).toBeTruthy();
+      expect(screen.queryByText("Your email is confirmed")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
+      expect(hardRedirectMock).toHaveBeenCalledWith("/auth/signup");
+    });
+
     /** @scenario Post-link routing still governs credential enrollment */
     it("hands a domain now routed to a provider to it, offering no local credential", async () => {
       const okta = { id: "okta", kind: "federated" as const, connectionId: "conn_acme" };

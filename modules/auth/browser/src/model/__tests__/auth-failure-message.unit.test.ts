@@ -5,10 +5,12 @@
 import { describe, expect, it } from "vitest";
 
 import { authFailureMessage, ssoHandOffFailureMessage } from "../auth-failure-message.ts";
+import { explainErrorCode } from "../error-presentation.ts";
 import { frontDoorErrorCopy } from "../front-door-error-copy.ts";
 
+/** The title the screens render for a code: the front door's own copy, else the shared registry. */
 const registryCopy = (code: string): string => {
-  const explanation = frontDoorErrorCopy({
+  const explanation = explainErrorCode({
     code,
     httpStatus: 500,
     meta: {},
@@ -115,6 +117,24 @@ describe("authFailureMessage", () => {
       expect(message).toContain("Sign-up on this installation is by invitation");
       expect(message).toMatch(/administrator to invite/);
       expect(message).not.toContain("auth_sign_up_restricted");
+    });
+  });
+
+  describe("when a sign-up is refused for a disposable email address", () => {
+    /** @scenario "The sign-up screen asks for a permanent email address" */
+    it("asks for a permanent address, and never says something broke", () => {
+      const message = authFailureMessage({
+        code: "auth_sign_up_disposable_email",
+        message: "auth_sign_up_disposable_email",
+        status: 403,
+      });
+
+      expect(registryCopy("auth_sign_up_disposable_email")).toBe(
+        "Please use a permanent email address",
+      );
+      expect(message).toContain("Please use a permanent email address");
+      expect(message).not.toContain("auth_sign_up_disposable_email");
+      expect(message).not.toBe("Sign in did not go through. Please try again.");
     });
   });
 

@@ -108,6 +108,7 @@ export const APP_ERROR_CODES = [
   "auth_invalid_origin",
   "auth_no_address_to_confirm",
   "auth_rate_limited",
+  "auth_sign_up_disposable_email",
   "auth_sign_up_restricted",
   "auth_validate_rate_limited",
   "authz_epoch_bump_failed",

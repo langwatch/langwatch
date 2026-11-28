@@ -69,6 +69,8 @@ export const STABLE_AUTH_ERRORS = [
   "sso_issuer_mismatch",
   // The installation's sign-up policy does not admit this address: an invitation has to change.
   "auth_sign_up_restricted",
+  // The address is on a disposable email domain: a permanent address has to be used instead.
+  "auth_sign_up_disposable_email",
   // The connection's arrival policy refused or held a newcomer: an administrator has to act.
   "identity_jit_disabled",
   "identity_link_proposed",
@@ -86,6 +88,15 @@ export const STABLE_AUTH_ERRORS = [
 
 export const isStableAuthError = (error: string | null | undefined): boolean =>
   !!error && (STABLE_AUTH_ERRORS as readonly string[]).includes(error);
+
+/** The codes the sign-up policy refuses a new address with; the registry has words for each. */
+export const SIGN_UP_REFUSAL_CODES = [
+  "auth_sign_up_restricted",
+  "auth_sign_up_disposable_email",
+] as const;
+
+export const isSignUpRefusalCode = (code: string | null | undefined): boolean =>
+  !!code && (SIGN_UP_REFUSAL_CODES as readonly string[]).includes(code);
 
 /** The one code every failure we have not written down arrives as. */
 export const GENERIC_SIGN_IN_ERROR_CODE = "sign_in_failed";

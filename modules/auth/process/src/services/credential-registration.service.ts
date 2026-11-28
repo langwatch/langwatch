@@ -15,7 +15,7 @@ import {
   normalizeIdentifierValue,
   type SignInMethod,
 } from "@langwatch/identity-contract";
-import { SignUpRestrictedError, type SignUpVerdict } from "@langwatch/organization-contract";
+import { signUpRefusalFor, type SignUpVerdict } from "@langwatch/organization-contract";
 import type {
   CreatedUser,
   RegisterCredentialAccountInput,
@@ -106,7 +106,7 @@ export class CredentialRegistrationService {
     // administrator invites it.
     const verdict = await this.peers.organizations.checkSignUp({ email });
 
-    if (!verdict.allowed) throw new SignUpRestrictedError(verdict.reason);
+    if (!verdict.allowed) throw signUpRefusalFor({ reason: verdict.reason });
 
     // The mailbox proof is the authority to enrol a credential, bound to this exact address.
     const addressConfirmed = await this.#claimProof({ token: input.addressProof, email });

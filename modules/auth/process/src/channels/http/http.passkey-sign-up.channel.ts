@@ -2,7 +2,7 @@ import { createHmac } from "node:crypto";
 
 import { normalizeIdentifierValue } from "@langwatch/identity-contract";
 import { createLogger } from "@langwatch/observability";
-import type { SignUpVerdict } from "@langwatch/organization-contract";
+import { signUpRefusalFor, type SignUpVerdict } from "@langwatch/organization-contract";
 import type { UserApi } from "@langwatch/user-contract";
 import type { GenericEndpointContext } from "better-auth";
 import { APIError, getSessionFromCtx } from "better-auth/api";
@@ -42,9 +42,6 @@ export const PASSKEY_SIGNUP_VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED";
 
 /** A signed-in browser ran the sign-up ceremony for some other address. */
 export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
-
-/** The installation restricts who may create an account, and this address is not admitted. */
-export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
 
 /** Main's code for an address that must use its organization's sign-in method. */
 export const PASSKEY_SIGNUP_NOT_LOCAL = "REGISTRATION_NOT_ALLOWED";
@@ -174,10 +171,8 @@ async function refuseIfPolicyRefuses({
   const verdict = await policy.checkSignUp({ email });
   if (verdict.allowed) return;
 
-  throw new APIError("FORBIDDEN", {
-    code: PASSKEY_SIGNUP_RESTRICTED,
-    message: "Accounts on this installation are created by invitation.",
-  });
+  const refusal = signUpRefusalFor({ reason: verdict.reason });
+  throw new APIError("FORBIDDEN", { code: refusal.code, message: refusal.message });
 }
 
 /**

@@ -4,14 +4,12 @@
  * The sign-up policy on the paths better-auth creates a user through: the
  * social and generic OAuth callbacks and the single sign-on plugin.
  * @see specs/auth/sign-up-restriction.feature
+ * @see specs/auth/sign-up-disposable-email.feature
  */
 import type { SignUpVerdict } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createBeforeUserCreateHook,
-  SIGN_UP_RESTRICTED_CODE,
-} from "../../channels/http/http.better-auth-hooks.channel.ts";
+import { createBeforeUserCreateHook } from "../../channels/http/http.better-auth-hooks.channel.ts";
 
 function userCreateBefore({
   verdict,
@@ -43,9 +41,22 @@ describe("user.create.before", () => {
       const { create, checkSignUp } = userCreateBefore({ verdict: REFUSED });
 
       await expect(create("stranger@example.com")).rejects.toMatchObject({
-        body: { code: SIGN_UP_RESTRICTED_CODE },
+        body: { code: "auth_sign_up_restricted" },
       });
       expect(checkSignUp).toHaveBeenCalledWith({ email: "stranger@example.com" });
+    });
+  });
+
+  describe("when the sign-up policy refuses the address as a disposable one", () => {
+    /** @scenario "A first sign-in through an identity provider from a disposable address creates no account" */
+    it("refuses with the disposable code the sign-in error page renders", async () => {
+      const { create } = userCreateBefore({
+        verdict: { allowed: false, reason: "disposable_email" },
+      });
+
+      await expect(create("sam@mailinator.com")).rejects.toMatchObject({
+        body: { code: "auth_sign_up_disposable_email" },
+      });
     });
   });
 

@@ -28,7 +28,7 @@ function process(role: "api" | "worker") {
     .withObservability((observability) => observability.withLogging(createTestLogger().logger))
     .withConfig({
       organization: {
-        signUp: { mode: "open", allowedDomains: [], adminEmails: [] },
+        signUp: { mode: "open", allowedDomains: [], adminEmails: [], disposableEmails: undefined },
         publicBaseUrl: undefined,
         isSaas: false,
       },

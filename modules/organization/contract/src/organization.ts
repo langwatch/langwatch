@@ -301,12 +301,24 @@ export type DocsPlaygroundPolicy = z.infer<typeof docsPlaygroundPolicySchema>;
 /** `open` admits anybody who reaches the installation; `invite_only` admits invited addresses. */
 export type SignUpMode = "open" | "invite_only";
 
+/** `SIGN_UP_DISPOSABLE_EMAILS`: whether a new address on a disposable email domain is refused. */
+export const signUpDisposableEmailsSchema = z.enum(["refuse", "allow"]);
+export type SignUpDisposableEmails = z.infer<typeof signUpDisposableEmailsSchema>;
+
+/** Why the sign-up policy refused an address; `disposable_email` has its own handled error. */
+export const signUpRefusalReasonSchema = z.enum([
+  "invite_only",
+  "domain_not_allowed",
+  "disposable_email",
+]);
+export type SignUpRefusalReason = z.infer<typeof signUpRefusalReasonSchema>;
+
 export type SignUpVerdict =
   | {
       allowed: true;
       via: "open" | "instance_admin" | "invitation" | "first_account";
     }
-  | { allowed: false; reason: "invite_only" | "domain_not_allowed" };
+  | { allowed: false; reason: SignUpRefusalReason };
 
 export type OrganizationCreationVerdict =
   | { allowed: true; via: "open" | "instance_admin" | "first_organization" }
