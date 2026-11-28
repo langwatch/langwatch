@@ -7,6 +7,7 @@ const EDITOR_BY_TYPE: Record<string, AgentEditorDrawer> = {
   http: "agentHttpEditor",
   workflow: "agentWorkflowEditor",
   voice: "agentVoiceEditor",
+  connector: "agentConnectorEditor",
 };
 
 /** What the agent list drawer reads and does when the address opened it. */

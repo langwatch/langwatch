@@ -34,6 +34,11 @@ const validRequestFor: Record<string, Record<string, unknown>> = {
     type: "voice",
     config: { transport: "elevenlabs_convai", agentId: "agent-1" },
   },
+  connector: {
+    name: "Shop connector",
+    type: "connector",
+    config: { call: { language: "python", code: "def execute(input):\n    return {}\n" } },
+  },
 };
 
 describe("the Agents create schemas", () => {

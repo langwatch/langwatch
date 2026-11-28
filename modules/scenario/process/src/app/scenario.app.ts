@@ -10,6 +10,7 @@ import { ApiKeyApi } from "@langwatch/api-key-contract";
 import { AuditLogApi } from "@langwatch/audit-log-contract";
 import { AuthzApi } from "@langwatch/authz-contract";
 import { DataRetentionApi } from "@langwatch/data-retention-contract";
+import { DatasetApi } from "@langwatch/dataset-contract";
 import { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EvaluationApi } from "@langwatch/evaluation-contract";
 import { EvaluatorApi } from "@langwatch/evaluator-contract";
@@ -159,6 +160,7 @@ import {
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
 import { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
 import { JudgePreviewChatService } from "../features/judge-preview/services/judge-preview-chat.service.ts";
+import { ScenarioConnectorTargetService } from "../features/prefetch/services/scenario-connector-target.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioRunExportDownloadService } from "../features/run-export/services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../features/run-export/services/scenario-run-export.service.ts";
@@ -261,6 +263,8 @@ const scenarioAppDependencyTokens = {
   prompts: PromptApi,
   secrets: SecretApi,
   workflows: WorkflowApi,
+  /** A connector agent's fixture rows, read before its child starts (ADR-194). */
+  datasets: DatasetApi,
   /** Which testing interface a project reads, for the links this module hands out. */
   featureFlags: FeatureFlagApi,
   /** The voice doors' conditional permission probe (#8021). */
@@ -413,6 +417,13 @@ export class ScenarioModule implements ScenarioApi {
           modelProviders: peers.modelProviders,
           gateway: peers.gateway,
           voiceCallMaxSeconds: config.voiceCallMaxSeconds,
+        }),
+        connectorTargets: ScenarioConnectorTargetService.create({
+          agents: peers.agents,
+          secrets: peers.secrets,
+          datasets: peers.datasets,
+          featureFlags: peers.featureFlags,
+          projects: peers.projects,
         }),
       }),
       failures: ScenarioFailureHandlerService.create({ agents: peers.agents, simulations }),

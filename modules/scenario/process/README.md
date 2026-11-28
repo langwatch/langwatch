@@ -1233,7 +1233,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:350
 
 // scenarios.getLastResultSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:325
@@ -1253,7 +1253,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationRunFreshnessSchema, ../contract/src/features/simulation/simulation.ts:377
+// Output: simulationRunFreshnessSchema, ../contract/src/features/simulation/simulation.ts:385
 interface Output {
   lastUpdatedAt: number;
 }
@@ -1268,7 +1268,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:369
+type Output = z.infer<typeof simulationScenarioSetRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:377
 
 // scenarios.getAllScenarioSetRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:366
@@ -1286,7 +1286,7 @@ interface Input {
   projectId: string;
   scenarioRunId: string;
 }
-type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:208
+type Output = z.infer<typeof simulationRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:216
 
 // scenarios.getScenarioSetBatchRunCount
 // Input: inline, ../contract/src/scenario.trpc.ts:374
@@ -1296,7 +1296,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-// Output: simulationBatchRunCountSchema, ../contract/src/features/simulation/simulation.ts:385
+// Output: simulationBatchRunCountSchema, ../contract/src/features/simulation/simulation.ts:393
 interface Output {
   count: number;
 }
@@ -1311,7 +1311,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:308
+type Output = z.infer<typeof simulationBatchHistorySchema>; // ../contract/src/features/simulation/simulation.ts:316
 
 // scenarios.getBatchRunData
 // Input: inline, ../contract/src/scenario.trpc.ts:393
@@ -1322,7 +1322,7 @@ interface Input {
   sinceTimestamp?: number;
   runTimestamps?: Record<string, number>;
 }
-type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:323
+type Output = z.infer<typeof simulationBatchRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:331
 
 // scenarios.getExternalSetSummaries
 // Input: inline, ../contract/src/scenario.trpc.ts:411
@@ -1349,7 +1349,7 @@ interface Input {
   startDate?: number;
   endDate?: number;
 }
-type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:342
+type Output = z.infer<typeof simulationAllSuitesRunDataSchema>; // ../contract/src/features/simulation/simulation.ts:350
 
 // scenarios.onSimulationUpdate
 // Input: inline, ../contract/src/scenario.trpc.ts:433
@@ -1358,7 +1358,7 @@ interface Input {
   tabKey?: string;
   tabId?: string;
 }
-// Output: simulationStreamFrameSchema, ../contract/src/features/simulation/simulation.ts:400
+// Output: simulationStreamFrameSchema, ../contract/src/features/simulation/simulation.ts:408
 interface Output {
   event: unknown;
   timestamp?: number;
@@ -1457,7 +1457,7 @@ interface Output {
 }
 
 // scenarios.testHttpAgent
-type Input = z.infer<typeof httpAgentTestInputSchema>; // ../../agent/contract/src/agent.commands.ts:32
+type Input = z.infer<typeof httpAgentTestInputSchema>; // ../../agent/contract/src/agent.commands.ts:33
 type Output = z.infer<typeof httpProxyResultSchema>; // ../../agent/contract/src/agent.queries.ts:280
 ```
 
@@ -1510,9 +1510,9 @@ Declared at `src/eventing/simulation-processing.pipeline.ts:118`. Events: `Simul
 
 | Kind   | Leaf                                                  | Environment variable                      | Declared at                              |
 | ------ | ----------------------------------------------------- | ----------------------------------------- | ---------------------------------------- |
-| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:282`            |
-| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:283`            |
-| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:285`            |
+| secret | `voiceSessionSigning`                                 | `CREDENTIALS_SECRET`                      | `src/app/scenario.app.ts:286`            |
+| secret | `voiceSessionSigningFallback`                         | `NEXTAUTH_SECRET`                         | `src/app/scenario.app.ts:287`            |
+| secret | `nlpInternal`                                         | `LANGWATCH_NLP_INTERNAL_SECRET`           | `src/app/scenario.app.ts:289`            |
 | config | `langwatchEndpoint`                                   | `LANGWATCH_ENDPOINT`                      | `../contract/src/scenario.config.ts:96`  |
 | config | `voicePublicBaseUrl`                                  | `VOICE_PUBLIC_BASE_URL`                   | `../contract/src/scenario.config.ts:98`  |
 | config | `voiceTunnel`                                         | `VOICE_TUNNEL`                            | `../contract/src/scenario.config.ts:100` |

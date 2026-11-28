@@ -96,6 +96,7 @@ function prefetcher({ agent }: { agent: Agent | "missing" }) {
       mintRunKey: async () => "run-key",
     }),
     voiceTargets: null,
+    connectorTargets: null,
   });
 }
 

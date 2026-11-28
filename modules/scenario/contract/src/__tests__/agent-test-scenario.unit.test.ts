@@ -14,6 +14,7 @@ import {
   getAgentTestSetId,
   isAgentTestScenarioId,
   isAgentTestSetId,
+  mapAgentTestTarget,
 } from "../agent-test-scenario.ts";
 import { isInternalSetId, isOnPlatformSet } from "../features/run/scenario-set-id.ts";
 
@@ -62,6 +63,13 @@ describe("agent test scenario", () => {
       expect(scenario.situation).toContain(`"${AGENT_TEST_USER_MESSAGE}"`);
       expect(scenario.criteria).toEqual([]);
       expect(scenario.labels).toEqual([]);
+    });
+  });
+
+  describe("given a connector agent", () => {
+    /** @scenario "Agent testing never runs a connector agent's call block" */
+    it("maps to no test target, so the test is refused before any call block runs", () => {
+      expect(mapAgentTestTarget({ id: "agent_shop", type: "connector" })).toBeNull();
     });
   });
 });

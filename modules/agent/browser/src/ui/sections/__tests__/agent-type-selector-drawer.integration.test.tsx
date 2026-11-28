@@ -30,6 +30,10 @@ const { voiceState } =
 const { VoiceTestHost, resetVoiceState } =
   await import("../../../features/voice-editor/ui/sections/__tests__/voice-editor.test-helpers.tsx");
 const { AgentManagementHostProvider } = await import("../../../model/agent-management-host.ts");
+const { connectorState } =
+  await import("../../../features/connector-editor/ui/sections/__tests__/connector-editor-doubles.test-helpers.tsx");
+const { ConnectorTestHost, resetConnectorState } =
+  await import("../../../features/connector-editor/ui/sections/__tests__/connector-editor.test-helpers.tsx");
 
 const Wrapper = ({ children }: { children: React.ReactNode }) => (
   <DesignSystemProvider forcedTheme="light">
@@ -124,6 +128,54 @@ describe("AgentTypeSelectorDrawer", () => {
       renderDrawer();
 
       expect(screen.queryByTestId("agent-type-voice")).toBeNull();
+    });
+  });
+
+  describe("given the release_scenario_connector_steps flag", () => {
+    beforeEach(resetConnectorState);
+
+    const renderWithConnectorFlag = () =>
+      render(<AgentTypeSelectorDrawer open />, {
+        wrapper: ({ children }: { children: React.ReactNode }) => (
+          <DesignSystemProvider forcedTheme="light">
+            <AgentManagementHostProvider value={new ConnectorTestHost()}>
+              {children}
+            </AgentManagementHostProvider>
+          </DesignSystemProvider>
+        ),
+      });
+
+    /** @scenario "The new agent flow offers a Scenario Connector while its flag is on" */
+    it("offers a Scenario Connector card after Code Agent while it is on", () => {
+      renderWithConnectorFlag();
+
+      expect(screen.getByText("Scenario Connector")).toBeTruthy();
+      const types = screen.getAllByTestId(/^agent-type-[a-z]+$/).map((card) => card.dataset.testid);
+      expect(types).toEqual([
+        "agent-type-connected",
+        "agent-type-http",
+        "agent-type-voice",
+        "agent-type-code",
+        "agent-type-connector",
+        "agent-type-workflow",
+      ]);
+    });
+
+    /** @scenario "The new agent flow offers a Scenario Connector while its flag is on" */
+    it("opens the connector editor when the Scenario Connector card is chosen", () => {
+      renderWithConnectorFlag();
+      fireEvent.click(screen.getByTestId("agent-type-connector"));
+
+      expect(drawer.openDrawer).toHaveBeenCalledExactlyOnceWith("agentConnectorEditor");
+    });
+
+    /** @scenario "The new agent flow hides the Scenario Connector while its flag is off" */
+    it("hides the Scenario Connector card while it is off", () => {
+      connectorState.flagOn = false;
+      renderWithConnectorFlag();
+
+      expect(screen.getByTestId("agent-type-code")).toBeTruthy();
+      expect(screen.queryByTestId("agent-type-connector")).toBeNull();
     });
   });
 

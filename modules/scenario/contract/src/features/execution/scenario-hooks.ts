@@ -32,6 +32,8 @@ const scenarioHookResultSchemaDefinition = z.object({
   stateTooLarge: z.boolean().optional(),
   returnedTooLarge: z.boolean().optional(),
   error: z.string().optional(),
+  /** The connector was refused before any block ran, so this hook had no test data to touch. */
+  refused: z.boolean().optional(),
 });
 export interface ScenarioHookResultSchema extends Named<
   typeof scenarioHookResultSchemaDefinition

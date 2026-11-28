@@ -20,6 +20,7 @@ export type AgentEditorDrawerName =
   | "agentHttpEditor"
   | "agentWorkflowEditor"
   | "agentVoiceEditor"
+  | "agentConnectorEditor"
   | "agentConnectedDetail";
 
 export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName | null {
@@ -35,6 +36,8 @@ export function agentEditorDrawerForType(type: AgentType): AgentEditorDrawerName
     /** Connected agents have no editor, send to detail view like the agents page does */
     case "connected":
       return "agentConnectedDetail";
+    case "connector":
+      return "agentConnectorEditor";
     case "signature":
       return null;
   }

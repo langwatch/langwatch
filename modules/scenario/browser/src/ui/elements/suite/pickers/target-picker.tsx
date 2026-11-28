@@ -13,10 +13,27 @@ import type { SuiteTarget, SuiteTargetType } from "@langwatch/suite-contract";
 import { AlertTriangle, Plus, X } from "lucide-react";
 
 function targetTypeLabel(type: SuiteTargetType): string {
-  if (type === "http") return "HTTP";
-  if (type === "code") return "Code";
-  if (type === "workflow") return "Workflow";
-  return "Prompt";
+  switch (type) {
+    case "http":
+      return "HTTP";
+    case "code":
+      return "Code";
+    case "workflow":
+      return "Workflow";
+    case "connected":
+      return "Connected";
+    case "voice":
+      return "Voice";
+    case "connector":
+      return "Scenario Connector";
+    case "prompt":
+      return "Prompt";
+    default: {
+      // A type a newer server sends reads as itself rather than breaking the list.
+      const unhandledType: never = type;
+      return String(unhandledType);
+    }
+  }
 }
 
 export interface TargetPickerTarget {

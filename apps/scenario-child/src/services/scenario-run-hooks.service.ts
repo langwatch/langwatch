@@ -49,11 +49,15 @@ export class ScenarioRunHooksError extends Error {
 
 const tracer = trace.getTracer("langwatch-scenario-child");
 
+function codeOf(error: unknown): unknown {
+  return typeof error === "object" && error !== null && "code" in error ? error.code : null;
+}
+
 function statusOf(error: unknown): ScenarioHookStatus {
-  const code = typeof error === "object" && error !== null && "code" in error ? error.code : null;
+  const code = codeOf(error);
   if (code === "agent_call_timeout") return "timed_out";
-  // No instance took the call, so the hook never ran.
-  if (code === "agent_offline") return "not_run";
+  // No instance took the call, or a refused connector ran no block, so the hook never ran.
+  if (code === "agent_offline" || code === "hook_refused") return "not_run";
   return "failed";
 }
 
@@ -139,7 +143,8 @@ export class ScenarioRunHooksService {
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
         span.setStatus({ code: SpanStatusCode.ERROR, message });
-        return { ...base(statusOf(error)), error: message };
+        const refused = codeOf(error) === "hook_refused";
+        return { ...base(statusOf(error)), error: message, ...(refused ? { refused } : {}) };
       } finally {
         span.end();
       }

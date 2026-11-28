@@ -1,8 +1,9 @@
 /**
  * Connected agents in the run dialog: presence mark, environment label,
- * disabled cards (another's dev agent, an unheld one), and the plan warning.
+ * disabled cards (another's dev agent, an unheld one), an enabled connector, and the plan warning.
  * @vitest-environment jsdom
  * @see specs/features/agents/connected-agents-ui.feature
+ * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -216,6 +217,50 @@ describe("connected agents in the run dialog", () => {
       );
 
       expect(screen.queryByTestId("run-dialog-offline-targets")).toBeNull();
+    });
+  });
+
+  describe("given a Scenario Connector agent", () => {
+    /** @scenario "A run plan can target a connector agent" */
+    it("draws it enabled and picks it as a connector target", async () => {
+      const user = userEvent.setup();
+      const onSelect = vi.fn();
+      const agents = scenarioAgentsOf({
+        agents: [
+          connectedRow({ id: "agent_on" }),
+          {
+            id: "agent_connector",
+            name: "Shop connector",
+            type: "connector",
+            updatedAt: Temporal.Instant.from("2026-08-30T10:00:00Z"),
+          },
+        ],
+        searchValue: "",
+        viewerUserId: VIEWER,
+      });
+      renderWithDesignSystem(
+        <TargetSection
+          mode="agents"
+          agents={agents}
+          prompts={[]}
+          target={null}
+          onSelect={onSelect}
+          onRemovePromptPicker={vi.fn()}
+          onSetupAgent={vi.fn()}
+        />,
+      );
+
+      expect(screen.getByTestId("run-dialog-agent-agent_on")).toHaveAttribute(
+        "aria-disabled",
+        "false",
+      );
+      const connector = screen.getByTestId("run-dialog-agent-agent_connector");
+      expect(connector).toHaveAttribute("aria-disabled", "false");
+
+      await user.click(connector);
+      expect(onSelect).toHaveBeenCalledWith(
+        expect.objectContaining({ type: "connector", id: "agent_connector" }),
+      );
     });
   });
 });

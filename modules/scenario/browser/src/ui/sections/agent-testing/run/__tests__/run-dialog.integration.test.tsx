@@ -6,6 +6,7 @@
  * @see specs/suites/test-suite-run-plan-reuse.feature
  * @see specs/features/agent-testing/results-tabs.feature
  * @see specs/licensing/cloud-free-creation-caps.feature
+ * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 import { markHandledGlobally } from "@langwatch/browser-host/errors";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
@@ -216,6 +217,14 @@ const VOICE_AGENT = {
   type: "voice" as const,
   updatedAt: "2026-07-01T12:00:00.000Z",
   config: { transport: "elevenlabs_convai", agentId: "el_agent_1" },
+};
+/** A Scenario Connector agent (ADR-194); its blocks are the scenario run's to read. */
+const CONNECTOR_AGENT = {
+  id: "agent_connector",
+  name: "shop-connector",
+  type: "connector" as const,
+  updatedAt: "2026-07-01T12:00:00.000Z",
+  config: {},
 };
 /** A connected agent whose own function declares two parameters. */
 const CONNECTED_AGENT = {
@@ -509,6 +518,27 @@ describe("<RunDialog/>", () => {
       expect.objectContaining({
         config: expect.objectContaining({
           targets: [expect.objectContaining({ type: "http", referenceId: "agent_1" })],
+        }),
+      }),
+    );
+  });
+
+  /** @scenario "A run plan can target a connector agent" */
+  it("offers a connector agent enabled and queues a plan whose target is type connector", async () => {
+    const user = userEvent.setup();
+    mockAgentsGetAll.mockReturnValue({ data: [ONLINE_AGENT, CONNECTOR_AGENT] });
+    renderDialog(suiteSubject());
+
+    const card = screen.getByTestId("run-dialog-agent-agent_connector");
+    expect(card).toHaveAttribute("aria-disabled", "false");
+    await user.click(card);
+    expect(card).toHaveAttribute("aria-pressed", "true");
+    await user.click(screen.getByTestId("run-dialog-run"));
+
+    expect(mockSuitesRunPlan).toHaveBeenCalledWith(
+      expect.objectContaining({
+        config: expect.objectContaining({
+          targets: [expect.objectContaining({ type: "connector", referenceId: "agent_connector" })],
         }),
       }),
     );

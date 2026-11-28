@@ -9,6 +9,7 @@ describe("getAgentEditorDrawer", () => {
     expect(getAgentEditorDrawer("http")).toBe("agentHttpEditor");
     expect(getAgentEditorDrawer("workflow")).toBe("agentWorkflowEditor");
     expect(getAgentEditorDrawer("voice")).toBe("agentVoiceEditor");
+    expect(getAgentEditorDrawer("connector")).toBe("agentConnectorEditor");
     expect(() => getAgentEditorDrawer("signature")).toThrow(
       "signature agents have no editor drawer",
     );

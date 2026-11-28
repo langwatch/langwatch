@@ -25,6 +25,7 @@ export const TARGET_RESOURCE_CLASS = {
   workflow: "light",
   connected: "light",
   voice: "voice",
+  connector: "light",
 } as const satisfies Record<ScenarioTargetType, ScenarioResourceClass>;
 
 export type ScenarioStopSignal = "SIGTERM" | "SIGINT" | "SIGKILL";
@@ -37,4 +38,5 @@ export const TARGET_STOP_SIGNAL = {
   workflow: "SIGTERM",
   connected: "SIGTERM",
   voice: "SIGTERM",
+  connector: "SIGTERM",
 } as const satisfies Record<ScenarioTargetType, ScenarioStopSignal>;

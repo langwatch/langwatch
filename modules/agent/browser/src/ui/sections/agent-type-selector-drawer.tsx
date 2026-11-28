@@ -1,7 +1,7 @@
 import { Card } from "@langwatch/design-system/card";
 import { Drawer } from "@langwatch/design-system/drawer";
 import { Box, HStack, Text, VStack } from "@langwatch/design-system/primitives";
-import { Cable, Code, Globe, Mic, Workflow } from "lucide-react";
+import { Cable, Code, Globe, Mic, Plug, Workflow } from "lucide-react";
 
 import { useAgentTypeSelection } from "../../behavior/use-agent-type-selection.ts";
 import type { NewAgentType } from "../../model/new-agent-drawer.ts";
@@ -44,6 +44,12 @@ const agentTypes: {
     description: "Write custom Python code to process inputs and generate outputs",
   },
   {
+    type: "connector",
+    icon: Plug,
+    title: "Scenario Connector",
+    description: "Write the call, setup and teardown in LangWatch; we host and run them",
+  },
+  {
     type: "workflow",
     icon: Workflow,
     title: "Workflow Agent",
@@ -78,7 +84,7 @@ export function AgentTypeSelectorDrawer({
         <VStack gap={3} align="stretch">
           <ConnectFromCodeCard onClick={selection.connectFromCode} />
           {agentTypes
-            .filter((agentType) => agentType.type !== "voice" || selection.voiceEnabled)
+            .filter((agentType) => isOffered({ type: agentType.type, flags: selection }))
             .map((agentType) => (
               <AgentTypeCard
                 key={agentType.type}
@@ -90,6 +96,19 @@ export function AgentTypeSelectorDrawer({
       </VStack>
     </Drawer>
   );
+}
+
+/** Fail-closed: a flagged kind shows only once its flag answers on. */
+function isOffered({
+  type,
+  flags,
+}: {
+  type: AgentType;
+  flags: { voiceEnabled: boolean; connectorEnabled: boolean };
+}): boolean {
+  if (type === "voice") return flags.voiceEnabled;
+  if (type === "connector") return flags.connectorEnabled;
+  return true;
 }
 
 /** Connect-from-code reuses the project's already-running agent. */

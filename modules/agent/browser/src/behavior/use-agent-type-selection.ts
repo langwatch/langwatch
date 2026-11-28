@@ -1,5 +1,6 @@
 import { useDrawer } from "@langwatch/browser-host/drawer";
 
+import { SCENARIO_CONNECTOR_FLAG_KEY } from "../features/connector-editor/model/connector-form.ts";
 import { VOICE_AGENTS_FLAG_KEY } from "../features/voice-editor/model/voice-talk.ts";
 import { useAgentManagementHost } from "../model/agent-management-host.ts";
 import { newAgentDrawerFor, type NewAgentType } from "../model/new-agent-drawer.ts";
@@ -18,6 +19,7 @@ export function useAgentTypeSelection({
   const host = useAgentManagementHost();
   return {
     voiceEnabled: host.isFeatureEnabled(VOICE_AGENTS_FLAG_KEY),
+    connectorEnabled: host.isFeatureEnabled(SCENARIO_CONNECTOR_FLAG_KEY),
     close: onClose ?? closeDrawer,
     select: onSelect ?? ((type: NewAgentType) => openDrawer(newAgentDrawerFor(type))),
     connectFromCode: onConnectFromCode ?? (() => openDrawer("agentConnectFromCode")),

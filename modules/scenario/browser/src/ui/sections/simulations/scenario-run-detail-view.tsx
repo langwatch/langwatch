@@ -367,7 +367,7 @@ export function RunDetailDialogs({ detail }: { detail: ScenarioRunDetail }) {
     runModalOpen,
     setRunModalOpen,
     handleRunAgain,
-    persistedTarget,
+    runAgainTarget,
     isRunning,
     scenarioEditorOpen,
     setScenarioEditorOpen,
@@ -375,11 +375,13 @@ export function RunDetailDialogs({ detail }: { detail: ScenarioRunDetail }) {
   } = detail;
   return (
     <>
+      {/* Keyed so the pick follows the run's target once the stream has read it. */}
       <RunScenarioModal
+        key={runAgainTarget ? `${runAgainTarget.type}:${runAgainTarget.id}` : "none"}
         open={runModalOpen}
         onClose={() => setRunModalOpen(false)}
         onRun={handleRunAgain}
-        initialTarget={persistedTarget}
+        initialTarget={runAgainTarget}
         isLoading={isRunning}
       />
 

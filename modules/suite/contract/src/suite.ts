@@ -55,6 +55,9 @@ export const suiteTargetTypeSchema = z.enum([
   // judge, so the target resolves to a call destination rather than an
   // endpoint.
   "voice",
+  // A Scenario Connector agent (ADR-194): the app runs its call, setup and
+  // teardown blocks. The scenario run itself refuses it while the release is off.
+  "connector",
 ]);
 export type SuiteTargetType = z.infer<typeof suiteTargetTypeSchema>;
 

@@ -39,6 +39,12 @@
       "path": "../../scenario/client/tsconfig.build.json"
     },
     {
+      "path": "../../dataset/client/tsconfig.build.json"
+    },
+    {
+      "path": "../../secret/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../prompt/client/tsconfig.build.json"
     },
     {
@@ -69,7 +75,7 @@
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).
   "nx": {
     "sync": {
-      "ignoredDependencies": ["@langwatch/vitest-config"]
+      "ignoredDependencies": ["@langwatch/test-harness", "@langwatch/vitest-config"]
     }
   }
 }

@@ -52,6 +52,9 @@ export interface FeatureFlagFamily {
   family: string;
 }
 
+/** The release flag for Scenario Connector steps (ADR-194), read by the scenario prefetch too. */
+export const SCENARIO_CONNECTOR_FLAG_KEY = "release_scenario_connector_steps" as const;
+
 export const FEATURE_FLAGS = [
   // ----- SYSTEM -----
   {
@@ -247,6 +250,13 @@ export const FEATURE_FLAGS = [
     defaultValue: false,
     description:
       "Runs a project's non-voice scenario runs on the Go scenario runner shipped in the worker image instead of the Node scenario child. Off by default; enable per project or organization via the operator store. Voice runs always stay on the Node child, and a worker without the binary keeps every run on Node.",
+  },
+  {
+    key: SCENARIO_CONNECTOR_FLAG_KEY,
+    scope: "PRODUCT",
+    defaultValue: false,
+    description:
+      "Runs a Scenario Connector agent's setup, call and teardown blocks in the code runner (ADR-194). Off by default on cloud and self-hosted; turn it on per project (or organization) with a targeting rule, or for a whole install with RELEASE_SCENARIO_CONNECTOR_STEPS. On, the Scenario Connector card shows in the new-agent list. Off, the card is hidden and a run of a connector agent records that connector steps are not released for the project, ends as an error and is not scored, and no block reaches the code runner.",
   },
   {
     key: "release_voice_agents_enabled",

@@ -1,5 +1,6 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
+import type { DatasetApi } from "@langwatch/dataset-contract";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
 import type { PromptApi } from "@langwatch/prompt-contract";
@@ -61,6 +62,7 @@ export function scenarioExecutorPeers() {
   return {
     prompts: createApiFixture<PromptApi>(),
     secrets: createApiFixture<SecretApi>(),
+    datasets: createApiFixture<DatasetApi>(),
     workflows: createApiFixture<WorkflowApi>(),
     apiKeys: createApiFixture<ApiKeyApi>(),
     gateway: createApiFixture<GatewayApi>(),

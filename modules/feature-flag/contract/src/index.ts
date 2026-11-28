@@ -11,6 +11,7 @@ export {
   listFeatureFlagFamilies,
   listFeatureFlags,
   pickFlagDefinition,
+  SCENARIO_CONNECTOR_FLAG_KEY,
 } from "./feature-flag.ts";
 export {
   deriveFeatureFlagEnvVarName,

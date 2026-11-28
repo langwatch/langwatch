@@ -4,6 +4,7 @@ from enum import Enum
 class PostApiSuitesByIdDuplicateResponse201TargetsItemType(str, Enum):
     CODE = "code"
     CONNECTED = "connected"
+    CONNECTOR = "connector"
     HTTP = "http"
     PROMPT = "prompt"
     VOICE = "voice"

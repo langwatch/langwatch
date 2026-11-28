@@ -1688,7 +1688,7 @@ export interface operations {
                              * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                              * @enum {string}
                              */
-                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                             config: {
                                 [key: string]: unknown;
                             } | null;
@@ -2199,6 +2199,81 @@ export interface operations {
                          */
                         callDirection?: "inbound" | "outbound";
                     };
+                } | {
+                    name: string;
+                    /** @description What changed, kept on the version this write creates. */
+                    commitMessage?: string;
+                    workflowId?: string;
+                    copiedFromAgentId?: string;
+                    /** @constant */
+                    type: "connector";
+                    config: {
+                        _library_ref?: string;
+                        name?: string;
+                        description?: string;
+                        cls?: string;
+                        parameters?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "file" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        inputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "file" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        outputs?: {
+                            identifier: string;
+                            /** @enum {string} */
+                            type: "str" | "image" | "file" | "float" | "int" | "bool" | "list" | "list[str]" | "list[float]" | "list[int]" | "list[bool]" | "dict" | "json_schema" | "chat_messages" | "signature" | "llm" | "prompting_technique" | "dataset" | "code";
+                            optional?: boolean;
+                            value?: unknown;
+                            desc?: string;
+                            prefix?: string;
+                            hidden?: boolean;
+                            json_schema?: {
+                                [key: string]: unknown;
+                            };
+                        }[];
+                        isCustom?: boolean;
+                        /** @constant */
+                        behave_as?: "evaluator";
+                        call: {
+                            /** @enum {string} */
+                            language: "python";
+                            code: string;
+                        };
+                        setup?: {
+                            /** @enum {string} */
+                            language: "python";
+                            code: string;
+                        };
+                        teardown?: {
+                            /** @enum {string} */
+                            language: "python";
+                            code: string;
+                        };
+                        /** @default [] */
+                        secretNames?: string[];
+                        fixturesDatasetId?: string;
+                        timeoutMs?: number;
+                    };
                 };
             };
         };
@@ -2216,7 +2291,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -2328,7 +2403,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -2425,7 +2500,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -2449,7 +2524,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -2553,7 +2628,7 @@ export interface operations {
                         id: string;
                         name: string;
                         /** @enum {string} */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         archivedAt: string | null;
                     };
                 };
@@ -2575,7 +2650,7 @@ export interface operations {
                 "application/json": {
                     name?: string;
                     /** @enum {string} */
-                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                    type?: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                     config?: {
                         [key: string]: unknown;
                     };
@@ -2599,7 +2674,7 @@ export interface operations {
                          * @description The kind of agent. A connected agent is registered from code by the SDK and cannot be created or reconfigured through this API.
                          * @enum {string}
                          */
-                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                        type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                         config: {
                             [key: string]: unknown;
                         } | null;
@@ -2707,7 +2782,7 @@ export interface operations {
                             version: number;
                             name: string;
                             /** @enum {string} */
-                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice";
+                            type: "signature" | "code" | "workflow" | "http" | "connected" | "voice" | "connector";
                             config: {
                                 [key: string]: unknown;
                             };
@@ -14089,7 +14164,7 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -14192,7 +14267,7 @@ export interface operations {
                         /** @description The prompts, agents or workflows every scenario runs against. Every target runs every scenario, so naming more than one compares them in the same run. */
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -14290,7 +14365,7 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {
@@ -14374,7 +14449,7 @@ export interface operations {
                         /** @description What the plan runs against, in the order the results show. A target carrying runParameters runs with those values. */
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -14555,7 +14630,7 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {
@@ -15185,7 +15260,7 @@ export interface operations {
                     /** @description The prompts, agents or workflows the suite runs against. A test suite stores none of its own, so a run states them. Every target runs every scenario, so naming more than one compares them in the same run. */
                     targets: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -15259,7 +15334,7 @@ export interface operations {
                             /** @description What it was run against. */
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {
@@ -15356,7 +15431,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15424,7 +15499,7 @@ export interface operations {
                     };
                     targets?: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -15485,7 +15560,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15560,7 +15635,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15672,7 +15747,7 @@ export interface operations {
                     scenarioIds?: string[];
                     targets?: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -15731,7 +15806,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15818,7 +15893,7 @@ export interface operations {
                         }) | null;
                         targets: {
                             /** @enum {string} */
-                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                            type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                             referenceId: string;
                             scenarioMappings?: {
                                 [key: string]: {
@@ -15878,7 +15953,7 @@ export interface operations {
                     /** @description The prompts, agents or workflows the run goes against. Read only when the id names a test suite, which stores no target of its own; a run plan already holds its own and refuses these. */
                     targets?: {
                         /** @enum {string} */
-                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                        type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                         referenceId: string;
                         scenarioMappings?: {
                             [key: string]: {
@@ -15937,7 +16012,7 @@ export interface operations {
                             scenarioId: string;
                             target: {
                                 /** @enum {string} */
-                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
+                                type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice" | "connector";
                                 referenceId: string;
                                 scenarioMappings?: {
                                     [key: string]: {

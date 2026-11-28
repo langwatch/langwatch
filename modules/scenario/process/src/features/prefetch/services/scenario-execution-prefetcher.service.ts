@@ -29,6 +29,7 @@ import type { ScenarioService } from "../../../services/scenario.service.ts";
 import type { JudgePreviewAvailabilityService } from "../../judge-preview/services/judge-preview-availability.service.ts";
 import { JudgePreviewModelParametersService } from "../../judge-preview/services/judge-preview-model-parameters.service.ts";
 import { AgentTestPrefetchService } from "./agent-test-prefetch.service.ts";
+import type { ConnectorTargetReader } from "./scenario-connector-target.service.ts";
 import {
   ScenarioPrefetchCompletionService,
   type ScenarioPrefetchLookups,
@@ -64,6 +65,7 @@ type ScenarioExecutionPrefetcherServiceOptions = {
   /** Mints the run's keys: the child's, and a code agent's sandbox key. */
   apiKeys: Pick<ApiKeyApi, "mintRunKey" | "mintAgentSandboxKey">;
   voiceTargets: VoiceTargetReader | null;
+  connectorTargets: ConnectorTargetReader | null;
   /** Whether LangWatch Judge (preview) may judge a project's run. */
   judgePreviewAvailability: JudgePreviewAvailabilityService;
 };
@@ -92,6 +94,7 @@ export class ScenarioExecutionPrefetcherService {
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,
       voiceTargets: options.voiceTargets,
+      connectorTargets: options.connectorTargets,
     });
     const runKeys = ScenarioRunKeyService.create({ apiKeys: options.apiKeys });
     const completion = ScenarioPrefetchCompletionService.create({

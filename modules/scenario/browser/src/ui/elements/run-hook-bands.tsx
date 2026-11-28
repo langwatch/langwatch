@@ -83,6 +83,7 @@ function KeyValues({ values, testId }: { values: Record<string, unknown>; testId
 function HookError({ error }: { error: string }) {
   return (
     <Box
+      data-testid="hook-error"
       borderWidth="1px"
       borderColor="red.solid/30"
       background="red.solid/5"
@@ -265,6 +266,15 @@ const TEARDOWN_FRAME: Record<ScenarioHookResult["status"], BandFrame> = {
   skipped: { icon: DatabaseZap, tone: "muted", word: "skipped", timed: false },
 };
 
+/**
+ * Whether a teardown left the run's test data in place: it failed, or it did not run, even after
+ * a setup that failed part way. Only a connector refused before any block ran made no data.
+ */
+function mayLeaveDataBehind({ result }: { result: ScenarioHookResult }): boolean {
+  if (result.status === "failed" || result.status === "timed_out") return true;
+  return result.status === "not_run" && result.refused !== true;
+}
+
 /** The teardown band: what it returned, or the error, the state it was given and the warning. */
 export function TeardownBand({
   result,
@@ -276,6 +286,7 @@ export function TeardownBand({
   const frame = TEARDOWN_FRAME[result.status];
   const failed = result.status === "failed" || result.status === "timed_out";
   const ran = result.status === "ok" || failed;
+  const notRun = result.status === "not_run";
   return (
     <HookBand
       phase="Teardown"
@@ -307,8 +318,9 @@ export function TeardownBand({
         </Box>
       )}
       {failed && result.stateTooLarge && <TooLarge what="The state given to teardown" />}
-      {result.error && result.status !== "ok" && <HookError error={result.error} />}
-      {(failed || result.status === "not_run") && <Note>{LEFT_BEHIND}</Note>}
+      {result.error && result.status !== "ok" && !notRun && <HookError error={result.error} />}
+      {result.error && notRun && <Note>{result.error}</Note>}
+      {mayLeaveDataBehind({ result }) && <Note>{LEFT_BEHIND}</Note>}
       {result.status === "skipped" && <Note>Rerun and keep data: test data left in place.</Note>}
     </HookBand>
   );

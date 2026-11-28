@@ -58,6 +58,13 @@ export const agentWeb = defineBrowserModule("agent")
           .AgentVoiceEditorDrawer,
       }),
     },
+    agentConnectorEditor: {
+      load: async () => ({
+        default: (
+          await import("./features/connector-editor/ui/sections/agent-connector-editor-drawer.tsx")
+        ).AgentConnectorEditorDrawer,
+      }),
+    },
     agentConnectedDetail: {
       load: async () => ({
         default: (await import("./ui/sections/routed-agent-drawers.tsx"))

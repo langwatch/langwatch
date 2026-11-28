@@ -18,6 +18,7 @@ const AGENT_ICONS = {
   workflow: Workflow,
   connected: Plug,
   voice: Mic,
+  connector: Plug,
 } as const;
 
 /**
@@ -32,7 +33,7 @@ const AGENT_GRID_COLUMNS = "repeat(3, 1fr)";
 export type RunDialogAgent = {
   id: string;
   name: string;
-  type: "http" | "code" | "workflow" | "connected" | "voice";
+  type: "http" | "code" | "workflow" | "connected" | "voice" | "connector";
   config?: unknown;
   /** The name with the environment of a connected agent, when it has one. */
   label?: string;

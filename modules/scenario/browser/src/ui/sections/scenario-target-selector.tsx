@@ -22,10 +22,7 @@ import {
 } from "../../behavior/scenarios/use-filtered-scenario-targets.ts";
 import type { ScenarioTarget } from "../../model/scenario-target.ts";
 
-export type ScenarioTargetSelection = {
-  type: "prompt" | "http" | "code" | "workflow" | "connected" | "voice";
-  id: string;
-};
+export type ScenarioTargetSelection = NonNullable<ScenarioTarget>;
 
 export type ScenarioTargetPrompt = {
   id: string;
@@ -92,6 +89,7 @@ function ScenarioTargetSelectionMark({ target }: { target: ScenarioTarget }) {
       {target?.type === "code" && <Code size={14} />}
       {target?.type === "workflow" && <Workflow size={14} />}
       {target?.type === "connected" && <Plug size={14} />}
+      {target?.type === "connector" && <Plug size={14} />}
     </>
   );
 }
@@ -314,6 +312,9 @@ function ScenarioTargetAgentMark({ agent }: { agent: ScenarioTargetAgentOption }
   }
   if (agent.type === "code") {
     return <Code size={14} color="var(--chakra-colors-fg-muted)" />;
+  }
+  if (agent.type === "connector") {
+    return <Plug size={14} color="var(--chakra-colors-fg-muted)" />;
   }
   return <Globe size={14} color="var(--chakra-colors-fg-muted)" />;
 }

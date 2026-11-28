@@ -116,6 +116,8 @@ export class AgentTestService {
       legacyDefaultModel: options.config.legacyDefaultModel,
       langwatchEndpoint: options.config.langwatchEndpoint,
       voiceTargets: null,
+      // An agent test never targets a connector agent (mapAgentTestTarget).
+      connectorTargets: null,
     });
 
     return new AgentTestService({

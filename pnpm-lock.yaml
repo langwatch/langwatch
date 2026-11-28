@@ -4919,6 +4919,9 @@ importers:
       '@langwatch/browser-host':
         specifier: workspace:*
         version: link:../../../packages/browser-host
+      '@langwatch/dataset-client':
+        specifier: workspace:*
+        version: link:../../dataset/client
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
@@ -4937,6 +4940,9 @@ importers:
       '@langwatch/scenario-contract':
         specifier: workspace:*
         version: link:../../scenario/contract
+      '@langwatch/secret-contract':
+        specifier: workspace:*
+        version: link:../../secret/contract
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time
@@ -4977,6 +4983,9 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
+      '@langwatch/test-harness':
+        specifier: workspace:*
+        version: link:../../../packages/test-harness
       '@langwatch/vitest-config':
         specifier: workspace:*
         version: link:../../../packages/vitest-config
@@ -14722,6 +14731,9 @@ importers:
       '@langwatch/data-retention-contract':
         specifier: workspace:*
         version: link:../../data-retention/contract
+      '@langwatch/dataset-contract':
+        specifier: workspace:*
+        version: link:../../dataset/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract

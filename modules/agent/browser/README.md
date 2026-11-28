@@ -18,26 +18,27 @@ A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`;
 
 ## Drawers (the name is the wire: `?drawer.open=<name>`)
 
-| Drawer                      | Opens                                                                 | Opened from                    |
-| --------------------------- | --------------------------------------------------------------------- | ------------------------------ |
-| `agentList`                 | `src/ui/sections/routed-agent-drawers.tsx`                            | experiment                     |
-| `agentHistory`              | `src/ui/sections/agent-history-drawer.tsx`                            | –                              |
-| `agentTypeSelector`         | `src/ui/sections/agent-type-selector-drawer.tsx`                      | navigation, scenario, workflow |
-| `agentCodeEditor`           | `src/ui/sections/routed-agent-drawers.tsx`                            | –                              |
-| `agentHttpEditor`           | `src/ui/sections/routed-agent-drawers.tsx`                            | scenario                       |
-| `agentVoiceEditor`          | `src/features/voice-editor/ui/sections/agent-voice-editor-drawer.tsx` | –                              |
-| `agentConnectedDetail`      | `src/ui/sections/routed-agent-drawers.tsx`                            | –                              |
-| `agentConnectFromCode`      | `src/ui/sections/routed-agent-drawers.tsx`                            | –                              |
-| `agentWorkflowEditor`       | `src/ui/sections/routed-agent-drawers.tsx`                            | scenario                       |
-| `agentWorkflowTargetEditor` | `src/ui/sections/routed-agent-drawers.tsx`                            | –                              |
-| `workflowSelector`          | `src/ui/sections/routed-agent-drawers.tsx`                            | –                              |
+| Drawer                      | Opens                                                                         | Opened from                    |
+| --------------------------- | ----------------------------------------------------------------------------- | ------------------------------ |
+| `agentList`                 | `src/ui/sections/routed-agent-drawers.tsx`                                    | experiment                     |
+| `agentHistory`              | `src/ui/sections/agent-history-drawer.tsx`                                    | –                              |
+| `agentTypeSelector`         | `src/ui/sections/agent-type-selector-drawer.tsx`                              | navigation, scenario, workflow |
+| `agentCodeEditor`           | `src/ui/sections/routed-agent-drawers.tsx`                                    | –                              |
+| `agentHttpEditor`           | `src/ui/sections/routed-agent-drawers.tsx`                                    | scenario                       |
+| `agentVoiceEditor`          | `src/features/voice-editor/ui/sections/agent-voice-editor-drawer.tsx`         | –                              |
+| `agentConnectorEditor`      | `src/features/connector-editor/ui/sections/agent-connector-editor-drawer.tsx` | –                              |
+| `agentConnectedDetail`      | `src/ui/sections/routed-agent-drawers.tsx`                                    | –                              |
+| `agentConnectFromCode`      | `src/ui/sections/routed-agent-drawers.tsx`                                    | –                              |
+| `agentWorkflowEditor`       | `src/ui/sections/routed-agent-drawers.tsx`                                    | scenario                       |
+| `agentWorkflowTargetEditor` | `src/ui/sections/routed-agent-drawers.tsx`                                    | –                              |
+| `workflowSelector`          | `src/ui/sections/routed-agent-drawers.tsx`                                    | –                              |
 
 Opened from lists the other modules (and `ui`, the app) whose browser source names the drawer in a
 `…Drawer("<name>")` call, a `?drawer.open=<name>` link or by its token; a name held in a constant is not followed.
 
 ## Calls
 
-- Client packages (package.json): `@langwatch/agent-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
+- Client packages (package.json): `@langwatch/agent-client`, `@langwatch/dataset-client`, `@langwatch/prompt-client`, `@langwatch/scenario-client`, `@langwatch/trace-client`.
 - Lends: `HttpConfigEditorToken`.
 - Host APIs it requires: `AgentManagementHostApi`.
 

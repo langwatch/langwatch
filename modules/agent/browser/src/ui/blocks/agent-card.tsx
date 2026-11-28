@@ -17,6 +17,7 @@ import {
   MoreVertical,
   Pencil,
   Play,
+  Plug,
   RefreshCw,
   Trash2,
   Workflow,
@@ -34,6 +35,7 @@ export const agentTypeIcons: Record<AgentType, LucideIcon> = {
   workflow: Workflow,
   connected: Bot,
   voice: Mic,
+  connector: Plug,
 };
 
 export const agentTypeLabels: Record<AgentType, string> = {
@@ -43,6 +45,7 @@ export const agentTypeLabels: Record<AgentType, string> = {
   workflow: "Workflow",
   connected: "Connected",
   voice: "Voice agent",
+  connector: "Scenario Connector",
 };
 
 /** The class that keeps a click inside the card menu out of the card click. */

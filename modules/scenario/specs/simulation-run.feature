@@ -87,6 +87,12 @@ Feature: A simulation run reports its true state and never leaks secrets
     When the run is read
     Then the run reads as that target
 
+  @unit
+  Scenario: A connector run's target type survives a read
+    Given a stored run whose platform namespace names the connector target type
+    When the run is read
+    Then the run reads as a connector target, not with no target type
+
   # The browser reads a run with no target type by its target alone.
   @unit
   Scenario: Running again a run with no target type offers the scenario's last chosen target

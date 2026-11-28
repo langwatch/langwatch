@@ -72,10 +72,19 @@ const STORED: Record<AgentType, Record<string, unknown>> = {
     phoneNumber: "+14155550123",
     isAgentSpeaksFirst: true,
   },
+  connector: {
+    name: "Shop connector",
+    call: { language: "python", code: "def execute(input):\n    return {'reply': 'hi'}\n" },
+    setup: { language: "python", code: "def execute(input):\n    return {'state': {}}\n" },
+    teardown: { language: "python", code: "def execute(input):\n    return {}\n" },
+    secretNames: ["SHOP_ADMIN_KEY"],
+    fixturesDatasetId: "dataset_1",
+    timeoutMs: 30_000,
+  },
 };
 
 describe("given the config key sets the previous release stored", () => {
-  for (const type of ["code", "http", "workflow", "connected", "signature"] as const) {
+  for (const type of ["code", "http", "workflow", "connected", "signature", "connector"] as const) {
     describe(`when a ${type} agent's config is read`, () => {
       it("keeps every stored key and value", () => {
         expect(parseAgentConfig(type, STORED[type])).toEqual(STORED[type]);

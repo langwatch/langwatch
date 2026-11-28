@@ -176,7 +176,7 @@ class TestAgentPageComposition implements AgentPageComposition {
 }
 
 class TestNavigation implements AgentManagementNavigation {
-  openEditor(): void {}
+  openEditor(_agent: WireAgentWithFields): void {}
 
   openTypeSelector(): void {}
 
@@ -208,6 +208,8 @@ class TestCard implements AgentManagementCard {
   render(props: AgentCardRenderInput): ReactNode {
     return (
       <div>
+        {props.onClick && <button type="button">Open agent</button>}
+        {props.onEdit && <button type="button">Edit agent</button>}
         <button type="button" onClick={props.onReplicate}>
           Replicate to another project
         </button>
@@ -248,13 +250,17 @@ const wireAgent: WireAgentWithFields = {
   fieldsResolved: true,
 };
 
-function renderPage(browser: TestAgentBrowser, lifecycle = new TestLifecycle()) {
+function renderPage(
+  browser: TestAgentBrowser,
+  lifecycle = new TestLifecycle(),
+  items: WireAgentWithFields[] = [wireAgent],
+) {
   renderWithDesignSystem(
     <AgentManagementPage
       data={{
         projectId: "project_1",
         agents: browser,
-        items: [wireAgent],
+        items,
         isLoading: false,
       }}
       navigation={new TestNavigation()}
@@ -320,6 +326,63 @@ describe("AgentManagementPage", () => {
       fireEvent.click(await screen.findByText("Confirm archive"));
 
       await waitFor(() => expect(lifecycle.agentArchivedCalls).toBe(1));
+    });
+  });
+
+  describe("given the project has a connector agent", () => {
+    /** @scenario "A connector agent's card opens its editor" */
+    it("opens the editor for the connector from its card's open and edit actions", async () => {
+      const opened: string[] = [];
+      class RecordingNavigation extends TestNavigation {
+        override openEditor(agent: WireAgentWithFields): void {
+          opened.push(agent.id);
+        }
+      }
+      class ActingCard extends TestCard {
+        override render(props: AgentCardRenderInput): ReactNode {
+          return (
+            <div>
+              <button type="button" onClick={props.onClick}>
+                Open {props.agent.name}
+              </button>
+              <button type="button" onClick={props.onEdit}>
+                Edit {props.agent.name}
+              </button>
+            </div>
+          );
+        }
+      }
+      renderWithDesignSystem(
+        <AgentManagementPage
+          data={{
+            projectId: "project_1",
+            agents: new TestAgentBrowser(),
+            items: [
+              {
+                ...wireAgent,
+                id: "agent_connector",
+                name: "Shop connector",
+                type: "connector",
+                config: {
+                  call: { language: "python", code: "class Code: ..." },
+                  secretNames: [],
+                },
+              },
+            ],
+            isLoading: false,
+          }}
+          navigation={new RecordingNavigation()}
+          feedback={new TestFeedback()}
+          lifecycle={new TestLifecycle()}
+          composition={new TestAgentPageComposition()}
+          card={new ActingCard()}
+        />,
+      );
+
+      fireEvent.click(await screen.findByText("Open Shop connector"));
+      fireEvent.click(screen.getByText("Edit Shop connector"));
+
+      expect(opened).toEqual(["agent_connector", "agent_connector"]);
     });
   });
 

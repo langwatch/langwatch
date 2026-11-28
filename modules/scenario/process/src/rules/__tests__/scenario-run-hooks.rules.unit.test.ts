@@ -89,3 +89,26 @@ describe("adapterDeclaresHooks()", () => {
     });
   });
 });
+
+describe("adapterDeclaresHooks() for a connector agent", () => {
+  const connector = {
+    type: "connector" as const,
+    agentId: "agent_1",
+    call: { language: "python" as const, code: "def execute(input): ..." },
+    secrets: {},
+    timeoutMs: 60_000,
+  };
+
+  it("counts a setup or a teardown block as hooked", () => {
+    expect(adapterDeclaresHooks({ ...connector, setup: connector.call })).toBe(true);
+    expect(adapterDeclaresHooks({ ...connector, teardown: connector.call })).toBe(true);
+  });
+
+  it("counts a refused connector as hooked, so its refusal is recorded as setup", () => {
+    expect(adapterDeclaresHooks({ ...connector, refusal: "not released" })).toBe(true);
+  });
+
+  it("does not count a connector with only a call block", () => {
+    expect(adapterDeclaresHooks(connector)).toBe(false);
+  });
+});

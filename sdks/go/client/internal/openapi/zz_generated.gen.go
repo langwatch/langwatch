@@ -8752,6 +8752,7 @@ func (e ListAgents200JSONResponseBodyDataStatus) Valid() bool {
 const (
 	ListAgents200JSONResponseBodyDataTypeCode      ListAgents200JSONResponseBodyDataType = "code"
 	ListAgents200JSONResponseBodyDataTypeConnected ListAgents200JSONResponseBodyDataType = "connected"
+	ListAgents200JSONResponseBodyDataTypeConnector ListAgents200JSONResponseBodyDataType = "connector"
 	ListAgents200JSONResponseBodyDataTypeHttp      ListAgents200JSONResponseBodyDataType = "http"
 	ListAgents200JSONResponseBodyDataTypeSignature ListAgents200JSONResponseBodyDataType = "signature"
 	ListAgents200JSONResponseBodyDataTypeVoice     ListAgents200JSONResponseBodyDataType = "voice"
@@ -8764,6 +8765,8 @@ func (e ListAgents200JSONResponseBodyDataType) Valid() bool {
 	case ListAgents200JSONResponseBodyDataTypeCode:
 		return true
 	case ListAgents200JSONResponseBodyDataTypeConnected:
+		return true
+	case ListAgents200JSONResponseBodyDataTypeConnector:
 		return true
 	case ListAgents200JSONResponseBodyDataTypeHttp:
 		return true
@@ -10170,6 +10173,288 @@ func (e CreateAgentJSONBody5Type) Valid() bool {
 	}
 }
 
+// Defines values for CreateAgentJSONBody6ConfigBehaveAs.
+const (
+	CreateAgentJSONBody6ConfigBehaveAsEvaluator CreateAgentJSONBody6ConfigBehaveAs = "evaluator"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6ConfigBehaveAs enum.
+func (e CreateAgentJSONBody6ConfigBehaveAs) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody6ConfigBehaveAsEvaluator:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody6ConfigCallLanguage.
+const (
+	CreateAgentJSONBody6ConfigCallLanguagePython CreateAgentJSONBody6ConfigCallLanguage = "python"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6ConfigCallLanguage enum.
+func (e CreateAgentJSONBody6ConfigCallLanguage) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody6ConfigCallLanguagePython:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody6ConfigInputsType.
+const (
+	CreateAgentJSONBody6ConfigInputsTypeBool               CreateAgentJSONBody6ConfigInputsType = "bool"
+	CreateAgentJSONBody6ConfigInputsTypeChatMessages       CreateAgentJSONBody6ConfigInputsType = "chat_messages"
+	CreateAgentJSONBody6ConfigInputsTypeCode               CreateAgentJSONBody6ConfigInputsType = "code"
+	CreateAgentJSONBody6ConfigInputsTypeDataset            CreateAgentJSONBody6ConfigInputsType = "dataset"
+	CreateAgentJSONBody6ConfigInputsTypeDict               CreateAgentJSONBody6ConfigInputsType = "dict"
+	CreateAgentJSONBody6ConfigInputsTypeFile               CreateAgentJSONBody6ConfigInputsType = "file"
+	CreateAgentJSONBody6ConfigInputsTypeFloat              CreateAgentJSONBody6ConfigInputsType = "float"
+	CreateAgentJSONBody6ConfigInputsTypeImage              CreateAgentJSONBody6ConfigInputsType = "image"
+	CreateAgentJSONBody6ConfigInputsTypeInt                CreateAgentJSONBody6ConfigInputsType = "int"
+	CreateAgentJSONBody6ConfigInputsTypeJsonSchema         CreateAgentJSONBody6ConfigInputsType = "json_schema"
+	CreateAgentJSONBody6ConfigInputsTypeList               CreateAgentJSONBody6ConfigInputsType = "list"
+	CreateAgentJSONBody6ConfigInputsTypeListBool           CreateAgentJSONBody6ConfigInputsType = "list[bool]"
+	CreateAgentJSONBody6ConfigInputsTypeListFloat          CreateAgentJSONBody6ConfigInputsType = "list[float]"
+	CreateAgentJSONBody6ConfigInputsTypeListInt            CreateAgentJSONBody6ConfigInputsType = "list[int]"
+	CreateAgentJSONBody6ConfigInputsTypeListStr            CreateAgentJSONBody6ConfigInputsType = "list[str]"
+	CreateAgentJSONBody6ConfigInputsTypeLlm                CreateAgentJSONBody6ConfigInputsType = "llm"
+	CreateAgentJSONBody6ConfigInputsTypePromptingTechnique CreateAgentJSONBody6ConfigInputsType = "prompting_technique"
+	CreateAgentJSONBody6ConfigInputsTypeSignature          CreateAgentJSONBody6ConfigInputsType = "signature"
+	CreateAgentJSONBody6ConfigInputsTypeStr                CreateAgentJSONBody6ConfigInputsType = "str"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6ConfigInputsType enum.
+func (e CreateAgentJSONBody6ConfigInputsType) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody6ConfigInputsTypeBool:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeChatMessages:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeCode:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeDataset:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeDict:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeFile:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeFloat:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeImage:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeInt:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeJsonSchema:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeList:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeListBool:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeListFloat:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeListInt:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeListStr:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeLlm:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypePromptingTechnique:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeSignature:
+		return true
+	case CreateAgentJSONBody6ConfigInputsTypeStr:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody6ConfigOutputsType.
+const (
+	CreateAgentJSONBody6ConfigOutputsTypeBool               CreateAgentJSONBody6ConfigOutputsType = "bool"
+	CreateAgentJSONBody6ConfigOutputsTypeChatMessages       CreateAgentJSONBody6ConfigOutputsType = "chat_messages"
+	CreateAgentJSONBody6ConfigOutputsTypeCode               CreateAgentJSONBody6ConfigOutputsType = "code"
+	CreateAgentJSONBody6ConfigOutputsTypeDataset            CreateAgentJSONBody6ConfigOutputsType = "dataset"
+	CreateAgentJSONBody6ConfigOutputsTypeDict               CreateAgentJSONBody6ConfigOutputsType = "dict"
+	CreateAgentJSONBody6ConfigOutputsTypeFile               CreateAgentJSONBody6ConfigOutputsType = "file"
+	CreateAgentJSONBody6ConfigOutputsTypeFloat              CreateAgentJSONBody6ConfigOutputsType = "float"
+	CreateAgentJSONBody6ConfigOutputsTypeImage              CreateAgentJSONBody6ConfigOutputsType = "image"
+	CreateAgentJSONBody6ConfigOutputsTypeInt                CreateAgentJSONBody6ConfigOutputsType = "int"
+	CreateAgentJSONBody6ConfigOutputsTypeJsonSchema         CreateAgentJSONBody6ConfigOutputsType = "json_schema"
+	CreateAgentJSONBody6ConfigOutputsTypeList               CreateAgentJSONBody6ConfigOutputsType = "list"
+	CreateAgentJSONBody6ConfigOutputsTypeListBool           CreateAgentJSONBody6ConfigOutputsType = "list[bool]"
+	CreateAgentJSONBody6ConfigOutputsTypeListFloat          CreateAgentJSONBody6ConfigOutputsType = "list[float]"
+	CreateAgentJSONBody6ConfigOutputsTypeListInt            CreateAgentJSONBody6ConfigOutputsType = "list[int]"
+	CreateAgentJSONBody6ConfigOutputsTypeListStr            CreateAgentJSONBody6ConfigOutputsType = "list[str]"
+	CreateAgentJSONBody6ConfigOutputsTypeLlm                CreateAgentJSONBody6ConfigOutputsType = "llm"
+	CreateAgentJSONBody6ConfigOutputsTypePromptingTechnique CreateAgentJSONBody6ConfigOutputsType = "prompting_technique"
+	CreateAgentJSONBody6ConfigOutputsTypeSignature          CreateAgentJSONBody6ConfigOutputsType = "signature"
+	CreateAgentJSONBody6ConfigOutputsTypeStr                CreateAgentJSONBody6ConfigOutputsType = "str"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6ConfigOutputsType enum.
+func (e CreateAgentJSONBody6ConfigOutputsType) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody6ConfigOutputsTypeBool:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeChatMessages:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeCode:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeDataset:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeDict:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeFile:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeFloat:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeImage:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeInt:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeJsonSchema:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeList:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeListBool:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeListFloat:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeListInt:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeListStr:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeLlm:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypePromptingTechnique:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeSignature:
+		return true
+	case CreateAgentJSONBody6ConfigOutputsTypeStr:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody6ConfigParametersType.
+const (
+	CreateAgentJSONBody6ConfigParametersTypeBool               CreateAgentJSONBody6ConfigParametersType = "bool"
+	CreateAgentJSONBody6ConfigParametersTypeChatMessages       CreateAgentJSONBody6ConfigParametersType = "chat_messages"
+	CreateAgentJSONBody6ConfigParametersTypeCode               CreateAgentJSONBody6ConfigParametersType = "code"
+	CreateAgentJSONBody6ConfigParametersTypeDataset            CreateAgentJSONBody6ConfigParametersType = "dataset"
+	CreateAgentJSONBody6ConfigParametersTypeDict               CreateAgentJSONBody6ConfigParametersType = "dict"
+	CreateAgentJSONBody6ConfigParametersTypeFile               CreateAgentJSONBody6ConfigParametersType = "file"
+	CreateAgentJSONBody6ConfigParametersTypeFloat              CreateAgentJSONBody6ConfigParametersType = "float"
+	CreateAgentJSONBody6ConfigParametersTypeImage              CreateAgentJSONBody6ConfigParametersType = "image"
+	CreateAgentJSONBody6ConfigParametersTypeInt                CreateAgentJSONBody6ConfigParametersType = "int"
+	CreateAgentJSONBody6ConfigParametersTypeJsonSchema         CreateAgentJSONBody6ConfigParametersType = "json_schema"
+	CreateAgentJSONBody6ConfigParametersTypeList               CreateAgentJSONBody6ConfigParametersType = "list"
+	CreateAgentJSONBody6ConfigParametersTypeListBool           CreateAgentJSONBody6ConfigParametersType = "list[bool]"
+	CreateAgentJSONBody6ConfigParametersTypeListFloat          CreateAgentJSONBody6ConfigParametersType = "list[float]"
+	CreateAgentJSONBody6ConfigParametersTypeListInt            CreateAgentJSONBody6ConfigParametersType = "list[int]"
+	CreateAgentJSONBody6ConfigParametersTypeListStr            CreateAgentJSONBody6ConfigParametersType = "list[str]"
+	CreateAgentJSONBody6ConfigParametersTypeLlm                CreateAgentJSONBody6ConfigParametersType = "llm"
+	CreateAgentJSONBody6ConfigParametersTypePromptingTechnique CreateAgentJSONBody6ConfigParametersType = "prompting_technique"
+	CreateAgentJSONBody6ConfigParametersTypeSignature          CreateAgentJSONBody6ConfigParametersType = "signature"
+	CreateAgentJSONBody6ConfigParametersTypeStr                CreateAgentJSONBody6ConfigParametersType = "str"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6ConfigParametersType enum.
+func (e CreateAgentJSONBody6ConfigParametersType) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody6ConfigParametersTypeBool:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeChatMessages:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeCode:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeDataset:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeDict:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeFile:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeFloat:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeImage:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeInt:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeJsonSchema:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeList:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeListBool:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeListFloat:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeListInt:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeListStr:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeLlm:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypePromptingTechnique:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeSignature:
+		return true
+	case CreateAgentJSONBody6ConfigParametersTypeStr:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody6ConfigSetupLanguage.
+const (
+	CreateAgentJSONBody6ConfigSetupLanguagePython CreateAgentJSONBody6ConfigSetupLanguage = "python"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6ConfigSetupLanguage enum.
+func (e CreateAgentJSONBody6ConfigSetupLanguage) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody6ConfigSetupLanguagePython:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody6ConfigTeardownLanguage.
+const (
+	Python CreateAgentJSONBody6ConfigTeardownLanguage = "python"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6ConfigTeardownLanguage enum.
+func (e CreateAgentJSONBody6ConfigTeardownLanguage) Valid() bool {
+	switch e {
+	case Python:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for CreateAgentJSONBody6Type.
+const (
+	CreateAgentJSONBody6TypeConnector CreateAgentJSONBody6Type = "connector"
+)
+
+// Valid indicates whether the value is a known member of the CreateAgentJSONBody6Type enum.
+func (e CreateAgentJSONBody6Type) Valid() bool {
+	switch e {
+	case CreateAgentJSONBody6TypeConnector:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for CreateAgent201JSONResponseBodyNotSelectableReason0.
 const (
 	CreateAgent201JSONResponseBodyNotSelectableReason0OwnedByAnotherPerson CreateAgent201JSONResponseBodyNotSelectableReason0 = "owned_by_another_person"
@@ -10228,6 +10513,7 @@ func (e CreateAgent201JSONResponseBodyStatus) Valid() bool {
 const (
 	CreateAgent201JSONResponseBodyTypeCode      CreateAgent201JSONResponseBodyType = "code"
 	CreateAgent201JSONResponseBodyTypeConnected CreateAgent201JSONResponseBodyType = "connected"
+	CreateAgent201JSONResponseBodyTypeConnector CreateAgent201JSONResponseBodyType = "connector"
 	CreateAgent201JSONResponseBodyTypeHttp      CreateAgent201JSONResponseBodyType = "http"
 	CreateAgent201JSONResponseBodyTypeSignature CreateAgent201JSONResponseBodyType = "signature"
 	CreateAgent201JSONResponseBodyTypeVoice     CreateAgent201JSONResponseBodyType = "voice"
@@ -10240,6 +10526,8 @@ func (e CreateAgent201JSONResponseBodyType) Valid() bool {
 	case CreateAgent201JSONResponseBodyTypeCode:
 		return true
 	case CreateAgent201JSONResponseBodyTypeConnected:
+		return true
+	case CreateAgent201JSONResponseBodyTypeConnector:
 		return true
 	case CreateAgent201JSONResponseBodyTypeHttp:
 		return true
@@ -10636,6 +10924,7 @@ func (e ListAgentVersions200JSONResponseBodyDataAuthorKind) Valid() bool {
 const (
 	ListAgentVersions200JSONResponseBodyDataTypeCode      ListAgentVersions200JSONResponseBodyDataType = "code"
 	ListAgentVersions200JSONResponseBodyDataTypeConnected ListAgentVersions200JSONResponseBodyDataType = "connected"
+	ListAgentVersions200JSONResponseBodyDataTypeConnector ListAgentVersions200JSONResponseBodyDataType = "connector"
 	ListAgentVersions200JSONResponseBodyDataTypeHttp      ListAgentVersions200JSONResponseBodyDataType = "http"
 	ListAgentVersions200JSONResponseBodyDataTypeSignature ListAgentVersions200JSONResponseBodyDataType = "signature"
 	ListAgentVersions200JSONResponseBodyDataTypeVoice     ListAgentVersions200JSONResponseBodyDataType = "voice"
@@ -10648,6 +10937,8 @@ func (e ListAgentVersions200JSONResponseBodyDataType) Valid() bool {
 	case ListAgentVersions200JSONResponseBodyDataTypeCode:
 		return true
 	case ListAgentVersions200JSONResponseBodyDataTypeConnected:
+		return true
+	case ListAgentVersions200JSONResponseBodyDataTypeConnector:
 		return true
 	case ListAgentVersions200JSONResponseBodyDataTypeHttp:
 		return true
@@ -10666,6 +10957,7 @@ func (e ListAgentVersions200JSONResponseBodyDataType) Valid() bool {
 const (
 	ArchiveAgent200JSONResponseBodyTypeCode      ArchiveAgent200JSONResponseBodyType = "code"
 	ArchiveAgent200JSONResponseBodyTypeConnected ArchiveAgent200JSONResponseBodyType = "connected"
+	ArchiveAgent200JSONResponseBodyTypeConnector ArchiveAgent200JSONResponseBodyType = "connector"
 	ArchiveAgent200JSONResponseBodyTypeHttp      ArchiveAgent200JSONResponseBodyType = "http"
 	ArchiveAgent200JSONResponseBodyTypeSignature ArchiveAgent200JSONResponseBodyType = "signature"
 	ArchiveAgent200JSONResponseBodyTypeVoice     ArchiveAgent200JSONResponseBodyType = "voice"
@@ -10678,6 +10970,8 @@ func (e ArchiveAgent200JSONResponseBodyType) Valid() bool {
 	case ArchiveAgent200JSONResponseBodyTypeCode:
 		return true
 	case ArchiveAgent200JSONResponseBodyTypeConnected:
+		return true
+	case ArchiveAgent200JSONResponseBodyTypeConnector:
 		return true
 	case ArchiveAgent200JSONResponseBodyTypeHttp:
 		return true
@@ -10750,6 +11044,7 @@ func (e GetAgent200JSONResponseBodyStatus) Valid() bool {
 const (
 	GetAgent200JSONResponseBodyTypeCode      GetAgent200JSONResponseBodyType = "code"
 	GetAgent200JSONResponseBodyTypeConnected GetAgent200JSONResponseBodyType = "connected"
+	GetAgent200JSONResponseBodyTypeConnector GetAgent200JSONResponseBodyType = "connector"
 	GetAgent200JSONResponseBodyTypeHttp      GetAgent200JSONResponseBodyType = "http"
 	GetAgent200JSONResponseBodyTypeSignature GetAgent200JSONResponseBodyType = "signature"
 	GetAgent200JSONResponseBodyTypeVoice     GetAgent200JSONResponseBodyType = "voice"
@@ -10762,6 +11057,8 @@ func (e GetAgent200JSONResponseBodyType) Valid() bool {
 	case GetAgent200JSONResponseBodyTypeCode:
 		return true
 	case GetAgent200JSONResponseBodyTypeConnected:
+		return true
+	case GetAgent200JSONResponseBodyTypeConnector:
 		return true
 	case GetAgent200JSONResponseBodyTypeHttp:
 		return true
@@ -10780,6 +11077,7 @@ func (e GetAgent200JSONResponseBodyType) Valid() bool {
 const (
 	UpdateAgentJSONBodyTypeCode      UpdateAgentJSONBodyType = "code"
 	UpdateAgentJSONBodyTypeConnected UpdateAgentJSONBodyType = "connected"
+	UpdateAgentJSONBodyTypeConnector UpdateAgentJSONBodyType = "connector"
 	UpdateAgentJSONBodyTypeHttp      UpdateAgentJSONBodyType = "http"
 	UpdateAgentJSONBodyTypeSignature UpdateAgentJSONBodyType = "signature"
 	UpdateAgentJSONBodyTypeVoice     UpdateAgentJSONBodyType = "voice"
@@ -10792,6 +11090,8 @@ func (e UpdateAgentJSONBodyType) Valid() bool {
 	case UpdateAgentJSONBodyTypeCode:
 		return true
 	case UpdateAgentJSONBodyTypeConnected:
+		return true
+	case UpdateAgentJSONBodyTypeConnector:
 		return true
 	case UpdateAgentJSONBodyTypeHttp:
 		return true
@@ -10864,6 +11164,7 @@ func (e UpdateAgent200JSONResponseBodyStatus) Valid() bool {
 const (
 	UpdateAgent200JSONResponseBodyTypeCode      UpdateAgent200JSONResponseBodyType = "code"
 	UpdateAgent200JSONResponseBodyTypeConnected UpdateAgent200JSONResponseBodyType = "connected"
+	UpdateAgent200JSONResponseBodyTypeConnector UpdateAgent200JSONResponseBodyType = "connector"
 	UpdateAgent200JSONResponseBodyTypeHttp      UpdateAgent200JSONResponseBodyType = "http"
 	UpdateAgent200JSONResponseBodyTypeSignature UpdateAgent200JSONResponseBodyType = "signature"
 	UpdateAgent200JSONResponseBodyTypeVoice     UpdateAgent200JSONResponseBodyType = "voice"
@@ -10876,6 +11177,8 @@ func (e UpdateAgent200JSONResponseBodyType) Valid() bool {
 	case UpdateAgent200JSONResponseBodyTypeCode:
 		return true
 	case UpdateAgent200JSONResponseBodyTypeConnected:
+		return true
+	case UpdateAgent200JSONResponseBodyTypeConnector:
 		return true
 	case UpdateAgent200JSONResponseBodyTypeHttp:
 		return true
@@ -10894,6 +11197,7 @@ func (e UpdateAgent200JSONResponseBodyType) Valid() bool {
 const (
 	ReplaceAgentJSONBodyTypeCode      ReplaceAgentJSONBodyType = "code"
 	ReplaceAgentJSONBodyTypeConnected ReplaceAgentJSONBodyType = "connected"
+	ReplaceAgentJSONBodyTypeConnector ReplaceAgentJSONBodyType = "connector"
 	ReplaceAgentJSONBodyTypeHttp      ReplaceAgentJSONBodyType = "http"
 	ReplaceAgentJSONBodyTypeSignature ReplaceAgentJSONBodyType = "signature"
 	ReplaceAgentJSONBodyTypeVoice     ReplaceAgentJSONBodyType = "voice"
@@ -10906,6 +11210,8 @@ func (e ReplaceAgentJSONBodyType) Valid() bool {
 	case ReplaceAgentJSONBodyTypeCode:
 		return true
 	case ReplaceAgentJSONBodyTypeConnected:
+		return true
+	case ReplaceAgentJSONBodyTypeConnector:
 		return true
 	case ReplaceAgentJSONBodyTypeHttp:
 		return true
@@ -10978,6 +11284,7 @@ func (e ReplaceAgent200JSONResponseBodyStatus) Valid() bool {
 const (
 	ReplaceAgent200JSONResponseBodyTypeCode      ReplaceAgent200JSONResponseBodyType = "code"
 	ReplaceAgent200JSONResponseBodyTypeConnected ReplaceAgent200JSONResponseBodyType = "connected"
+	ReplaceAgent200JSONResponseBodyTypeConnector ReplaceAgent200JSONResponseBodyType = "connector"
 	ReplaceAgent200JSONResponseBodyTypeHttp      ReplaceAgent200JSONResponseBodyType = "http"
 	ReplaceAgent200JSONResponseBodyTypeSignature ReplaceAgent200JSONResponseBodyType = "signature"
 	ReplaceAgent200JSONResponseBodyTypeVoice     ReplaceAgent200JSONResponseBodyType = "voice"
@@ -10990,6 +11297,8 @@ func (e ReplaceAgent200JSONResponseBodyType) Valid() bool {
 	case ReplaceAgent200JSONResponseBodyTypeCode:
 		return true
 	case ReplaceAgent200JSONResponseBodyTypeConnected:
+		return true
+	case ReplaceAgent200JSONResponseBodyTypeConnector:
 		return true
 	case ReplaceAgent200JSONResponseBodyTypeHttp:
 		return true
@@ -34213,6 +34522,7 @@ func (e ListRunPlans200JSONResponseBodyTargetsScenarioMappings1Type) Valid() boo
 const (
 	ListRunPlans200JSONResponseBodyTargetsTypeCode      ListRunPlans200JSONResponseBodyTargetsType = "code"
 	ListRunPlans200JSONResponseBodyTargetsTypeConnected ListRunPlans200JSONResponseBodyTargetsType = "connected"
+	ListRunPlans200JSONResponseBodyTargetsTypeConnector ListRunPlans200JSONResponseBodyTargetsType = "connector"
 	ListRunPlans200JSONResponseBodyTargetsTypeHttp      ListRunPlans200JSONResponseBodyTargetsType = "http"
 	ListRunPlans200JSONResponseBodyTargetsTypePrompt    ListRunPlans200JSONResponseBodyTargetsType = "prompt"
 	ListRunPlans200JSONResponseBodyTargetsTypeVoice     ListRunPlans200JSONResponseBodyTargetsType = "voice"
@@ -34225,6 +34535,8 @@ func (e ListRunPlans200JSONResponseBodyTargetsType) Valid() bool {
 	case ListRunPlans200JSONResponseBodyTargetsTypeCode:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case ListRunPlans200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case ListRunPlans200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -34384,6 +34696,7 @@ func (e RunRunPlanJSONBodyConfigTargetsScenarioMappings1Type) Valid() bool {
 const (
 	RunRunPlanJSONBodyConfigTargetsTypeCode      RunRunPlanJSONBodyConfigTargetsType = "code"
 	RunRunPlanJSONBodyConfigTargetsTypeConnected RunRunPlanJSONBodyConfigTargetsType = "connected"
+	RunRunPlanJSONBodyConfigTargetsTypeConnector RunRunPlanJSONBodyConfigTargetsType = "connector"
 	RunRunPlanJSONBodyConfigTargetsTypeHttp      RunRunPlanJSONBodyConfigTargetsType = "http"
 	RunRunPlanJSONBodyConfigTargetsTypePrompt    RunRunPlanJSONBodyConfigTargetsType = "prompt"
 	RunRunPlanJSONBodyConfigTargetsTypeVoice     RunRunPlanJSONBodyConfigTargetsType = "voice"
@@ -34396,6 +34709,8 @@ func (e RunRunPlanJSONBodyConfigTargetsType) Valid() bool {
 	case RunRunPlanJSONBodyConfigTargetsTypeCode:
 		return true
 	case RunRunPlanJSONBodyConfigTargetsTypeConnected:
+		return true
+	case RunRunPlanJSONBodyConfigTargetsTypeConnector:
 		return true
 	case RunRunPlanJSONBodyConfigTargetsTypeHttp:
 		return true
@@ -34444,6 +34759,7 @@ func (e RunRunPlan200JSONResponseBodyItemsTargetScenarioMappings1Type) Valid() b
 const (
 	RunRunPlan200JSONResponseBodyItemsTargetTypeCode      RunRunPlan200JSONResponseBodyItemsTargetType = "code"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeConnected RunRunPlan200JSONResponseBodyItemsTargetType = "connected"
+	RunRunPlan200JSONResponseBodyItemsTargetTypeConnector RunRunPlan200JSONResponseBodyItemsTargetType = "connector"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
 	RunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RunRunPlan200JSONResponseBodyItemsTargetType = "voice"
@@ -34456,6 +34772,8 @@ func (e RunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case RunRunPlan200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case RunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
@@ -34630,6 +34948,7 @@ func (e GetRunPlan200JSONResponseBodyTargetsScenarioMappings1Type) Valid() bool 
 const (
 	GetRunPlan200JSONResponseBodyTargetsTypeCode      GetRunPlan200JSONResponseBodyTargetsType = "code"
 	GetRunPlan200JSONResponseBodyTargetsTypeConnected GetRunPlan200JSONResponseBodyTargetsType = "connected"
+	GetRunPlan200JSONResponseBodyTargetsTypeConnector GetRunPlan200JSONResponseBodyTargetsType = "connector"
 	GetRunPlan200JSONResponseBodyTargetsTypeHttp      GetRunPlan200JSONResponseBodyTargetsType = "http"
 	GetRunPlan200JSONResponseBodyTargetsTypePrompt    GetRunPlan200JSONResponseBodyTargetsType = "prompt"
 	GetRunPlan200JSONResponseBodyTargetsTypeVoice     GetRunPlan200JSONResponseBodyTargetsType = "voice"
@@ -34642,6 +34961,8 @@ func (e GetRunPlan200JSONResponseBodyTargetsType) Valid() bool {
 	case GetRunPlan200JSONResponseBodyTargetsTypeCode:
 		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case GetRunPlan200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case GetRunPlan200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -34690,6 +35011,7 @@ func (e RerunRunPlan200JSONResponseBodyItemsTargetScenarioMappings1Type) Valid()
 const (
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeCode      RerunRunPlan200JSONResponseBodyItemsTargetType = "code"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeConnected RerunRunPlan200JSONResponseBodyItemsTargetType = "connected"
+	RerunRunPlan200JSONResponseBodyItemsTargetTypeConnector RerunRunPlan200JSONResponseBodyItemsTargetType = "connector"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp      RerunRunPlan200JSONResponseBodyItemsTargetType = "http"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypePrompt    RerunRunPlan200JSONResponseBodyItemsTargetType = "prompt"
 	RerunRunPlan200JSONResponseBodyItemsTargetTypeVoice     RerunRunPlan200JSONResponseBodyItemsTargetType = "voice"
@@ -34702,6 +35024,8 @@ func (e RerunRunPlan200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case RerunRunPlan200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case RerunRunPlan200JSONResponseBodyItemsTargetTypeHttp:
 		return true
@@ -34780,6 +35104,7 @@ func (e PostApiScenarioEventsJSONBody0MetadataLangwatchCallerKind) Valid() bool 
 const (
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeCode      PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "code"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeConnected PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "connected"
+	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeConnector PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "connector"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeHttp      PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "http"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypePrompt    PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "prompt"
 	PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeVoice     PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType = "voice"
@@ -34792,6 +35117,8 @@ func (e PostApiScenarioEventsJSONBody0MetadataLangwatchTargetType) Valid() bool 
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeCode:
 		return true
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeConnected:
+		return true
+	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeConnector:
 		return true
 	case PostApiScenarioEventsJSONBody0MetadataLangwatchTargetTypeHttp:
 		return true
@@ -37099,6 +37426,7 @@ func (e GetApiSuites200JSONResponseBodyTargetsScenarioMappings1Type) Valid() boo
 const (
 	GetApiSuites200JSONResponseBodyTargetsTypeCode      GetApiSuites200JSONResponseBodyTargetsType = "code"
 	GetApiSuites200JSONResponseBodyTargetsTypeConnected GetApiSuites200JSONResponseBodyTargetsType = "connected"
+	GetApiSuites200JSONResponseBodyTargetsTypeConnector GetApiSuites200JSONResponseBodyTargetsType = "connector"
 	GetApiSuites200JSONResponseBodyTargetsTypeHttp      GetApiSuites200JSONResponseBodyTargetsType = "http"
 	GetApiSuites200JSONResponseBodyTargetsTypePrompt    GetApiSuites200JSONResponseBodyTargetsType = "prompt"
 	GetApiSuites200JSONResponseBodyTargetsTypeVoice     GetApiSuites200JSONResponseBodyTargetsType = "voice"
@@ -37111,6 +37439,8 @@ func (e GetApiSuites200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuites200JSONResponseBodyTargetsTypeCode:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case GetApiSuites200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case GetApiSuites200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37237,6 +37567,7 @@ func (e PostApiSuitesJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	PostApiSuitesJSONBodyTargetsTypeCode      PostApiSuitesJSONBodyTargetsType = "code"
 	PostApiSuitesJSONBodyTargetsTypeConnected PostApiSuitesJSONBodyTargetsType = "connected"
+	PostApiSuitesJSONBodyTargetsTypeConnector PostApiSuitesJSONBodyTargetsType = "connector"
 	PostApiSuitesJSONBodyTargetsTypeHttp      PostApiSuitesJSONBodyTargetsType = "http"
 	PostApiSuitesJSONBodyTargetsTypePrompt    PostApiSuitesJSONBodyTargetsType = "prompt"
 	PostApiSuitesJSONBodyTargetsTypeVoice     PostApiSuitesJSONBodyTargetsType = "voice"
@@ -37249,6 +37580,8 @@ func (e PostApiSuitesJSONBodyTargetsType) Valid() bool {
 	case PostApiSuitesJSONBodyTargetsTypeCode:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypeConnected:
+		return true
+	case PostApiSuitesJSONBodyTargetsTypeConnector:
 		return true
 	case PostApiSuitesJSONBodyTargetsTypeHttp:
 		return true
@@ -37375,6 +37708,7 @@ func (e PostApiSuites201JSONResponseBodyTargetsScenarioMappings1Type) Valid() bo
 const (
 	PostApiSuites201JSONResponseBodyTargetsTypeCode      PostApiSuites201JSONResponseBodyTargetsType = "code"
 	PostApiSuites201JSONResponseBodyTargetsTypeConnected PostApiSuites201JSONResponseBodyTargetsType = "connected"
+	PostApiSuites201JSONResponseBodyTargetsTypeConnector PostApiSuites201JSONResponseBodyTargetsType = "connector"
 	PostApiSuites201JSONResponseBodyTargetsTypeHttp      PostApiSuites201JSONResponseBodyTargetsType = "http"
 	PostApiSuites201JSONResponseBodyTargetsTypePrompt    PostApiSuites201JSONResponseBodyTargetsType = "prompt"
 	PostApiSuites201JSONResponseBodyTargetsTypeVoice     PostApiSuites201JSONResponseBodyTargetsType = "voice"
@@ -37387,6 +37721,8 @@ func (e PostApiSuites201JSONResponseBodyTargetsType) Valid() bool {
 	case PostApiSuites201JSONResponseBodyTargetsTypeCode:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypeConnected:
+		return true
+	case PostApiSuites201JSONResponseBodyTargetsTypeConnector:
 		return true
 	case PostApiSuites201JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37513,6 +37849,7 @@ func (e GetApiSuitesById200JSONResponseBodyTargetsScenarioMappings1Type) Valid()
 const (
 	GetApiSuitesById200JSONResponseBodyTargetsTypeCode      GetApiSuitesById200JSONResponseBodyTargetsType = "code"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeConnected GetApiSuitesById200JSONResponseBodyTargetsType = "connected"
+	GetApiSuitesById200JSONResponseBodyTargetsTypeConnector GetApiSuitesById200JSONResponseBodyTargetsType = "connector"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeHttp      GetApiSuitesById200JSONResponseBodyTargetsType = "http"
 	GetApiSuitesById200JSONResponseBodyTargetsTypePrompt    GetApiSuitesById200JSONResponseBodyTargetsType = "prompt"
 	GetApiSuitesById200JSONResponseBodyTargetsTypeVoice     GetApiSuitesById200JSONResponseBodyTargetsType = "voice"
@@ -37525,6 +37862,8 @@ func (e GetApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeCode:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case GetApiSuitesById200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case GetApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37633,6 +37972,7 @@ func (e PatchApiSuitesByIdJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	PatchApiSuitesByIdJSONBodyTargetsTypeCode      PatchApiSuitesByIdJSONBodyTargetsType = "code"
 	PatchApiSuitesByIdJSONBodyTargetsTypeConnected PatchApiSuitesByIdJSONBodyTargetsType = "connected"
+	PatchApiSuitesByIdJSONBodyTargetsTypeConnector PatchApiSuitesByIdJSONBodyTargetsType = "connector"
 	PatchApiSuitesByIdJSONBodyTargetsTypeHttp      PatchApiSuitesByIdJSONBodyTargetsType = "http"
 	PatchApiSuitesByIdJSONBodyTargetsTypePrompt    PatchApiSuitesByIdJSONBodyTargetsType = "prompt"
 	PatchApiSuitesByIdJSONBodyTargetsTypeVoice     PatchApiSuitesByIdJSONBodyTargetsType = "voice"
@@ -37645,6 +37985,8 @@ func (e PatchApiSuitesByIdJSONBodyTargetsType) Valid() bool {
 	case PatchApiSuitesByIdJSONBodyTargetsTypeCode:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypeConnected:
+		return true
+	case PatchApiSuitesByIdJSONBodyTargetsTypeConnector:
 		return true
 	case PatchApiSuitesByIdJSONBodyTargetsTypeHttp:
 		return true
@@ -37771,6 +38113,7 @@ func (e PatchApiSuitesById200JSONResponseBodyTargetsScenarioMappings1Type) Valid
 const (
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeCode      PatchApiSuitesById200JSONResponseBodyTargetsType = "code"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeConnected PatchApiSuitesById200JSONResponseBodyTargetsType = "connected"
+	PatchApiSuitesById200JSONResponseBodyTargetsTypeConnector PatchApiSuitesById200JSONResponseBodyTargetsType = "connector"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp      PatchApiSuitesById200JSONResponseBodyTargetsType = "http"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypePrompt    PatchApiSuitesById200JSONResponseBodyTargetsType = "prompt"
 	PatchApiSuitesById200JSONResponseBodyTargetsTypeVoice     PatchApiSuitesById200JSONResponseBodyTargetsType = "voice"
@@ -37783,6 +38126,8 @@ func (e PatchApiSuitesById200JSONResponseBodyTargetsType) Valid() bool {
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeCode:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeConnected:
+		return true
+	case PatchApiSuitesById200JSONResponseBodyTargetsTypeConnector:
 		return true
 	case PatchApiSuitesById200JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37909,6 +38254,7 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsScenarioMappings1Typ
 const (
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeCode      PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "code"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnected PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "connected"
+	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnector PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "connector"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeHttp      PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "http"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypePrompt    PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "prompt"
 	PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeVoice     PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType = "voice"
@@ -37921,6 +38267,8 @@ func (e PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsType) Valid() bool {
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeCode:
 		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnected:
+		return true
+	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeConnector:
 		return true
 	case PostApiSuitesByIdDuplicate201JSONResponseBodyTargetsTypeHttp:
 		return true
@@ -37969,6 +38317,7 @@ func (e PostApiSuitesByIdRunJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	PostApiSuitesByIdRunJSONBodyTargetsTypeCode      PostApiSuitesByIdRunJSONBodyTargetsType = "code"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeConnected PostApiSuitesByIdRunJSONBodyTargetsType = "connected"
+	PostApiSuitesByIdRunJSONBodyTargetsTypeConnector PostApiSuitesByIdRunJSONBodyTargetsType = "connector"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeHttp      PostApiSuitesByIdRunJSONBodyTargetsType = "http"
 	PostApiSuitesByIdRunJSONBodyTargetsTypePrompt    PostApiSuitesByIdRunJSONBodyTargetsType = "prompt"
 	PostApiSuitesByIdRunJSONBodyTargetsTypeVoice     PostApiSuitesByIdRunJSONBodyTargetsType = "voice"
@@ -37981,6 +38330,8 @@ func (e PostApiSuitesByIdRunJSONBodyTargetsType) Valid() bool {
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeCode:
 		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeConnected:
+		return true
+	case PostApiSuitesByIdRunJSONBodyTargetsTypeConnector:
 		return true
 	case PostApiSuitesByIdRunJSONBodyTargetsTypeHttp:
 		return true
@@ -38029,6 +38380,7 @@ func (e PostApiSuitesByIdRun200JSONResponseBodyItemsTargetScenarioMappings1Type)
 const (
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeCode      PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "code"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnected PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "connected"
+	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnector PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "connector"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp      PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "http"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypePrompt    PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "prompt"
 	PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeVoice     PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType = "voice"
@@ -38041,6 +38393,8 @@ func (e PostApiSuitesByIdRun200JSONResponseBodyItemsTargetType) Valid() bool {
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case PostApiSuitesByIdRun200JSONResponseBodyItemsTargetTypeHttp:
 		return true
@@ -38617,6 +38971,7 @@ func (e RunTestSuiteJSONBodyTargetsScenarioMappings1Type) Valid() bool {
 const (
 	RunTestSuiteJSONBodyTargetsTypeCode      RunTestSuiteJSONBodyTargetsType = "code"
 	RunTestSuiteJSONBodyTargetsTypeConnected RunTestSuiteJSONBodyTargetsType = "connected"
+	RunTestSuiteJSONBodyTargetsTypeConnector RunTestSuiteJSONBodyTargetsType = "connector"
 	RunTestSuiteJSONBodyTargetsTypeHttp      RunTestSuiteJSONBodyTargetsType = "http"
 	RunTestSuiteJSONBodyTargetsTypePrompt    RunTestSuiteJSONBodyTargetsType = "prompt"
 	RunTestSuiteJSONBodyTargetsTypeVoice     RunTestSuiteJSONBodyTargetsType = "voice"
@@ -38629,6 +38984,8 @@ func (e RunTestSuiteJSONBodyTargetsType) Valid() bool {
 	case RunTestSuiteJSONBodyTargetsTypeCode:
 		return true
 	case RunTestSuiteJSONBodyTargetsTypeConnected:
+		return true
+	case RunTestSuiteJSONBodyTargetsTypeConnector:
 		return true
 	case RunTestSuiteJSONBodyTargetsTypeHttp:
 		return true
@@ -38677,6 +39034,7 @@ func (e RunTestSuite200JSONResponseBodyItemsTargetScenarioMappings1Type) Valid()
 const (
 	RunTestSuite200JSONResponseBodyItemsTargetTypeCode      RunTestSuite200JSONResponseBodyItemsTargetType = "code"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeConnected RunTestSuite200JSONResponseBodyItemsTargetType = "connected"
+	RunTestSuite200JSONResponseBodyItemsTargetTypeConnector RunTestSuite200JSONResponseBodyItemsTargetType = "connector"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeHttp      RunTestSuite200JSONResponseBodyItemsTargetType = "http"
 	RunTestSuite200JSONResponseBodyItemsTargetTypePrompt    RunTestSuite200JSONResponseBodyItemsTargetType = "prompt"
 	RunTestSuite200JSONResponseBodyItemsTargetTypeVoice     RunTestSuite200JSONResponseBodyItemsTargetType = "voice"
@@ -38689,6 +39047,8 @@ func (e RunTestSuite200JSONResponseBodyItemsTargetType) Valid() bool {
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeCode:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeConnected:
+		return true
+	case RunTestSuite200JSONResponseBodyItemsTargetTypeConnector:
 		return true
 	case RunTestSuite200JSONResponseBodyItemsTargetTypeHttp:
 		return true
@@ -48918,6 +49278,93 @@ type CreateAgentJSONBody_5_Config struct {
 
 // CreateAgentJSONBody5Type defines parameters for CreateAgent.
 type CreateAgentJSONBody5Type string
+
+// CreateAgentJSONBody6 defines parameters for CreateAgent.
+type CreateAgentJSONBody6 struct {
+	// CommitMessage What changed, kept on the version this write creates.
+	CommitMessage *string `json:"commitMessage,omitempty"`
+	Config        struct {
+		UnderscoreLibraryRef *string                             `json:"_library_ref,omitempty"`
+		BehaveAs             *CreateAgentJSONBody6ConfigBehaveAs `json:"behave_as,omitempty"`
+		Call                 struct {
+			Code     string                                 `json:"code"`
+			Language CreateAgentJSONBody6ConfigCallLanguage `json:"language"`
+		} `json:"call"`
+		Cls               *string `json:"cls,omitempty"`
+		Description       *string `json:"description,omitempty"`
+		FixturesDatasetId *string `json:"fixturesDatasetId,omitempty"`
+		Inputs            *[]struct {
+			Desc       *string                              `json:"desc,omitempty"`
+			Hidden     *bool                                `json:"hidden,omitempty"`
+			Identifier string                               `json:"identifier"`
+			JsonSchema *map[string]interface{}              `json:"json_schema,omitempty"`
+			Optional   *bool                                `json:"optional,omitempty"`
+			Prefix     *string                              `json:"prefix,omitempty"`
+			Type       CreateAgentJSONBody6ConfigInputsType `json:"type"`
+			Value      interface{}                          `json:"value,omitempty"`
+		} `json:"inputs,omitempty"`
+		IsCustom *bool   `json:"isCustom,omitempty"`
+		Name     *string `json:"name,omitempty"`
+		Outputs  *[]struct {
+			Desc       *string                               `json:"desc,omitempty"`
+			Hidden     *bool                                 `json:"hidden,omitempty"`
+			Identifier string                                `json:"identifier"`
+			JsonSchema *map[string]interface{}               `json:"json_schema,omitempty"`
+			Optional   *bool                                 `json:"optional,omitempty"`
+			Prefix     *string                               `json:"prefix,omitempty"`
+			Type       CreateAgentJSONBody6ConfigOutputsType `json:"type"`
+			Value      interface{}                           `json:"value,omitempty"`
+		} `json:"outputs,omitempty"`
+		Parameters *[]struct {
+			Desc       *string                                  `json:"desc,omitempty"`
+			Hidden     *bool                                    `json:"hidden,omitempty"`
+			Identifier string                                   `json:"identifier"`
+			JsonSchema *map[string]interface{}                  `json:"json_schema,omitempty"`
+			Optional   *bool                                    `json:"optional,omitempty"`
+			Prefix     *string                                  `json:"prefix,omitempty"`
+			Type       CreateAgentJSONBody6ConfigParametersType `json:"type"`
+			Value      interface{}                              `json:"value,omitempty"`
+		} `json:"parameters,omitempty"`
+		SecretNames *[]string `json:"secretNames,omitempty"`
+		Setup       *struct {
+			Code     string                                  `json:"code"`
+			Language CreateAgentJSONBody6ConfigSetupLanguage `json:"language"`
+		} `json:"setup,omitempty"`
+		Teardown *struct {
+			Code     string                                     `json:"code"`
+			Language CreateAgentJSONBody6ConfigTeardownLanguage `json:"language"`
+		} `json:"teardown,omitempty"`
+		TimeoutMs *int `json:"timeoutMs,omitempty"`
+	} `json:"config"`
+	CopiedFromAgentId *string                  `json:"copiedFromAgentId,omitempty"`
+	Name              string                   `json:"name"`
+	Type              CreateAgentJSONBody6Type `json:"type"`
+	WorkflowId        *string                  `json:"workflowId,omitempty"`
+}
+
+// CreateAgentJSONBody6ConfigBehaveAs defines parameters for CreateAgent.
+type CreateAgentJSONBody6ConfigBehaveAs string
+
+// CreateAgentJSONBody6ConfigCallLanguage defines parameters for CreateAgent.
+type CreateAgentJSONBody6ConfigCallLanguage string
+
+// CreateAgentJSONBody6ConfigInputsType defines parameters for CreateAgent.
+type CreateAgentJSONBody6ConfigInputsType string
+
+// CreateAgentJSONBody6ConfigOutputsType defines parameters for CreateAgent.
+type CreateAgentJSONBody6ConfigOutputsType string
+
+// CreateAgentJSONBody6ConfigParametersType defines parameters for CreateAgent.
+type CreateAgentJSONBody6ConfigParametersType string
+
+// CreateAgentJSONBody6ConfigSetupLanguage defines parameters for CreateAgent.
+type CreateAgentJSONBody6ConfigSetupLanguage string
+
+// CreateAgentJSONBody6ConfigTeardownLanguage defines parameters for CreateAgent.
+type CreateAgentJSONBody6ConfigTeardownLanguage string
+
+// CreateAgentJSONBody6Type defines parameters for CreateAgent.
+type CreateAgentJSONBody6Type string
 
 // CreateAgent201JSONResponseBodyCreatedBy0 defines parameters for CreateAgent.
 type CreateAgent201JSONResponseBodyCreatedBy0 struct {
@@ -94897,6 +95344,32 @@ func (t *CreateAgentJSONBody) FromCreateAgentJSONBody5(v CreateAgentJSONBody5) e
 
 // MergeCreateAgentJSONBody5 performs a merge with any union data inside the CreateAgentJSONBody, using the provided CreateAgentJSONBody5
 func (t *CreateAgentJSONBody) MergeCreateAgentJSONBody5(v CreateAgentJSONBody5) error {
+	b, err := json.Marshal(v)
+	if err != nil {
+		return err
+	}
+
+	merged, err := runtime.JSONMerge(t.union, b)
+	t.union = merged
+	return err
+}
+
+// AsCreateAgentJSONBody6 returns the union data inside the CreateAgentJSONBody as a CreateAgentJSONBody6
+func (t CreateAgentJSONBody) AsCreateAgentJSONBody6() (CreateAgentJSONBody6, error) {
+	var body CreateAgentJSONBody6
+	err := json.Unmarshal(t.union, &body)
+	return body, err
+}
+
+// FromCreateAgentJSONBody6 overwrites any union data inside the CreateAgentJSONBody as the provided CreateAgentJSONBody6
+func (t *CreateAgentJSONBody) FromCreateAgentJSONBody6(v CreateAgentJSONBody6) error {
+	b, err := json.Marshal(v)
+	t.union = b
+	return err
+}
+
+// MergeCreateAgentJSONBody6 performs a merge with any union data inside the CreateAgentJSONBody, using the provided CreateAgentJSONBody6
+func (t *CreateAgentJSONBody) MergeCreateAgentJSONBody6(v CreateAgentJSONBody6) error {
 	b, err := json.Marshal(v)
 	if err != nil {
 		return err
