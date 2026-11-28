@@ -9,6 +9,7 @@ import { memorySessionState } from "@langwatch/process-stores";
 import { beforeEach, describe, expect, it } from "vitest";
 
 import { LangyDeleteConfirmationMemoryRepository } from "../../../../repositories/memory/memory.langy-delete-confirmation.repository.ts";
+import type { ConfirmTarget } from "../../../../rules/langy-local-control-keys.rules.ts";
 import { deleteConfirmationFixture } from "./delete-confirmation.fixture.ts";
 
 let now: number;
@@ -207,6 +208,62 @@ describe("the confirmation gate", () => {
       expect([bulk.status, again.status]).toEqual([200, 409]);
       expect(langy.archived).toEqual(["ev_toxicity", "ev_missing"]);
       expect(langy.started).toHaveLength(2);
+    });
+  });
+
+  describe("given a bulk delete of three records without a click", () => {
+    it("looks the records up together, and still names them in the order asked", async () => {
+      const ids = ["ev_toxicity", "ev_faithful", "ev_missing"];
+      const memory = LangyDeleteConfirmationMemoryRepository.create({ now: () => now });
+      let inFlight = 0;
+      let maxInFlight = 0;
+      const held: (() => void)[] = [];
+      // Released last-first once all are in, so a later record answers before an earlier one.
+      // A lookup that is never joined is let go on the next turn of the loop instead of hanging.
+      const releaseAll = () =>
+        held
+          .splice(0)
+          .reverse()
+          .forEach((release) => release());
+      const holdingEveryLookup = new Proxy(memory, {
+        get: (target, property) => {
+          if (property === "hasGrant") {
+            return async (record: ConfirmTarget) => {
+              inFlight += 1;
+              maxInFlight = Math.max(maxInFlight, inFlight);
+              const released = new Promise<void>((resolve) => held.push(resolve));
+              if (held.length === ids.length) releaseAll();
+              else setImmediate(releaseAll);
+              await released;
+              inFlight -= 1;
+              return memory.hasGrant(record);
+            };
+          }
+          const value: unknown = Reflect.get(target, property, target);
+          return typeof value === "function" ? value.bind(target) : value;
+        },
+      });
+      const bulk = deleteConfirmationFixture({
+        store: memorySessionState({ now: () => now }),
+        confirmations: holdingEveryLookup,
+        projectId: "proj_bulk",
+        now: () => now,
+      });
+      await bulk.bindKey("turn1", "turn_1");
+
+      const answer = await bulk.deleteMany(ids);
+
+      expect(maxInFlight).toBeGreaterThan(1);
+      expect(answer).toMatchObject({ status: 409, body: { code: "langy_confirmation_required" } });
+      expect(answer.body.message).toBe(
+        "Deleting needs a confirmation click. A confirmation card for " +
+          'evaluator "Toxicity check" (…city), evaluator "Faithfulness" (…hful) is now shown ' +
+          "to the user. Wait for their answer; after they choose Yes, run the same command again.",
+      );
+      expect(bulk.started.map(({ questions }) => questions?.[0]?.question)).toEqual([
+        'Delete evaluator "Toxicity check" (…city)?',
+        'Delete evaluator "Faithfulness" (…hful)?',
+      ]);
     });
   });
 
