@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -22,6 +23,13 @@ const (
 	catalog    = "../../../enterprise/modules/billing/contract/src/stripe-catalog.json"
 	seatPrice  = "price_1SzP11IMsTw08cudRhGETYNa" // GROWTH_SEAT_USD_MONTHLY, 3200 usd
 	eventsMtr  = "mtr_test_61UBL0fe0hM4Csg7x41IMsTw08cudQaG"
+	storageMtr = "mtr_test_61VjKmnOYgbfwXOun41IMsTw08cudHtw"
+	// RETENTION_STORAGE_EUR_MONTHLY, 300 eur per GB-month
+	storagePrice = "price_1UZwpSIMsTw08cud1AbkINGw"
+	// GROWTH_PII_REDACTION_USD, 100 usd cents per dollar on the PII redaction meter
+	piiRedactionPrice = "price_1Uat9tIMsTw08cudpWWrZG4a"
+	// GROWTH_INSTANT_EVAL_USD, 100 usd cents per dollar on the Instant Evals meter
+	instantEvalPrice = "price_1UHJZnIMsTw08cudkPOesmTR"
 )
 
 var epoch = time.Date(2026, 10, 1, 12, 0, 0, 0, time.UTC)
@@ -192,6 +200,80 @@ func TestRefusesCallWithoutKey(t *testing.T) {
 	}
 }
 
+// A unit amount keeps a price off the BILLABLE_EVENTS fallback, so only catalogMetered meters it.
+// @scenario "Each dollar usage price is metered on its own meter"
+func TestCatalogMetersEachUsagePriceOnItsOwnMeter(t *testing.T) {
+	raw := []byte(`{
+		"mapping": {
+			"GROWTH_INSTANT_EVAL_USD": {"test": "price_instant"},
+			"GROWTH_PII_REDACTION_USD": {"test": "price_pii"}
+		},
+		"meters": {
+			"INSTANT_EVAL_USD": {"test": "mtr_instant"},
+			"PII_REDACTION_USD": {"test": "mtr_pii"}
+		},
+		"prices": {
+			"price_instant": {"id": "price_instant", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}},
+			"price_pii": {"id": "price_pii", "unitAmount": 100, "currency": "usd", "recurring": {"interval": "month", "intervalCount": 1}}
+		}
+	}`)
+	st := newState()
+	if err := st.seedCatalog(raw, "test", epoch); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"price_instant": "mtr_instant", "price_pii": "mtr_pii"}
+	for _, p := range st.prices {
+		meter, ok := want[p.ID]
+		if !ok {
+			continue
+		}
+		if !isMetered(p) || p.Recurring.Meter == nil || *p.Recurring.Meter != meter {
+			t.Errorf("%s: recurring %+v, want metered on %s", p.ID, p.Recurring, meter)
+		}
+		delete(want, p.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("prices not seeded: %v", want)
+	}
+}
+
+// A euro usage price bills the dollar meter its dollar price bills: one meter, two currencies.
+// @scenario "A euro usage price is metered on its dollar meter in the payment simulator"
+func TestCatalogMetersEuroUsagePriceOnTheDollarMeter(t *testing.T) {
+	raw := []byte(`{
+		"mapping": {
+			"GROWTH_INSTANT_EVAL_EUR": {"test": "price_instant_eur"},
+			"GROWTH_PII_REDACTION_EUR": {"test": "price_pii_eur"}
+		},
+		"meters": {
+			"INSTANT_EVAL_USD": {"test": "mtr_instant"},
+			"PII_REDACTION_USD": {"test": "mtr_pii"}
+		},
+		"prices": {
+			"price_instant_eur": {"id": "price_instant_eur", "unitAmount": 85, "currency": "eur", "recurring": {"interval": "month", "intervalCount": 1}},
+			"price_pii_eur": {"id": "price_pii_eur", "unitAmount": 85, "currency": "eur", "recurring": {"interval": "month", "intervalCount": 1}}
+		}
+	}`)
+	st := newState()
+	if err := st.seedCatalog(raw, "test", epoch); err != nil {
+		t.Fatal(err)
+	}
+	want := map[string]string{"price_instant_eur": "mtr_instant", "price_pii_eur": "mtr_pii"}
+	for _, p := range st.prices {
+		meter, ok := want[p.ID]
+		if !ok {
+			continue
+		}
+		if !isMetered(p) || p.Recurring.Meter == nil || *p.Recurring.Meter != meter {
+			t.Errorf("%s: recurring %+v, want metered on %s", p.ID, p.Recurring, meter)
+		}
+		delete(want, p.ID)
+	}
+	if len(want) != 0 {
+		t.Fatalf("prices not seeded: %v", want)
+	}
+}
+
 // @scenario "The catalog seeds the product's own price ids"
 func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 	g := newRig(t)
@@ -208,9 +290,17 @@ func TestCatalogSeedsRealPriceIDs(t *testing.T) {
 		t.Fatalf("product not expanded: %v", seat["product"])
 	}
 	_, meters := g.stripe(http.MethodGet, "/v1/billing/meters", "limit=10")
-	m := meters["data"].([]any)[0].(map[string]any)
-	if m["id"] != eventsMtr || m["event_name"] != "langwatch_billable_events" {
-		t.Fatalf("meter %v", m)
+	// Meters are seeded from a map, so listing order is not fixed.
+	events := map[string]any{}
+	for _, m := range meters["data"].([]any) {
+		events[m.(map[string]any)["id"].(string)] = m.(map[string]any)["event_name"]
+	}
+	if events[eventsMtr] != "langwatch_billable_events" || events[storageMtr] != "langwatch_retention_storage_gb" {
+		t.Fatalf("meters %v", events)
+	}
+	storage, _ := found[storagePrice]["recurring"].(map[string]any)
+	if storage == nil || storage["usage_type"] != "metered" || storage["meter"] != storageMtr {
+		t.Fatalf("storage price %v", found[storagePrice])
 	}
 }
 
@@ -344,6 +434,85 @@ func TestRenewalBillsUsage(t *testing.T) {
 	}
 }
 
+// The catalog's own Instant Evals price, not a hand-seeded one: proves the mapping and the meter together.
+// @scenario "A renewal bills the dollars judged on the catalog's Instant Evals price"
+func TestRenewalBillsInstantEvalUsage(t *testing.T) {
+	g := newRig(t)
+	_, cus := g.stripe(http.MethodPost, "/v1/customers", "name=Acme")
+	customer := cus["id"].(string)
+	form := url.Values{
+		"mode": {"subscription"}, "customer": {customer}, "success_url": {"http://app/ok"},
+		"line_items[0][price]": {seatPrice}, "line_items[0][quantity]": {"2"},
+		"line_items[1][price]": {instantEvalPrice},
+	}
+	status, sess := g.stripe(http.MethodPost, "/v1/checkout/sessions", form.Encode())
+	if status != http.StatusOK {
+		t.Fatalf("checkout with the catalog's Instant Evals price: %d %v", status, sess)
+	}
+	_, done := g.control(http.MethodPost, "/_sim/api/checkout/"+sess["id"].(string)+"/complete", "")
+	subID := done["subscription"].(string)
+
+	status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_instant_eval_usd&payload[stripe_customer_id]="+customer+"&payload[value]=1.2345&identifier=ie1")
+	if status != http.StatusOK {
+		t.Fatalf("%d %v", status, out)
+	}
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":2764800}`)
+	_, invoices := g.stripe(http.MethodGet, "/v1/invoices", "subscription="+subID+"&limit=1")
+	inv := invoices["data"].([]any)[0].(map[string]any)
+	// 2 seats x 3200 + 1.2345 dollars x 100 cents, to the cent
+	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6523 {
+		t.Fatalf("renewal invoice %v", inv)
+	}
+}
+
+// The catalog's PII redaction price is metered on the PII redaction meter, so a renewal
+// bills the dollars that meter summed, and a customer's subscriptions list shows the line.
+func TestRenewalBillsPiiRedactionUsage(t *testing.T) {
+	g := newRig(t)
+	_, cus := g.stripe(http.MethodPost, "/v1/customers", "name=Acme")
+	customer := cus["id"].(string)
+	form := url.Values{
+		"mode": {"subscription"}, "customer": {customer}, "success_url": {"http://app/ok"},
+		"line_items[0][price]": {seatPrice}, "line_items[0][quantity]": {"2"},
+		"line_items[1][price]": {piiRedactionPrice},
+	}
+	_, sess := g.stripe(http.MethodPost, "/v1/checkout/sessions", form.Encode())
+	_, done := g.control(http.MethodPost, "/_sim/api/checkout/"+sess["id"].(string)+"/complete", "")
+	subID := done["subscription"].(string)
+
+	status, list := g.stripe(http.MethodGet, "/v1/subscriptions", "customer="+customer+"&status=all&limit=100")
+	if status != http.StatusOK {
+		t.Fatalf("list subscriptions: %d %v", status, list)
+	}
+	subs := list["data"].([]any)
+	if len(subs) != 1 || subs[0].(map[string]any)["id"] != subID {
+		t.Fatalf("subscriptions %v", subs)
+	}
+	var prices []string
+	for _, it := range subs[0].(map[string]any)["items"].(map[string]any)["data"].([]any) {
+		prices = append(prices, it.(map[string]any)["price"].(map[string]any)["id"].(string))
+	}
+	if !slices.Contains(prices, piiRedactionPrice) {
+		t.Fatalf("subscription prices %v", prices)
+	}
+	_, other := g.stripe(http.MethodGet, "/v1/subscriptions", "customer=cus_nobody&status=all")
+	if len(other["data"].([]any)) != 0 {
+		t.Fatalf("another customer's subscriptions %v", other)
+	}
+
+	status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_pii_redaction_usd&payload[stripe_customer_id]="+customer+"&payload[value]=1.2345&identifier=pii1")
+	if status != http.StatusOK {
+		t.Fatalf("%d %v", status, out)
+	}
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":2764800}`)
+	_, invoices := g.stripe(http.MethodGet, "/v1/invoices", "subscription="+subID+"&limit=1")
+	inv := invoices["data"].([]any)[0].(map[string]any)
+	// 2 seats x 3200 + 1.2345 dollars x 100 cents, to the cent
+	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6523 {
+		t.Fatalf("renewal invoice %v", inv)
+	}
+}
+
 // @scenario "A forced payment failure fires invoice.payment_failed and marks the subscription past due"
 // @scenario "A retried invoice pays and restores the subscription"
 func TestPaymentFailureAndRetry(t *testing.T) {
@@ -380,6 +549,80 @@ func TestCancelAtPeriodEnd(t *testing.T) {
 	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
 	if sub["status"] != "canceled" || len(g.eventIDs("customer.subscription.deleted")) != 1 {
 		t.Fatalf("%v %v", sub["status"], g.eventTypes())
+	}
+}
+
+// @scenario "A meter event value may be a decimal, as in Stripe"
+// @scenario "A meter event value that is not a number is refused"
+func TestMeterDecimalValues(t *testing.T) {
+	g := newRig(t)
+	for i, v := range []string{"0.0001", "1.1233"} {
+		status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_billable_events&payload[stripe_customer_id]=cus_d&payload[value]="+v+"&identifier=d"+strconv.Itoa(i))
+		if status != http.StatusOK {
+			t.Fatalf("value %s: %d %v", v, status, out)
+		}
+	}
+	_, usage := g.control(http.MethodGet, "/_sim/api/usage?customer=cus_d", "")
+	if v := usage["totals"].([]any)[0].(map[string]any)["value"].(float64); v != 1.1234 {
+		t.Fatalf("usage total %v", v)
+	}
+	start := epoch.Unix() - 3600
+	_, sums := g.stripe(http.MethodGet, "/v1/billing/meters/"+eventsMtr+"/event_summaries", "customer=cus_d&start_time="+strconv.FormatInt(start, 10)+"&end_time="+strconv.FormatInt(start+7200, 10))
+	if v := sums["data"].([]any)[0].(map[string]any)["aggregated_value"].(float64); v != 1.1234 {
+		t.Fatalf("aggregated %v", v)
+	}
+	status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_billable_events&payload[stripe_customer_id]=cus_d&payload[value]=0,0001&identifier=comma")
+	if status != http.StatusBadRequest || !strings.Contains(out["error"].(map[string]any)["message"].(string), "must be a number") {
+		t.Fatalf("comma value answered %d %v", status, out)
+	}
+}
+
+// @scenario "Decimal usage on a per-unit price bills to the cent"
+func TestDecimalUsageBillsToTheCent(t *testing.T) {
+	g := newRig(t)
+	g.control(http.MethodPost, "/_sim/api/prices", `{"id":"price_1T8nfzIMsTw08cudahMR8H7U","product":"prod_U09JyXm95Yad65","currency":"usd","interval":"month","usage_type":"metered","meter":"`+eventsMtr+`","unit_amount":100}`)
+	cus, subID := g.subscribe(2)
+	for i, v := range []string{"0.0001", "1.1233"} {
+		if status, out := g.stripe(http.MethodPost, "/v1/billing/meter_events", "event_name=langwatch_billable_events&payload[stripe_customer_id]="+cus+"&payload[value]="+v+"&identifier=c"+strconv.Itoa(i)); status != http.StatusOK {
+			t.Fatalf("%d %v", status, out)
+		}
+	}
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":2764800}`)
+	_, list := g.stripe(http.MethodGet, "/v1/invoices", "subscription="+subID+"&limit=1")
+	inv := list["data"].([]any)[0].(map[string]any)
+	// 2 seats x 3200 + 1.1234 units x 100, to the cent
+	if inv["billing_reason"] != "subscription_cycle" || inv["total"].(float64) != 6400+112 {
+		t.Fatalf("renewal invoice %v", inv)
+	}
+	metered := 0
+	for _, l := range inv["lines"].(map[string]any)["data"].([]any) {
+		line := l.(map[string]any)
+		if line["price"].(map[string]any)["id"] == "price_1T8nfzIMsTw08cudahMR8H7U" {
+			metered++
+			if line["amount"].(float64) != 112 {
+				t.Fatalf("metered line %v", line)
+			}
+		}
+	}
+	if metered != 1 {
+		t.Fatalf("want one metered line, got %d in %v", metered, inv["lines"])
+	}
+}
+
+// @scenario "Half a cent of decimal usage rounds up"
+func TestMeteredAmountRoundsHalfCentUp(t *testing.T) {
+	cents := func(n int64) *Price { return &Price{BillingScheme: "per_unit", UnitAmount: &n} }
+	for _, c := range []struct {
+		unit int64
+		used float64
+		want int64
+	}{
+		{100, 0.005, 1}, {100, 1.005, 101}, {100, 1.125, 113}, {100, 0.285, 29}, {100, 2.675, 268},
+		{100, 1.1234, 112}, {100, 0.0049, 0}, {3200, 2, 6400}, {1, 9007199254740991, 9007199254740991},
+	} {
+		if got := meteredAmount(cents(c.unit), c.used); got != c.want {
+			t.Errorf("%d cents x %v units = %d, want %d", c.unit, c.used, got, c.want)
+		}
 	}
 }
 

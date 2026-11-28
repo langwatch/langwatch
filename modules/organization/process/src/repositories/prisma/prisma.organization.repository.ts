@@ -5,6 +5,7 @@ import {
   parseOnboardingVariant,
 } from "@langwatch/onboarding-contract";
 import {
+  BillingOnlyNoTeamAccessError,
   organizationJoinSettingSchema,
   type OrganizationJoinSetting,
   OrganizationHasNoTeamError,
@@ -21,6 +22,7 @@ import {
   type OrganizationUsageCount,
   type PricingModel,
   type SignInSecurityPolicy,
+  type DocsPlaygroundPolicy,
   type OrganizationCurrency,
   ORGANIZATION_KIND,
 } from "@langwatch/organization-contract";
@@ -37,6 +39,9 @@ import {
   type StoredOrganizationSettings,
   type OrganizationTeamProject,
   type OrganizationPresenceSettingRow,
+  type OrganizationActiveMemberPage,
+  type OrganizationOperatorQuery,
+  type OrganizationOperatorRow,
 } from "../organization.repository.ts";
 import { PrismaOrganizationAuditStore } from "./prisma.organization-audit.store.ts";
 
@@ -90,6 +95,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     return { ids: page, next: page[page.length - 1] ?? null };
   }
 
+  async findOperatorRows(input: OrganizationOperatorQuery): Promise<OrganizationOperatorRow[]> {
+    const matching =
+      "organizationIds" in input
+        ? { id: { in: [...input.organizationIds] } }
+        : {
+            OR: (["id", "name", "slug"] as const).map((field) => ({
+              [field]: { contains: literalSubstring(input.query), mode: "insensitive" as const },
+            })),
+          };
+    const rows = await this.database.organization.findMany({
+      where: { kind: { not: ORGANIZATION_KIND.SYSTEM }, ...matching },
+      select: { id: true, name: true, slug: true, createdAt: true },
+      orderBy: [{ name: "asc" }, { createdAt: "asc" }],
+      ...("limit" in input ? { take: input.limit } : {}),
+    });
+    if (rows.length === 0) return [];
+    const counts = await this.database.organizationUser.groupBy({
+      by: ["organizationId"],
+      where: { organizationId: { in: rows.map((row) => row.id) } },
+      _count: { _all: true },
+    });
+    const members = new Map(counts.map((count) => [count.organizationId, count._count._all]));
+    return rows.map((row) => ({
+      id: row.id,
+      name: row.name,
+      slug: row.slug,
+      createdAt: fromDate(row.createdAt),
+      memberCount: members.get(row.id) ?? 0,
+    }));
+  }
+
   async findPresenceSettingPage({
     afterId,
     limit,
@@ -106,6 +142,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
       },
       take: limit,
     });
+  }
+
+  async findActiveMemberPage({
+    afterId,
+    limit,
+  }: {
+    afterId: string | null;
+    limit: number;
+  }): Promise<OrganizationActiveMemberPage> {
+    const organizations = await this.database.organization.findMany({
+      select: { id: true },
+      orderBy: { id: "asc" },
+      ...(afterId === null ? {} : { where: { id: { gt: afterId } } }),
+      take: limit,
+    });
+    const ids = organizations.map(({ id }) => id);
+    if (ids.length === 0) return { lastOrganizationId: null, organizations: 0, members: [] };
+    const members = await this.database.organizationUser.findMany({
+      where: { organizationId: { in: ids }, disabledAt: null, user: { deactivatedAt: null } },
+      select: { organizationId: true, userId: true, createdAt: true },
+      orderBy: [{ organizationId: "asc" }, { userId: "asc" }],
+    });
+    return {
+      lastOrganizationId: ids.at(-1) ?? null,
+      organizations: ids.length,
+      members: members.map(({ organizationId, userId, createdAt }) => ({
+        organizationId,
+        userId,
+        joinedAt: fromDate(createdAt),
+      })),
+    };
   }
 
   async countUsage({
@@ -190,6 +257,38 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     await this.database.organization.update({
       where: { id: organizationId },
       data: { maxSessionDurationDays },
+    });
+  }
+
+  async getDocsPlaygroundPolicy({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<DocsPlaygroundPolicy> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { docsPlaygroundSessionsEnabled: true, docsPlaygroundSessionsDisabledAt: true },
+    });
+    return {
+      docsPlaygroundSessionsEnabled: row?.docsPlaygroundSessionsEnabled ?? false,
+      docsPlaygroundSessionsDisabledAt: row?.docsPlaygroundSessionsDisabledAt ?? null,
+    };
+  }
+
+  async saveDocsPlaygroundPolicy({
+    organizationId,
+    docsPlaygroundSessionsEnabled,
+    changedAt,
+  }: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedAt: Instant;
+  }): Promise<void> {
+    await this.database.organization.update({
+      where: { id: organizationId },
+      data: docsPlaygroundSessionsEnabled
+        ? { docsPlaygroundSessionsEnabled }
+        : { docsPlaygroundSessionsEnabled, docsPlaygroundSessionsDisabledAt: toDate(changedAt) },
     });
   }
 
@@ -290,6 +389,39 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
              "updatedAt" = now()
        WHERE "id" = ${input.organizationId}
          AND "instantEvalsEnabledAt" IS NULL
+    `;
+  }
+
+  async isPiiRedactionModelAccepted({
+    organizationId,
+  }: {
+    organizationId: string;
+  }): Promise<boolean> {
+    const row = await this.database.organization.findUnique({
+      where: { id: organizationId },
+      select: { piiRedactionModelAcceptedAt: true },
+    });
+    return !!row?.piiRedactionModelAcceptedAt;
+  }
+
+  async recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+    at: Instant;
+  }): Promise<void> {
+    // As the Instant Evals consent: a second admin parked on the row lock re-checks the
+    // condition and keeps the first record.
+    await this.database.$executeRaw`
+      ${skipTenantCheck({
+        // An organization is addressed by its own primary key.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "Organization"
+         SET "piiRedactionModelAcceptedAt" = ${toDate(input.at)},
+             "piiRedactionModelAcceptedByUserId" = ${input.userId},
+             "updatedAt" = now()
+       WHERE "id" = ${input.organizationId}
+         AND "piiRedactionModelAcceptedAt" IS NULL
     `;
   }
 
@@ -563,15 +695,37 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
     expiresAt: Instant;
     validatedAt: Instant | null;
   }): Promise<void> {
-    const { count } = await this.database.organization.updateMany({
-      where: { id: input.organizationId },
-      data: {
-        license: input.licenseKey,
-        licenseExpiresAt: toDate(input.expiresAt),
-        licenseLastValidatedAt: input.validatedAt && toDate(input.validatedAt),
-      },
+    // The organization row is locked first, as licensing's conditional write does, and
+    // licensing's row is read under a share lock, so a key it stores meanwhile is seen.
+    const found = await this.database.$transaction(async (transaction) => {
+      const organizations = await transaction.$queryRaw<{ id: string }[]>`
+        ${skipTenantCheck({
+          // An organization is addressed by its own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        SELECT "id" FROM "Organization" WHERE "id" = ${input.organizationId} FOR UPDATE
+      `;
+      if (organizations.length === 0) return false;
+      const held = await transaction.$queryRaw<{ licenseKey: string | null }[]>`
+        ${skipTenantCheck({
+          // Licensing's row is keyed by the organization's own primary key.
+          SKIP_TENANT_CHECK: true,
+        })}
+        SELECT "licenseKey" FROM "OrganizationLicense"
+         WHERE "organizationId" = ${input.organizationId} FOR SHARE
+      `;
+      if (held[0]?.licenseKey !== input.licenseKey) return true;
+      await transaction.organization.update({
+        where: { id: input.organizationId },
+        data: {
+          license: input.licenseKey,
+          licenseExpiresAt: toDate(input.expiresAt),
+          licenseLastValidatedAt: input.validatedAt && toDate(input.validatedAt),
+        },
+      });
+      return true;
     });
-    if (count === 0) throw new OrganizationNotFoundError();
+    if (!found) throw new OrganizationNotFoundError();
   }
 
   async clearLicense(input: { organizationId: string }): Promise<void> {
@@ -632,6 +786,16 @@ export class PrismaOrganizationRepository extends OrganizationRepository {
   }): Promise<EnsuredPersonalTeam> {
     try {
       return await this.database.$transaction(async (transaction) => {
+        const membership = await transaction.organizationUser.findUnique({
+          where: {
+            userId_organizationId: {
+              userId: input.workspace.userId,
+              organizationId: input.workspace.organizationId,
+            },
+          },
+          select: { billingOnly: true },
+        });
+        if (membership?.billingOnly) throw new BillingOnlyNoTeamAccessError();
         const existing = await this.tryFindPersonalTeam(transaction, input.workspace);
         if (existing) return existing;
 
@@ -863,4 +1027,9 @@ function mapPersonalWorkspace(
       createdAtMs: project.createdAt.getTime(),
     },
   };
+}
+
+/** The query as a literal substring: LIKE reads `%`, `_` and `\\` as patterns otherwise. */
+function literalSubstring(query: string): string {
+  return query.replace(/[\\%_]/g, (character) => `\\${character}`);
 }

@@ -7,7 +7,14 @@
  */
 import type { QueryCompleteness } from "@langwatch/analytics-contract";
 import type { ChartQueryError } from "@langwatch/analytics-contract/chart-frame-protocol";
+import type { UiAnalytics } from "@langwatch/browser-host/analytics";
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import {
+  createUiHostServicesFromHost,
+  RecordingUiAnalytics,
+} from "@langwatch/browser-host/testing";
 import { DesignSystemProvider } from "@langwatch/design-system/provider";
+import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { act, cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -79,6 +86,30 @@ const widget = (refreshedAt?: number) => (
   </AnalyticsHostProvider>
 );
 
+/** The widget on board_1, under a host whose analytics records what it reports. */
+const reportingWidget = (analytics: UiAnalytics) => (
+  <UiHostServicesContextProvider
+    value={{
+      ...createUiHostServicesFromHost({
+        route: () => ({ params: {}, query: {} }),
+        navigate: () => void 0,
+      }),
+      analytics,
+    }}
+  >
+    <AnalyticsHostProvider value={new StubAnalyticsHost()}>
+      <DashboardWidgetFrame
+        id="graph_1"
+        graph={GRAPH}
+        projectId="project_1"
+        projectSlug="project"
+        maxHeight={300}
+        dashboardId="board_1"
+      />
+    </AnalyticsHostProvider>
+  </UiHostServicesContextProvider>
+);
+
 beforeEach(() => {
   periodMock.mockReturnValue(period({ startMs: 1_000, endMs: 2_000 }));
   executorMock.mockReturnValue({
@@ -148,6 +179,182 @@ describe("given a placed dashboard widget", () => {
 
       expect(screen.getByTestId("frame-diagnostic-badge")).toBeTruthy();
       expect(screen.getByTestId("sandboxed-frame")).toBeTruthy();
+    });
+  });
+});
+
+describe("given a placed dashboard widget whose frame reports an error", () => {
+  describe("when the widget crashes while drawing, and says so twice", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports one exception naming the frame, the board and the widget", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+      const crash = {
+        level: "error",
+        source: "lw.error",
+        text: "Render error: x is undefined",
+      } as const;
+
+      act(() => {
+        lastFrameProps().onLog(crash);
+        lastFrameProps().onLog(crash);
+      });
+
+      expect(analytics.exceptions).toHaveLength(1);
+      // Text only: an Error built here would carry this host's stack, not the widget's.
+      expect(analytics.exceptions[0]?.error).toBe("Render error: x is undefined");
+      expect(analytics.exceptions[0]?.properties).toEqual({
+        surface: "dashboard_widget_frame",
+        widgetId: "graph_1",
+        dashboardId: "board_1",
+      });
+    });
+  });
+
+  describe("when the crash text runs over several lines", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports only the first line", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: "Render error: x is undefined\n  at row value secret-ish",
+        });
+      });
+
+      expect(analytics.exceptions[0]?.error).toBe("Render error: x is undefined");
+    });
+  });
+
+  describe("when two crashes share a first line but differ on later lines", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports the crash once", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+      const crashWith = (detail: string) =>
+        ({
+          level: "error",
+          source: "lw.error",
+          text: `Render error: x is undefined\n  at ${detail}`,
+        }) as const;
+
+      act(() => {
+        lastFrameProps().onLog(crashWith("row one"));
+        lastFrameProps().onLog(crashWith("row two"));
+      });
+
+      expect(analytics.exceptions).toHaveLength(1);
+    });
+  });
+
+  describe("when the crash text is one very long line", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports at most 200 characters", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: `Render error: ${"x".repeat(500)}`,
+        });
+      });
+
+      expect(String(analytics.exceptions[0]?.error).length).toBeLessThanOrEqual(200);
+    });
+  });
+
+  describe("when a crash's first line runs past 200 characters with a key across the cut", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("drops the partial word, so no start of the key is sent", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+      const prefix = `Widget crashed while rendering: ${"x ".repeat(79)}`;
+      const key = `sk-${"A1b2C3d4E5".repeat(3)}`;
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: `${prefix}${key} and then more text`,
+        });
+      });
+
+      const reported = String(analytics.exceptions[0]?.error);
+      expect(prefix).toHaveLength(190);
+      expect(reported).not.toContain("sk-");
+      expect(reported).not.toContain("A1b2C3d4E5");
+    });
+  });
+
+  describe("when the widget keeps crashing with new first lines", () => {
+    /** @scenario "Telemetry: a widget that keeps crashing with new messages stops reporting after five" */
+    it("reports the first five distinct crashes and no more", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+      const crashWith = (text: string) => ({ level: "error", source: "lw.error", text }) as const;
+
+      act(() => {
+        for (let n = 1; n <= 7; n++) lastFrameProps().onLog(crashWith(`Render error: row ${n}`));
+        lastFrameProps().onLog(crashWith("Render error: row 1"));
+      });
+
+      expect(analytics.exceptions.map(({ error }) => error)).toEqual([
+        "Render error: row 1",
+        "Render error: row 2",
+        "Render error: row 3",
+        "Render error: row 4",
+        "Render error: row 5",
+      ]);
+    });
+  });
+
+  describe("when the frame's own libraries do not load", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports it under the frame's load surface", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: "Compiler failed to load: Babel did not load from the CDN.",
+        });
+      });
+
+      expect(analytics.exceptions.map(({ properties }) => properties)).toEqual([
+        { surface: "dashboard_widget_frame_load", widgetId: "graph_1", dashboardId: "board_1" },
+      ]);
+    });
+  });
+
+  describe("when the frame refuses the widget's own source, or the code logs an error", () => {
+    /** @scenario "Telemetry: a chart or a board header action that crashes while drawing is reported as an exception" */
+    it("reports nothing", () => {
+      const analytics = new RecordingUiAnalytics();
+      renderWithDesignSystem(reportingWidget(analytics));
+
+      act(() => {
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: "Compile error: Unexpected token (1:7)",
+        });
+        lastFrameProps().onLog({
+          level: "error",
+          source: "lw.error",
+          text: "No default export: The widget file must export default a React component.",
+        });
+        lastFrameProps().onLog({ level: "error", source: "console", text: "Render error" });
+      });
+
+      expect(screen.getByTestId("frame-diagnostic-badge")).toBeTruthy();
+      expect(analytics.exceptions).toEqual([]);
     });
   });
 });
@@ -301,23 +508,22 @@ describe("given a widget on a board", () => {
   });
 
   describe("when its query fails on a limit", () => {
-    const BUILT_IN_WORDS =
-      "This widget hit a LangWatch limit in the selected period. This is not a problem with your data.";
+    const NOT_YOUR_DATA = "This is not a problem with your data.";
 
     /** @scenario "A built-in widget that fails on a limit says the limit is LangWatch's" */
-    it.each([OUT_OF_MEMORY, TIMED_OUT])(
-      "tells a built-in card the limit is LangWatch's, for $code",
-      async (error) => {
-        const run = frameRuns(() => Promise.reject(error));
-        render(boardWidget({ limitAudience: { kind: "built_in" } }));
-        await run();
+    it.each([
+      [OUT_OF_MEMORY, `This widget hit a LangWatch limit in the selected period. ${NOT_YOUR_DATA}`],
+      [TIMED_OUT, `This query took longer than 60 s, the most a widget may take. ${NOT_YOUR_DATA}`],
+    ])("tells a built-in card the limit is LangWatch's, for %#", async (error, words) => {
+      const run = frameRuns(() => Promise.reject(error));
+      render(boardWidget({ limitAudience: { kind: "built_in" } }));
+      await run();
 
-        expect(screen.getByText("Couldn't load")).toBeTruthy();
-        expect(screen.getByText(BUILT_IN_WORDS)).toBeTruthy();
-        expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
-        expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
-      },
-    );
+      expect(screen.getByText("Couldn't load")).toBeTruthy();
+      expect(screen.getByText(words)).toBeTruthy();
+      expect(screen.getByRole("button", { name: "Retry" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Edit code" })).toBeNull();
+    });
 
     /** @scenario "An editable widget that fails on memory says its query used too much" */
     it("tells an editable card its query used too much memory and offers the edits", async () => {
@@ -336,12 +542,14 @@ describe("given a widget on a board", () => {
     });
 
     /** @scenario "An editable widget that fails on time says its query ran too long" */
-    it("tells an editable card its query ran past the time a widget may take", async () => {
+    it("tells an editable card its query took longer than the 60 s a widget may take", async () => {
       const run = frameRuns(() => Promise.reject(TIMED_OUT));
       render(boardWidget({ limitAudience: { kind: "editable", onEditCode: vi.fn() } }));
       await run();
 
-      expect(screen.getByText("The query ran past the time a widget may take.")).toBeTruthy();
+      expect(
+        screen.getByText("This query took longer than 60 s, the most a widget may take."),
+      ).toBeTruthy();
     });
 
     /** @scenario "A reader who cannot edit is told to ask someone who can" */
@@ -360,7 +568,11 @@ describe("given a widget on a board", () => {
     /** @scenario "A failed limit card carries short words beside the full words" */
     it.each([
       [OUT_OF_MEMORY, "The query used more memory than a widget may use.", "Hit the memory limit."],
-      [TIMED_OUT, "The query ran past the time a widget may take.", "Hit the time limit."],
+      [
+        TIMED_OUT,
+        "This query took longer than 60 s, the most a widget may take.",
+        "Took longer than 60 s.",
+      ],
     ])("holds hidden short words beside the full ones for %#", async (error, full, short) => {
       const run = frameRuns(() => Promise.reject(error));
       render(boardWidget({ limitAudience: { kind: "editable" } }));
@@ -599,21 +811,21 @@ describe("given a widget on a board whose queries are running", () => {
     });
 
     /** @scenario "A widget that loads for long says it is still loading" */
-    it("says it is still loading", () => {
+    it("says it is a slow query, still running", () => {
       vi.useFakeTimers();
       frameRuns(() => new Promise(() => undefined));
       render(boardWidget({}));
-      expect(screen.queryByText("Still loading…")).toBeNull();
+      expect(screen.queryByText("Slow query, still running…")).toBeNull();
 
       act(() => {
         vi.advanceTimersByTime(4_999);
       });
-      expect(screen.queryByText("Still loading…")).toBeNull();
+      expect(screen.queryByText("Slow query, still running…")).toBeNull();
       act(() => {
         vi.advanceTimersByTime(1);
       });
 
-      expect(screen.getByText("Still loading…")).toBeTruthy();
+      expect(screen.getByText("Slow query, still running…")).toBeTruthy();
     });
   });
 

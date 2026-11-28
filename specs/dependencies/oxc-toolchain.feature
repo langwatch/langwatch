@@ -95,6 +95,14 @@ Feature: Repository-wide Oxc lint and format toolchain
       Then the command exits non-zero
       And the file remains byte-for-byte unchanged
 
+    @integration @format @ci @unimplemented
+    Scenario: A failing CI format check prints the fix and leaves the worktree unchanged
+      Given a supported first-party file is not in canonical Oxfmt form
+      When the CI format step runs
+      Then the step exits non-zero
+      And the log shows the Oxfmt fix as a diff, cut at 2000 lines
+      And the worktree is byte-identical to the checkout when the step ends, untracked files included
+
     @integration @format @unimplemented
     Scenario: The write command produces the checked representation
       Given a supported first-party file is not in canonical Oxfmt form

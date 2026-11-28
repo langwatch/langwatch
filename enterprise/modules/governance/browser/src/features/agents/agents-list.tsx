@@ -4,6 +4,7 @@ import type { GovernanceAgentRow } from "@langwatch/enterprise-governance-contra
 import { LayoutGrid, List as ListIcon } from "lucide-react";
 
 import { AgentCard } from "./agent-card";
+import type { AgentRowExtras } from "./agent-row-extras";
 import { AgentsTable } from "./agents-table";
 
 /**
@@ -66,13 +67,15 @@ export function AgentsList({
   agents,
   layout,
   sample = false,
+  extras,
 }: {
   agents: readonly GovernanceAgentRow[];
   layout: AgentsLayout;
   sample?: boolean;
+  extras?: AgentRowExtras;
 }) {
   if (layout === "list") {
-    return <AgentsTable agents={agents} sample={sample} />;
+    return <AgentsTable agents={agents} sample={sample} extras={extras} />;
   }
 
   return (
@@ -83,7 +86,7 @@ export function AgentsList({
       gap={3}
     >
       {agents.map((agent) => (
-        <AgentCard key={agent.id} agent={agent} sample={sample} />
+        <AgentCard key={agent.id} agent={agent} sample={sample} extras={extras} />
       ))}
     </SimpleGrid>
   );

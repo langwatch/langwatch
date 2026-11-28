@@ -1,15 +1,113 @@
 /**
  * The decision models the Instant Evals column may hold (ADR-182 decision 2): the hosted, metered
- * LangWatch Evals Preview, then own-key models behind the own-decision-model flag. Ids read
+ * LangWatch Instant (preview), then own-key models behind the own-decision-model flag. Ids read
  * `<provider>/decisions:<model>` so none collides with a chat model of the same name.
  */
 
 import type { ModelRole } from "./model-feature-registry.ts";
 
-/** Same id as `INSTANT_EVAL_JUDGE_MODEL_ID`; a contract never imports another module's contract. */
-export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-evals";
+/** The hosted default's current id, the decision model alone; writes store the written id. */
+export const LANGWATCH_DECISION_MODEL_ID = "langwatch/instant-preview";
 
-const EVALS_PREVIEW = { label: "Evals Preview", description: "Optimized for evals" } as const;
+/** The hosted judge router (ADR-190): an LLM judge picks it where the router flag is on. */
+export const LANGWATCH_EVALS_MODEL_ID = "langwatch/evals-preview";
+
+/**
+ * LangWatch's hosted scenario judge. Not a decision model: it sits in LANGWATCH_DECISION_PREVIEWS
+ * only for its label and the column it fills. Only the Judge column and a scenario's or suite's
+ * judge may hold it.
+ */
+export const LANGWATCH_JUDGE_MODEL_ID = "langwatch/judge-preview";
+
+export function isLangWatchJudgeModelId(id: string): boolean {
+  return id === LANGWATCH_JUDGE_MODEL_ID;
+}
+
+/** The one feature the model serves: the scenario judge, and so the Judge column that feeds it. */
+export const LANGWATCH_JUDGE_FEATURE_KEY = "scenarios.judge";
+
+/** Whether a config about to be stored newly picks LangWatch Judge (preview) under any key. */
+export function picksLangWatchJudgeModel({
+  config,
+  stored = {},
+}: {
+  config: Readonly<Record<string, string>>;
+  /** What the config held before; a value kept as it was is not a new pick. */
+  stored?: Readonly<Record<string, string>>;
+}): boolean {
+  return Object.entries(config).some(
+    ([key, model]) => isLangWatchJudgeModelId(model) && stored[key] !== model,
+  );
+}
+
+/**
+ * The id every LangWatch hosted pick is written as, in Default models and judge settings: the one
+ * the previous release reads (expand then contract, ADR-182 amendment 2026-11-23). Where the
+ * router flag is on, a judge on it is routed. Writing the -preview ids is a planned follow-up.
+ */
+export const LANGWATCH_WRITTEN_MODEL_ID = "langwatch/instant-evals";
+
+/** The earlier public id, read wherever a stored or sent id is read. Pickers never list it. */
+export const LEGACY_LANGWATCH_MODEL_IDS: Readonly<Record<string, string>> = {
+  [LANGWATCH_WRITTEN_MODEL_ID]: LANGWATCH_DECISION_MODEL_ID,
+};
+
+/** The current id of a model: a legacy LangWatch id reads as its new one, any other id as is. */
+export function canonicalModelId(id: string): string {
+  return Object.hasOwn(LEGACY_LANGWATCH_MODEL_IDS, id) ? LEGACY_LANGWATCH_MODEL_IDS[id]! : id;
+}
+
+/** The id a write stores: any LangWatch hosted id as the written one, any other id as is. */
+export function writtenModelId(id: string): string {
+  return isLangWatchDecisionModelId(id) ? LANGWATCH_WRITTEN_MODEL_ID : id;
+}
+
+/**
+ * Whether an LLM judge naming this id goes through the judge router where its flag is on: Evals
+ * Preview, and the written id, which was routed before LangWatch Instant (preview) split from it.
+ */
+export function isJudgeRoutedModelId(id: string): boolean {
+  return id === LANGWATCH_EVALS_MODEL_ID || id === LANGWATCH_WRITTEN_MODEL_ID;
+}
+
+/**
+ * The id an LLM judge's picker shows for a stored one. A hosted id reads as the written id the
+ * picker offers (LangWatch Evals where the router flag is on, else LangWatch Instant), except
+ * LangWatch Instant itself where the flag is on: it is never routed, so it keeps its own name.
+ */
+export function judgeShownModelIdOf({
+  id,
+  isJudgeRouted,
+}: {
+  id: string;
+  isJudgeRouted: boolean;
+}): string {
+  if (!isLangWatchDecisionModelId(id)) return id;
+  if (isJudgeRouted && !isJudgeRoutedModelId(id)) return LANGWATCH_DECISION_MODEL_ID;
+  return LANGWATCH_WRITTEN_MODEL_ID;
+}
+
+/** Whether a LangWatch hosted model may fill this Default models column, from its `fills`. */
+export function isLangWatchModelFillingRole(id: string, role: ModelRole): boolean {
+  const canonical = canonicalModelId(id);
+  return LANGWATCH_DECISION_PREVIEWS.some(
+    (preview) => preview.id === canonical && preview.fills.includes(role),
+  );
+}
+
+/** The LangWatch hosted models that fill a Default models column, in catalogue order. */
+export function langWatchModelsFillingRole(role: ModelRole): LangWatchDecisionPreview[] {
+  return LANGWATCH_DECISION_PREVIEWS.filter((preview) => preview.fills.includes(role));
+}
+
+const INSTANT_PREVIEW = {
+  label: "LangWatch Instant (preview)",
+  description: "Optimized for search and quick classification",
+} as const;
+const EVALS_PREVIEW = {
+  label: "LangWatch Evals (preview)",
+  description: "Optimized for evals",
+} as const;
 
 /** One of LangWatch's own decision models, named for what it is optimized for. */
 export type LangWatchDecisionPreview = Readonly<{
@@ -18,25 +116,24 @@ export type LangWatchDecisionPreview = Readonly<{
   description: string;
   /** The Default models columns it can fill; empty while it is not hosted yet. */
   fills: readonly ModelRole[];
+  /** Picked only on an LLM judge, where the judge router flag is on; no column lists it. */
+  isJudgeRouter?: true;
 }>;
 
 /**
- * LangWatch's decision models, first in the Instant Evals picker. Only Evals Preview is hosted;
- * the others are listed as coming soon. Making one pickable is adding its column here.
+ * LangWatch's own hosted models and the Default models column each fills: Instant (preview) fills
+ * Instant Evals, Evals (preview) is for LLM judges only, Judge (preview) fills Judge. The Instant
+ * Evals and Judge pickers list what fills their column, so a new pick is a column added here.
  */
 export const LANGWATCH_DECISION_PREVIEWS: readonly LangWatchDecisionPreview[] = [
-  { id: LANGWATCH_DECISION_MODEL_ID, ...EVALS_PREVIEW, fills: ["INSTANT_EVALS"] },
+  { id: LANGWATCH_DECISION_MODEL_ID, ...INSTANT_PREVIEW, fills: ["INSTANT_EVALS"] },
+  { id: LANGWATCH_EVALS_MODEL_ID, ...EVALS_PREVIEW, fills: [], isJudgeRouter: true },
   {
-    id: "langwatch/scenario-judge-preview",
-    label: "Scenario Judge Preview",
+    id: LANGWATCH_JUDGE_MODEL_ID,
+    label: "LangWatch Judge (preview)",
     description: "Optimized for scenario judge",
-    fills: [],
-  },
-  {
-    id: "langwatch/search-preview",
-    label: "Search Preview",
-    description: "Optimized for search",
-    fills: [],
+    // The Judge pickers list it from this, where the judge preview flag is on.
+    fills: ["JUDGE"],
   },
 ];
 
@@ -46,13 +143,18 @@ export const INSTANT_EVAL_DECISION_FEATURE_KEY = "instant_eval.judge";
 /**
  * The request shapes the Instant Evals judge speaks, one channel each (ADR-182 decision 8).
  * `jev` is the System One body (Jev, Inception, Perplexity, Microsoft-Decision-1, OpenRouter);
- * Cloudflare's REST route wraps that answer in `result`, which `cloudflare_jev` unwraps.
+ * `cloudflare_jev` unwraps Cloudflare's `result`; `gemini_decisions` sends `input`, not `state`.
  */
-export const DECISION_MODEL_WIRES = ["openai_decisions", "jev", "cloudflare_jev"] as const;
+export const DECISION_MODEL_WIRES = [
+  "openai_decisions",
+  "jev",
+  "cloudflare_jev",
+  "gemini_decisions",
+] as const;
 export type DecisionModelWire = (typeof DECISION_MODEL_WIRES)[number];
 
-/** How the key travels: `Authorization: Bearer`, or Azure's `api-key` header. */
-export const DECISION_MODEL_AUTH_HEADERS = ["bearer", "api_key"] as const;
+/** How the key travels: `Authorization: Bearer`, Azure's `api-key` or Google's `x-goog-api-key`. */
+export const DECISION_MODEL_AUTH_HEADERS = ["bearer", "api_key", "goog_api_key"] as const;
 export type DecisionModelAuthHeader = (typeof DECISION_MODEL_AUTH_HEADERS)[number];
 
 /**
@@ -99,6 +201,11 @@ const OPENROUTER_DECISIONS = "https://openrouter.ai/api/alpha/decisions";
 export const DECISION_MODELS: readonly DecisionModelEntry[] = [
   {
     id: LANGWATCH_DECISION_MODEL_ID,
+    provider: "langwatch",
+    ...INSTANT_PREVIEW,
+  },
+  {
+    id: LANGWATCH_EVALS_MODEL_ID,
     provider: "langwatch",
     ...EVALS_PREVIEW,
   },
@@ -223,6 +330,16 @@ export const DECISION_MODELS: readonly DecisionModelEntry[] = [
     endpoint: OPENROUTER_DECISIONS,
   },
   {
+    id: "gemini/decisions:gemini-decision-1",
+    provider: "gemini",
+    label: "Gemini Decision 1",
+    description: "Google's Gemini Decisions API, on your AI Studio key.",
+    wire: "gemini_decisions",
+    providerModel: "gemini-decision-1",
+    endpoint: "https://generativelanguage.googleapis.com/v1beta/decisions",
+    authHeader: "goog_api_key",
+  },
+  {
     id: "fireworks/decisions:rune",
     provider: "fireworks",
     label: "Fireworks Rune",
@@ -251,7 +368,8 @@ export function azureResourceOf(endpoint: string): AzureEndpointRead {
 }
 
 export function findDecisionModel(id: string): DecisionModelEntry | undefined {
-  return DECISION_MODELS.find((entry) => entry.id === id);
+  const canonical = canonicalModelId(id);
+  return DECISION_MODELS.find((entry) => entry.id === canonical);
 }
 
 /** A decision model's title in a picker row or chip, beside its provider icon. */
@@ -265,7 +383,12 @@ export function isDecisionModelId(id: string): boolean {
 
 /** Whether a stored column value runs on the organization's own key. */
 export function isOwnDecisionModelId(id: string): boolean {
-  return isDecisionModelId(id) && id !== LANGWATCH_DECISION_MODEL_ID;
+  return isDecisionModelId(id) && !isLangWatchDecisionModelId(id);
+}
+
+/** Whether an id names one of LangWatch's hosted decision models, under any of its ids. */
+export function isLangWatchDecisionModelId(id: string): boolean {
+  return findDecisionModel(id)?.provider === "langwatch";
 }
 
 /** Why a project's own decision model cannot run; none of them falls back to LangWatch. */

@@ -1,5 +1,5 @@
 import { createLogger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 
 import type { GroupQueueRedis } from "../dependencies-adapter.ts";
 import { deleteStrandedGroup } from "../scripts.ts";
@@ -46,7 +46,7 @@ export async function reapStrandedGroups({
   minAgeHours = 6,
   apply = false,
   signal,
-  now = () => nowInstant().epochMilliseconds,
+  now = () => nowEpochMs(),
 }: {
   redis: GroupQueueRedis;
   keyPrefix?: string;

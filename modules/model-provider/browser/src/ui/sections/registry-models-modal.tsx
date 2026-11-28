@@ -3,7 +3,7 @@ import { Dialog } from "@langwatch/design-system/dialog";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import { Box, HStack, Input, Text, VStack } from "@langwatch/design-system/primitives";
 import { SmallLabel } from "@langwatch/design-system/small-label";
-import { getProviderModelOptions } from "@langwatch/model-provider-contract";
+import { getProviderModelOptions, type CustomModelEntry } from "@langwatch/model-provider-contract";
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
@@ -11,21 +11,48 @@ type RegistryModelsModalProps = {
   open: boolean;
   onClose: () => void;
   provider: string;
+  /** The provider's own models in place of the catalogue: a custom provider serves only these. */
+  providerModels?: CustomModelEntry[];
   /** `card` keeps the card ground the onboarding page gives its dialogs. */
   ground?: "card";
 };
 
+type ModelOption = { value: string; label: string };
+
+function optionsFor(entries: CustomModelEntry[], mode: CustomModelEntry["mode"]): ModelOption[] {
+  return entries
+    .filter((entry) => entry.mode === mode)
+    .map((entry) => ({ value: entry.modelId, label: entry.displayName }));
+}
+
 /**
- * Read-only modal that displays all registry models for a given provider.
- * Provides a search input to filter models by name.
- * Groups models into Chat and Embedding sections.
+ * Read-only modal that lists a provider's registry models, or its own models when
+ * `providerModels` is given, grouped into Chat and Embedding with a search filter.
  */
-export function RegistryModelsModal({ open, onClose, provider, ground }: RegistryModelsModalProps) {
+export function RegistryModelsModal({
+  open,
+  onClose,
+  provider,
+  providerModels,
+  ground,
+}: RegistryModelsModalProps) {
   const [search, setSearch] = useState("");
 
-  const chatModels = useMemo(() => getProviderModelOptions(provider, "chat"), [provider]);
+  const chatModels = useMemo(
+    () =>
+      providerModels
+        ? optionsFor(providerModels, "chat")
+        : getProviderModelOptions(provider, "chat"),
+    [provider, providerModels],
+  );
 
-  const embeddingModels = useMemo(() => getProviderModelOptions(provider, "embedding"), [provider]);
+  const embeddingModels = useMemo(
+    () =>
+      providerModels
+        ? optionsFor(providerModels, "embedding")
+        : getProviderModelOptions(provider, "embedding"),
+    [provider, providerModels],
+  );
 
   const filteredChatModels = useMemo(() => {
     if (!search.trim()) return chatModels;
@@ -52,7 +79,7 @@ export function RegistryModelsModal({ open, onClose, provider, ground }: Registr
     <Dialog
       open={open}
       onClose={handleClose}
-      title="Registry models"
+      title={providerModels ? "Provider models" : "Registry models"}
       size="lg"
       ground={ground}
       cancelLabel="Close"

@@ -33,6 +33,9 @@ const tips: Record<string, readonly string[]> = {
   langy_idempotency_mismatch: [
     "The same idempotency key was reused with different content — mint a fresh key for every new send",
   ],
+  langy_attachment_refused: [
+    "Attach a PNG, JPEG, GIF or WebP image of 5 MB or less, at most four per message",
+  ],
   langy_empty_message: ["Send a message with actual text content"],
   langy_dispatch_rejected: [
     "The agent rejected this turn's request as invalid — it will not be retried; send a new message",
@@ -86,7 +89,7 @@ const tips: Record<string, readonly string[]> = {
     "The worker died mid-reply and the server already exhausted its recovery — the message is on record, retry manually",
   ],
   langy_agent_errored: [
-    "The model call was rejected upstream — check meta/reasons for the provider's typed failure, then retry",
+    "The reply failed on the cause named in meta/reasons; fix what it names, then retry",
   ],
   langy_turn_timeout: [
     "Retry — or ask for a narrower slice: a shorter time range or a single trace",

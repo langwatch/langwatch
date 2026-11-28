@@ -22,6 +22,14 @@ export interface DataPrivacyProjectScopeSchema extends Named<
 export const dataPrivacyProjectScopeSchema: DataPrivacyProjectScopeSchema =
   dataPrivacyProjectScopeSchemaDefinition;
 
+/** The organization an organization-wide act names, and the door authorizes. */
+const dataPrivacyOrganizationInputSchemaDefinition = z.object({ organizationId: z.string() });
+export interface DataPrivacyOrganizationInputSchema extends Named<
+  typeof dataPrivacyOrganizationInputSchemaDefinition
+> {}
+export const dataPrivacyOrganizationInputSchema: DataPrivacyOrganizationInputSchema =
+  dataPrivacyOrganizationInputSchemaDefinition;
+
 /** The (tier, id) pair a rule hangs on, in the tiers the contract enumerates. */
 const dataPrivacyScopeInputSchemaDefinition = z.object({
   scopeType: z.enum(DATA_PRIVACY_SCOPE_TYPES),
@@ -57,7 +65,7 @@ export const dataPrivacyTrpc = defineTrpcContract("dataPrivacy")
   /**
    * Write the rule at one target, authorized on the TARGET scope (not the
    * project named): ORGANIZATION/DEPARTMENT need `organization:manage`, TEAM
-   * `team:manage`, PROJECT `project:update` — so no member can push a rule up.
+   * `team:manage`, PROJECT `project:manage` — so no member can push a rule up.
    */
   .mutation("setForScope")
   .withInput(
@@ -68,4 +76,11 @@ export const dataPrivacyTrpc = defineTrpcContract("dataPrivacy")
   /** Remove the rule at one target; the next tier up then applies. */
   .mutation("removeForScope")
   .withInput(dataPrivacyScopeTargetInputSchema)
+
+  /**
+   * An organization admin accepts the PII Redaction Model's price for the organization, which
+   * Strict needs on Cloud before it runs, and is billed, on the model (ADR-201 decision 15).
+   */
+  .mutation("acceptPiiRedactionModel")
+  .withInput(dataPrivacyOrganizationInputSchema)
   .build();

@@ -1,5 +1,6 @@
 import {
   extractAiCallFailedInfo,
+  extractAiContentFilteredInfo,
   extractMissingModelInfo,
   extractProviderDisabledInfo,
 } from "@langwatch/browser-host/model-error";
@@ -11,4 +12,5 @@ import {
 export const shouldShowGenericTranslateError = (error: unknown): boolean =>
   !extractMissingModelInfo(error) &&
   !extractAiCallFailedInfo(error) &&
+  !extractAiContentFilteredInfo(error) &&
   !extractProviderDisabledInfo(error);

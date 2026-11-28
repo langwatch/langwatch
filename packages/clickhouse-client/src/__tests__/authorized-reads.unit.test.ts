@@ -2,9 +2,11 @@ import {
   AccessNotGrantedError,
   type Authorization,
   AuthorizationExpiredError,
+  BRAID_CONDITION_EVERY_SPAN,
   ForgedAuthorizationError,
   narrowAuthorization,
   sealAuthorization,
+  SPAN_BRAID_PERMISSION,
 } from "@langwatch/authorization";
 import { tenantScope, tenantSet } from "@langwatch/clickhouse-markers";
 import { describe, expect, it, vi } from "vitest";
@@ -130,6 +132,28 @@ describe("AuthorizedClickHouse", () => {
         expect(sent().retryOnTimeout).toBe(false);
       });
 
+      /** @scenario "A column always wins over an alias of its name" */
+      it("pins a column over an alias of its name, whatever the caller's settings", async () => {
+        const { sent, clickhouse } = clientWith();
+        const reader = clickhouse.as(proof(), { reads: "traces" });
+
+        await reader.query({
+          query: `SELECT TraceId FROM trace_summaries WHERE ${tenantScope("OccurredAt")}`,
+          format: "JSONEachRow",
+          clickhouse_settings: {
+            prefer_column_name_to_alias: 0,
+            enable_global_with_statement: 0,
+            max_threads: 2,
+          },
+        });
+
+        expect(sent().settings).toMatchObject({
+          prefer_column_name_to_alias: 1,
+          enable_global_with_statement: 1,
+          max_threads: 2,
+        });
+      });
+
       // @scenario "The client adds the tenant set from the proof"
       it("restricts the query to tenants aggregate, A and B, and A and B to their windows", async () => {
         const { sent, resolveClient, clickhouse } = clientWith();
@@ -173,9 +197,9 @@ describe("AuthorizedClickHouse", () => {
             query_params: { tenantScope_all: ["proj_elsewhere"] },
           }),
         ).rejects.toMatchObject({ violation: { kind: "reserved-param" } });
-        expect(
+        expect(() =>
           narrowAuthorization({ authorization: proof(), projectId: "proj_elsewhere" }),
-        ).toBeNull();
+        ).toThrow(AccessNotGrantedError);
         expect(execute).not.toHaveBeenCalled();
       });
 
@@ -287,10 +311,15 @@ describe("AuthorizedClickHouse", () => {
             },
             {
               projectId: B,
-              permissions: ["traces:view"],
+              permissions: [SPAN_BRAID_PERMISSION],
               via: ["grant_b"],
               kind: "shared",
-              condition: { type: "span", from: 0, until: null },
+              condition: {
+                type: "span",
+                compiledWhere: BRAID_CONDITION_EVERY_SPAN,
+                from: 0,
+                until: null,
+              },
             },
           ],
         });
@@ -611,14 +640,8 @@ describe("AuthorizedClickHouse", () => {
   });
 
   describe("given an aggregate's proof narrowed to one member", () => {
-    const narrowedTo = (projectId: string): Authorization => {
-      const narrowed = narrowAuthorization({
-        authorization: proof(),
-        projectId,
-      });
-      if (!narrowed) throw new Error(`expected ${projectId} in the proof`);
-      return narrowed;
-    };
+    const narrowedTo = (projectId: string): Authorization =>
+      narrowAuthorization({ authorization: proof(), projectId });
 
     describe("when the fence is built", () => {
       it("fences that member alone, inside its grant's window", () => {

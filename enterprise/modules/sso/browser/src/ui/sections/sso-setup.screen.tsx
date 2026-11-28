@@ -78,7 +78,7 @@ export default function SsoSetupScreen() {
           onNavigate={(href) => navigation?.navigate(href)}
         />
       </PageLayout.Header>
-      <Box paddingTop={4}>
+      <Box>
         <VStack align="stretch" gap={6} width="full">
           <Text color="fg.muted">
             Where your people sign in, and everything it takes to put it in front of them.

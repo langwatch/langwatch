@@ -16,6 +16,10 @@ import type {
   GithubInstallationRow,
   GithubInstallationsRepository,
 } from "../repositories/github-installations.repository.ts";
+import {
+  GITHUB_TURN_OPTIONAL_PERMISSIONS,
+  GITHUB_WRITE_PERMISSIONS,
+} from "../rules/github-app-permissions.rules.ts";
 
 const logger = createLogger("langwatch:github:installation-access");
 
@@ -233,6 +237,7 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
       const minted = await this.appTokens.mintInstallationToken({
         installationId: input.installationId,
         ...(input.repositoryIds ? { repositoryIds: input.repositoryIds } : {}),
+        optionalPermissions: GITHUB_TURN_OPTIONAL_PERMISSIONS,
       });
 
       return {
@@ -240,6 +245,7 @@ export class GithubInstallationAccessService implements GithubInstallationLookup
           token: minted.token,
           repoScopeKey: this.appTokens.computeRepoScopeKey({
             repositoryIds: input.repositoryIds,
+            permissions: { ...GITHUB_TURN_OPTIONAL_PERMISSIONS, ...GITHUB_WRITE_PERMISSIONS },
           }),
           installationId: input.installationId,
         },

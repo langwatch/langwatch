@@ -11,7 +11,7 @@ Datasets and their records: creating, naming, mapping and reading them by slug o
 | Classification | core (`modules/catalogue.json`)                                                                        |
 | Subjects       | dataset, dataset-record                                                                                |
 | Halves         | [contract](contract) · [process](process/README.md) · [browser](browser) · [client](client)            |
-| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:239` (51 operations) |
+| Api token      | `DatasetApi` = `moduleApi<DatasetApi>()("dataset")`, `contract/src/dataset.api.ts:244` (51 operations) |
 | Installed by   | api, worker, tasks (process); ui (browser)                                                             |
 
 ## What dataset owns
@@ -47,6 +47,6 @@ Anything else dataset needs belongs to another module and is reached through its
 
 ## Who depends on dataset
 
-[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [workflow](../workflow/README.md) (as a peer).
+[automation](../automation/README.md), [evaluation](../evaluation/README.md), [experiment](../experiment/README.md), [langy](../langy/README.md), [onboarding](../onboarding/README.md), [ops](../ops/README.md), [staff-access](../staff-access/README.md), [workflow](../workflow/README.md) (as a peer).
 
 <!-- readme:generated:end -->

@@ -23,3 +23,17 @@ Feature: Consistent upgrade and access states
     Given a Lite member is refused an action
     When the access dialog opens
     Then it offers an access request and a way back without a purchase action
+
+  @integration
+  Scenario: A gate inside a card draws no box of its own
+    Given a card that already draws its own surface
+    When an access gate is shown inside it
+    Then the lock sits beside the title on the card's content edge
+    And the gate still names what is missing and offers its actions
+
+  @integration
+  Scenario: A gate that is a page's only content sits on the centre axis
+    Given a page whose only content is an access gate with an illustration
+    When the gate is shown centred
+    Then the lock, the title, the description, the illustration and the actions are centred
+    And an illustration that fills the width still fills it

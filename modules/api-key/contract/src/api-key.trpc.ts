@@ -23,7 +23,9 @@ import {
   apiKeyTrpcUpdateInputSchema,
 } from "./api-key-trpc.schemas.ts";
 import {
+  apiKeyTrpcDocsSessionAvailabilityInputSchema,
   apiKeyTrpcMintDocsSessionKeyInputSchema,
+  docsSessionAvailabilitySchema,
   docsSessionKeyMintedSchema,
 } from "./api-key.docs-session.ts";
 import { apiKeyListEntrySchema, namedApiKeyBindingSchema } from "./api-key.list.ts";
@@ -88,5 +90,10 @@ export const apiKeyTrpc = defineTrpcContract("apiKey")
   .mutation("mintDocsSessionKey")
   .withInput(apiKeyTrpcMintDocsSessionKeyInputSchema)
   .withOutput(docsSessionKeyMintedSchema)
+
+  // Whether the project's organization lets the docs playground connect (ADR-185, 2026-11-13).
+  .query("docsSessionAvailability")
+  .withInput(apiKeyTrpcDocsSessionAvailabilityInputSchema)
+  .withOutput(docsSessionAvailabilitySchema)
 
   .build();

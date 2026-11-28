@@ -4,10 +4,12 @@
  * turn-start to `useChat().error`.
  */
 
-import { beforeEach, describe, expect, it, type Mock, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 import {
   createLangyChatTransport,
+  LANGY_TURN_STREAM_MAX_REATTACHES,
+  LANGY_TURN_STREAM_REATTACH_DELAY_MS,
   type LangyChatTransportDeps,
   type LangyTurnClient,
   type LangyTurnRequestContext,
@@ -457,6 +459,140 @@ describe("createLangyChatTransport", () => {
       handlers().onComplete();
 
       expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
+    });
+  });
+
+  describe("when the connection to a running turn is lost", () => {
+    type StreamHandlers = {
+      onData: (entry: unknown) => void;
+      onError: (err: unknown) => void;
+      onComplete: () => void;
+    };
+    const handlersOf = (call: number) => subscription.mock.calls[call]![2] as StreamHandlers;
+
+    let onTurnSettled: Mock<NonNullable<LangyChatTransportDeps["onTurnSettled"]>>;
+    let onWireEntry: Mock<NonNullable<LangyChatTransportDeps["onWireEntry"]>>;
+    let chunks: { type: string; errorText?: string; delta?: string }[];
+    let done: Promise<void>;
+
+    beforeEach(async () => {
+      vi.useFakeTimers();
+      onTurnSettled = vi.fn();
+      onWireEntry = vi.fn();
+      const { transport } = makeTransport({}, { onTurnSettled, onWireEntry });
+      const stream = await transport.sendMessages(options());
+      chunks = [];
+      done = (async () => {
+        const reader = stream.getReader();
+        for (;;) {
+          const { value, done: finished } = await reader.read();
+          if (finished) return;
+          chunks.push(value as { type: string });
+        }
+      })();
+    });
+
+    afterEach(() => {
+      vi.useRealTimers();
+    });
+
+    /** @scenario "A lost connection follows the running turn instead of failing it" */
+    it("reattaches to the same turn instead of failing it", async () => {
+      handlersOf(0).onData({ type: "delta", text: "Looking", cursor: "100-0" });
+      handlersOf(0).onError(new Error("SSE connection failed after 5 attempts"));
+
+      expect(onTurnSettled).not.toHaveBeenCalled();
+      vi.advanceTimersByTime(LANGY_TURN_STREAM_REATTACH_DELAY_MS);
+      expect(subscription).toHaveBeenCalledTimes(2);
+      expect(subscription.mock.calls[1]![1]).toEqual({
+        projectId: "p1",
+        conversationId: "conv-1",
+        turnId: "turn-1",
+      });
+
+      handlersOf(1).onData({ type: "delta", text: "Looking", cursor: "100-0" });
+      handlersOf(1).onData({ type: "delta", text: " at the traces", cursor: "101-0" });
+      handlersOf(1).onData({ type: "end", cursor: "102-0" });
+      await done;
+
+      expect(chunks.some((chunk) => chunk.type === "error")).toBe(false);
+      expect(chunks.filter((c) => c.type === "text-delta").map((c) => c.delta)).toEqual([
+        "Looking",
+        " at the traces",
+      ]);
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "end" });
+    });
+
+    /** @scenario "A lost connection follows the running turn instead of failing it" */
+    it("skips what a reopened connection replays", async () => {
+      handlersOf(0).onData({ type: "delta", text: "one", cursor: "100-0" });
+      handlersOf(0).onData({ type: "delta", text: "two", cursor: "100-1" });
+      handlersOf(0).onData({ type: "delta", text: "one", cursor: "100-0" });
+      handlersOf(0).onData({ type: "delta", text: "two", cursor: "100-1" });
+      handlersOf(0).onData({ type: "delta", text: "three", cursor: "101-0" });
+      handlersOf(0).onData({ type: "end", cursor: "102-0" });
+      await done;
+
+      expect(chunks.filter((c) => c.type === "text-delta").map((c) => c.delta)).toEqual([
+        "one",
+        "two",
+        "three",
+      ]);
+      expect(onWireEntry).toHaveBeenCalledTimes(4);
+    });
+
+    /** @scenario "A reattach to a turn longer than its buffer drops nothing it had not shown" */
+    it("skips by cursor when the replayed buffer was trimmed", async () => {
+      const shown = Array.from({ length: 2500 }, (_, i) => `t${i}`);
+      shown.forEach((text, i) =>
+        handlersOf(0).onData({ type: "delta", text, cursor: `${1000 + i}-0` }),
+      );
+      handlersOf(0).onError(new Error("SSE connection failed after 5 attempts"));
+      vi.advanceTimersByTime(LANGY_TURN_STREAM_REATTACH_DELAY_MS);
+
+      // The buffer keeps only its last ~2000 entries, so the replay starts mid-turn.
+      for (let i = 500; i < 2500; i++) {
+        handlersOf(1).onData({ type: "delta", text: `t${i}`, cursor: `${1000 + i}-0` });
+      }
+      handlersOf(1).onData({ type: "delta", text: "new-1", cursor: "3500-0" });
+      handlersOf(1).onData({ type: "delta", text: "new-2", cursor: "3501-0" });
+      handlersOf(1).onData({ type: "end", cursor: "3502-0" });
+      await done;
+
+      const deltas = chunks.filter((c) => c.type === "text-delta").map((c) => c.delta);
+      expect(deltas.slice(-2)).toEqual(["new-1", "new-2"]);
+      expect(deltas).toHaveLength(2502);
+    });
+
+    /** @scenario "A stream the server refused by name still fails the turn" */
+    it("fails at once on a refusal the server named", async () => {
+      handlersOf(0).onError(new Error("langy_conversation_not_found"));
+      await done;
+
+      expect(chunks).toContainEqual({ type: "error", errorText: "langy_conversation_not_found" });
+      expect(subscription).toHaveBeenCalledTimes(1);
+      expect(onTurnSettled).toHaveBeenCalledExactlyOnceWith({ reason: "error" });
+    });
+
+    /** @scenario "A lost connection follows the running turn instead of failing it" */
+    it("gives the loss to the panel only after every reattach failed", async () => {
+      for (let attempt = 0; attempt < LANGY_TURN_STREAM_MAX_REATTACHES; attempt++) {
+        handlersOf(attempt).onError(new Error("SSE connection failed after 5 attempts"));
+        vi.advanceTimersByTime(60_000);
+      }
+      expect(subscription).toHaveBeenCalledTimes(LANGY_TURN_STREAM_MAX_REATTACHES + 1);
+
+      handlersOf(LANGY_TURN_STREAM_MAX_REATTACHES).onError(
+        new Error("SSE connection failed after 5 attempts"),
+      );
+      await done;
+
+      expect(chunks.at(-2)).toEqual({
+        type: "error",
+        errorText: "SSE connection failed after 5 attempts",
+      });
+      vi.advanceTimersByTime(60_000);
+      expect(subscription).toHaveBeenCalledTimes(LANGY_TURN_STREAM_MAX_REATTACHES + 1);
     });
   });
 

@@ -15,6 +15,7 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { ProjectAvatar } from "@langwatch/design-system/project-avatar";
 import { Tooltip } from "@langwatch/design-system/tooltip";
 import { CreateProjectDrawerToken } from "@langwatch/organization-client";
 import { HelpCircle, Plus, Trash2 } from "lucide-react";
@@ -33,7 +34,6 @@ import { api, type RouterOutputs } from "../../behavior/organization-api.ts";
 import { useDrawer } from "../../behavior/use-drawer.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
-import { ProjectAvatar } from "../elements/project-avatar.tsx";
 
 /**
  * One team as this form reads it: whatever `team.getTeamWithMembers` answers.

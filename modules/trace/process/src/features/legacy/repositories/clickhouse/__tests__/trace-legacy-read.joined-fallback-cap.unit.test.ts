@@ -64,7 +64,7 @@ function spanRow({ traceId, spanIndex }: { traceId: string; spanIndex: number })
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: 1,
-    StartTime: String(OCCURRED_AT),
+    StartTimeMs: String(OCCURRED_AT),
     EndTime: String(OCCURRED_AT + 1),
     DurationMs: "1",
     SpanName: "span",

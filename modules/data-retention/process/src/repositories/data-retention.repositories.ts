@@ -3,6 +3,7 @@ import type { DataRetentionCacheRepository } from "./data-retention-cache.reposi
 import type { DataRetentionProjectScopeRepository } from "./data-retention-project-scope.repository.ts";
 import type { DataRetentionRepository } from "./data-retention.repository.ts";
 import type { PinnedTraceRepository } from "./pinned-trace.repository.ts";
+import type { RetentionApplyStatusRepository } from "./retention-apply-status.repository.ts";
 import type { RetroactiveRetentionRepository } from "./retroactive-retention.repository.ts";
 import type { StorageMeterCacheRepository } from "./storage-meter-cache.repository.ts";
 import type { StorageMeterRepository } from "./storage-meter.repository.ts";
@@ -22,4 +23,6 @@ export interface DataRetentionRepositories {
   readonly cache: DataRetentionCacheRepository;
   /** Measured storage per tenant, and who may refresh it. */
   readonly storageMeterCache: StorageMeterCacheRepository;
+  /** Per scope, whether its last saved change reached stored data. */
+  readonly applyStatus: RetentionApplyStatusRepository;
 }

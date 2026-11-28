@@ -164,6 +164,8 @@ jobs:
           test -x "$(dirname "$gyp")/../gyp/gyp_main.py"
           echo "npm_config_node_gyp=$gyp" >> "$GITHUB_ENV"
 
+      - uses: ./.github/actions/apt-ubuntu-sources
+
       # Install ONLY tools that aren't predeps but the CLI needs to operate
       # (lsof for port-collision detection on linux). Postgres, redis,
       # clickhouse, uv, and goose all flow through their respective predeps,
@@ -214,6 +216,32 @@ jobs:
         run: pnpm run build:server
         env:
           NODE_ENV: production
+
+      # The aigateway predep downloads its binary from the v$VERSION release,
+      # which npx-server-publish.yml fills well after release-please bumps the
+      # version on main. In that window the download 404s and the boot fails, so
+      # this step builds the binary with the publish flags into
+      # $LANGWATCH_HOME/bin, where the predep finds the right version.
+      - name: Build aigateway when the release has no binary for it yet
+        shell: bash
+        run: |
+          set -euo pipefail
+          version="$(node -p "require('./apps/server/package.json').version")"
+          os="$(uname -s | tr '[:upper:]' '[:lower:]')"
+          case "$(uname -m)" in
+            x86_64|amd64) arch=amd64 ;;
+            arm64|aarch64) arch=arm64 ;;
+            *) echo "✗ no aigateway build for $(uname -m)"; exit 1 ;;
+          esac
+          url="https://github.com/langwatch/langwatch/releases/download/v$version/aigateway-$os-$arch"
+          if curl -fsSL --connect-timeout 5 --max-time 60 -r 0-0 -o /dev/null "$url"; then
+            echo "✓ $url is published, the predep downloads it"
+            exit 0
+          fi
+          echo "::notice::$url is not published yet, building aigateway $version with the publish flags"
+          mkdir -p "$LANGWATCH_HOME/bin"
+          CGO_ENABLED=0 go build -ldflags="-s -w -X main.Version=$version" \
+            -o "$LANGWATCH_HOME/bin/aigateway" ./cmd/service
 
       # The publish job builds and checks each archive with these two scripts.
       - name: Build and check this runner's app archive
@@ -520,6 +548,7 @@ jobs:
           retention-days: 7
 
   alls-green:
+    timeout-minutes: 5
     if: always()
     needs: [smoke]
     runs-on: ubuntu-latest

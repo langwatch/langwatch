@@ -13,6 +13,7 @@ import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 import type { SubsystemProbeChannel } from "../channels/subsystem-probe.channel.ts";
 import {
   canaryHeaders,
+  canaryAnswerOf,
   otelCanaryPayload,
   readbackHeaders,
   restCanaryPayload,
@@ -287,10 +288,15 @@ export class SubsystemProbeService {
     return { ok: true, status: response.status, body: await response.json() };
   }
 
-  async #withRetries(send: () => Promise<Response>): Promise<Response> {
+  /** Sends up to three times, a second apart, while `retryWhen` holds; drops a refused body. */
+  async #withRetries(
+    send: () => Promise<Response>,
+    retryWhen: (response: Response, attempt: number) => boolean = (response) => !response.ok,
+  ): Promise<Response> {
     const maxAttempts = 3;
     let response = await send();
-    for (let attempt = 1; attempt < maxAttempts && !response.ok; attempt++) {
+    for (let attempt = 1; attempt < maxAttempts && retryWhen(response, attempt); attempt++) {
+      await response.body?.cancel();
       await sleep(1000);
       response = await send();
     }
@@ -361,9 +367,9 @@ export class SubsystemProbeService {
   }
 
   /**
-   * One canary POST back through our own boundary. A network-level failure and
-   * a refusal are the same handled outcome, and the transport cause is logged
-   * here because the wire masks a non-handled reason.
+   * One canary POST back through our own boundary. A network failure and a refusal are the
+   * same handled outcome; the transport cause is logged because the wire masks it. A refusal
+   * no handler saw (a pod starting or draining) is sent again first: nothing was stored.
    */
   async #sendCanary({
     probe,
@@ -382,13 +388,24 @@ export class SubsystemProbeService {
   }): Promise<Response> {
     const deadline = new AbortController();
     const timer = setTimeout(() => deadline.abort(), CANARY_TIMEOUT_MS);
-    let response: Response;
-    try {
-      response = await this.#collaborators.canaries.post({
+    const send = () =>
+      this.#collaborators.canaries.post({
         path,
         headers,
         body,
         signal: signal === undefined ? deadline.signal : AbortSignal.any([signal, deadline.signal]),
+      });
+    let response: Response;
+    try {
+      // A rollout drains one pod at a time, so the next attempt lands on another.
+      response = await this.#withRetries(send, (refused, attempt) => {
+        const answer = canaryAnswerOf(refused);
+        if (!answer.notHandled) return false;
+        this.#logger.info(
+          { probe, transport, path, attempt, ...answer },
+          "Health canary landed on a pod that is starting or shutting down, sending it again",
+        );
+        return true;
       });
     } catch (error) {
       this.#logger.error({ probe, transport, path, error }, "Health canary transport failed");
@@ -402,7 +419,13 @@ export class SubsystemProbeService {
     }
     if (!response.ok) {
       this.#logger.error(
-        { probe, transport, path, upstreamStatus: response.status },
+        {
+          probe,
+          transport,
+          path,
+          upstreamStatus: response.status,
+          ...canaryAnswerOf(response),
+        },
         "Health canary refused by our own boundary",
       );
       throw new HealthCheckFailedError({ probe, transport, upstreamStatus: response.status });

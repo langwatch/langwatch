@@ -95,7 +95,7 @@ const BANNER = "limit-failed-widgets-banner";
 const LIMIT_WORDS =
   "LangWatch limits the memory and time a widget's query may use. This is not a problem with your data.";
 /** Each card says these only when its failure's code reached it; a lost code reads as unknown. */
-const TIME_LIMIT_WORDS = "The query ran past the time a widget may take.";
+const TIME_LIMIT_WORDS = "This query took longer than 60 s, the most a widget may take.";
 const UNKNOWN_COLUMN_WORDS = "Check the column names against the dataset's columns.";
 
 /** The status the server answers each code with. */

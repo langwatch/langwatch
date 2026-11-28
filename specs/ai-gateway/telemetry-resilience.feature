@@ -45,3 +45,11 @@ Feature: Gateway telemetry resilience
       Then otelsetup.New returns a noop Provider
       And no global error handler is registered
       And subsequent otel.Handle calls fall back to the SDK default
+
+  Rule: A metric source the reader cannot use never breaks metric export
+
+    @unit
+    Scenario: a missing producer does not break the metric reader
+      Given the reader is configured with a nil producer beside a real one
+      When the reader collects
+      Then the real producer's series arrive and nothing panics

@@ -105,6 +105,8 @@ export function bindingScopeCanGrantPermission({
   // fixed org-exclusive set.
   if (!def) return true;
   const scopes: readonly AuthzScopeType[] = def.scopes;
+  // A permission declared at no scope (`spans:braided`) is minted onto a proof, never granted.
+  if (scopes.length === 0) return false;
   // Platform permissions (`ops:*`) count only from PLATFORM-tier grants, never a binding.
   if (scopes.includes("platform")) return false;
   if (scopeType === "ORGANIZATION") return true;

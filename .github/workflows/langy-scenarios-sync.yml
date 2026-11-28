@@ -19,6 +19,12 @@ on:
 permissions:
   contents: read
 
+# A newer push to the same pull request cancels the superseded test run.
+# The sync job keeps its own non-cancelling group below.
+concurrency:
+  group: langy-scenarios-sync-${{ github.event.pull_request.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 jobs:
   test:
     runs-on: ubuntu-latest
@@ -81,4 +87,4 @@ jobs:
         if: steps.secrets.outputs.ready == 'true'
         env:
           DRY_RUN: ${{ inputs.dry_run && '--dry-run' || '' }}
-        run: node dev/dogfood/langy/sync.ts $DRY_RUN
+        run: node dev/dogfood/langy/sync.ts ${DRY_RUN:+"$DRY_RUN"}

@@ -41,38 +41,46 @@ export function wrapMembership(membership: string, negated: boolean): string {
 }
 
 /**
- * Match the rows an Instant Eval run judged as passed. Dedup is eventual, so
- * the verdict is `argMax(Passed, UpdatedAt)` per key; the partition key is
- * bounded to when the run wrote its judgements, not to the trace window.
+ * Match the rows an Instant Eval run judged as passed, or, with `verdict: "not_passed"`, judged and
+ * not passed. Dedup is eventual, so each reads the latest verdict per key by `UpdatedAt`; the
+ * partition key is bounded to when the run wrote its judgements, not to the trace window.
  */
 export function instantEvalJudgmentsSubquery({
   by,
   runParam,
   fromParam,
   untilParam,
+  verdict = "passed",
 }: {
   by: "trace" | "conversation";
   runParam: string;
   fromParam: string;
   untilParam: string;
+  /** The latest verdict kept: passed, or judged and not passed (a skip or failure is neither). */
+  verdict?: "passed" | "not_passed";
 }): string {
   const where =
     `${tenantSet()} AND RunId = {${runParam}:String}` +
     ` AND CreatedAt >= fromUnixTimestamp64Milli({${fromParam}:Int64})` +
     ` AND CreatedAt <= fromUnixTimestamp64Milli({${untilParam}:Int64})`;
+  // A NULL verdict (skipped or failed) reads as 2, so only a latest real "no" is 0.
+  const having =
+    verdict === "passed"
+      ? "argMax(Passed, UpdatedAt) = 1"
+      : "argMax(coalesce(Passed, 2), UpdatedAt) = 0";
   // A threads run judges one row per conversation and addresses it by its
   // last trace, so keeping only that trace would show a matched
   // conversation as one turn.
   if (by === "conversation") {
     return (
       `((TenantId, Attributes['gen_ai.conversation.id']) IN (SELECT TenantId, argMax(ThreadId, UpdatedAt) AS MatchedThreadId FROM instant_eval_judgments WHERE ${where}` +
-      ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1 AND MatchedThreadId != ''))`
+      ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING ${having} AND MatchedThreadId != ''))`
     );
   }
 
   return (
     `((TenantId, TraceId) IN (SELECT TenantId, TraceId FROM instant_eval_judgments WHERE ${where}` +
-    ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING argMax(Passed, UpdatedAt) = 1))`
+    ` GROUP BY TenantId, TraceId, SpanId, QuestionId HAVING ${having}))`
   );
 }
 

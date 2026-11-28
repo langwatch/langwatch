@@ -16,6 +16,7 @@ import {
   modelProviderWriteInputSchema,
   type ModelDefaultScope,
   type ModelProvider,
+  type ModelProviderSave,
   type ModelProviderApiKeyValidation,
   type ModelProviderApiKeyValidationInput,
   type ModelProviderCredentialVerdict,
@@ -28,6 +29,7 @@ import { nowInstant, toDate } from "@langwatch/time";
 import type { ModelProviderConnectionPingService } from "../features/credential-probe/services/model-provider-connection-ping.service.ts";
 import type { ModelProviderConnectionRateLimiter } from "../features/credential-probe/services/windowed-model-provider-connection-rate-limiter.service.ts";
 import type { ModelProviderOnboardingDefaultsService } from "../features/defaults/services/model-provider-onboarding-defaults.service.ts";
+import type { ModelProviderModelImportService } from "../features/served-models/services/model-provider-model-import.service.ts";
 import type { ModelDefaultRepository } from "../repositories/model-default.repository.ts";
 import type { ModelProviderRepository } from "../repositories/model-provider.repository.ts";
 import {
@@ -53,6 +55,8 @@ type ModelProviderCommandOptions = {
   onboardingDefaults: ModelProviderOnboardingDefaultsService;
   ids: ModelProviderIdService;
   scopes: ModelProviderScopeService;
+  /** Imports an OpenAI-compatible provider's listed models on save; absent imports nothing. */
+  modelImport?: ModelProviderModelImportService;
 };
 
 export class ModelProviderCommandService {
@@ -62,7 +66,7 @@ export class ModelProviderCommandService {
     return new ModelProviderCommandService(options);
   }
 
-  async upsert(input: ModelProviderWriteInput): Promise<ModelProvider> {
+  async upsert(input: ModelProviderWriteInput): Promise<ModelProviderSave> {
     this.assertTenantAnchor(input);
 
     const parsed = modelProviderWriteInputSchema.parse(input);
@@ -80,12 +84,15 @@ export class ModelProviderCommandService {
       organizationId,
       routingHandle,
     });
-    const saved = await this.saveProvider(provider, existing, routingHandle);
+    // Before the write and outside any transaction: this asks the provider over the network.
+    const imported = await this.options.modelImport?.importIntoSave({ provider, existing });
+    const saved = await this.saveProvider(imported?.provider ?? provider, existing, routingHandle);
 
     await this.seedOnboardingDefaults(existing, saved);
     await this.saveProjectDefault(parsed);
 
-    return this.withMaskedCredentials(saved);
+    const masked = this.withMaskedCredentials(saved);
+    return imported?.outcome ? { ...masked, modelImport: imported.outcome } : masked;
   }
 
   /** A write answers what a read answers: the caller already holds what it sent. */
@@ -98,7 +105,7 @@ export class ModelProviderCommandService {
   }
 
   /** The project key's legacy shape: the provider string names the one row it already holds. */
-  async upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProvider> {
+  async upsertByProviderKey(input: ModelProviderWriteInput): Promise<ModelProviderSave> {
     const [existing] = await this.findOwnProjectRows(input);
     return this.upsert(existing ? { ...input, id: existing.id } : input);
   }
@@ -381,6 +388,7 @@ export class ModelProviderCommandService {
           ? (existing?.providerConfig ?? null)
           : parsed.providerConfig,
       langySkipPermissionsModels: deriveSkipPermissionsForWrite(parsed, existing),
+      lastListedModelIds: existing?.lastListedModelIds ?? null,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     });

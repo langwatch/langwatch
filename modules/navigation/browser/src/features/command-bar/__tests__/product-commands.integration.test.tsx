@@ -9,15 +9,19 @@ import { describe, expect, it, vi } from "vitest";
 
 import { productFromPathname } from "../../../model/products.ts";
 import { WithStubNavigationHost } from "../../../testing.tsx";
-import { useFilteredCommands } from "../behavior/use-filtered-commands.ts";
+import { type FilteredCommands, useFilteredCommands } from "../behavior/use-filtered-commands.ts";
 import type { Command } from "../model/command-bar-types.ts";
 import { handleCommandSelect } from "../model/command-select-handlers.ts";
 
 let personalFeatures: Record<string, boolean> | undefined;
 
+/** The organization's Dashboards flags; unanswered by default, so no home moves to the library. */
+let organizationFlags: unknown = { isLoading: true };
+
 vi.mock("../../../behavior/navigation-api.ts", () => ({
   navigationApi: {
     personalWorkspaceFeatures: { get: { useQuery: () => ({ data: personalFeatures }) } },
+    featureFlag: { isEnabledForEachOrganization: { useQuery: () => organizationFlags } },
   },
 }));
 
@@ -33,19 +37,21 @@ const PERSONAL_TEAM = {
   projects: [{ id: "project_me", slug: "me-project", name: "Me" }],
 };
 
-function commandsFor({
-  query,
-  reachable,
-  codingAgentSessions = false,
-  dashboards = false,
-  projectKind,
-}: {
+type CommandsOptions = {
   query: string;
   reachable: { governance: boolean; gateway: boolean };
   codingAgentSessions?: boolean;
   dashboards?: boolean;
   projectKind?: string;
-}): Command[] {
+};
+
+function filteredFor({
+  query,
+  reachable,
+  codingAgentSessions = false,
+  dashboards = false,
+  projectKind,
+}: CommandsOptions): FilteredCommands {
   const wrapper = ({ children }: { children: ReactNode }) => (
     <WithStubNavigationHost
       readings={{
@@ -82,8 +88,10 @@ function commandsFor({
     () => useFilteredCommands({ query, isSaas: true, projectId: "project_1", isDevMode: false }),
     { wrapper },
   );
-  return result.current.navigation;
+  return result.current;
 }
+
+const commandsFor = (options: CommandsOptions): Command[] => filteredFor(options).navigation;
 
 const EVERYTHING = { governance: true, gateway: true };
 
@@ -97,8 +105,8 @@ describe("Quick Search across products", () => {
 
       expect(sessions).toMatchObject({
         label: "Sessions",
-        productLabel: "Me",
-        path: "/me/sessions",
+        productLabel: "Coding agents",
+        path: "/coding-agents/sessions",
       });
     });
   });
@@ -108,7 +116,7 @@ describe("Quick Search across products", () => {
     it("finds pull requests, coding agent traces and my usage", () => {
       const labelFor = (query: string) =>
         commandsFor({ query, reachable: EVERYTHING })
-          .filter((command) => command.productLabel === "Me")
+          .filter((command) => command.productLabel === "Coding agents")
           .map((command) => command.label);
 
       expect(labelFor("pull request")).toContain("Pull Requests");
@@ -176,10 +184,10 @@ describe("Quick Search across products", () => {
       personalFeatures = undefined;
       const off = commandsFor({ query: "datasets", reachable: EVERYTHING });
 
-      expect(on.find((command) => command.productLabel === "Me")?.path).toBe(
+      expect(on.find((command) => command.productLabel === "Coding agents")?.path).toBe(
         "/me-project/datasets",
       );
-      expect(off.some((command) => command.productLabel === "Me")).toBe(false);
+      expect(off.some((command) => command.productLabel === "Coding agents")).toBe(false);
     });
   });
 
@@ -216,11 +224,85 @@ describe("Quick Search across products", () => {
       expect(analyticsPath({ dashboards: false })).toBe("/[project]/analytics");
     });
 
+    const labelled = (options: { dashboards: boolean }) =>
+      commandsFor({ query: "analytics", reachable: EVERYTHING, ...options }).map(
+        (command) => command.label,
+      );
+
+    /** @scenario Quick Search replaces Analytics with Dashboards when Dashboards is released */
+    it("shows Dashboards instead of Analytics when Dashboards is reachable", () => {
+      const labels = labelled({ dashboards: true });
+
+      expect(labels).toContain("Dashboards");
+      expect(labels).not.toContain("Analytics");
+    });
+
+    /** @scenario Quick Search keeps Analytics while Dashboards is not reachable */
+    it("keeps Analytics and no Dashboards entry when Dashboards is out of reach", () => {
+      const labels = labelled({ dashboards: false });
+
+      expect(labels).toContain("Analytics");
+      expect(labels).not.toContain("Dashboards");
+    });
+
     /** @scenario "AC3r Quick Search opens the same Analytics destination as the sidebar" */
     it("opens analytics for an aggregate project", () => {
       expect(analyticsPath({ dashboards: true, projectKind: "aggregate" })).toBe(
         "/[project]/analytics",
       );
+    });
+  });
+
+  describe("when a dashboard is to be created", () => {
+    const createDashboard = ({
+      query = "new dashboard",
+      area,
+      dashboards = true,
+    }: {
+      query?: string;
+      area: "open" | "legacy";
+      dashboards?: boolean;
+    }) => {
+      const enabledByOrganizationId = area === "open" ? { [ORGANIZATION.id]: true } : {};
+      organizationFlags = { data: { enabledByOrganizationId }, isLoading: false };
+      try {
+        return filteredFor({ query, reachable: EVERYTHING, dashboards }).actions.find(
+          (command) => command.id === "action-create-dashboard",
+        );
+      } finally {
+        organizationFlags = { isLoading: true };
+      }
+    };
+
+    /** @scenario Quick Search creates a dashboard where the Dashboards entry leads */
+    it("offers Create a dashboard, which opens the library with its create dialog", () => {
+      const command = createDashboard({ area: "open" });
+      const go = vi.fn();
+
+      handleCommandSelect({
+        cmd: command!,
+        projectSlug: "demo",
+        ctx: { go, newTab: false, close: vi.fn() },
+        addRecentItem: vi.fn(),
+        openDrawer: vi.fn(),
+        openDrawerByToken: vi.fn(),
+      });
+
+      expect(command?.label).toBe("Create a dashboard");
+      expect(go).toHaveBeenCalledWith("/dashboards?new=1");
+    });
+
+    /** @scenario Quick Search creates a dashboard where the Dashboards entry leads */
+    it("is found by create, analytics and chart too", () => {
+      for (const query of ["create", "analytics", "chart"]) {
+        expect(createDashboard({ query, area: "open" })?.label).toBe("Create a dashboard");
+      }
+    });
+
+    /** @scenario No Create a dashboard in Quick Search without the library */
+    it("offers none with the library off, nor while Dashboards is out of reach", () => {
+      expect(createDashboard({ area: "legacy" })).toBeUndefined();
+      expect(createDashboard({ area: "open", dashboards: false })).toBeUndefined();
     });
   });
 });

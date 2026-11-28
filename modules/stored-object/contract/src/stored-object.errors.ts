@@ -1,5 +1,6 @@
 import {
   HandledError,
+  remediation,
   type HandledErrorFault,
   handledErrorFaultSchema,
 } from "@langwatch/handled-error";
@@ -21,6 +22,7 @@ export const STORED_OBJECT_PROBLEM_CODES = [
   "stored_object_not_found",
   "stored_object_missing",
   "stored_object_unavailable",
+  "stored_object_write_conflict",
   "storage_unavailable",
   "idempotency_conflict",
 ] as const;
@@ -70,6 +72,7 @@ export const STORED_OBJECT_PROBLEM_HTTP_STATUS = {
   stored_object_not_found: 404,
   stored_object_missing: 404,
   stored_object_unavailable: 409,
+  stored_object_write_conflict: 409,
   storage_unavailable: 502,
   idempotency_conflict: 409,
 } as const satisfies Record<StoredObjectProblemCode, number>;
@@ -81,7 +84,9 @@ abstract class StoredObjectHandledError extends HandledError {
     options: {
       meta?: Record<string, unknown>;
       fault?: HandledErrorFault;
+      retryable?: boolean;
       tips?: readonly string[];
+      docsUrl?: string;
     } = {},
   ) {
     super(code, message, {
@@ -254,6 +259,22 @@ export class StoredObjectUnavailableError extends StoredObjectHandledError {
   ) {
     super("stored_object_unavailable", "The stored object is not currently available.", {
       meta: { projectId, objectId },
+    });
+  }
+}
+
+/** Every attempt to write the row lost to another writer; no storage call failed. */
+export class StoredObjectWriteConflictError extends StoredObjectHandledError {
+  readonly name = "StoredObjectWriteConflictError";
+
+  constructor(
+    readonly projectId: StoredObjectProjectId,
+    readonly objectId: StoredObjectId,
+  ) {
+    super("stored_object_write_conflict", "The stored object kept changing while it was written.", {
+      meta: { projectId, objectId },
+      retryable: true,
+      ...remediation("stored_object_write_conflict"),
     });
   }
 }

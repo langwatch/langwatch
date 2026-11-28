@@ -17,6 +17,7 @@ import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
 import { EventStoreMemory } from "@langwatch/eventing/testing";
 import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import type { GatewayApi } from "@langwatch/gateway-contract";
+import type { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { PresenceApi } from "@langwatch/presence-contract";
 import { createApp } from "@langwatch/process";
@@ -76,6 +77,7 @@ function process(role: "api" | "worker", emitter: EventEmitter) {
       authz: createApiFixture<AuthzApi>(),
       gateway: createApiFixture<GatewayApi>(),
       "api-key": createApiFixture<ApiKeyApi>(),
+      "instant-eval-judge": createApiFixture<InstantEvalJudgeApi>(),
     });
 }
 
@@ -120,6 +122,7 @@ const SIMULATION_KEYS = [
   "command:recordCutAtLimit",
   "command:recordEvaluations",
   "command:recordHooks",
+  "command:recordRedTeamReport",
   "command:startRun",
   "command:textMessageEnd",
   "command:textMessageStart",

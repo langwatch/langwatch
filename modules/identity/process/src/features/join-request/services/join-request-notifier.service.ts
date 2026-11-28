@@ -246,7 +246,7 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
     const [organizationName, requesterEmail, personalProjectUrl] = await Promise.all([
       this.organizationName({ organizationId }),
       this.emailOf({ userId: requesterUserId }),
-      this.tryPersonalProjectUrl({ userId: requesterUserId }),
+      this.personalProjectUrl({ userId: requesterUserId }),
     ]);
     if (!requesterEmail) return;
     await this.fanOut({
@@ -399,9 +399,10 @@ export class JoinRequestNotifierService implements JoinRequestNotifier {
 
   /**
    * A personal project of the requester's own in any organization they hold one in, not necessarily
-   * this one. `undefined` when they have none yet, the ordinary case for a first sign-in.
+   * this one. `undefined` when they have none yet, the ordinary case for a first sign-in. A failed
+   * read fails the notification, which the outbox retries; it is never mistaken for "none".
    */
-  private async tryPersonalProjectUrl({ userId }: { userId: string }): Promise<string | undefined> {
+  private async personalProjectUrl({ userId }: { userId: string }): Promise<string | undefined> {
     const [slug] = await this.context.findPersonalTeamSlugs(userId);
     return slug ? `${this.baseHost}/${slug}` : undefined;
   }

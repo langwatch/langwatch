@@ -1,5 +1,9 @@
 # Always-run workflow with internal path gating + aggregator. See #3223.
-# Branch protection requires `codeql-complete`. Draft PRs are excluded
+# A push to main and the nightly schedule analyse everything (detect-changes
+# forces every filter outside a pull request). A pull request is analysed only
+# when it touches .github/, auth or billing code; any other pull request skips
+# the analysis and `codeql-complete` still passes, so the required check
+# never hangs. Branch protection requires `codeql-complete`. Draft PRs are excluded
 # at the `changes` gate, so the analyze matrix never starts on drafts,
 # unless the PR carries the `ci:full` label.
 name: codeql
@@ -20,6 +24,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     # A draft or release-please PR is skipped unless labelled `ci:full`.
     if: >-
       (github.event_name != 'pull_request' || (github.event.pull_request.draft != true && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent'))
@@ -52,33 +57,47 @@ jobs:
             # no matching language produces an empty matrix and skips just the
             # same. Both failure modes are silent and both read green.
             #
-            # `sdks/go/**` used to sit here and is deliberately gone: this
-            # workflow's matrix analyses javascript-typescript and python only,
-            # so a Go path could never produce a leg. It was buying nothing
-            # except a js+python scan triggered by a Go-only change. (Whether Go
-            # gets analysed at all is a separate question — see the note about
-            # the default code-scanning setup in the PR that added this.)
+            # These filters apply to pull requests only: the rest of the tree
+            # is analysed on the push to main and nightly.
             relevant:
-              - 'apps/**'
-              - 'sdks/python/**'
-              - 'sdks/typescript/**'
-              - 'mcp/typescript/**'
-              - 'services/langevals/**'
-              - 'packages/**'
-              - 'modules/**'
-              - 'enterprise/**'
-              - '.github/workflows/codeql.yml'
+              - '.github/**'
+              - 'modules/auth/**'
+              - 'modules/authz/**'
+              - 'modules/api-key/**'
+              - 'modules/identity/**'
+              - 'modules/role/**'
+              - 'modules/entitlement/**'
+              - 'packages/authorization/**'
+              - 'packages/plans/**'
+              - 'packages/webhook-verify/**'
+              - 'packages/api/src/rest/browser-session.ts'
+              - 'packages/api/src/hosting/session-reader.ts'
+              - 'packages/browser-host/src/session.ts'
+              - 'enterprise/modules/billing/**'
+              - 'enterprise/modules/licensing/**'
+              - 'enterprise/modules/sso/**'
+              - 'enterprise/modules/scim/**'
+            codeql-actions:
+              - '.github/**'
             codeql-javascript:
-              - 'apps/**'
-              - 'sdks/typescript/**'
-              - 'mcp/typescript/**'
-              - 'packages/**'
-              - 'modules/**'
-              - 'enterprise/**'
+              - 'modules/auth/**'
+              - 'modules/authz/**'
+              - 'modules/api-key/**'
+              - 'modules/identity/**'
+              - 'modules/role/**'
+              - 'modules/entitlement/**'
+              - 'packages/authorization/**'
+              - 'packages/plans/**'
+              - 'packages/webhook-verify/**'
+              - 'packages/api/src/rest/browser-session.ts'
+              - 'packages/api/src/hosting/session-reader.ts'
+              - 'packages/browser-host/src/session.ts'
+              - 'enterprise/modules/billing/**'
+              - 'enterprise/modules/licensing/**'
+              - 'enterprise/modules/sso/**'
+              - 'enterprise/modules/scim/**'
               - '.github/workflows/codeql.yml'
             codeql-python:
-              - 'sdks/python/**'
-              - 'services/langevals/**'
               - '.github/workflows/codeql.yml'
 
       # Emitted as a matrix rather than as two `if`s on a fixed matrix, because
@@ -89,6 +108,9 @@ jobs:
         shell: bash
         run: |
           languages=()
+          if [ "${{ steps.detect.outputs.codeql-actions }}" = "true" ]; then
+            languages+=('{"language":"actions","build-mode":"none"}')
+          fi
           if [ "${{ steps.detect.outputs.codeql-javascript }}" = "true" ]; then
             languages+=('{"language":"javascript-typescript","build-mode":"none"}')
           fi
@@ -177,6 +199,9 @@ jobs:
           category: "/language:${{matrix.language}}"
 
   codeql-complete:
+    timeout-minutes: 5
+    # Reads only its needs' results, so its token gets no scopes.
+    permissions: {}
     needs: [changes, analyze]
     # `changes` is skipped on draft PRs; treat that as complete too.
     if: always()

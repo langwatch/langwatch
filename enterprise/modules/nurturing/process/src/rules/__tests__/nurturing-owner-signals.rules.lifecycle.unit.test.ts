@@ -10,6 +10,8 @@ import {
   firstTraceRecordedSignal,
   integrationMethodChosenSignal,
   inviteAcceptedSignal,
+  memberAdmittedSignal,
+  memberRoleChangedSignal,
   membersInvitedSignal,
   promptCreatedSignal,
   scenarioCreatedSignal,
@@ -131,6 +133,33 @@ describe("organization's lifecycle events", () => {
     });
   });
 
+  it("raise a role change with the new and previous role, once per person and moment", () => {
+    const data = { ...org, userId: "user_new", role: "ADMIN", previousRole: "MEMBER" };
+    expect(memberRoleChangedSignal({ data, aggregateId: "org_acme" })).toEqual({
+      kind: "member_role_changed",
+      sourceEventId: `org_acme:role:user_new:${AT}`,
+      tenantId: "org_acme",
+      occurredAt: AT,
+      userId: "user_new",
+      organizationId: "org_acme",
+      role: "ADMIN",
+      previousRole: "MEMBER",
+    });
+  });
+
+  it("raise an admission with the role admitted, once per person and moment", () => {
+    const data = { ...org, userId: "user_new", role: "MEMBER", via: "create_membership" };
+    expect(memberAdmittedSignal({ data, aggregateId: "org_acme" })).toEqual({
+      kind: "member_admitted",
+      sourceEventId: `org_acme:admitted:user_new:${AT}`,
+      tenantId: "org_acme",
+      occurredAt: AT,
+      userId: "user_new",
+      organizationId: "org_acme",
+      role: "MEMBER",
+    });
+  });
+
   /** @scenario "Integration-method identify call is fire-and-forget" */
   it("raise the person's chosen integration method under their own id", () => {
     const data = {
@@ -194,7 +223,7 @@ describe("a created prompt, workflow or scenario", () => {
     });
   });
 
-  /** @scenario "Scenario creation updates scenario count and fires event" */
+  /** @scenario "Scenario creation fires its event; its count comes from the organization's usage traits" */
   it("raises the scenario, the project's count and the variant, keyed by the scenario", () => {
     const data = {
       scenarioId: "scenario-1",

@@ -4,6 +4,7 @@
  * reads the Default model while unset. Binds specs/model-providers/judge-default-model.feature.
  */
 import type * as actualModule from "@langwatch/design-system/scope-chip-picker";
+import { NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   DECISION_MODELS,
   isLatestAlias,
@@ -24,14 +25,16 @@ const mockListDecisionModels = vi.fn();
 
 // The drawer asks the judge router and own decision model flags; off unless a case turns one on.
 const flagsOn = new Set<string>();
+const flagReads: { flag: string; target: unknown }[] = [];
 vi.mock("@langwatch/feature-flag-client", () => ({
-  useFeatureFlag: (flag: { name: string }) => ({
-    enabled: flagsOn.has(flag.name),
-    isLoading: false,
-  }),
+  useFeatureFlag: (flag: { name: string }, target: unknown) => {
+    flagReads.push({ flag: flag.name, target });
+    return { enabled: flagsOn.has(flag.name), isLoading: false };
+  },
 }));
 const JUDGE_ROUTER_FLAG = "release_instant_evals_judge_router";
 const OWN_DECISION_MODEL_FLAG = "release_instant_evals_own_decision_model";
+const JUDGE_PREVIEW_FLAG = "release_langwatch_judge_preview";
 const OWN_DECISION_MODEL_IDS = DECISION_MODELS.filter((entry) =>
   isOwnDecisionModelId(entry.id),
 ).map((entry) => entry.id);
@@ -57,7 +60,7 @@ vi.mock("@langwatch/design-system/scope-chip-picker", async () => {
 
 vi.mock("../../../behavior/model-provider-api.ts", () => ({
   modelProviderApi: {
-    // Not answered yet: Evals Preview stays offered, as before the read lands.
+    // Not answered yet: LangWatch Instant (preview) stays offered, as before the read lands.
     instantEval: { access: { useQuery: () => ({ data: undefined, isLoading: true }) } },
     useUtils: () => ({ modelProvider: { invalidate: vi.fn() } }),
     modelProvider: {
@@ -143,6 +146,7 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
   });
   afterEach(() => {
     flagsOn.clear();
+    flagReads.length = 0;
     cleanup();
   });
 
@@ -166,7 +170,7 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
     flagsOn.add(OWN_DECISION_MODEL_FLAG);
     mockListDecisionModels.mockReturnValue({
       data: [
-        { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" },
+        { value: LANGWATCH_DECISION_MODEL_ID, label: "LangWatch Instant (preview)" },
         { value: "openai/decisions:gpt-6-luna", label: "OpenAI Decisions" },
       ],
       isLoading: false,
@@ -191,6 +195,36 @@ describe("<DefaultModelOverrideDrawer/> Judge row", () => {
       expect(row.querySelector('[data-testid="model-option-subtitle"]')).toBeNull();
       expect(row).not.toHaveAttribute("aria-disabled", "true");
     }
+  });
+
+  /** @scenario "The drawer's Judge row offers LangWatch Judge (preview) where its flag is on" */
+  it("lists LangWatch Judge (preview) right after the inherit row, in the Judge row only", () => {
+    flagsOn.add(JUDGE_PREVIEW_FLAG);
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const rows = within(judgeListbox()).getAllByRole("option", { hidden: true });
+    expect(rows[0]?.dataset.testid).toBe("provider-model-selector-inherit");
+    expect(rows[1]?.dataset.value).toBe("langwatch/judge-preview");
+    expect(rows[1]).toHaveTextContent("LangWatch Judge (preview)");
+    expect(rows[1]).toHaveTextContent("Optimized for scenario judge");
+    expect(optionValues("default").join("\n")).not.toContain("LangWatch Judge");
+    expect(optionValues("fast").join("\n")).not.toContain("LangWatch Judge");
+  });
+
+  /** @scenario "The drawer's Judge row offers LangWatch Judge (preview) where its flag is on" */
+  it("does not list it where the flag is off", () => {
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    expect(optionValues("judge").join("\n")).not.toContain("LangWatch Judge");
+  });
+
+  /** @scenario "The drawer's Judge row offers LangWatch Judge (preview) where its flag is on" */
+  it("asks its flag of the organization, never the project, as the save does", () => {
+    renderWithModelProviderHost(<DefaultModelOverrideDrawer editingId="cfg_1" />);
+
+    const reads = flagReads.filter((entry) => entry.flag === JUDGE_PREVIEW_FLAG);
+    expect(reads.length).toBeGreaterThan(0);
+    for (const read of reads) expect(read.target).toMatchObject({ projectId: NOT_TARGETED });
   });
 
   /** @scenario "An unset Judge row inherits the Default model" */

@@ -162,6 +162,8 @@ interface IOViewerToolbarProps {
   originalContent: string;
   /** What Copy puts on the clipboard: whatever the panel displays. */
   copyText: string;
+  /** A span braided in from another project: its annotate and playground actions are off. */
+  isBraided?: boolean;
 }
 
 /**
@@ -188,6 +190,7 @@ export function IOViewerToolbar({
   fieldAnchor,
   originalContent,
   copyText,
+  isBraided,
 }: IOViewerToolbarProps) {
   const actions = useIOActions({
     translation,
@@ -197,6 +200,7 @@ export function IOViewerToolbar({
     mode,
     fieldAnchor,
     originalContent,
+    isBraided,
   });
 
   return (

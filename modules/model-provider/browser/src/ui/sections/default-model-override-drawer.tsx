@@ -18,8 +18,14 @@ import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import {
   buildCustomModelDisplayNames,
   isModelAllowedAsRoleDefault,
+  canonicalModelId,
+  isLangWatchDecisionModelId,
+  isLangWatchJudgeModelId,
   isModelAllowedForFeature,
   LANGWATCH_DECISION_MODEL_ID,
+  LANGWATCH_JUDGE_MODEL_ID,
+  judgeColumnModelIds,
+  langwatchJudgePickerOption,
   LATEST_ALIAS_PROVIDERS,
   MODEL_ROLES,
   modelDisplayLabel,
@@ -62,7 +68,7 @@ const ROLE_BLURB: Record<ModelRole, string> = {
   LANGY: "The model Langy chats and works with.",
   EMBEDDINGS: "Semantic vectors used by topic clustering and similar features.",
   INSTANT_EVALS:
-    "The decision model Instant Evals answer with. LangWatch Evals Preview unless you pick your own.",
+    "The decision model Instant Evals answer with. LangWatch Instant (preview) unless you pick your own.",
   JUDGE: "The model scenario runs judge with. Uses the Default model unless you pick one.",
 };
 
@@ -256,13 +262,32 @@ function modelOptionsForMode({
   return Array.from(new Set([...customModelIdsFor({ enabledEntries, mode }), ...registryModels]));
 }
 
+/** One model's picker row: LangWatch's own models from the catalogue, any other from its id. */
+function pickerOptionOf({
+  modelValue,
+  decisionOptions,
+  displayNames,
+}: {
+  modelValue: string;
+  decisionOptions: ModelPickerOption[];
+  displayNames: Record<string, string>;
+}): ModelPickerOption {
+  if (isLangWatchJudgeModelId(modelValue)) return langwatchJudgePickerOption();
+  return (
+    decisionOptions.find((option) => option.value === modelValue) ??
+    modelPickerOption({ displayNames, modelValue })
+  );
+}
+
 function modelOptionsByRoleFor({
   decisionOptions,
+  isJudgePreviewOffered,
   hasProviderLoadError,
   isLoading,
   providers,
 }: {
   decisionOptions: ModelPickerOption[];
+  isJudgePreviewOffered: boolean;
   hasProviderLoadError: boolean;
   isLoading: boolean;
   providers: ProviderRow[];
@@ -279,7 +304,8 @@ function modelOptionsByRoleFor({
     DEFAULT: llmModels,
     FAST: llmModels,
     LANGY: llmModels,
-    JUDGE: llmModels,
+    // The LangWatch models the catalogue lets fill Judge first, where the judge preview is on.
+    JUDGE: [...judgeColumnModelIds({ isJudgePreviewOffered }), ...llmModels],
     EMBEDDINGS: modelOptionsForMode({
       enabledEntries,
       hasProviderLoadError,
@@ -454,6 +480,11 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
       enabled: !!projectId && open,
     },
   );
+  const { enabled: isJudgePreviewOffered } = useFeatureFlag(
+    FrontendFlags.release_langwatch_judge_preview,
+    // Asked of the organization only, as the server's save gate asks it.
+    { projectId: NOT_TARGETED, organizationId, enabled: !!projectId && open },
+  );
   const { enabled: isOwnModelEnabled } = useFeatureFlag(
     FrontendFlags.release_instant_evals_own_decision_model,
     // Asked of the organization only, as the server asks it (ADR-182 decision 4).
@@ -468,6 +499,7 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   });
   const modelOptionsByRole = modelOptionsByRoleFor({
     decisionOptions,
+    isJudgePreviewOffered,
     hasProviderLoadError: projectProviders.isError,
     isLoading: projectProviders.isLoading,
     providers: projectProviders.data ?? [],
@@ -478,10 +510,10 @@ export function DefaultModelOverrideDrawer({ editingId }: Props) {
   const displayNames = {
     ...buildCustomModelDisplayNames(projectProviders.data ?? []),
     ...DECISION_MODEL_DISPLAY_NAMES,
+    [LANGWATCH_JUDGE_MODEL_ID]: langwatchJudgePickerOption().label,
   };
   const pickerOptionFor = (modelValue: string): ModelPickerOption =>
-    decisionOptions.find((option) => option.value === modelValue) ??
-    modelPickerOption({ displayNames, modelValue });
+    pickerOptionOf({ modelValue, decisionOptions, displayNames });
 
   const setOverride = (key: string, model: string | null) => {
     setConfig((prev) => withOverride(prev, key, model));
@@ -623,12 +655,10 @@ function RoleRow({
   /** This row's picker options from its LLM entries. */
   pickerFor: (llmOptions: ModelPickerOption[]) => ModelPickerOption[];
 }) {
-  // A pinned Evals Preview the column no longer offers reads as unset, as the table cell does.
-  const stored = config[role] ?? "";
+  // A pinned LangWatch model the column no longer offers reads as unset, as the table cell does.
+  const stored = canonicalModelId(config[role] ?? "");
   const current =
-    role === "INSTANT_EVALS" &&
-    stored === LANGWATCH_DECISION_MODEL_ID &&
-    !modelOptions.includes(stored)
+    role === "INSTANT_EVALS" && isLangWatchDecisionModelId(stored) && !modelOptions.includes(stored)
       ? ""
       : stored;
   const pickerOptions = pickerFor(
@@ -671,7 +701,9 @@ function RoleRow({
             onChange={(m) => onSetOverride(role, m)}
             inheritOption={unsetDefault && !current ? undefined : roleInherit}
             disabled={unsupportedAtScope}
-            labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
+            labelFor={(fullModelId) =>
+              modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
+            }
           />
         </Box>
         {canExpand ? (
@@ -784,7 +816,7 @@ function FeatureRow({
       <Box flex={1} />
       <Box width="240px" flexShrink={0}>
         <ProviderModelSelector
-          model={override || unsetDefault || ""}
+          model={canonicalModelId(override || unsetDefault || "")}
           query={{
             data: featureRowModelOptions({
               options: modelOptions,
@@ -794,7 +826,9 @@ function FeatureRow({
           }}
           onChange={(m) => onSetOverride(feature.key, m)}
           inheritOption={unsetDefault && !override ? undefined : inheritOption}
-          labelFor={(fullModelId) => modelDisplayLabel({ fullModelId, displayNames })}
+          labelFor={(fullModelId) =>
+            modelDisplayLabel({ fullModelId: canonicalModelId(fullModelId), displayNames })
+          }
         />
       </Box>
       <Box width="24px" flexShrink={0} />
@@ -805,7 +839,7 @@ function FeatureRow({
 export type InheritOptionShape = {
   model?: string;
   label: string;
-  /** The model an unset role runs on and the picker lists itself (Instant Evals: Evals Preview). */
+  /** The model an unset role runs on, listed by the picker (Instant Evals: LangWatch Instant). */
   isUnsetDefault?: boolean;
 };
 
@@ -846,7 +880,7 @@ export function inheritHitOption(entry: InheritedEntry): InheritOptionShape | un
 /**
  * Builds the `inheritOption` payload `ProviderModelSelector` consumes. With no cascade hit it
  * reads "Not configured" with no model attached, so an edit can clear a pinned key back to
- * inherit; Instant Evals falls back to Evals Preview, or "Not set" where it is not offered.
+ * inherit; Instant Evals falls back to LangWatch Instant (preview), or "Not set" if not offered.
  */
 export function buildInheritOption(
   entry: InheritedEntry,
@@ -875,7 +909,7 @@ export function roleInheritOption({
   role: ModelRole;
   inherited: Record<string, InheritedEntry>;
   config: Record<string, string>;
-  /** Whether Evals Preview may be offered; not, the unset Instant Evals column reads "Not set". */
+  /** Whether LangWatch Instant (preview) may be offered; if not, unset reads "Not set". */
   isHostedOffered?: boolean;
 }): InheritOptionShape {
   const own = inheritHitOption(inherited[role] ?? null);

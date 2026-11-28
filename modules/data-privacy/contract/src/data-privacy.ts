@@ -27,6 +27,8 @@ const audienceSchemaDefinition = z
     viewers: z.boolean().optional(),
     projectOwner: z.boolean().optional(),
     groupIds: z.array(z.string()).optional(),
+    /** ADR-208: API keys that read this content as Admins do. */
+    apiKeyIds: z.array(z.string()).max(50).optional(),
   })
   .strict();
 export interface AudienceSchema extends Named<typeof audienceSchemaDefinition> {}
@@ -124,6 +126,7 @@ const resolvedAudienceSchemaDefinition = z
     viewers: z.boolean(),
     projectOwner: z.boolean(),
     groupIds: z.array(z.string()),
+    apiKeyIds: z.array(z.string()),
   })
   .strict();
 export interface ResolvedAudienceSchema extends Named<typeof resolvedAudienceSchemaDefinition> {}
@@ -187,6 +190,7 @@ export const EMPTY_AUDIENCE: ResolvedAudience = {
   viewers: false,
   projectOwner: false,
   groupIds: [],
+  apiKeyIds: [],
 };
 export const PLATFORM_DEFAULT_DATA_PRIVACY: ResolvedDataPrivacy = {
   categories: {
@@ -207,7 +211,19 @@ export function resolveAudience(audience?: Audience): ResolvedAudience {
     viewers: audience?.viewers ?? false,
     projectOwner: audience?.projectOwner ?? false,
     groupIds: audience?.groupIds ?? [],
+    apiKeyIds: audience?.apiKeyIds ?? [],
   };
+}
+
+/** ADR-208: every key the content categories' audiences name, once each. */
+export function namedApiKeyIds(config: DataPrivacyConfig | undefined): string[] {
+  return [
+    ...new Set(
+      CONTENT_CATEGORIES.flatMap(
+        (category) => config?.categories?.[category]?.audience?.apiKeyIds ?? [],
+      ),
+    ),
+  ];
 }
 
 const dataPrivacyPolicySchemaDefinition = z

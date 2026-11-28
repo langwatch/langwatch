@@ -16,6 +16,8 @@ import { MemoryBillingStore } from "./memory.billing.store.ts";
 import { MemoryConnectedBillingRepository } from "./memory.connected-billing.repository.ts";
 import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate-subscriptions-report.repository.ts";
 import { MemoryLicenseRenewalClaimRepository } from "./memory.license-renewal-claim.repository.ts";
+import { MemoryOverPlanRepository } from "./memory.over-plan.repository.ts";
+import { MemoryPaymentRecoveryRepository } from "./memory.payment-recovery.repository.ts";
 import { MemorySeatEventSubscriptionRepository } from "./memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "./memory.subscription.repository.ts";
 
@@ -77,6 +79,8 @@ export class MemoryBillingRepositories {
       organizations: MemoryBillingOrganizationRepository.create(store),
       organizationCache: MemoryBillingOrganizationCacheRepository.create(),
       organizationPricing: MemoryOrganizationPricingRepository.create(store),
+      paymentRecovery: MemoryPaymentRecoveryRepository.create(store),
+      overPlan: MemoryOverPlanRepository.create(store),
       projects: MemoryBillingProjectDirectoryRepository.create(store),
       reportOrganizations: MemoryBillingReportOrganizationRepository.create(store),
       seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),

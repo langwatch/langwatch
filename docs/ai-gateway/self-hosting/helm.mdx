@@ -46,7 +46,7 @@ ingress:
   className: nginx
   # ...your app hosts, tls and annotations
   gateway:
-    host: gateway.acme.com        # publishes /v1 and /health on this host
+    host: gateway.acme.com        # publishes /v1, /a2a and /health on this host
     tls:
       secretName: gateway-tls
   # className nginx adds the streaming, timeout and body-size annotations
@@ -56,8 +56,9 @@ gateway:
   chartManaged: true
 
   # Externally reachable URL the control plane hands to CLI users at login.
-  # Leave empty to derive https://<ingress.gateway.host> from the ingress below.
-  publicUrl: ""
+  # The gateway also builds A2A Agent Card URLs from it and refuses Agent
+  # Card calls while it is empty, so set it to https://<ingress.gateway.host>.
+  publicUrl: https://gateway.acme.com
 
   # Where the gateway reaches the control plane. Empty resolves to
   # http://<release>-app:5560, the app Service of this install.

@@ -7,6 +7,10 @@ import { describe, expect, it } from "vitest";
 
 import {
   type GrowthSeatPlan,
+  developerMinimumHint,
+  developerSeatMinimum,
+  developerTargetWithin,
+  snapDeveloperTarget,
   freeSeatPlan,
   growthMinimumSeats,
   growthSeatPlan,
@@ -108,6 +112,50 @@ describe("freeSeatPlan()", () => {
     expect(freeSeatPlan({ includedSeats: 2, inUse: 1, invites: 0, price: EUR }).action.kind).toBe(
       "none",
     );
+  });
+});
+
+describe("developerSeatMinimum()", () => {
+  /** @scenario "The Developer seat stepper stops at the Developers in use" */
+  it("stops the Developer stepper at the Developers in use and says why", () => {
+    expect(developerSeatMinimum({ current: 3, inUse: 2 })).toBe(2);
+    expect(developerMinimumHint({ target: 2, current: 3, inUse: 2 })).toBe(
+      "2 people use Developer seats. Remove someone in Users to go lower.",
+    );
+    expect(developerMinimumHint({ target: 3, current: 3, inUse: 2 })).toBeUndefined();
+  });
+
+  /** @scenario "The Developer seat stepper never plans Developer seats nobody asked for" */
+  it("never raises the floor above the Developer seats billed now", () => {
+    expect(developerSeatMinimum({ current: 0, inUse: 2 })).toBe(0);
+    expect(developerMinimumHint({ target: 0, current: 0, inUse: 2 })).toBeUndefined();
+  });
+
+  /** @scenario "Raising Developer seats skips the counts below the Developers in use" */
+  it("skips the counts the server refuses, up and down", () => {
+    expect(snapDeveloperTarget({ previous: 0, next: 1, current: 0, inUse: 2 })).toBe(2);
+    expect(developerMinimumHint({ target: 2, current: 0, inUse: 2 })).toBe(
+      "2 people use Developer seats, so you need at least 2.",
+    );
+    expect(snapDeveloperTarget({ previous: 2, next: 1, current: 0, inUse: 2 })).toBe(0);
+    expect(snapDeveloperTarget({ previous: 2, next: 3, current: 0, inUse: 2 })).toBe(3);
+    expect(snapDeveloperTarget({ previous: 3, next: 2, current: 3, inUse: 2 })).toBe(2);
+  });
+
+  it("puts the verb in agreement with one person", () => {
+    expect(developerMinimumHint({ target: 1, current: 3, inUse: 1 })).toBe(
+      "1 person uses Developer seats. Remove someone in Users to go lower.",
+    );
+    expect(growthSeatPlan(growth({ paid: 5, seats: 1, inUse: 1 })).minimumHint).toBe(
+      "1 person uses full seats. Remove someone in Users to go lower.",
+    );
+  });
+
+  /** @scenario "Developers counted after a lower pick lift the pick to the floor" */
+  it("lifts a pick below the floor once the Developers in use are counted", () => {
+    expect(developerTargetWithin({ target: 1, current: 3, inUse: 2 })).toBe(2);
+    expect(developerTargetWithin({ target: 3, current: 3, inUse: 2 })).toBe(3);
+    expect(developerTargetWithin({ target: 0, current: 0, inUse: 2 })).toBe(0);
   });
 });
 

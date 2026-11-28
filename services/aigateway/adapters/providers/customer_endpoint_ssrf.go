@@ -5,20 +5,18 @@ import (
 	"errors"
 	"fmt"
 	"net"
-	"net/netip"
 	"net/url"
 	"strings"
 
-	"github.com/langwatch/langwatch/pkg/ssrf"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
 type endpointResolver func(context.Context, string) ([]net.IP, error)
 
 type customerEndpointPolicy struct {
-	blockLocal   bool
+	egress       egress.Policy
 	requireHTTPS bool
-	allowedHosts map[string]struct{}
 	resolve      endpointResolver
 }
 
@@ -31,65 +29,15 @@ func (e *endpointResolutionError) Error() string {
 func (e *endpointResolutionError) Unwrap() error { return e.cause }
 
 func newCustomerEndpointPolicy(blockLocal, requireHTTPS bool, allowedHosts []string) customerEndpointPolicy {
-	policy := customerEndpointPolicy{
-		blockLocal:   blockLocal,
+	return customerEndpointPolicy{
+		egress:       egress.NewPolicy(blockLocal, allowedHosts),
 		requireHTTPS: requireHTTPS,
-		allowedHosts: make(map[string]struct{}, len(allowedHosts)),
 		resolve:      defaultEndpointResolver,
 	}
-	for _, host := range allowedHosts {
-		host = normalizeEndpointHost(host)
-		if host != "" {
-			policy.allowedHosts[host] = struct{}{}
-		}
-	}
-	return policy
-}
-
-func normalizeEndpointHost(host string) string {
-	return strings.TrimSuffix(strings.ToLower(strings.TrimSpace(host)), ".")
 }
 
 func defaultEndpointResolver(ctx context.Context, host string) ([]net.IP, error) {
 	return net.DefaultResolver.LookupIP(ctx, "ip", host)
-}
-
-// endpointAddressError maps a literal or resolved customer-endpoint address
-// onto the shared pkg/ssrf rule set. Classification is shared; the always-block
-// policy below is this validator's own, deliberately stricter layer on top.
-//
-// Refused unconditionally (even for a self-hosted operator who has opted into
-// private egress):
-//   - cloud metadata (pkg/ssrf CategoryMetadata) — credential-theft SSRF;
-//   - unspecified 0.0.0.0/:: — collapses to localhost on many network stacks;
-//   - link-local 169.254.0.0/16 / fe80::/10 (and link-local multicast) — where
-//     undocumented instance-metadata surfaces live.
-//
-// None of those is ever a legitimate LLM endpoint. Every other non-public
-// address is refused only when the policy blocks local egress and the host is
-// not explicitly allowlisted. Sharing pkg/ssrf keeps the underlying "which range
-// is this address in" decision identical across this validator, the Langy egress
-// proxy and the TypeScript app — one rule set, tested by one corpus.
-func endpointAddressError(ip net.IP, blockLocal, allowlisted bool) error {
-	addr, ok := netip.AddrFromSlice(ip)
-	if !ok {
-		return fmt.Errorf("customer endpoint resolves to an unparseable address")
-	}
-	addr = addr.Unmap()
-	switch ssrf.Classify(addr) {
-	case ssrf.CategoryGlobal:
-		return nil
-	case ssrf.CategoryMetadata:
-		return fmt.Errorf("customer endpoint resolves to a reserved address")
-	case ssrf.CategorySpecial:
-		if addr.IsUnspecified() || addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast() {
-			return fmt.Errorf("customer endpoint resolves to a reserved address")
-		}
-		if blockLocal && !allowlisted {
-			return fmt.Errorf("customer endpoint resolves to a non-public address")
-		}
-	}
-	return nil
 }
 
 func isAlwaysBlockedEndpointHost(host string) bool {
@@ -112,7 +60,7 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 	if u.User != nil {
 		return fmt.Errorf("customer endpoint must not contain URL credentials")
 	}
-	host := normalizeEndpointHost(u.Hostname())
+	host := egress.NormalizeHost(u.Hostname())
 	if host == "" {
 		return fmt.Errorf("customer endpoint has no host")
 	}
@@ -120,12 +68,12 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 		return fmt.Errorf("customer endpoint host is reserved for cloud metadata")
 	}
 
-	_, allowlisted := policy.allowedHosts[host]
+	allowlisted := policy.egress.Allowlisted(host)
 	if policy.requireHTTPS && scheme != "https" {
 		return fmt.Errorf("customer endpoint must use https")
 	}
 	if parsed := net.ParseIP(host); parsed != nil {
-		return endpointAddressError(parsed, policy.blockLocal, allowlisted)
+		return egress.AddressError(parsed, policy.egress.BlockLocal, allowlisted)
 	}
 
 	addresses, err := policy.resolve(ctx, host)
@@ -136,7 +84,7 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 		return fmt.Errorf("customer endpoint host has no address records")
 	}
 	for _, address := range addresses {
-		if err := endpointAddressError(address, policy.blockLocal, allowlisted); err != nil {
+		if err := egress.AddressError(address, policy.egress.BlockLocal, allowlisted); err != nil {
 			return err
 		}
 	}

@@ -77,6 +77,7 @@ Feature: Dashboards demo seed - realistic synthetic data for every dashboard wid
     Given LANGY_MIRROR_PROJECT_ID and LANGY_MIRROR_TRACE_KEY name a project
     When the seed has run
     Then that project holds Langy turns with origin "langy", the same shape the mirror sends
+    And each turn hangs off a "langy.turn" root, and names the organization and project it came from
     And each turn carries its user, model calls with tokens and cost, and CLI tool calls
     And some turns fail, and reviewers thumb some turns
 
@@ -85,7 +86,7 @@ Feature: Dashboards demo seed - realistic synthetic data for every dashboard wid
     When the seed has run
     Then about 5% of the traces in "Customer care" are Langy turns with origin "langy"
     And they have the shape the gateway gives the asking project, which names no source organization
-    # This is the mirror shape, not the full one: a live turn in an asking project also carries
+    # These are the gateway's calls only: a live turn in an asking project also carries
     # a "langy.turn" root span and the worker's spans, which the seed does not send.
     And no other demo project holds a Langy turn
 

@@ -208,7 +208,7 @@ function EmailSuppressionsPage({
       <PageLayout.Header>
         <PageLayout.Heading>Email Suppressions</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="start" paddingTop={4}>
+      <VStack gap={6} width="full" align="start">
         <Text color="fg.muted">
           Recipients who unsubscribed from this project&apos;s trigger notifications. Removing an
           entry resumes delivery to that address.

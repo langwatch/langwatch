@@ -39,7 +39,7 @@ global:
       drop:
         - ALL
     readOnlyRootFilesystem: true
-  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
+  ## @param global.automountServiceAccountToken [default: false] Mount the ServiceAccount token into first-party workload pods (app, workers, nlp, langevals, PII redaction model, cronjobs, postgresql, redis). Defaults to false — none of these call the Kubernetes API, and many clusters deny pods that automount the token. Set true only if a sidecar needs in-cluster API access.
   automountServiceAccountToken: false
   ## @param global.nodeHeapCeiling.enabled [default: true] Give the app and workers containers a JavaScript heap of three quarters of their memory limit (NODE_OPTIONS=--max-old-space-size-percentage=75). Rendered only for a container with a memory limit and no NODE_OPTIONS in its extraEnvs. Set false when NODE_OPTIONS reaches the containers another way, such as extraEnvFrom: the chart's entry would replace it.
   nodeHeapCeiling:
@@ -72,7 +72,7 @@ global:
   ## @param global.scheduling.nodeSelector [object] Node selector labels for all pods.
   ## @param global.scheduling.affinity [object] Affinity rules for all pods.
   ## @param global.scheduling.tolerations [array] Tolerations applied to all pods.
-  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
+  ## @param global.scheduling.priorityClassName [string] PriorityClass for every pod this chart renders (app, workers, nlp, langevals, PII redaction model, cronjobs, and the bundled postgresql/redis). Set a per-component priorityClassName to override. Bundled SUBCHARTS (gateway, langyagent, clickhouse) manage their own scheduling and are not covered.
   scheduling:
     nodeSelector: {}
     affinity: {}
@@ -155,21 +155,30 @@ images:
   ## @param images.app.pullPolicy [string] App image pull policy.
   app:
     repository: langwatch/langwatch
-    tag: 3.23.0 # x-release-please-version
+    tag: 3.31.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langwatch_nlp.repository [string] NLP image repository (Go nlpgo binary, published as langwatch_nlp).
   ## @param images.langwatch_nlp.tag [string] NLP image tag.
   ## @param images.langwatch_nlp.pullPolicy [string] NLP image pull policy.
   langwatch_nlp:
     repository: langwatch/langwatch_nlp
-    tag: 3.23.0 # x-release-please-version
+    tag: 3.31.0 # x-release-please-version
     pullPolicy: IfNotPresent
   ## @param images.langevals.repository [string] Langevals image repository.
   ## @param images.langevals.tag [string] Langevals image tag.
   ## @param images.langevals.pullPolicy [string] Langevals image pull policy.
   langevals:
     repository: langwatch/langevals
-    tag: 3.23.0 # x-release-please-version
+    tag: 3.31.0 # x-release-please-version
+    pullPolicy: IfNotPresent
+  # The PII redaction model's public image (piiRedactionModel below), used
+  # only when piiRedactionModel.enabled.
+  ## @param images.pii_redaction_model.repository [string] PII redaction model image repository.
+  ## @param images.pii_redaction_model.tag [string] PII redaction model image tag.
+  ## @param images.pii_redaction_model.pullPolicy [string] PII redaction model image pull policy.
+  pii_redaction_model:
+    repository: langwatch/pii-redaction-model
+    tag: 3.31.0 # x-release-please-version
     pullPolicy: IfNotPresent
 
 # =============================================================================
@@ -369,6 +378,7 @@ app:
   ## @param app.dataplane.enabled [default: false] Enable dataset object storage.
   ## @param app.dataplane.provider [string, default: awsS3] Object storage provider. Options: awsS3, azureBlob.
   ## @param app.dataplane.bucket [string, default: langwatch-dataset] Bucket name for datasets (awsS3 provider).
+  ## @param app.dataplane.uploads [string, default: ""] Where browsers and SDKs send upload bytes, rendered as STORED_OBJECTS_UPLOADS: direct (the bucket's endpoint, the default when empty) or through-langwatch (LangWatch's signed upload route, for a bucket only reachable inside the cluster).
   dataplane:
     enabled: false
     # Storage provider to use. Options: awsS3 (default), azureBlob.
@@ -378,16 +388,28 @@ app:
     # by providers.azureBlob.authMode; mirrors the awsS3 shape.
     provider: awsS3
     bucket: "langwatch-dataset" # Bucket name for dataset storage
+    # Where clients send upload bytes. Empty or `direct`: browsers and SDKs PUT
+    # straight to the bucket's endpoint, so that endpoint must be reachable from
+    # them, with a CORS rule for the app's origin. `through-langwatch`: they PUT
+    # to LangWatch, which streams the bytes into the bucket; use it when the
+    # bucket is only reachable inside the cluster. With ingress.className nginx
+    # the chart routes that path through its own Ingress (see ingress.uploads).
+    uploads: ""
 
     # Provider-specific configurations
     providers:
       # AWS S3 configuration for dataset storage
       ## @extra app.dataplane.providers.awsS3 AWS S3 provider configuration.
       ## @param app.dataplane.providers.awsS3.endpoint.value [string] Custom S3 endpoint.
+      ## @param app.dataplane.providers.awsS3.region.value [string] S3 region, rendered as S3_REGION. Unset, a regional AWS endpoint names its own, other endpoints use auto, AWS_REGION or the AWS profile wins next, else the bucket's own region is looked up once. GovCloud and China need it set.
       ## @param app.dataplane.providers.awsS3.accessKeyId.value [string] S3 access key ID (not recommended in production — use accessKeyId.secretKeyRef).
       ## @param app.dataplane.providers.awsS3.secretAccessKey.value [string] S3 secret access key (not recommended in production — use secretAccessKey.secretKeyRef).
       ## @param app.dataplane.providers.awsS3.keySalt.value [string] Optional key salt.
       awsS3:
+        region:
+          value: ""
+          ## @param app.dataplane.providers.awsS3.region.secretKeyRef [object] Secret ref for the S3 region.
+          secretKeyRef: { name: "", key: "" }
         endpoint:
           value: ""
           ## @param app.dataplane.providers.awsS3.endpoint.secretKeyRef [object] Secret ref for custom S3 endpoint.
@@ -1514,6 +1536,79 @@ langevals:
   extraVolumeMounts: []
 
 # =============================================================================
+# PII Redaction Model
+# =============================================================================
+# The model the app and workers call for Strict PII analysis instead of
+# Presidio; any failure falls back to Presidio. Off by default; see the chart
+# README. Sizing and measured memory: docs/self-hosting/configuration/sizing-and-scaling.mdx
+## @section PII redaction model service
+piiRedactionModel:
+  ## @param piiRedactionModel.enabled [default: false] Deploy the PII redaction model (Deployment, Service and PDB) and point the app and workers at it.
+  enabled: false
+
+  # Like enabled, it forces release_pii_redaction_model_enabled: Strict
+  # organizations with an Enterprise license go to the model, the rest stay on
+  # Presidio. Self-hosted calls are never priced.
+  ## @param piiRedactionModel.externalEndpoint [string] PII_REDACTION_MODEL_ENDPOINT for a model this release does not deploy: an http(s) address, or a Lambda alias ARN when global.serviceAccount carries an IAM role allowed lambda:InvokeFunction. Ignored when enabled. Like enabled, it routes Strict organizations with an Enterprise license to the model; the rest stay on Presidio.
+  externalEndpoint: ""
+
+  ## @param piiRedactionModel.imagePullSecrets [array] Optional, only for a private mirror of images.pii_redaction_model (the default image is public), e.g. [{ name: my-registry }].
+  imagePullSecrets: []
+
+  ## @param piiRedactionModel.replicaCount [default: 1] Number of PII redaction model replicas.
+  replicaCount: 1
+  ## @extra piiRedactionModel.service Service for the PII redaction model.
+  ## @param piiRedactionModel.service.port [default: 8080] Service port.
+  service: { port: 8080 }
+  ## @extra piiRedactionModel.resources Resource requests and limits.
+  ## @param piiRedactionModel.resources.requests.cpu [string, default: 2] Requested CPU.
+  ## @param piiRedactionModel.resources.requests.memory [string, default: 7Gi] Requested memory.
+  ## @param piiRedactionModel.resources.limits.cpu [string, default: 4] CPU limit (the model's threads follow it).
+  ## @param piiRedactionModel.resources.limits.memory [string, default: 7Gi] Memory limit.
+  resources:
+    requests: { cpu: 2, memory: 7Gi }
+    limits: { cpu: 4, memory: 7Gi }
+  ## @param piiRedactionModel.terminationGracePeriodSeconds [default: 80] Time a stopping pod gets to answer requests in flight: 30 s body read + the 45 s request deadline + 5 s.
+  terminationGracePeriodSeconds: 80
+  ## @param piiRedactionModel.scratchSizeLimit [string, default: 256Mi] Size cap for the /tmp emptyDir under the read-only root filesystem.
+  scratchSizeLimit: 256Mi
+
+  ## @param piiRedactionModel.podSecurityContext [object] Pod security context overrides.
+  podSecurityContext: {}
+  ## @param piiRedactionModel.containerSecurityContext [object] Container security context overrides.
+  containerSecurityContext: {}
+  ## @param piiRedactionModel.podDisruptionBudget [object] PodDisruptionBudget spec overrides (rendered with more than one replica).
+  podDisruptionBudget: {}
+  ## @param piiRedactionModel.nodeSelector [object] Node selector overrides.
+  nodeSelector: {}
+  ## @param piiRedactionModel.tolerations [array] Tolerations overrides.
+  tolerations: []
+  ## @param piiRedactionModel.affinity [object] Affinity overrides.
+  affinity: {}
+  ## @param piiRedactionModel.topologySpreadConstraints [array] Topology spread constraints.
+  topologySpreadConstraints: []
+  ## @param piiRedactionModel.priorityClassName [string] PriorityClass for PII redaction model pods (overrides global.scheduling.priorityClassName).
+  priorityClassName: ""
+  ## @extra piiRedactionModel.pod Pod-level metadata.
+  pod:
+    ## @param piiRedactionModel.pod.annotations [object] Additional pod annotations.
+    annotations: {}
+    ## @param piiRedactionModel.pod.labels [object] Additional pod labels.
+    labels: {}
+  ## @extra piiRedactionModel.deployment Deployment-level metadata and strategy.
+  deployment:
+    ## @param piiRedactionModel.deployment.annotations [object] Additional deployment annotations.
+    annotations: {}
+    ## @param piiRedactionModel.deployment.labels [object] Additional deployment labels.
+    labels: {}
+    ## @param piiRedactionModel.deployment.strategy [object] Deployment strategy overrides.
+    strategy: {}
+    ## @param piiRedactionModel.deployment.revisionHistoryLimit [default: 10] Number of old replicasets to retain.
+    revisionHistoryLimit: 10
+  ## @param piiRedactionModel.extraEnvs [array] Additional environment variables for the model container. An entry named PII_COMPONENTS, PII_WARMUP, PII_MAX_CONCURRENT_REQUESTS or PII_REQUEST_TIMEOUT_SECONDS replaces the chart's value (raise terminationGracePeriodSeconds with a longer timeout). PORT is refused.
+  extraEnvs: []
+
+# =============================================================================
 # CronJobs Configuration
 # =============================================================================
 # Scheduled tasks that run automatically to maintain LangWatch
@@ -1682,7 +1777,7 @@ ingress:
 
   # Ingress annotations for specific behaviors
   # See: https://kubespec.dev/networking.k8s.io/v1/Ingress#metadata.annotations
-  ## @param ingress.annotations [object] Additional ingress annotations.
+  ## @param ingress.annotations [object] Additional ingress annotations. With className nginx the app Ingress also gets proxy-read-timeout and proxy-send-timeout of 120 s and proxy-body-size 64m (the trace receiver's default OTLP_TRACES_MAX_BODY_BYTES); set any of them here to override.
   annotations: {}
 
   # Extra labels applied to the Ingress and to the blackhole Service that backs
@@ -1748,6 +1843,21 @@ ingress:
       ## @param ingress.gateway.tls.secretName [string, default: ""] TLS Secret for the gateway host. Empty serves the host without a tls entry.
       secretName: ""
     ## @param ingress.gateway.annotations [object] Annotations for the gateway Ingress only, applied over ingress.annotations and the nginx defaults.
+    annotations: {}
+
+  # Upload route on the app hosts. The chart renders a second Ingress,
+  # `<release>-uploads-ingress`, routing /api/stored-objects/uploads (Prefix)
+  # on every ingress.hosts host to the app Service, with ingress.annotations
+  # (minus rewrites and the host-scoped server-snippet). A host whose own
+  # paths already route exactly /api/stored-objects/uploads is left out. When className
+  # contains "nginx" it adds request buffering off, a 5121m body limit (the
+  # 5 GiB upload limit and headroom) and 3600s read/send timeouts: nginx's 1m
+  # default on the app Ingress would refuse almost every file. Other classes
+  # get only ingress.uploads.annotations on top.
+  uploads:
+    ## @param ingress.uploads.enabled [nullable] Render the uploads Ingress. Unset: on when ingress.className is nginx. true: on for any class (an empty default class, nginx-internal). false: off.
+    enabled: null
+    ## @param ingress.uploads.annotations [object] Annotations for the uploads Ingress only, applied over ingress.annotations and the nginx upload defaults.
     annotations: {}
 
 # =============================================================================
@@ -2173,7 +2283,7 @@ clickhouse:
   # ClickHouse; rotate a live secret with `kubectl rollout restart statefulset`.
   ## @param clickhouse.podAnnotations [object] Annotations on the ClickHouse pod template (carries the LWQL catalog version so upgrades re-mount the access Secret).
   podAnnotations:
-    langwatch.com/lwql-access-catalog: "3.23.0" # x-release-please-version
+    langwatch.com/lwql-access-catalog: "3.31.0" # x-release-please-version
 
 # =============================================================================
 # LangWatchQL (LWQL) Configuration
@@ -2182,8 +2292,8 @@ clickhouse:
 # identity (langwatch_lwql), the <database>_profile settings profile
 # (langwatch_profile by default), the tenant row policies, the lwql_postgres
 # named collection and the caller-facing views.
-# The `release_lwql_workbench` feature flag still gates the HTTP endpoint; the
-# backend objects exist regardless.
+# The `release_lwql_workbench` feature flag gates the HTTP endpoint and is on by
+# default on a self-hosted install; the backend objects exist regardless.
 #
 # One rule, one owner (issue #8258): the APPLICATION owns the access model in
 # code. How it reaches ClickHouse depends on the posture:
@@ -2207,7 +2317,7 @@ clickhouse:
 # it converges the identities with.
 ## @section LangWatchQL (LWQL)
 lwql:
-  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag still gates the endpoint.
+  ## @param lwql.enabled [default: true] Provision the LangWatchQL backend (identity, policies, named collection, views). Delivered as rendered config to every pod on chart-managed ClickHouse (default), or via SQL DDL on bring-your-own ClickHouse (LWQL_ACCESS_MODEL_MODE=sql). The feature flag, on by default on a self-hosted install, gates the endpoint.
   enabled: true
   ## @param lwql.imagePullSecrets [array] Pull secrets for the app image the access-render Job runs. That Job uses its own ServiceAccount, so secrets on the namespace default ServiceAccount do not reach it (same reason app.storedObjects.localFilesystem.serializeUpgradesPullSecrets exists).
   imagePullSecrets: []
@@ -2319,7 +2429,7 @@ gateway:
   ## @param gateway.chartManaged [default: true] Lift the AI gateway pod as part of this chart (false = external or off).
   chartManaged: true
 
-  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
+  ## @param gateway.publicUrl [string, default: ""] Externally-reachable URL of the AI Gateway (e.g. https://gateway.your-corp.com). The control plane hands this to CLI users (langwatch claude/codex/cursor) at login. REQUIRED for self-hosted CLI/agentic use: without it the CLI falls back to http://localhost:5563, which a developer laptop cannot reach against a remote cluster. Leave empty to auto-derive from gateway.ingress.host when you set your own host. The gateway also uses it as A2A_PUBLIC_BASE_URL, the base of the URLs in proxied A2A Agent Cards; without it the gateway refuses Agent Card calls (a2a_public_url_unset), even when ingress.gateway.host publishes the gateway. Set LANGWATCH_GATEWAY_URL on the client to override per-user.
   publicUrl: ""
 
   ## @param gateway.internalUrl [string, default: ""] URL the control plane itself uses to reach the gateway, from inside the cluster. Distinct from publicUrl, which is for browsers and laptops: an install with no gateway ingress still needs this, and Langy refuses every turn without it. Empty derives the Service this chart renders, so set it only for a gateway that lives outside this release or behind a mesh address.

@@ -13,6 +13,7 @@ import { describe, expect, it } from "vitest";
 import { MemoryOttlTransformChannel } from "../channels/memory/memory.ottl-transform.channel.ts";
 import { MemoryProviderAccountChannel } from "../channels/memory/memory.provider-account.channel.ts";
 import { PullDestinationService } from "../features/ingestion-pull/services/pull-destination.service.ts";
+import { IngestionSourceFactsService } from "../features/ingestion-source/services/ingestion-source-facts.service.ts";
 import {
   IngestionSecretConfiguration,
   IngestionSecretService,
@@ -67,6 +68,7 @@ function harness() {
     providerAccounts: MemoryProviderAccountChannel.create(),
     diagnostics: new NoDiagnostics(),
     ottl: MemoryOttlTransformChannel.create(),
+    facts: IngestionSourceFactsService.create({ reportError: () => {} }),
   });
 
   const createGenie = (startingAt: string) =>

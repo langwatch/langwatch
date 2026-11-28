@@ -21,7 +21,9 @@ export function attachJsonlReader({
   onEnd?: () => void;
 }): void {
   const decoder = new StringDecoder("utf8");
-  let buffer = "";
+  // A turn line can be tens of MiB (base64 images) arriving in 64 KiB chunks:
+  // only each new chunk is searched for LF, the partial line is joined once.
+  let pending: string[] = [];
 
   const emit = (line: string) => {
     const trimmed = line.endsWith("\r") ? line.slice(0, -1) : line;
@@ -29,18 +31,21 @@ export function attachJsonlReader({
   };
 
   stream.on("data", (chunk) => {
-    buffer += typeof chunk === "string" ? chunk : decoder.write(chunk);
-    let newlineIndex = buffer.indexOf("\n");
+    let text = typeof chunk === "string" ? chunk : decoder.write(chunk);
+    let newlineIndex = text.indexOf("\n");
     while (newlineIndex !== -1) {
-      emit(buffer.slice(0, newlineIndex));
-      buffer = buffer.slice(newlineIndex + 1);
-      newlineIndex = buffer.indexOf("\n");
+      emit(pending.join("") + text.slice(0, newlineIndex));
+      pending = [];
+      text = text.slice(newlineIndex + 1);
+      newlineIndex = text.indexOf("\n");
     }
+    if (text.length > 0) pending.push(text);
   });
 
   stream.on("end", () => {
-    buffer += decoder.end();
-    if (buffer.length > 0) emit(buffer);
+    const rest = pending.join("") + decoder.end();
+    pending = [];
+    if (rest.length > 0) emit(rest);
     onEnd?.();
   });
 }

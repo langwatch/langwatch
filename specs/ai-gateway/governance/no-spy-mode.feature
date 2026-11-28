@@ -102,7 +102,7 @@ Feature: AI Gateway Governance — No-Spy Mode (org-level content stripping)
     And user "jane@acme-privacy.com" has installed the claude_code template
         and holds ingestion key `sk-lw-KEY_JANE`
     When jane fires a trace through `sk-lw-KEY_JANE`
-    Then the trace lands at /me/traces with:
+    Then the trace lands at /<personal project slug>/traces with:
       | attribute                       | value                                                       |
       | gen_ai.usage.* + cost.usd       | populated                                                    |
       | langwatch.origin                | "coding_agent" (receiver-stamped — ingestKeyProvenance 5-key set) |

@@ -4,7 +4,7 @@ Feature: Monitor Execution with Evaluator Reference
   I want monitors to read settings from linked evaluators
   So that evaluator changes automatically apply to monitors
 
-  # All 16 scenarios are currently @unimplemented. (3 were previously bound to
+  # All 15 scenarios are currently @unimplemented. (3 were previously bound to
   # evaluationsWorker.integration.test.ts — Execute using evaluator settings,
   # Evaluator settings take precedence, Backward compatibility with legacy
   # monitors — but that worker and its test were removed with the BullMQ stack;
@@ -25,7 +25,9 @@ Feature: Monitor Execution with Evaluator Reference
   #   "Evaluation trigger passes all trace attributes for precondition matching"
   # - "Evaluation results stored correctly": UPDATE per manifest — results
   #   stored in ClickHouse via the fold projection
-  # - The remaining KEEP scenarios (Thread-level evaluation, Sampling, Cost
+  # - "Sampling applies correctly": moved, bound, to
+  #   modules/evaluation/specs/monitor-evaluation-sampling.feature
+  # - The remaining KEEP scenarios (Thread-level evaluation, Cost
   #   tracking, Concurrent evaluations, Evaluation error handling) need new
   #   integration tests against executeEvaluation.command.ts.
   # Aspirational pending DELETE/UPDATE rewrites + KEEP integration test additions
@@ -101,12 +103,6 @@ Feature: Monitor Execution with Evaluator Reference
     When the evaluation runs
     Then only input and output fields should be extracted from each trace
     And the conversation array should have 5 entries
-
-  @unimplemented
-  Scenario: Sampling applies correctly
-    Given a monitor with sample rate 0.5
-    When 100 traces are processed
-    Then approximately 50 evaluations should be scheduled
 
   @unimplemented
   Scenario: Preconditions filter traces

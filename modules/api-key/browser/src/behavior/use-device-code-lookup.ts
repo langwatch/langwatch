@@ -6,6 +6,7 @@ import type {
   ApiKeyHostApi,
   ApiKeySessionStatus,
   CliCredentialType,
+  CliDeviceClient,
   CliDeviceCodeLookup,
 } from "../model/api-key-host.ts";
 
@@ -18,9 +19,10 @@ export type DeviceCodeLookupState =
       expiresAt: number;
       credentialType: CliCredentialType;
       management: boolean;
+      client: CliDeviceClient | null;
     }
   | { kind: "error"; message: string }
-  | { kind: "expired" };
+  | { kind: "expired"; client: CliDeviceClient | null };
 
 function lookupStateFrom({
   result,
@@ -31,7 +33,7 @@ function lookupStateFrom({
 }): DeviceCodeLookupState {
   switch (result.outcome) {
     case "expired":
-      return { kind: "expired" };
+      return { kind: "expired", client: result.client };
     case "unknown":
       return {
         kind: "error",
@@ -47,6 +49,7 @@ function lookupStateFrom({
         expiresAt: result.expiresAt,
         credentialType: result.credentialType,
         management: result.management,
+        client: result.client,
       };
   }
 }

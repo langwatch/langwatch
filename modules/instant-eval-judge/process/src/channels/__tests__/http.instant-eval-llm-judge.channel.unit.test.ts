@@ -158,7 +158,42 @@ describe("HttpInstantEvalLlmJudgeChannel", () => {
 
     const answer = await llm().judge(request("openai_responses"));
 
-    expect(answer).toMatchObject({ outcome: "skipped", reason: "classifier_provider_unavailable" });
+    expect(answer).toMatchObject({
+      outcome: "skipped",
+      reason: "classifier_provider_unavailable",
+      isUsageUnread: true,
+    });
+  });
+
+  /** @scenario "An LLM call that went out with no usage back keeps its hold on the ceiling" */
+  it("marks a call past its timeout as usage unread, with no tokens", async () => {
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, { usage: { input_tokens: 500, output_tokens: 900 } })
+      .delay(500);
+
+    const answer = await llm().judge({ ...request("openai_responses"), timeoutMs: 20 });
+
+    expect(answer).toEqual({
+      outcome: "skipped",
+      reason: "classifier_provider_unavailable",
+      inputTokens: 0,
+      outputTokens: 0,
+      isUsageUnread: true,
+    });
+  });
+
+  /** @scenario "An LLM call that went out with no usage back keeps its hold on the ceiling" */
+  it("does not mark a refused call, which the provider answered, as usage unread", async () => {
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(429, { error: { message: "slow down" } });
+
+    const answer = await llm().judge(request("openai_responses"));
+
+    expect(answer).not.toHaveProperty("isUsageUnread");
   });
 });
 
@@ -194,6 +229,168 @@ function anthropicAnswering(
       };
     });
 }
+
+describe("HttpInstantEvalLlmJudgeChannel, given a backend's reasoning effort", () => {
+  const answering = (capture: (body: string) => void) =>
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, (options) => {
+        capture(sentText(options.body));
+        return {
+          output: [
+            {
+              type: "function_call",
+              name: "evaluation",
+              arguments: JSON.stringify({ reasoning: "r", result: true }),
+            },
+          ],
+          // A reasoning model reports its reasoning inside the output tokens.
+          usage: { input_tokens: 500, output_tokens: 900 },
+        };
+      });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("sends the effort on OpenAI Responses and bills the reasoning as output", async () => {
+    let sent = "";
+    answering((body) => (sent = body));
+
+    const answer = await llm().judge({ ...request("openai_responses"), reasoningEffort: "high" });
+
+    expect((JSON.parse(sent) as Record<string, unknown>).reasoning).toEqual({ effort: "high" });
+    expect(answer).toMatchObject({ outcome: "answered", inputTokens: 500, outputTokens: 900 });
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("sends the body unchanged, key for key, when the backend sets none", async () => {
+    let sent = "";
+    answering((body) => (sent = body));
+
+    await llm().judge(request("openai_responses"));
+
+    const body = JSON.parse(sent) as Record<string, unknown>;
+    expect(Object.keys(body)).toEqual([
+      "model",
+      "input",
+      "max_output_tokens",
+      "store",
+      "tools",
+      "tool_choice",
+    ]);
+    expect(body).toMatchObject({ model: "llm-model-b", max_output_tokens: 8000, store: false });
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("adds only the effort to that body, in the same place every time", async () => {
+    const bodies: string[] = [];
+    answering((body) => bodies.push(body));
+    answering((body) => bodies.push(body));
+
+    await llm().judge(request("openai_responses"));
+    await llm().judge({ ...request("openai_responses"), reasoningEffort: "medium" });
+
+    const [plain, withEffort] = bodies.map((body) => JSON.parse(body) as Record<string, unknown>);
+    const { reasoning, max_output_tokens, ...rest } = withEffort!;
+    expect(reasoning).toEqual({ effort: "medium" });
+    expect(max_output_tokens).toBe(32_000);
+    expect(rest).toEqual({ ...plain, max_output_tokens: undefined });
+    expect(Object.keys(withEffort!)).toEqual([
+      "model",
+      "input",
+      "max_output_tokens",
+      "reasoning",
+      "store",
+      "tools",
+      "tool_choice",
+    ]);
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it.each([
+    ["none", 8_000],
+    ["minimal", 32_000],
+    ["low", 32_000],
+    ["high", 32_000],
+  ] as const)("asks effort %s with an output cap of %i tokens", async (effort, cap) => {
+    let sent = "";
+    answering((body) => (sent = body));
+
+    await llm().judge({ ...request("openai_responses"), reasoningEffort: effort });
+
+    expect((JSON.parse(sent) as Record<string, unknown>).max_output_tokens).toBe(cap);
+  });
+
+  /** @scenario "A backend that reasons waits long enough to write its output cap" */
+  it("sends a backend's own output cap on either wire, reasoning or not", async () => {
+    let openAi = "";
+    answering((body) => (openAi = body));
+    const anthropic: { body?: Record<string, unknown> } = {};
+    anthropicAnswering({ result: true }, anthropic);
+
+    await llm().judge({
+      ...request("openai_responses"),
+      reasoningEffort: "high",
+      maxOutputTokens: 1_100,
+    });
+    await llm().judge({ ...request("anthropic_messages"), maxOutputTokens: 500 });
+
+    expect((JSON.parse(openAi) as Record<string, unknown>).max_output_tokens).toBe(1_100);
+    expect(anthropic.body?.max_tokens).toBe(500);
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("skips an answer stopped at the output cap before its call, billing and naming it", async () => {
+    const warned: unknown[][] = [];
+    agent
+      .get("https://api.openai.com")
+      .intercept({ path: "/v1/responses", method: "POST" })
+      .reply(200, {
+        status: "incomplete",
+        incomplete_details: { reason: "max_output_tokens" },
+        output: [{ type: "reasoning", summary: [] }],
+        usage: { input_tokens: 500, output_tokens: 32_000 },
+      });
+
+    const answer = await HttpInstantEvalLlmJudgeChannel.create({
+      keys: { openai_responses: "lw-openai" },
+      dispatcher: agent,
+      logger: { warn: (...args: unknown[]) => void warned.push(args) },
+    }).judge({ ...request("openai_responses"), reasoningEffort: "high" });
+
+    expect(answer).toEqual({
+      outcome: "skipped",
+      reason: "classifier_failed",
+      inputTokens: 500,
+      outputTokens: 32_000,
+    });
+    expect(warned).toEqual([
+      [
+        expect.objectContaining({ stoppedBy: "max_output_tokens", reasoningEffort: "high" }),
+        "Instant Evals LLM leg stopped before its evaluation call",
+      ],
+    ]);
+  });
+
+  /** @scenario "A reasoning effort is sent only when the backend sets one" */
+  it("never sends one on Anthropic Messages, which the table refuses it on", async () => {
+    let sent = "";
+    agent
+      .get("https://api.anthropic.com")
+      .intercept({ path: "/v1/messages", method: "POST" })
+      .reply(200, (options) => {
+        sent = sentText(options.body);
+        return {
+          content: [
+            { type: "tool_use", name: "evaluation", input: { reasoning: "r", result: true } },
+          ],
+        };
+      });
+
+    await llm().judge({ ...request("anthropic_messages"), reasoningEffort: "high" });
+
+    expect(JSON.parse(sent)).not.toHaveProperty("reasoning");
+  });
+});
 
 describe("HttpInstantEvalLlmJudgeChannel, given a score or category question", () => {
   /** @scenario "The LLM legs send one forced score or category tool call and read it back" */

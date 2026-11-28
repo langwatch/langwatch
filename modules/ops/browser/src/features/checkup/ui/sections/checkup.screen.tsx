@@ -22,7 +22,7 @@ export default function CheckupScreen() {
       <PageLayout.Header description="Whether this install is correctly wired, what is broken and how to fix it, and exactly what it sends to LangWatch.">
         <PageLayout.Heading>Checkup</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack align="stretch" gap={6} width="full" paddingTop={4}>
+      <VStack align="stretch" gap={6} width="full">
         {organizationId ? <CheckupSettings organizationId={organizationId} /> : null}
       </VStack>
     </>

@@ -1,30 +1,43 @@
 /**
  * Set membership over trace_summaries without dedup via TenantId-first predicate.
  */
+import type { ClickHouseQueryClient } from "@langwatch/clickhouse-client";
 import { createLogger, type Logger } from "@langwatch/observability";
-import type { TraceCost, TraceUsageCount } from "@langwatch/trace-contract";
+import type { TraceCost, TracePresence, TraceUsageCount } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { TraceExistenceRepository } from "../trace-existence.repository.ts";
+import { TraceExistenceRepository, type TraceProjectCount } from "../trace-existence.repository.ts";
 import type { TraceClickHouseResolver } from "./clickhouse.trace-member-client.repository.ts";
 import { chNumber, chString } from "./stored-span-row.mapper.ts";
 
 const traceIdRowsSchema = z.array(z.looseObject({ TraceId: chString }));
+const tenantIdRowsSchema = z.array(z.looseObject({ TenantId: chString }));
 const totalRowsSchema = z.array(z.looseObject({ Total: chString }));
+const projectCountRowsSchema = z.array(
+  z.looseObject({ Total: chNumber, LastAtMs: chNumber.nullable() }),
+);
+const presenceRowsSchema = z.array(
+  z.looseObject({ FirstSeenMs: chNumber, LastSeenMs: chNumber, SpanCount: chNumber }),
+);
 const traceCostRowsSchema = z.array(
   z.looseObject({ TraceId: chString, TotalCost: chNumber.nullable() }),
 );
 
 export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository {
+  /** `clickhouse` serves the reads over a declared tenant set; absent, those refuse by name. */
   static create(options: {
     resolveClient: TraceClickHouseResolver;
+    clickhouse?: ClickHouseQueryClient;
   }): ClickHouseTraceExistenceRepository {
-    return new ClickHouseTraceExistenceRepository(options.resolveClient);
+    return new ClickHouseTraceExistenceRepository(options.resolveClient, options.clickhouse);
   }
 
   private readonly logger: Pick<Logger, "warn"> = createLogger("langwatch:trace:existence");
 
-  private constructor(private readonly resolveClient: TraceClickHouseResolver) {
+  private constructor(
+    private readonly resolveClient: TraceClickHouseResolver,
+    private readonly clickhouse: ClickHouseQueryClient | undefined,
+  ) {
     super();
   }
 
@@ -64,6 +77,45 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
       );
       throw new Error("Failed to check which traces exist");
     }
+  }
+
+  /**
+   * One statement per table over the whole set (`TenantId IN` plus `TraceId`, the sorting key's
+   * prefix, so it prunes), each bounded by the id index: a miss the ready index has never seen
+   * reads only the index. One organisation's projects, which the router requires of a set.
+   */
+  async findProjectsHoldingTrace({
+    projectIds,
+    traceId,
+  }: {
+    projectIds: readonly string[];
+    traceId: string;
+  }): Promise<string[]> {
+    const tenantIds = [...new Set(projectIds)];
+    const [firstTenantId] = tenantIds;
+    if (firstTenantId === undefined) return [];
+    const clickhouse = this.clickhouse;
+    if (clickhouse === undefined) {
+      throw new Error("No ClickHouse member was composed for a read over a tenant set");
+    }
+    const holdersIn = async (table: "trace_summaries" | "stored_spans") => {
+      const result = await clickhouse.query({
+        tenantId: firstTenantId,
+        tenantIds,
+        table,
+        sql: `
+          SELECT DISTINCT TenantId FROM ${table}
+          WHERE TenantId IN ({tenantIds:Array(String)})
+            AND TraceId = {traceId:String}
+            {{idBound:${table}.TraceId:traceId}}`,
+        params: { tenantIds, traceId },
+        // A ready index's miss means absent; a hit is still confirmed on the source.
+        idBound: { onMiss: "none" },
+      });
+      return tenantIdRowsSchema.parse(result.rows).map((row) => row.TenantId);
+    };
+    const holders = await Promise.all([holdersIn("trace_summaries"), holdersIn("stored_spans")]);
+    return [...new Set(holders.flat())];
   }
 
   async findTraceCosts({
@@ -148,5 +200,75 @@ export class ClickHouseTraceExistenceRepository extends TraceExistenceRepository
       traces: perProject.reduce((sum, row) => sum + row.traces, 0),
       spans: perProject.reduce((sum, row) => sum + row.spans, 0),
     };
+  }
+
+  /**
+   * One statement per project on its own tenant client, `OccurredAt` (the partition key) bounding
+   * the range. A trace re-folded into several summary versions counts once.
+   */
+  async countTracesByProject({
+    projectIds,
+    since,
+    until,
+  }: {
+    projectIds: readonly string[];
+    since: number;
+    until: number;
+  }): Promise<TraceProjectCount[]> {
+    return Promise.all(
+      [...new Set(projectIds)].map(async (projectId) => {
+        const client = await this.resolveClient(projectId);
+        const result = await client.query({
+          // ID_BOUND_SKIP: a count over the caller's occurred-time range, not a by-id read.
+          query: `
+            SELECT
+              count(DISTINCT TraceId) AS Total,
+              if(count() = 0, NULL, toUnixTimestamp64Milli(max(OccurredAt))) AS LastAtMs
+            FROM trace_summaries
+            WHERE TenantId = {tenantId:String}
+              AND OccurredAt >= fromUnixTimestamp64Milli({since:Int64})
+              AND OccurredAt < fromUnixTimestamp64Milli({until:Int64})`,
+          query_params: { tenantId: projectId, since, until },
+          format: "JSONEachRow",
+        });
+        const [row] = projectCountRowsSchema.parse(await result.json());
+        const traces = row?.Total ?? 0;
+        return { projectId, traces, lastTraceAt: traces === 0 ? null : (row?.LastAtMs ?? null) };
+      }),
+    );
+  }
+
+  /** Arrival times are the stored rows' write stamps; `SpanCount` counts each span id once. */
+  async findTracePresence({
+    projectId,
+    traceId,
+  }: {
+    projectId: string;
+    traceId: string;
+  }): Promise<TracePresence[]> {
+    const client = await this.resolveClient(projectId);
+    const result = await client.query({
+      query: `
+        SELECT
+          toUnixTimestamp64Milli(min(CreatedAt)) AS FirstSeenMs,
+          toUnixTimestamp64Milli(max(UpdatedAt)) AS LastSeenMs,
+          uniqExact(SpanId) AS SpanCount
+        FROM stored_spans
+        WHERE TenantId = {tenantId:String}
+          AND TraceId = {traceId:String}
+          {{idBound:stored_spans.TraceId:traceId}}
+        GROUP BY TraceId`,
+      query_params: { tenantId: projectId, traceId },
+      format: "JSONEachRow",
+      // A ready index's miss means absent; a hit is still confirmed on the source.
+      idBound: { onMiss: "none" },
+    });
+    return presenceRowsSchema.parse(await result.json()).map((row) => ({
+      traceId,
+      projectId,
+      firstSeenAt: row.FirstSeenMs,
+      lastSeenAt: row.LastSeenMs,
+      spanCount: row.SpanCount,
+    }));
   }
 }

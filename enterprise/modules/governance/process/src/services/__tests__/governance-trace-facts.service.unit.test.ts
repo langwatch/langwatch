@@ -6,7 +6,7 @@ import type {
   GovernanceKpiContribution,
   GovernanceKpiContributionWriter,
   GovernanceOcsfEvent,
-  GovernanceOcsfEventWriter,
+  GovernanceOcsfEventSink,
 } from "../../repositories/governance.repositories.ts";
 import {
   type GovernanceTraceSummary,
@@ -84,10 +84,10 @@ class ReplacingKpis implements GovernanceKpiContributionWriter {
   }
 }
 
-class ReplacingOcsf implements GovernanceOcsfEventWriter {
+class ReplacingOcsf implements GovernanceOcsfEventSink {
   readonly rows = new Map<string, GovernanceOcsfEvent>();
-  async insertEvent(row: GovernanceOcsfEvent): Promise<void> {
-    this.rows.set(`${row.tenantId}:${row.eventId}`, row);
+  async insertEvents(rows: GovernanceOcsfEvent[]): Promise<void> {
+    for (const row of rows) this.rows.set(`${row.tenantId}:${row.eventId}`, row);
   }
 }
 

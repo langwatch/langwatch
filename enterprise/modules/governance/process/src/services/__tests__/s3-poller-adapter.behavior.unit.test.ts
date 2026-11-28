@@ -28,6 +28,8 @@ const VALID_CONFIG = {
   },
 };
 
+const S3_KEYS = { aws_access_key_id: "access", aws_secret_access_key: "secret" };
+
 let storage: TestObjectStorage;
 
 function makeAdapter(): S3PollingPullerService {
@@ -81,7 +83,7 @@ describe("S3PollingPullerService", () => {
         endpoint: "https://objects.internal.example.test",
       });
 
-      await adapter.runOnce({ cursor: null }, config);
+      await adapter.runOnce({ cursor: null, credentials: S3_KEYS }, config);
 
       expect(storage.lastList?.endpoint).toBe("https://objects.internal.example.test");
     });
@@ -129,7 +131,10 @@ describe("S3PollingPullerService", () => {
         },
       ];
 
-      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: S3_KEYS },
+        adapter.validateConfig(VALID_CONFIG),
+      );
 
       expect(result.errorCount).toBe(0);
       expect(result.cursor).toBe("anthropic/compliance/2026-05-03-01.ndjson");
@@ -163,7 +168,7 @@ describe("S3PollingPullerService", () => {
       ];
 
       const result = await adapter.runOnce(
-        { cursor: "anthropic/compliance/2026-05-03-01.ndjson" },
+        { cursor: "anthropic/compliance/2026-05-03-01.ndjson", credentials: S3_KEYS },
         adapter.validateConfig(VALID_CONFIG),
       );
 
@@ -176,7 +181,7 @@ describe("S3PollingPullerService", () => {
       const adapter = makeAdapter();
       // storage.objects empty
       const result = await adapter.runOnce(
-        { cursor: "anthropic/compliance/2026-05-03-99.ndjson" },
+        { cursor: "anthropic/compliance/2026-05-03-99.ndjson", credentials: S3_KEYS },
         adapter.validateConfig(VALID_CONFIG),
       );
       expect(result.events).toHaveLength(0);
@@ -214,7 +219,10 @@ describe("S3PollingPullerService", () => {
             }),
         },
       ];
-      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: S3_KEYS },
+        adapter.validateConfig(VALID_CONFIG),
+      );
       expect(result.events).toHaveLength(2);
       expect(result.cursor).toBe("anthropic/compliance/bad.ndjson");
       // This assertion used to read `toBe(0)`, with a comment explaining that the parser
@@ -234,7 +242,10 @@ describe("S3PollingPullerService", () => {
           body: "not-json\nalso-not-json\nstill-not-json",
         },
       ];
-      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: S3_KEYS },
+        adapter.validateConfig(VALID_CONFIG),
+      );
       expect(result.events).toHaveLength(0);
       expect(result.errorCount).toBe(3);
       // A file that is entirely unreadable is the truncated-upload case. It
@@ -267,7 +278,10 @@ describe("S3PollingPullerService", () => {
         }),
       }));
 
-      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: S3_KEYS },
+        adapter.validateConfig(VALID_CONFIG),
+      );
 
       // Not yet implemented: PullResult.completeness (the run port field the
       // truncation settlement adds). Field not yet on the port (held by PR
@@ -303,7 +317,10 @@ describe("S3PollingPullerService", () => {
         },
       ];
 
-      const result = await adapter.runOnce({ cursor: null }, adapter.validateConfig(VALID_CONFIG));
+      const result = await adapter.runOnce(
+        { cursor: null, credentials: S3_KEYS },
+        adapter.validateConfig(VALID_CONFIG),
+      );
 
       const reported = result as typeof result & {
         completeness?: "complete" | "truncated";
@@ -343,7 +360,7 @@ describe("S3PollingPullerService", () => {
         },
       ];
       const result = await adapter.runOnce(
-        { cursor: null },
+        { cursor: null, credentials: S3_KEYS },
         adapter.validateConfig({ ...VALID_CONFIG, parser: "json-array" }),
       );
       expect(result.events).toHaveLength(2);
@@ -365,7 +382,7 @@ describe("S3PollingPullerService", () => {
         },
       ];
       const result = await adapter.runOnce(
-        { cursor: null },
+        { cursor: null, credentials: S3_KEYS },
         adapter.validateConfig({ ...VALID_CONFIG, parser: "csv" }),
       );
       expect(result.events).toHaveLength(3);

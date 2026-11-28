@@ -1,8 +1,13 @@
-import { type Authorization, internalActor, narrowAuthorization } from "@langwatch/authorization";
+import {
+  type Authorization,
+  internalActor,
+  narrowAuthorizationOrNotFound,
+} from "@langwatch/authorization";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import {
   EvaluationNotFoundError,
   evaluationInputsQuerySchema,
+  evaluationOutcomesQuerySchema,
   evaluationRunDataSchema,
   evaluationRunLookupSchema,
   evaluationRunsByTraceQuerySchema,
@@ -12,17 +17,22 @@ import {
   type EvaluationExecutionResult,
   type EvaluationRunData,
   type EvaluationRunLookup,
+  type EvaluatorOutcomeCount,
+  type EvaluatorOutcomeCountQuery,
   type MonitorPerformanceQuery,
   type OnlineEvaluationPerformance,
   type ExecuteEvaluationCommand,
   type UpsertEvaluationRunCommand,
   type EvaluationInputsQuery,
+  type EvaluationOutcomePage,
+  type EvaluationOutcomesQuery,
 } from "@langwatch/evaluation-contract";
 import { canReadCapturedContent, type TraceApi } from "@langwatch/trace-contract";
 import type { WorkflowApi } from "@langwatch/workflow-contract";
 
 import type { EvaluationExecutionService } from "../features/execution/services/evaluation-execution.service.ts";
 import type { EvaluationInputsOffloadService } from "../features/execution/services/evaluation-inputs-offload.service.ts";
+import { EvaluatorOutcomeService } from "../features/monitors/services/evaluator-outcome.service.ts";
 import { MonitorPerformanceService } from "../features/monitors/services/monitor-performance.service.ts";
 import type {
   EvaluationRunRepository,
@@ -52,12 +62,16 @@ export class EvaluationService {
   }
 
   private readonly monitorPerformance: MonitorPerformanceService;
+  private readonly evaluatorOutcomes: EvaluatorOutcomeService;
 
   private constructor(private readonly options: EvaluationServiceOptions) {
     // The trend is composable on its own, and one process composes it that
     // way: the monitors page reads it without an executor. Delegated rather
     // than duplicated so both callers fold the same buckets the same way.
     this.monitorPerformance = MonitorPerformanceService.create({
+      repository: options.monitorPerformance,
+    });
+    this.evaluatorOutcomes = EvaluatorOutcomeService.create({
       repository: options.monitorPerformance,
     });
   }
@@ -130,6 +144,28 @@ export class EvaluationService {
     });
   }
 
+  /** A page of finished runs on a trace; a full page names where the next resumes. */
+  async listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage> {
+    const { tenantId, sinceMs, after, limit } = evaluationOutcomesQuerySchema.parse(input);
+    const outcomes = await this.options.repository.findOutcomesSince({
+      authorization: await this.ownProof({
+        projectId: tenantId,
+        entry: "EvaluationService.listEvaluationOutcomes",
+      }),
+      sinceMs,
+      after,
+      limit,
+    });
+    const last = outcomes.at(-1);
+    return {
+      outcomes,
+      next:
+        outcomes.length === limit && last
+          ? { occurredAt: last.occurredAt, evaluationId: last.evaluationId }
+          : null,
+    };
+  }
+
   /** The `*Api` names a tenant, not a proof: the platform reads that one project as itself. */
   private ownProof({
     projectId,
@@ -155,11 +191,11 @@ export class EvaluationService {
     input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },
   ): Promise<Record<string, unknown> | null> {
     const query = evaluationInputsQuerySchema.parse(input);
-    const authorization =
-      query.tenantId === undefined
-        ? input.authorization
-        : narrowAuthorization({ authorization: input.authorization, projectId: query.tenantId });
-    if (authorization === null) throw new EvaluationNotFoundError(query.evaluationId);
+    const authorization = narrowAuthorizationOrNotFound({
+      authorization: input.authorization,
+      tenantId: query.tenantId,
+      notFound: () => new EvaluationNotFoundError(query.evaluationId),
+    });
 
     const protections = await this.options.traces.resolveViewerProtections({
       projectId: query.projectId,
@@ -182,5 +218,9 @@ export class EvaluationService {
 
   getMonitorPerformance(input: MonitorPerformanceQuery): Promise<OnlineEvaluationPerformance[]> {
     return this.monitorPerformance.getMonitorPerformance(input);
+  }
+
+  countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]> {
+    return this.evaluatorOutcomes.countEvaluatorOutcomes(input);
   }
 }

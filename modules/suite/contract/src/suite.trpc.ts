@@ -30,7 +30,12 @@ import {
   updateSuiteTrpcInputSchema,
   updateTestSuiteTrpcInputSchema,
 } from "./suite-trpc.schemas.ts";
-import { suiteSchema } from "./suite.ts";
+import {
+  appliedSuiteTemplateSchema,
+  applySuiteTemplateTrpcInputSchema,
+  suiteSchema,
+  suiteTemplateSchema,
+} from "./suite.ts";
 
 export const suiteTrpc = defineTrpcContract("suites")
   .mutation("create")
@@ -123,4 +128,13 @@ export const testSuiteTrpc = defineTrpcContract("suites.testSuites")
   .mutation("archive")
   .withInput(testSuiteTrpcIdInputSchema)
   .withOutput(scenarioTestSuiteSchema)
+
+  // Every shipped suite template, with full scenario data for a preview.
+  .query("listTemplates")
+  .withInput(suiteProjectInputSchema)
+  .withOutput(suiteTemplateSchema.array())
+
+  .mutation("applyTemplate")
+  .withInput(applySuiteTemplateTrpcInputSchema)
+  .withOutput(appliedSuiteTemplateSchema)
   .build();

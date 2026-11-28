@@ -8,7 +8,7 @@ You are an org admin on a fresh LangWatch deployment. By the end of this page yo
 
 - Published a default [Routing Policy](/ai-gateway/governance/routing-policies) so developers can sign in via `langwatch login`.
 - Configured an [Ingestion Source](/ai-governance/ingestion-sources/index) that lands telemetry from your gateway (or any OTLP-compatible upstream) in the unified trace store.
-- Imported the [AI Tools Portal](/ai-governance/personal-portal/admin-catalog#starter-pack) starter pack so every developer's `/me` page renders a real catalog instead of an empty state.
+- Imported the [AI Tools Portal](/ai-governance/personal-portal/admin-catalog#starter-pack) starter pack so every developer's `/coding-agents` page renders a real catalog instead of an empty state.
 - Invited a colleague through `/settings/members` and watched their first request land in `/governance`.
 
 If you are a developer trying to _use_ the org as a developer (not configure it), jump to the [developer walkthrough](/ai-governance/getting-started-developer) instead.
@@ -60,7 +60,7 @@ If no upstream is ready yet, skip this step. Your gateway itself is an implicit 
 
 ## Step 4: Import the AI Tools Portal starter pack
 
-The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/me`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/governance/inventory?tab=catalog` shows you a one-click **Import starter pack** CTA on first visit:
+The [AI Tools Portal](/ai-governance/personal-portal/overview) is the card grid every developer sees on `/coding-agents`. A fresh org has an empty catalog; the [admin editor](/ai-governance/personal-portal/admin-catalog) at `/governance/inventory?tab=catalog` shows you a one-click **Import starter pack** CTA on first visit:
 
 1. Navigate to **Governance → Inventory → Catalog tab** (`/governance/inventory?tab=catalog`).
 2. Click **Import starter pack**.
@@ -142,7 +142,7 @@ In the meantime, [Budgets](/ai-gateway/budgets) are the control that is availabl
 | Symptom | Likely cause | Fix |
 |---|---|---|
 | Developer sees `409 no_default_routing_policy` on `langwatch login` | Step 2 skipped or no policy marked default | [Routing Policies](/ai-gateway/governance/routing-policies): pick one, tick **Mark as default**. |
-| `/me` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/inventory?tab=catalog` → **Import starter pack**. |
+| `/coding-agents` shows "your IT team is still setting things up" empty state | Step 4 skipped | Open `/governance/inventory?tab=catalog` → **Import starter pack**. |
 | Ingestion source sits at `awaiting_first_event` forever | Source-type doesn't have a wired adapter yet | [Ingestion Sources index → State of each receiver](/ai-governance/ingestion-sources/index#state-of-each-receiver-at-a-glance): three rows are setup-contract-only as of this release. |
 | `/governance` doesn't appear in your sidebar | Org's [setup-state OR-of-flags](/ai-governance/control-plane#persona-based-home-routing-the-setup-state-signal) hasn't tripped yet | Any one of these is enough: Personal VKs, Routing Policies, Ingestion Sources, Anomaly Rules, Recent activity (30d). After Steps 2-7 above you will have several. |
 | Member colleague got an `Access Restricted` page on `/settings/audit-log` | Working as designed, audit log is admin-only | Either elevate them to `Admin` or grant a custom role with `organization:manage` (delegable via the `CustomRolePermissions` JSON column). |

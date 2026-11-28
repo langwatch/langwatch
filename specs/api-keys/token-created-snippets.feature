@@ -167,6 +167,26 @@ Feature: Token Created modal command snippets
     # rather than carrying its own timing.
 
   @integration
+  Scenario: The dialog closes while a copy is still pending, and the copied state is never shown or reset afterwards
+    # A copy resolves after the dialog has gone. The button must not flash,
+    # schedule a reset, or update state on an unmounted component.
+    Given I click any copy button in the dialog, "Copy API key" or a command box, and the clipboard has not yet answered
+    When I close the dialog before the copy resolves
+    And the clipboard write then succeeds
+    Then no copied state is shown
+    And no reset timer is scheduled
+    And no error or state-update warning is logged
+
+  @integration
+  Scenario: Copying twice restarts the reset window
+    # A second copy inside the 2 second window must extend it, not let the
+    # first copy's reset clear the tick early.
+    When I click the copy button on a command box
+    And I click the same copy button again 1.5 seconds later
+    Then the button still shows the success state 2 seconds after the first copy
+    And the button returns to its default copy state 2 seconds after the second copy
+
+  @integration
   Scenario: Reveal toggle still works for masked secret values
     Given a command box currently shows a masked value (e.g. "pat-lw-…")
     When I click the reveal (eye) toggle

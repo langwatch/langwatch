@@ -4,26 +4,26 @@ Feature: Quick Search reaches every product
   So that I can type a page name or switch product without leaving the keyboard
 
   Quick Search lists "Switch to <product>" for each reachable product, and
-  every Me, Gateway and Governance page, read from the lists the sidebars
+  every Coding agents, Gateway and Governance page, read from the lists the sidebars
   render. Each page carries its product's name beside it. A product the
   person cannot reach is left out, exactly as the product switcher leaves
   it out. Choosing a page navigates to it, and the product follows the address.
 
   @integration
   Scenario: Quick Search finds a page in another product by name
-    Given I can reach Me and Governance
+    Given I can reach Coding agents and Governance
     When I type "sessions" in Quick Search
-    Then I see "Sessions" with "Me"
+    Then I see "Sessions" with "Coding agents"
 
   @integration
   Scenario: Quick Search finds a page in another product by keyword
-    Given I can reach Me, Gateway and Governance
+    Given I can reach Coding agents, Gateway and Governance
     When I type "pull request" in Quick Search
-    Then I see "Pull Requests" with "Me"
+    Then I see "Pull Requests" with "Coding agents"
     When I type "coding agent traces" in Quick Search
-    Then I see "Traces" with "Me"
+    Then I see "Traces" with "Coding agents"
     When I type "my usage" in Quick Search
-    Then I see "My Usage" with "Me"
+    Then I see "My Usage" with "Coding agents"
 
   @integration
   Scenario: Choosing a page in another product switches product and navigates
@@ -52,7 +52,7 @@ Feature: Quick Search reaches every product
   Scenario: Quick Search offers the Me library pages that are turned on
     Given I turned on Datasets in my personal workspace
     When I type "datasets" in Quick Search
-    Then I see "Datasets" with "Me"
+    Then I see "Datasets" with "Coding agents"
     And a library page I have not turned on is not offered
 
   @integration
@@ -61,3 +61,32 @@ Feature: Quick Search reaches every product
     When I type "sessions" in Quick Search
     Then I see "Sessions" with "LLM Ops"
     And project pages such as "Analytics" carry "LLM Ops"
+
+  @integration
+  Scenario: Quick Search replaces Analytics with Dashboards when Dashboards is released
+    Given Dashboards is reachable for me
+    When I type "analytics" in Quick Search
+    Then I see "Dashboards" and no entry named "Analytics"
+    And "Dashboards" opens where the sidebar entry opens
+
+  @integration
+  Scenario: Quick Search keeps Analytics while Dashboards is not reachable
+    Given Dashboards is not reachable for me
+    When I type "analytics" in Quick Search
+    Then I see "Analytics" and no entry named "Dashboards"
+
+  # Owner, 2026-11-24: "Create a dashboard ... like the + we have for each section, and then
+  # opening up the dialog already on the new dashboard".
+  @integration
+  Scenario: Quick Search creates a dashboard where the Dashboards entry leads
+    Given Dashboards is reachable for me and the organization's Dashboards library is on
+    When I type "new dashboard", "create", "analytics" or "chart" in Quick Search
+    Then I see the action "Create a dashboard"
+    And choosing it opens "/dashboards?new=1", the library with its create dialog open
+
+  # The project's Dashboards page has no create dialog: it makes a blank board at once.
+  @integration
+  Scenario: No Create a dashboard in Quick Search without the library
+    Given the organization's Dashboards library is off, or Dashboards is not reachable for me
+    When I type "new dashboard" in Quick Search
+    Then there is no "Create a dashboard"

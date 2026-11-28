@@ -51,6 +51,7 @@ function placementOf(address: string): Placement | undefined {
 
 const everythingOpen = {
   hasPermission: () => true,
+  hasOrganizationPermission: () => true,
   isSaaS: true,
   hasCloudOps: true,
   hosting: "cloud" as const,
@@ -58,6 +59,7 @@ const everythingOpen = {
   isLiteMember: false,
   hasOpsAccess: true,
   isPlatformAdmin: true,
+  braidsEnabled: true,
 };
 
 describe("given every page the Settings menu can open", () => {

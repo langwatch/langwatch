@@ -9,7 +9,9 @@ import {
  */
 export async function handleCreateEvaluator(params: {
   name: string;
+  type?: "evaluator" | "code" | "workflow";
   config: Record<string, unknown>;
+  workflowId?: string;
 }): Promise<string> {
   const result = await apiCreateEvaluator(params);
 

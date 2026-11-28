@@ -4,6 +4,7 @@ import type {
   BatchedFacetResult,
   DiscreteFacetResult,
   FacetDescriptor,
+  SpanAnalyticsFloor,
   TraceListRead,
 } from "@langwatch/trace-contract";
 
@@ -15,6 +16,7 @@ import type {
   RangeFacetDef,
 } from "#features/facet/rules/trace-facet-registry.rules";
 
+import { batchedFacetSource } from "../features/facet/rules/trace-facet-light-twin.rules.ts";
 import type { TraceFacetDescriptorService } from "../features/facet/services/trace-facet-descriptor.service.ts";
 import type { TraceFilterWhere } from "../rules/trace-filter-hidden-origins.rules.ts";
 import type { DiscoverParams } from "../rules/trace-list-cache-key.rules.ts";
@@ -67,23 +69,34 @@ export class TraceDiscoverTaskService {
   private readonly repository: TraceListRead;
   private readonly descriptors: TraceFacetDescriptorService;
   private readonly facets: FacetCatalog;
+  private readonly lightFloor: (() => Promise<SpanAnalyticsFloor>) | undefined;
 
   private constructor(deps: {
     repository: TraceListRead;
     descriptors: TraceFacetDescriptorService;
     facets: FacetCatalog;
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }) {
     this.repository = deps.repository;
     this.descriptors = deps.descriptors;
     this.facets = deps.facets;
+    this.lightFloor = deps.lightFloor;
   }
 
   static create(deps: {
     repository: TraceListRead;
     descriptors: TraceFacetDescriptorService;
     facets: FacetCatalog;
+    /** Where the light twin tables start; absent, batched reads stay on the facet tables. */
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }): TraceDiscoverTaskService {
     return new TraceDiscoverTaskService(deps);
+  }
+
+  /** The light twin's floor, or null when unknown: a failed read keeps the facet table. */
+  private async readLightFloor(): Promise<SpanAnalyticsFloor | null> {
+    if (!this.lightFloor) return null;
+    return this.lightFloor().catch(() => null);
   }
 
   /** Simple-expression facets per table share one batched ClickHouse scan. */
@@ -95,22 +108,30 @@ export class TraceDiscoverTaskService {
         1,
         Number(slot.categoricals.length > 0) + Number(slot.ranges.length > 0),
       ),
-      run: () =>
-        this.repository
-          .findBatchedFacets({
-            authorization: params.authorization,
-            timeRange: params.timeRange,
-            table: slot.table,
-            timeColumn: this.facets.timeColumns[slot.table],
-            categoricalSpecs: slot.categoricals.map((d) => ({
-              key: d.key,
-              expression: d.expression,
-            })),
-            rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: d.expression })),
-            topN: DISCOVER_TOP_N,
-            ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
-          })
-          .then((result): Outcome => ({ kind: "batch", slotKey, result })),
+      run: async (): Promise<Outcome> => {
+        const source = batchedFacetSource({
+          catalog: this.facets,
+          table: slot.table,
+          categoricals: slot.categoricals,
+          ranges: slot.ranges,
+          floor: this.facets.lightTwins?.[slot.table] ? await this.readLightFloor() : null,
+          fromMs: params.timeRange.from,
+        });
+        const result = await this.repository.findBatchedFacets({
+          authorization: params.authorization,
+          timeRange: params.timeRange,
+          table: source.table,
+          timeColumn: source.timeColumn,
+          categoricalSpecs: slot.categoricals.map((d) => ({
+            key: d.key,
+            expression: source.expressionOf(d),
+          })),
+          rangeSpecs: slot.ranges.map((d) => ({ key: d.key, expression: source.expressionOf(d) })),
+          topN: DISCOVER_TOP_N,
+          ...(slot.filterWhere ? { filterWhere: slot.filterWhere } : {}),
+        });
+        return { kind: "batch", slotKey, result };
+      },
     }));
   }
 

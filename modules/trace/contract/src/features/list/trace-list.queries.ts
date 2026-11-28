@@ -184,7 +184,11 @@ export interface DiscreteFacetResult {
   distinctCount: number;
 }
 
-export type FacetTableName = "trace_summaries" | "evaluation_runs" | "stored_spans";
+export type FacetTableName =
+  | "trace_summaries"
+  | "evaluation_runs"
+  | "stored_spans"
+  | "span_analytics";
 
 export interface BatchedFacetResult {
   categoricals: Record<string, CategoricalFacetResult>;
@@ -331,3 +335,29 @@ export type TraceListRepository = TraceListRead;
  * but keyset cursor reads pay nothing. Shared so service and pagination UI agree.
  */
 export const TRACE_LIST_MAX_OFFSET_ROWS = 100_000;
+
+/**
+ * Keeps each trace_summaries trace's latest version in `where`, a filter on one unjoined table.
+ * Both sets hold one entry per trace with an older version there, so they stay small; the row
+ * must match `where` too. specs/traces-v2/latest-version-dedup.feature
+ */
+export function latestTraceVersionOnly({
+  where,
+  alias,
+}: {
+  where: string;
+  alias?: string;
+}): string {
+  const column = (name: string) => (alias ? `${alias}.${name}` : name);
+  const id = `sipHash128(${column("TenantId")}, ${column("TraceId")})`;
+  const versioned = (select: string) => `SELECT sipHash128(TenantId, TraceId) AS id${select}
+      FROM trace_summaries
+      WHERE ${where}
+      GROUP BY id
+      HAVING min(UpdatedAt) < max(UpdatedAt)`;
+  return `((${where}) AND (${id} NOT IN (
+      ${versioned("")}
+    ) OR (${id}, ${column("UpdatedAt")}) IN (
+      ${versioned(", max(UpdatedAt)")}
+    )))`;
+}

@@ -3,6 +3,7 @@ import {
   idIndexedClientDouble,
   type ScriptedStatements,
 } from "@langwatch/clickhouse-client/testing";
+import { parse } from "@langwatch/ksuid";
 import {
   clickHouseClientDouble,
   clickHouseQueryClientDouble,
@@ -18,6 +19,12 @@ import { describe, expect, it, vi } from "vitest";
 
 import { ownProof } from "../../../__tests__/support/authorization-proofs.fixture.ts";
 import { createFoldState } from "../../../eventing/__tests__/trace-subscriber.fixtures.ts";
+import {
+  createSpanReceivedEvent,
+  createTestRuntime,
+} from "../../../eventing/__tests__/trace-summary-test.fixtures.ts";
+import { TraceSummaryFoldProjection } from "../../../eventing/trace-summary.projection.ts";
+import { TraceCanonicalisationService } from "../../../features/derivation/services/trace-canonicalisation.service.ts";
 import { TRACE_ID_INDEXES } from "../clickhouse.trace-id-indexes.database.ts";
 import { TraceSummaryClickHouseRepository } from "../trace-summary.repository.ts";
 
@@ -30,10 +37,10 @@ const heavyRow = {
   TraceId: "t1",
   Version: "v1",
   Attributes: {},
-  OccurredAt: "0",
+  OccurredAtMs: "0",
   EarliestSpanStartMs: "0",
   CreatedAt: "0",
-  UpdatedAt: "0",
+  UpdatedAtMs: "0",
   ComputedIOSchemaVersion: "v1",
   ComputedInput: "log-input",
   ComputedOutput: "log-output",
@@ -248,7 +255,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         {
           ...heavyRow,
           Version: TRACE_SUMMARY_PROJECTION_VERSION_PRE_STORAGE_ANCHOR,
-          OccurredAt: baselineMs,
+          OccurredAtMs: baselineMs,
           // The column did not exist when this row was written, so ClickHouse
           // reads it back as its DEFAULT 0. Decoding that as the baseline would
           // reset the trace's duration to start from its next span.
@@ -274,7 +281,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
         {
           ...heavyRow,
           Version: TRACE_SUMMARY_PROJECTION_VERSION_LATEST,
-          OccurredAt: anchorMs,
+          OccurredAtMs: anchorMs,
           EarliestSpanStartMs: baselineMs,
         },
       ]);
@@ -298,7 +305,7 @@ describe("given the trace-summary row carries a storage anchor", () => {
           // ordinary schema bump. It is still post-split, so the anchor must not
           // be handed back as the trace's start.
           Version: "2027-03-01",
-          OccurredAt: anchorMs,
+          OccurredAtMs: anchorMs,
           EarliestSpanStartMs: baselineMs,
         },
       ]);
@@ -383,6 +390,80 @@ describe("given the trace-summary row carries a storage anchor", () => {
       // createdAt, rather than jumping straight to fold time.
       const record = insert.mock.calls[0]?.[0]?.values[0];
       expect(record.OccurredAt).toEqual(new Date(anchorMs));
+    });
+  });
+});
+
+describe("given the trace-summary id layout (#9575)", () => {
+  function makeWriteRepo(heavy: Record<string, unknown>) {
+    const insert = vi.fn().mockResolvedValue(undefined);
+    const { repo } = makeRepo((sql) => (isResolve(sql) ? [] : [heavy]));
+    const writer = TraceSummaryClickHouseRepository.create({
+      resolveClient: async () => clickHouseClientDouble({ insert }),
+      clickhouse: new AuthorizedClickHouse({
+        resolveClient: async () => clickHouseQueryClientDouble(),
+      }),
+    });
+    const written = () => insert.mock.calls.map((call) => call[0]?.values[0]);
+    return { repo, writer, written };
+  }
+
+  describe("when the stored row carries no IdLayout", () => {
+    /**
+     * @scenario "A trace summary stored before its id layout was recorded keeps its id on the next write"
+     */
+    it("reads it back as v1-legacy and writes the same legacy id again", async () => {
+      const { repo, writer, written } = makeWriteRepo({ ...heavyRow, IdLayout: null });
+
+      const stored = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
+        window: { fromMs: 0, toMs: 2_000_000_000_000 },
+      });
+      const { tenantId: _tenantId, ...state } = stored!;
+      await writer.upsert({ ...state, occurredAt: 1_760_000_000_000 }, "tenant-1", 30);
+      const { idLayout: _idLayout, ...beforeTheColumn } = state;
+      await writer.upsert({ ...beforeTheColumn, occurredAt: 1_760_000_000_000 }, "tenant-1", 30);
+
+      const [rewritten, legacy] = written();
+      expect(stored?.idLayout).toBe("v1-legacy");
+      expect(rewritten.IdLayout).toBe("v1-legacy");
+      expect(parse(rewritten.ProjectionId).layout).toBe("v1-legacy");
+      expect(rewritten.ProjectionId).toBe(legacy.ProjectionId);
+    });
+  });
+
+  describe("when the stored row records IdLayout v2", () => {
+    it("reads it back as v2", async () => {
+      const { repo } = makeWriteRepo({ ...heavyRow, IdLayout: "v2" });
+
+      const stored = await repo.findByTraceId({
+        authorization,
+        traceId: "t1",
+        window: { fromMs: 0, toMs: 2_000_000_000_000 },
+      });
+
+      expect(stored?.idLayout).toBe("v2");
+    });
+  });
+
+  describe("when a trace was never stored", () => {
+    /** @scenario "A new trace summary mints a corrected id and records its layout" */
+    it("folds its first span from init and writes a v2 id", async () => {
+      const { writer, written } = makeWriteRepo(heavyRow);
+      const projection = TraceSummaryFoldProjection.create({
+        store: { get: async () => ({ kind: "empty" }), store: async () => {} },
+        traceCanonicalisation: TraceCanonicalisationService.create(),
+        runtime: createTestRuntime(),
+      });
+
+      const state = projection.apply(projection.init(), createSpanReceivedEvent());
+      await writer.upsert(state, "tenant-1", 30);
+
+      const [record] = written();
+      expect(state.idLayout).toBe("v2");
+      expect(record.IdLayout).toBe("v2");
+      expect(parse(record.ProjectionId).layout).toBe("v2");
     });
   });
 });

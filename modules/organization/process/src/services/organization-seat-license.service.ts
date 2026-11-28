@@ -14,6 +14,10 @@ import type {
   OrganizationSeatRepository,
   SeatLease,
 } from "../repositories/organization-seat.repository.ts";
+import {
+  assertAdditionsNotHeldForPayment,
+  isAdditionsHeldForPayment,
+} from "../rules/payment-hold.rules.ts";
 import type { SeatLimitNoticeService } from "./seat-limit-notice.service.ts";
 
 /**
@@ -46,7 +50,8 @@ export interface OrganizationSeatLicense {
   }): Promise<T>;
 
   /** Whether one more of `resource` fits inside the organization's plan. Answers rather than
-   * throws, since only the caller knows how to turn a refusal into a named error. */
+   * throws, since only the caller knows how to turn a refusal into a named error; an unpaid
+   * invoice's hold throws `member_additions_held_for_payment`. */
   checkLimit(input: {
     organizationId: string;
     resource: LimitType;
@@ -64,6 +69,8 @@ export interface OrganizationSeatLicense {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
+    /** The member is Billing only now (ADR-205): any new role enters a pool. */
+    currentBillingOnly?: boolean;
     role: string;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void>;
@@ -107,6 +114,10 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     }
 
     const { current, free } = await this.seatsFor({ plan, ...input });
+    // A read answers the hold instead of throwing it; seat-taking writes refuse via assertSeatFree.
+    if (isAdditionsHeldForPayment(plan)) {
+      return { allowed: false, limitType: input.resource, current, max, heldForPayment: true };
+    }
     return { allowed: free, limitType: input.resource, current, max };
   }
 
@@ -125,6 +136,7 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     organizationId: string;
     currentRole: string;
     userPermissions: string[] | undefined;
+    currentBillingOnly?: boolean;
     role: string;
     user?: OrganizationPlanUser | undefined;
   }): Promise<void> {
@@ -133,15 +145,17 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
     // carries none, and a custom one is gated on the plan by the door, not on
     // a seat. That is the platform's own call, kept.
     const oldRole = input.currentRole as OrganizationUserRole;
+    const billingOnly = input.currentBillingOnly ?? false;
     const change = getRoleChangeType({
       oldRole,
       oldPermissions: input.userPermissions,
+      oldBillingOnly: billingOnly,
       newRole: input.role as OrganizationUserRole,
       newPermissions: undefined,
     });
     await this.assertSeatForChange({
       change,
-      wasFull: isFullMember(oldRole, input.userPermissions),
+      wasFull: isFullMember(oldRole, input.userPermissions, { billingOnly }),
       organizationId: input.organizationId,
       plan,
     });
@@ -161,6 +175,7 @@ export class OrganizationSeatLicenseService implements OrganizationSeatLicense {
       input.change === "to-developer" ||
       (input.change === "full-to-lite" && input.wasFull);
     if (freesOrSkipsCappedSeat || input.plan.overrideAddingLimitations) return;
+    assertAdditionsNotHeldForPayment(input.plan);
 
     const resource = input.change === "lite-to-full" ? "members" : "membersLite";
     const max = this.allowance(input.plan, resource);

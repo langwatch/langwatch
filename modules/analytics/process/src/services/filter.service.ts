@@ -2,6 +2,7 @@ import type { FilterField } from "@langwatch/analytics-contract";
 import { type Authorization, projectIdsReadBy } from "@langwatch/authorization";
 import { HandledError, isHandledTransientRefusal } from "@langwatch/handled-error";
 import { createLogger, type Logger } from "@langwatch/observability";
+import type { SpanAnalyticsFloor } from "@langwatch/trace-contract";
 import { getLangWatchTracer } from "langwatch";
 
 import type {
@@ -20,6 +21,8 @@ type GetFilterOptionsInput = {
   endDate: number;
   scope?: FindFilterOptionsInput["scope"];
   authorization: Authorization;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloor | undefined;
 };
 
 /**
@@ -84,6 +87,7 @@ export class FilterService {
             startDate: input.startDate,
             endDate: input.endDate,
             ...(input.scope ? { scope: input.scope } : {}),
+            spanAnalyticsFloor: input.spanAnalyticsFloor,
             // A proof spanning members holds each evaluation to its trace's window.
             readsMembers: projectIdsReadBy(input.authorization, "analytics:view").length > 1,
           });

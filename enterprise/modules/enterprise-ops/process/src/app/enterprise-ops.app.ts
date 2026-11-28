@@ -54,6 +54,11 @@ export class EnterpriseOpsModule implements EnterpriseOpsApiContract {
   getIssuedLicense: EnterpriseOpsApiContract["getIssuedLicense"] = async ({ operator, id }) =>
     this.#licenses.getById({ id, operatorId: await this.#staff(operator) });
 
+  getIssuedLicenseChain: EnterpriseOpsApiContract["getIssuedLicenseChain"] = async ({
+    operator,
+    id,
+  }) => this.#licenses.getChain({ id, operatorId: await this.#staff(operator) });
+
   issueLicense: EnterpriseOpsApiContract["issueLicense"] = async ({ operator, ...rest }) =>
     this.#licenses.issue({ ...rest, operatorId: await this.#manager(operator) });
 

@@ -872,6 +872,7 @@ export const EditModelProviderForm = ({
     customKeys: state.customKeys,
     model: probedModel,
     resetKey: providerId,
+    refusalCode: apiKeyValidationErrorCode,
   });
 
   const reportRefusal = useEffectEvent((code: string) =>
@@ -955,7 +956,7 @@ export const EditModelProviderForm = ({
         canResolveTarget={!cannotResolveTarget}
         fieldErrors={fieldErrors}
         setFieldErrors={setFieldErrors}
-        refusal={apiKeyValidationError}
+        refusal={apiKeyValidationError ?? state.errors.customKeysRoot}
         refusalCode={apiKeyValidationErrorCode}
         clearRefusal={clearApiKeyError}
         connectLabel={probeRequired ? "Connect" : saveLabel}

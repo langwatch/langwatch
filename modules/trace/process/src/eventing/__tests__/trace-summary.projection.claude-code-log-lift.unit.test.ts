@@ -112,6 +112,31 @@ describe("TraceSummaryFoldProjection compact log contribution", () => {
     expect(after.attributes["langwatch.reserved.log_record_count"]).toBe("1");
   });
 
+  /** @scenario A declared output is kept over the agent's later closing text */
+  it("keeps a declared output over a later inferred one", () => {
+    const projection = makeProjection();
+    const declared = makeContribution();
+    declared.data = {
+      ...declared.data,
+      input: null,
+      output: "The build is green.",
+      outputDeclared: true,
+    };
+    const closing = makeContribution();
+    closing.data = {
+      ...closing.data,
+      recordId: "e".repeat(64),
+      input: null,
+      output: "NO_REPLY",
+      timeUnixMs: closing.data.timeUnixMs + 5_000,
+    };
+
+    const afterDeclared = projection.handleTraceLogContributed(declared, createInitState());
+    const after = projection.handleTraceLogContributed(closing, afterDeclared);
+
+    expect(after.computedOutput).toBe("The build is green.");
+  });
+
   describe("when the log names its service", () => {
     const withService = (service: string): LogContributedEvent => {
       const event = makeContribution();
@@ -176,6 +201,29 @@ describe("TraceSummaryFoldProjection — log-path lift", () => {
       );
       expect(after.computedInput).toBe(state.computedInput);
       expect(after.attributes["langwatch.input"]).toBeUndefined();
+    });
+  });
+
+  describe("when a launcher declares the reply its agent posted through a tool", () => {
+    /** @scenario A declared output is kept over the agent's later closing text */
+    it("keeps the declared reply over the agent's later closing marker", () => {
+      const projection = makeProjection();
+      const declared = projection.handleTraceLogRecordReceived(
+        makeLogEvent(
+          { "event.name": "tool_result", "langwatch.output": "The build is green." },
+          { body: "claude_code.tool_result" },
+        ),
+        createInitState(),
+      );
+      const closing = makeLogEvent(
+        { "event.name": "assistant_response", query_source: "sdk", response: "NO_REPLY" },
+        { body: "claude_code.assistant_response" },
+      );
+      closing.data.timeUnixMs += 5_000;
+
+      const after = projection.handleTraceLogRecordReceived(closing, declared);
+
+      expect(after.computedOutput).toBe("The build is green.");
     });
   });
 
@@ -575,6 +623,53 @@ describe("TraceSummaryFoldProjection context size", () => {
       });
 
       expect(state.attributes["langwatch.reserved.context_size_tokens"]).toBeUndefined();
+    });
+  });
+});
+
+describe("TraceSummaryFoldProjection — Claude Code turn conversation", () => {
+  const SESSION = "8325f595-a06a-4ec0-8344-7b5682760622";
+  const SUBAGENT = "a976532ca15f3135f";
+
+  const subagentSpan = () =>
+    createTestSpan({
+      spanId: "bbbbbbbbbbbbbbb1",
+      parentSpanId: "aaaaaaaaaaaaaaa1",
+      name: "claude_code.llm_request",
+      startTimeUnixMs: 2_000,
+      spanAttributes: { "gen_ai.conversation.id": SUBAGENT, agent_id: SUBAGENT },
+    });
+
+  const promptRecord = () =>
+    makeLogEvent(
+      { "event.name": "user_prompt", "session.id": SESSION, prompt: "count the files" },
+      { body: "claude_code.user_prompt" },
+    );
+
+  describe("when a subagent span reaches the trace before the prompt record", () => {
+    /** @scenario "A Claude Code turn whose subagent span lands first stays in its session" */
+    it("files the trace under the session, not the subagent", () => {
+      const projection = makeProjection();
+      const runtime = createTestRuntime();
+      let state = applySpanToSummary({ state: createInitState(), runtime, span: subagentSpan() });
+      expect(state.attributes["gen_ai.conversation.id"]).toBe(SUBAGENT);
+
+      state = projection.handleTraceLogRecordReceived(promptRecord(), state);
+
+      expect(state.attributes["gen_ai.conversation.id"]).toBe(SESSION);
+    });
+  });
+
+  describe("when the prompt record reaches the trace first", () => {
+    /** @scenario "A Claude Code turn whose subagent span lands first stays in its session" */
+    it("keeps the session when a subagent span folds afterwards", () => {
+      const projection = makeProjection();
+      const runtime = createTestRuntime();
+      let state = projection.handleTraceLogRecordReceived(promptRecord(), createInitState());
+
+      state = applySpanToSummary({ state, runtime, span: subagentSpan() });
+
+      expect(state.attributes["gen_ai.conversation.id"]).toBe(SESSION);
     });
   });
 });

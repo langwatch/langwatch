@@ -99,13 +99,13 @@ describe("the Stored Objects feature packages", () => {
 
 describe("the Stored Objects persistence", () => {
   /** @scenario One Postgres row owns current state */
-  it("owns one Postgres table, StoredObject, holding the row's tenant, status, owner, provider identity, byte facts and expiry", () => {
+  it("owns two Postgres tables, StoredObject and its StoredObjectOwner links, the first holding the row's tenant, status, owner, provider identity, byte facts and expiry", () => {
     const schema = readFileSync(
       path.join(REPO_ROOT, "packages", "prisma-client", "prisma", "schema.prisma"),
       "utf8",
     );
     const models = [...schema.matchAll(/^model (\w*StoredObject\w*) \{([\s\S]*?)^\}/gm)];
-    expect(models.map((model) => model[1])).toEqual(["StoredObject"]);
+    expect(models.map((model) => model[1])).toEqual(["StoredObject", "StoredObjectOwner"]);
 
     const columns = (models[0]?.[2] ?? "")
       .split("\n")
@@ -151,6 +151,18 @@ describe("the Stored Objects persistence", () => {
     expect(
       readFileSync(path.join(PROCESS_ROOT, "src", "services", "stored-object.service.ts"), "utf8"),
     ).toMatch(/export class StoredObjectService\b/);
-    expect(existsSync(path.join(PROCESS_ROOT, "src", "eventing"))).toBe(false);
+    const eventing = path.join(PROCESS_ROOT, "src", "eventing");
+    const pipelines = readdirSync(eventing)
+      .filter((name) => name.endsWith(".pipeline.ts"))
+      .toSorted();
+    expect(pipelines).toEqual([
+      "stored-object-maintenance.pipeline.ts",
+      "stored-object-retention.pipeline.ts",
+    ]);
+    for (const pipeline of pipelines) {
+      const source = readFileSync(path.join(eventing, pipeline), "utf8");
+      expect(source).toMatch(/\.withEvents\(\[\]\)/);
+      expect(source).not.toMatch(/Projection|withCommand|withEventSubscriber/);
+    }
   });
 });

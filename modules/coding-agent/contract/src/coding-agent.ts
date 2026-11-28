@@ -225,12 +225,52 @@ export const codingAgentSessionEventSchema: CodingAgentSessionEventSchema =
   codingAgentSessionEventSchemaDefinition;
 
 /**
- * One durable row in the ordered coding-agent session-event read model. `aiUnits` is what the
- * call consumed in its agent's AI units (migration 00123), a count beside the dollar figure;
- * written for the pull-request read, not part of the events answer.
+ * The account columns every per-call row carries (migration 00136). Blank strings and nulls on
+ * rows from before the columns existed and on rows with no account. Percent and instants are only
+ * ever what the account itself reported; nothing here is derived from tokens.
+ */
+const codingAgentAccountColumnsSchemaDefinition = z
+  .object({
+    accountId: z.string(),
+    accountName: z.string(),
+    accountSource: z.string(),
+    accountUsagePercent: z.number().nullable(),
+    accountUsageWindow: z.string(),
+    accountUsageResetsAtMs: z.number().nullable(),
+    accountUsageReadAtMs: z.number().nullable(),
+    accountLimitedUntilMs: z.number().nullable(),
+  })
+  .strict();
+export interface CodingAgentAccountColumnsSchema extends Named<
+  typeof codingAgentAccountColumnsSchemaDefinition
+> {}
+export const codingAgentAccountColumnsSchema: CodingAgentAccountColumnsSchema =
+  codingAgentAccountColumnsSchemaDefinition;
+export type CodingAgentAccountColumns = z.infer<typeof codingAgentAccountColumnsSchema>;
+
+/** A row with no account: what every row from before the columns reads as. */
+export const NO_ACCOUNT_COLUMNS: CodingAgentAccountColumns = Object.freeze({
+  accountId: "",
+  accountName: "",
+  accountSource: "",
+  accountUsagePercent: null,
+  accountUsageWindow: "",
+  accountUsageResetsAtMs: null,
+  accountUsageReadAtMs: null,
+  accountLimitedUntilMs: null,
+});
+
+/**
+ * One durable row in the ordered coding-agent session-event read model. `aiUnits` (00123) and
+ * the account columns (00136) are written for the pull-request read and LWQL queries, not part
+ * of the events answer.
  */
 const codingAgentSessionEventRecordSchemaDefinition = codingAgentSessionEventSchema
-  .safeExtend({ tenantId: z.string(), aiUnits: z.number() })
+  .safeExtend({
+    tenantId: z.string(),
+    aiUnits: z.number(),
+    ...codingAgentAccountColumnsSchema.shape,
+  })
   .strict();
 export interface CodingAgentSessionEventRecordSchema extends Named<
   typeof codingAgentSessionEventRecordSchemaDefinition
@@ -441,6 +481,17 @@ export interface CodingAgentTraceSessionLookupInputSchema extends Named<
 > {}
 export const codingAgentTraceSessionLookupInputSchema: CodingAgentTraceSessionLookupInputSchema =
   codingAgentTraceSessionLookupInputSchemaDefinition;
+
+/** A session's most recent stored trace: the turn a replay opens on. */
+const codingAgentSessionLastTurnSchemaDefinition = z
+  .object({ traceId: z.string(), occurredAtMs: z.number() })
+  .strict();
+export interface CodingAgentSessionLastTurnSchema extends Named<
+  typeof codingAgentSessionLastTurnSchemaDefinition
+> {}
+export const codingAgentSessionLastTurnSchema: CodingAgentSessionLastTurnSchema =
+  codingAgentSessionLastTurnSchemaDefinition;
+export type CodingAgentSessionLastTurn = z.infer<typeof codingAgentSessionLastTurnSchema>;
 
 const codingAgentRecentSessionsInputSchemaDefinition = z
   .object({

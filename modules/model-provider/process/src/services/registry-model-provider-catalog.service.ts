@@ -1,3 +1,4 @@
+import type { ManagedBedrockCredentials } from "@langwatch/enterprise-managed-provider-contract";
 import {
   allFeatures,
   buildProviderOnboardingDefaultPlan,
@@ -12,7 +13,9 @@ import {
   isLatestAlias,
   isModelAllowedAsRoleDefault,
   isModelAllowedForFeature,
+  writtenModelId,
   isDecisionModelId,
+  isLangWatchJudgeModelId,
   isModelRole,
   MODEL_ROLES,
   ModelDefaultValidationError,
@@ -36,6 +39,11 @@ function refuseDefault({ key, value }: { key: string; value: string }): never {
   if (isDecisionDefaultKey(key)) {
     throw new ModelDefaultValidationError(
       `"${value}" is not a decision model. Pick one from the Instant Evals list.`,
+    );
+  }
+  if (isLangWatchJudgeModelId(value)) {
+    throw new ModelDefaultValidationError(
+      "LangWatch Judge (preview) judges scenarios and can only be the Judge default.",
     );
   }
   if (isDecisionModelId(value)) {
@@ -157,7 +165,7 @@ export abstract class ModelProviderCatalog {
       }
       if (!allowed) refuseDefault({ key, value });
 
-      clean[key] = value;
+      clean[key] = writtenModelId(value);
     }
 
     return { config: clean, droppedRestricted };
@@ -174,6 +182,11 @@ export abstract class ModelProviderCatalog {
   }
   isManagedProvider(_input: { organizationId: string; provider: string }): boolean {
     return false;
+  }
+  getManagedBedrockCredentials(_input: {
+    organizationId: string;
+  }): Promise<ManagedBedrockCredentials> {
+    return Promise.reject(new Error("This catalogue manages no Bedrock credentials."));
   }
   prepareExecution(input: {
     parameters: Record<string, string>;
@@ -349,6 +362,12 @@ export class RegistryModelProviderCatalogService extends ModelProviderCatalog {
 
   isManagedProvider(input: { organizationId: string; provider: string }): boolean {
     return this.options.managed.isManaged(input);
+  }
+
+  getManagedBedrockCredentials(input: {
+    organizationId: string;
+  }): Promise<ManagedBedrockCredentials> {
+    return this.options.managed.getBedrockCredentials(input);
   }
 
   prepareExecution(input: {

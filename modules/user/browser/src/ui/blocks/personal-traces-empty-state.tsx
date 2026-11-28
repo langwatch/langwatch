@@ -1,5 +1,5 @@
 /**
- * Empty state for /me "Recent activity", with personal-user-specific trace sources.
+ * Empty state for /coding-agents "Recent activity", with personal-user-specific trace sources.
  */
 import { Card, CardGrid } from "@langwatch/design-system/card";
 import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
@@ -51,7 +51,7 @@ const CompactIntegratePane: React.FC<{ children: React.ReactNode; ariaLabel?: st
   </Flex>
 );
 
-/** Anchor ids the offers scroll to — set on the matching /me sections. */
+/** Anchor ids the offers scroll to — set on the matching /coding-agents sections. */
 export const PERSONAL_AI_TOOLS_ANCHOR = "me-ai-tools";
 export const PERSONAL_TRACE_INGEST_ANCHOR = "me-trace-ingest";
 

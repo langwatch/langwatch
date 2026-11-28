@@ -16,6 +16,13 @@ Feature: A secret family answers every name under one prefix
     Then it receives the three names under the prefix, the environment's value winning the repeat
 
   @unit
+  Scenario: A family keeps a name set to an empty value so its owner can refuse it
+    Given the environment or the .env file sets a name under the prefix to an empty value
+    When an owner that declared the family resolves it
+    Then it receives that name with an empty value, the environment's empty value winning over the file's
+    And a single secret set to an empty value still reads as unset
+
+  @unit
   Scenario: A family nobody sets resolves empty and never fails the preflight
     Given no name under the prefix is set anywhere
     When the boot preflights and the owner resolves the family

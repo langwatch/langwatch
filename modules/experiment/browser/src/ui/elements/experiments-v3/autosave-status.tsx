@@ -1,12 +1,14 @@
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
 import { Tooltip } from "@langwatch/design-system/tooltip";
-import { AlertCircle, Check, Cloud, CloudOff, RefreshCw } from "lucide-react";
+import { AlertCircle, Check, Cloud, CloudOff, Eye, RefreshCw } from "lucide-react";
 import type { ReactNode } from "react";
 
 import type { AutosaveState } from "../../../model/dataset/dataset-table-context.tsx";
 import { AUTOSAVE_OUT_OF_DATE_REASON } from "../../../model/experiments-v3/constants.ts";
 
 type AutosaveStatusProps = {
+  /** The reader's role cannot save: the badge says so instead of a save state. */
+  viewOnly?: boolean;
   evaluationState: AutosaveState;
   datasetState: AutosaveState;
   evaluationError?: string;
@@ -89,11 +91,30 @@ function tooltipContent({
  * Displays "Saving...", "All changes saved", or error state.
  */
 export function AutosaveStatus({
+  viewOnly = false,
   evaluationState,
   datasetState,
   evaluationError,
   datasetError,
 }: AutosaveStatusProps) {
+  if (viewOnly) {
+    return (
+      <Tooltip content="Your role can't save changes to this experiment. Edits stay in this tab.">
+        <HStack
+          gap={1.5}
+          fontSize="xs"
+          color="fg.muted"
+          cursor="default"
+          paddingX={2}
+          paddingY={1}
+          data-testid="autosave-view-only"
+        >
+          <Eye size={14} />
+          <Text>View only</Text>
+        </HStack>
+      </Tooltip>
+    );
+  }
   // A refused save and a failed save are different events and must not share a
   // label: the refusal wrote nothing and lost nothing, so "Failed to save"
   // tells the reader the opposite of what happened. A real failure alongside a

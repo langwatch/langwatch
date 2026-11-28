@@ -28,6 +28,7 @@
     "@langwatch/enterprise-billing-contract": "workspace:*",
     "@langwatch/enterprise-licensing-client": "workspace:*",
     "@langwatch/enterprise-licensing-contract": "workspace:*",
+    "@langwatch/organization-client": "workspace:*",
     "@langwatch/plans": "workspace:*",
     "@langwatch/time": "workspace:*",
     "lucide-react": "catalog:"
@@ -45,6 +46,7 @@
     "jsdom": "catalog:",
     "react": "catalog:",
     "react-dom": "catalog:",
+    "react-router": "catalog:",
     "typescript": "catalog:",
     "vitest": "catalog:"
   },

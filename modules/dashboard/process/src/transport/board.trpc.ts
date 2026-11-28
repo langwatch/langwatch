@@ -1,7 +1,7 @@
 /**
  * The server half of `boards.*`, the Dashboards area's boards. Reading and starring take
- * `analytics:view`; creating `analytics:create`, editing and scope `analytics:update`, removing
- * `analytics:delete`. The service asks for a scope change's author.
+ * `analytics:view`, a member's own sidebar order `organization:view`; creating
+ * `analytics:create`, editing, scope and moving `analytics:update`, removing `analytics:delete`.
  */
 import { defineTrpcRouter, type TrpcRouterDeclaration } from "@langwatch/api/trpc";
 import { DashboardApi, boardTrpc } from "@langwatch/dashboard-contract";
@@ -23,6 +23,36 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
       }));
     })
 
+    // Asked of the organization, which every seat holds, Developer included (ADR-002); the
+    // service then reads each project only where the member holds `analytics:view`.
+    .procedure("listInOrganization")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.findBoardsInOrganization({
+        organizationId: input.organizationId,
+        viewer: { userId: actor.id },
+      }),
+    )
+
+    // The same door and loaded-row rule as the library, so an id answers only what it lists.
+    .procedure("resolve")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.getBoardInOrganization({
+        organizationId: input.organizationId,
+        viewer: { userId: actor.id },
+        dashboardId: input.dashboardId,
+      }),
+    )
+
+    // Asked of the organization like the library; the service keeps the projects the member
+    // may create in, with Dashboards on.
+    .procedure("storeProjects")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.findStoreProjects({ organizationId: input.organizationId, viewer: { userId: actor.id } }),
+    )
+
     .procedure("getById")
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
@@ -36,7 +66,25 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
     .procedure("create")
     .withPermission("analytics:create")
     .handle(async ({ app, input, actor }) =>
-      app.createBoard({ projectId: input.projectId, name: input.name, createdById: actor.id }),
+      app.createBoard({
+        projectId: input.projectId,
+        name: input.name,
+        createdById: actor.id,
+        ...(input.homeProduct === undefined ? {} : { homeProduct: input.homeProduct }),
+      }),
+    )
+
+    // Making it and setting its scope, in one write: both grants, asked at the door.
+    .procedure("createAtScope")
+    .withPermission(["analytics:create", "analytics:update"])
+    .handle(async ({ app, input, actor }) =>
+      app.createBoard({
+        projectId: input.projectId,
+        name: input.name,
+        createdById: actor.id,
+        scope: input.scope,
+        ...(input.homeProduct === undefined ? {} : { homeProduct: input.homeProduct }),
+      }),
     )
 
     .procedure("update")
@@ -48,6 +96,18 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
         viewer: { userId: actor.id },
         ...(input.name === undefined ? {} : { name: input.name }),
         ...(input.description === undefined ? {} : { description: input.description }),
+      }),
+    )
+
+    // Asked in the owning project, as an edit is; the service applies the scope a move implies.
+    .procedure("move")
+    .withPermission("analytics:update")
+    .handle(async ({ app, input, actor }) =>
+      app.moveBoard({
+        projectId: input.projectId,
+        dashboardId: input.dashboardId,
+        homeProduct: input.homeProduct,
+        viewer: { userId: actor.id },
       }),
     )
 
@@ -117,5 +177,27 @@ export const boardTrpcTransport: TrpcRouterDeclaration<DashboardApi, typeof boar
     .withPermission("analytics:view")
     .handle(async ({ app, input, actor }) =>
       app.reorderStars({ projectId: input.projectId, userId: actor.id, stars: input.stars }),
+    )
+
+    // The member's own sidebar, so the organization floor every seat holds is enough.
+    .procedure("sidebarOrder")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.getSidebarOrder({
+        organizationId: input.organizationId,
+        userId: actor.id,
+        homeProduct: input.homeProduct,
+      }),
+    )
+
+    .procedure("reorderSidebar")
+    .withPermission("organization:view")
+    .handle(async ({ app, input, actor }) =>
+      app.setSidebarOrder({
+        organizationId: input.organizationId,
+        userId: actor.id,
+        homeProduct: input.homeProduct,
+        dashboardIds: input.dashboardIds,
+      }),
     )
     .build();

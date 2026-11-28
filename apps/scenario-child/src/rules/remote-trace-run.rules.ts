@@ -13,10 +13,11 @@ import type { TargetConfig } from "@langwatch/scenario-contract";
 export const TRACE_WAIT_CAP_MS = 30_000;
 
 /**
- * Quiet period a trace's span set must hold, once every parent resolved, before the
- * judge reads it: a tool span ending after its parent exported lands a second later.
+ * Quiet period a trace's span set must hold, once every parent resolved, before the judge
+ * reads it. Above the 5s OpenTelemetry batch flush plus ~2s ingest, so a flat trace's next
+ * flush lands before it settles. The fallback when the job carries the project's own value.
  */
-export const TRACE_QUIET_PERIOD_MS = 2_000;
+export const TRACE_QUIET_PERIOD_MS = 7_000;
 
 export interface RemoteTraceRunConfig {
   fetchRemoteTraces: true;
@@ -29,14 +30,21 @@ export interface RemoteTraceRunConfig {
   };
 }
 
+/**
+ * Only http and connected targets fetch: prompt targets call the model in this child, code and
+ * workflow run in nlpgo with do_not_trace, and voice platforms never get the trace context, so
+ * none puts spans in LangWatch under the turn's trace id and a fetch would only wait.
+ */
 export function buildRemoteTraceRunConfig({
   targetType,
   traceWaitTimeoutMs,
+  traceQuietPeriodMs,
   langwatchEndpoint,
   langwatchApiKey,
 }: {
   targetType: TargetConfig["type"];
   traceWaitTimeoutMs: number | undefined;
+  traceQuietPeriodMs?: number | undefined;
   langwatchEndpoint: string;
   langwatchApiKey: string;
 }): RemoteTraceRunConfig | Record<string, never> {
@@ -47,7 +55,7 @@ export function buildRemoteTraceRunConfig({
     fetchRemoteTraces: true,
     ...(traceWaitTimeoutMs !== undefined ? { traceWaitTimeoutMs } : {}),
     traceWaitExtensionMs: TRACE_WAIT_CAP_MS,
-    traceQuietPeriodMs: TRACE_QUIET_PERIOD_MS,
+    traceQuietPeriodMs: traceQuietPeriodMs ?? TRACE_QUIET_PERIOD_MS,
     langwatch: {
       endpoint: langwatchEndpoint,
       apiKey: langwatchApiKey,

@@ -10,7 +10,7 @@ import { DataPrivacyApi, dataPrivacyTrpc } from "@langwatch/data-privacy-contrac
 const SCOPE_TARGETED_PERMISSIONS = [
   "organization:manage",
   "team:manage",
-  "project:update",
+  "project:manage",
 ] as const;
 
 function scopeTargeted(act: string): {
@@ -66,5 +66,12 @@ export const dataPrivacyTrpcTransport: TrpcRouterDeclaration<
       personalOnly: input.personalOnly,
       userId: actor.id,
     });
+  })
+
+  /** Accepting the model's price binds the whole organization: its admins' act alone. */
+  .procedure("acceptPiiRedactionModel")
+  .withPermission("organization:manage")
+  .handle(async ({ app, input, actor }) => {
+    await app.acceptPiiRedactionModel({ organizationId: input.organizationId, userId: actor.id });
   })
   .build();

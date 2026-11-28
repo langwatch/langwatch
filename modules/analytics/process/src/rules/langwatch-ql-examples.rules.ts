@@ -34,13 +34,6 @@ interface LangWatchQLExample {
 }
 
 /**
- * The database qualifier every published statement is written against — the
- * production spelling `DEFAULT_LWQL_DATABASE` carries, which a deployment
- * serving the views elsewhere rewrites out of the document it publishes.
- */
-export const LWQL_EXAMPLE_DATABASE = "analytics";
-
-/**
  * The keyset cursor parameter names, named here rather than in the CLI: two
  * names in two files is a paging loop that re-reads its first page forever.
  */
@@ -59,7 +52,7 @@ export const LWQL_EXAMPLES: readonly LangWatchQLExample[] = [
     intent: "triage",
     tags: ["errors", "starter"],
     sql: `SELECT TraceId, TraceName, OccurredAt, TotalDurationMs
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 1)
   AND ContainsErrorStatus
 ORDER BY OccurredAt DESC
@@ -76,7 +69,7 @@ LIMIT 100`,
   toStartOfDay(OccurredAt) AS day,
   count() AS traces,
   countIf(ContainsErrorStatus) AS errors
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 30)
 GROUP BY day
 ORDER BY day`,
@@ -94,7 +87,7 @@ ORDER BY day`,
   quantile(0.5)(TotalDurationMs) AS p50_ms,
   quantile(0.95)(TotalDurationMs) AS p95_ms,
   quantile(0.99)(TotalDurationMs) AS p99_ms
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)`,
     parameters: [],
     gates: [],
@@ -108,7 +101,7 @@ WHERE OccurredAt >= subtractDays(now(), 7)`,
   toStartOfHour(BucketStart) AS hour,
   sum(TraceCount) AS traces,
   sum(ErrorCount) AS errors
-FROM analytics.trace_metrics_by_minute
+FROM trace_metrics_by_minute
 WHERE BucketStart >= subtractDays(now(), 2)
 GROUP BY hour
 ORDER BY hour`,
@@ -126,7 +119,7 @@ ORDER BY hour`,
   Model,
   sum(CostSum) AS cost_usd,
   sum(PromptTokensSum + CompletionTokensSum) AS tokens
-FROM analytics.model_usage_by_minute
+FROM model_usage_by_minute
 WHERE BucketStart >= subtractDays(now(), 7)
 GROUP BY Model
 ORDER BY cost_usd DESC
@@ -144,7 +137,7 @@ LIMIT 50`,
   count() AS turns,
   min(OccurredAt) AS started_at,
   max(OccurredAt) AS last_turn
-FROM analytics.trace_metrics
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND ConversationId IS NOT NULL
 GROUP BY ConversationId
@@ -164,7 +157,7 @@ LIMIT 50`,
   EvaluatorName,
   count() AS evaluations,
   countIf(Passed = 1) AS passed
-FROM analytics.evaluations
+FROM evaluations
 WHERE ScheduledAt >= subtractDays(now(), 7)
   AND Status = 'processed'
 GROUP BY EvaluatorName
@@ -185,8 +178,8 @@ LIMIT 50`,
   t.TraceName AS TraceName,
   count() AS spans,
   max(s.DurationMs) AS slowest_span_ms
-FROM analytics.traces AS t
-INNER JOIN analytics.spans AS s
+FROM traces AS t
+INNER JOIN spans AS s
   ON s.TenantId = t.TenantId AND s.TraceId = t.TraceId
 WHERE t.OccurredAt >= subtractDays(now(), 1)
   AND s.StartTime >= subtractDays(now(), 1)
@@ -207,7 +200,7 @@ LIMIT 50`,
   TraceId,
   OccurredAt,
   Attributes['langwatch.user_id'] AS user_id
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), {days:UInt32})
   AND Attributes['langwatch.user_id'] = {user_id:String}
 ORDER BY OccurredAt DESC
@@ -230,7 +223,7 @@ LIMIT 100`,
     intent: "quality",
     tags: ["simulations"],
     sql: `SELECT ScenarioRunId, Name, Verdict, StartedAt
-FROM analytics.simulations
+FROM simulations
 WHERE StartedAt >= subtractDays(now(), 7)
   AND Verdict = 'failure'
 ORDER BY StartedAt DESC
@@ -244,7 +237,7 @@ LIMIT 50`,
     intent: "export",
     tags: ["export", "paging", "parameters"],
     sql: `SELECT OccurredAt AS after_ts, TraceId AS after_id, CapturedInput, CapturedOutput
-FROM analytics.traces
+FROM traces
 WHERE OccurredAt >= subtractDays(now(), 7)
   AND (OccurredAt, TraceId) > ({after_ts:DateTime64(3)}, {after_id:String})
 ORDER BY OccurredAt, TraceId

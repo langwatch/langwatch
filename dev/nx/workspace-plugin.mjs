@@ -1,34 +1,13 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { dirname, join, normalize } from "node:path";
+import { existsSync, readdirSync } from "node:fs";
+import { dirname, join } from "node:path";
+
+import { buildInfoOutsideDist, declarationOutputs, referenced } from "./typecheck-plugin.mjs";
 
 // Project `workspace` (at dev/nx: no project owns the root) holds the repo-wide builds:
 // `build:types` (`tsc -b` over every module contract's build config, declarations into the dist of
 // every project those reference) plus `lint:rules` and `test:scripts`, which run the Makefile
 // recipes as `lint:go` does. Keyed on nx.json, which every workspace has. ADR-150 records why.
 const contracts = "modules/*/contract/tsconfig.build.json";
-
-// Declarations only: a project whose own `build` emits its published `.d.ts`
-// (ksuid) keeps those, and this target owns just its maps and build info.
-const declarationOutputs = (root, dir) => {
-  const manifest = join(root, dir, "package.json");
-  const ownBuild =
-    existsSync(manifest) && JSON.parse(readFileSync(manifest, "utf8")).scripts?.build;
-  const globs = ["dist/**/*.d.ts.map", "dist/**/*.tsbuildinfo"];
-  return (ownBuild ? globs : ["dist/**/*.d.ts", ...globs]).map(
-    (g) => `{workspaceRoot}/${dir}/${g}`,
-  );
-};
-
-// A reference names a config or, for a package with no build config, its directory.
-const referenced = (root, reference, seen) => {
-  const file = reference.endsWith(".json") ? reference : join(reference, "tsconfig.json");
-  if (seen.has(file)) return seen;
-  seen.add(file);
-  const config = JSON.parse(readFileSync(join(root, file), "utf8").replace(/^\s*\/\/.*$/gm, ""));
-  for (const { path } of config.references ?? [])
-    referenced(root, normalize(join(dirname(file), path)), seen);
-  return seen;
-};
 
 const contractBuilds = (root) =>
   readdirSync(join(root, "modules"), { withFileTypes: true })
@@ -79,31 +58,53 @@ export const createNodes = [
         "!{workspaceRoot}/.claude/**/*",
         "!{workspaceRoot}/.nx/**/*",
       ];
-      // The one root `tsc -b` (`pnpm typecheck`, bare `nx typecheck`): its tsbuildinfo
-      // is the incremental cache, so Nx caches nothing. `nx sync` writes every project
-      // reference first (ADR-150, 2026-10-10).
-      const typecheck = {
-        executor: "nx:run-commands",
-        options: {
-          cwd: "{workspaceRoot}",
-          command: "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b --builders 1 --checkers 1",
-        },
-        cache: false,
-        syncGenerators: ["@nx/js:typescript-sync"],
-        dependsOn: [
-          "@langwatch/prisma-client:prisma:generate",
-          ...["langwatch", "@langwatch/mcp-server", "@langwatch/ksuid", "@langwatch/mail"].map(
-            (project) => `${project}:build`,
-          ),
-        ],
-      };
-      // Local default: the same root build without the test programs; CI runs `typecheck`.
+      // `pnpm typecheck:src`, the local default: one root `tsc -b` without the test programs,
+      // cached on the sources of what it reads and of the files its dependencies generate,
+      // never on dist contents. `pnpm typecheck` is the per-project `typecheck` targets
+      // (typecheck-plugin.mjs). ADR-150, amendments 2026-10-10 and 2026-11-27.
+      const solution = referenced(workspaceRoot, "tsconfig.json", new Set());
+      const solutionDirs = [...new Set([...solution].map(dirname))].filter((dir) => dir !== ".");
+      const prepared = [
+        "@langwatch/prisma-client:prisma:generate",
+        ...["langwatch", "@langwatch/mcp-server", "@langwatch/ksuid", "@langwatch/mail"].map(
+          (project) => `${project}:build`,
+        ),
+      ];
       const sourceTypecheck = {
-        ...typecheck,
+        executor: "nx:run-commands",
         options: { cwd: "{workspaceRoot}", command: "node dev/scripts/typecheck-src.mjs" },
+        cache: true,
+        inputs: [
+          "{workspaceRoot}/**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json}",
+          "!{workspaceRoot}/.claude/**/*",
+          "!{workspaceRoot}/.nx/**/*",
+          "{workspaceRoot}/**/*.prisma",
+          "{workspaceRoot}/sdks/typescript/copy-types.sh",
+          "{workspaceRoot}/skills/**/*",
+          "{workspaceRoot}/pnpm-lock.yaml",
+          { env: "LANGWATCH_SKILLS_RENDER" },
+          { runtime: "node --version" },
+        ],
+        outputs: [
+          ...solutionDirs.flatMap((dir) => declarationOutputs(workspaceRoot, dir)),
+          ...buildInfoOutsideDist(workspaceRoot, solution),
+        ],
+        syncGenerators: ["@nx/js:typescript-sync"],
+        dependsOn: prepared,
+      };
+      // `pnpm lint` over a resolved scope (dev/nx/lint.mjs passes it as arguments, which
+      // Nx hashes); the plugin rules read files beyond the linted ones, so it hashes the
+      // tree. The type-aware lint is per project (`lint:types`, after its `typecheck`).
+      const lintTree = {
+        executor: "nx:run-commands",
+        options: { cwd: "{workspaceRoot}", command: "node dev/nx/lint.mjs" },
+        cache: true,
+        inputs: [...everything, { env: "LANGWATCH_SKILLS_RENDER" }, { runtime: "node --version" }],
+        outputs: [],
+        dependsOn: prepared,
       };
       const targets = {
-        typecheck,
+        "lint:tree": lintTree,
         "typecheck:src": sourceTypecheck,
         "build:types": target,
         "lint:rules": make("lint-rules-run", "uvx --version", everything),

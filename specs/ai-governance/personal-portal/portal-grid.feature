@@ -1,12 +1,12 @@
-Feature: AI Tools Portal — Grid layout on /me
+Feature: AI Tools Portal — Grid layout on /coding-agents
   As an end user signing in to LangWatch via generic `langwatch login`
-  I want my /me dashboard to surface the AI tools I'm allowed to use
+  I want my /coding-agents dashboard to surface the AI tools I'm allowed to use
   as a card grid, grouped by class (coding assistant / model provider /
   internal tool)
   So that I can pick the next tool to set up without hunting through
   documentation or asking my admin
 
-    /me is the AI Tools Home. Portal grid hero on top, existing usage
+    /coding-agents is the AI Tools Home. Portal grid hero on top, existing usage
     dashboard below. Single landing surface; no ferry between two URLs.
     The portal is the customizable company portal — admins curate the
     catalog at org or team scope, end-users see only what they're allowed.
@@ -26,7 +26,7 @@ Feature: AI Tools Portal — Grid layout on /me
       | model_provider    | Anthropic      |     1 |
       | model_provider    | OpenAI         |     2 |
       | external_tool     | Copilot Studio |     1 |
-    When user "jane@acme.com" loads "/me"
+    When user "jane@acme.com" loads "/coding-agents"
     Then the portal renders three section headings in this order:
       | Coding assistants                                  |
       | Model providers (issue your own virtual key)       |
@@ -36,7 +36,7 @@ Feature: AI Tools Portal — Grid layout on /me
 
   Scenario: empty section is hidden, not shown empty
     Given the org-scoped catalog has only model-provider entries
-    When user "jane@acme.com" loads "/me"
+    When user "jane@acme.com" loads "/coding-agents"
     Then the "Coding assistants" section heading does NOT render
     And the "Internal tools" section heading does NOT render
     And the "Model providers" section renders normally
@@ -49,7 +49,7 @@ Feature: AI Tools Portal — Grid layout on /me
     Given the org's catalog has no enabled tools left
     And no team-scoped entries are published for any of jane's teams
     And user "jane@acme.com" cannot manage the catalog (member, not admin)
-    When user "jane@acme.com" loads "/me"
+    When user "jane@acme.com" loads "/coding-agents"
     Then a single empty-state callout renders titled "Your AI tools portal"
     And the callout tells the member their admin has not added any tools yet
     And no install-the-CLI affordance renders in the empty state
@@ -59,7 +59,7 @@ Feature: AI Tools Portal — Grid layout on /me
   Scenario: curated-empty catalog shows the getting-started banner to a catalog admin
     Given the org's catalog has no enabled tools left
     And user "alice@acme.com" can manage the catalog (aiTools:manage)
-    When user "alice@acme.com" loads "/me"
+    When user "alice@acme.com" loads "/coding-agents"
     Then the AI-governance getting-started banner renders
     And it links to the tool tiles page at "/governance/inventory?tab=catalog"
     And no install-the-CLI affordance renders in the empty state
@@ -67,20 +67,20 @@ Feature: AI Tools Portal — Grid layout on /me
   Scenario: team-scoped entries override org-scoped entries by slug
     Given the org-scoped catalog publishes "Claude Code" with `setupCommand=langwatch claude`
     And the team-scoped catalog for team "engineering" publishes "Claude Code" with `setupCommand=langwatch claude --team-engineering`
-    When user "jane@acme.com" (member of team "engineering") loads "/me"
+    When user "jane@acme.com" (member of team "engineering") loads "/coding-agents"
     Then exactly ONE Claude Code tile renders
     And clicking that tile reveals `setupCommand=langwatch claude --team-engineering`
 
   Scenario: disabled entries are excluded from the user-facing list
     Given the org-scoped catalog has Claude Code entry with `enabled=false`
     And the org-scoped catalog has Codex entry with `enabled=true`
-    When user "jane@acme.com" loads "/me"
+    When user "jane@acme.com" loads "/coding-agents"
     Then the Claude Code tile does NOT render
     And the Codex tile DOES render
 
   Scenario: feature flag off hides the whole portal
     Given the `release_ui_ai_governance_enabled` feature flag is OFF
-    When user "jane@acme.com" loads "/me"
+    When user "jane@acme.com" loads "/coding-agents"
     Then the portal does NOT render
     And the page renders the not-found scene
     And no `api.aiTools.list` query is fired

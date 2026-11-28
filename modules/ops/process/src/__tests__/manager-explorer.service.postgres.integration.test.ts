@@ -8,6 +8,7 @@ import { randomUUID } from "node:crypto";
 import type {
   AuditLogApi,
   AuditLogHistoryEntry,
+  AuditLogExportEntry,
   AuditLogTargetEntry,
   RecordAuditLogCommand,
   RecordedAuditLogEntry,
@@ -66,6 +67,10 @@ class PrismaAuditLogTestSink implements AuditLogApi {
   }
 
   async findByTargetKind(): Promise<AuditLogTargetEntry[]> {
+    return [];
+  }
+
+  async findForOrganization(): Promise<AuditLogExportEntry[]> {
     return [];
   }
 }

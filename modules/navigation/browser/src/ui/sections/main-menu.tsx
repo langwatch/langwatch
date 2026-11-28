@@ -128,7 +128,7 @@ function ObserveSection({
 }) {
   return (
     <SidebarSection id="observe" label="Observe" showExpanded={showExpanded}>
-      {showAnalytics && analyticsEntry.isSettled && (
+      {showAnalytics && analyticsEntry.isSettled && analyticsEntry.isOffered && (
         <PageMenuLink
           path={analyticsEntry.path}
           icon={featureIcons.analytics.icon}

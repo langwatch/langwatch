@@ -29,10 +29,12 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   readonly portalSessions: { customerId: string; returnUrl: string; url: string }[] = [];
   readonly previews: { subscriptionId: string; change: BillingSubscriptionPreviewChange }[] = [];
   private readonly held = new Map<string, BillingSubscription>();
+  /** Which customer each seeded subscription bills; one seeded without a customer has none. */
+  private readonly customers = new Map<string, string>();
   private readonly lineItems = new Map<string, BillingPurchasedLineItem[]>();
   private readonly refusals = new Map<
     Operation,
-    { error: Error; allowed: number; times: number }
+    { error: Error; allowed: number; times: number; endedElsewhere: boolean }
   >();
   private readonly subscriptionCheckouts = new Map<string, BillingSubscriptionCheckout>();
   readonly checkoutLookups: string[] = [];
@@ -47,9 +49,16 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     return new MemoryStripeSubscriptionsChannel();
   }
 
-  /** Puts a subscription at the provider, as a test declares it. */
-  seed({ subscription }: { subscription: BillingSubscription }): void {
+  /** Puts a subscription at the provider, as a test declares it, for `customerId` when given. */
+  seed({
+    subscription,
+    customerId,
+  }: {
+    subscription: BillingSubscription;
+    customerId?: string;
+  }): void {
     this.held.set(subscription.id, subscription);
+    if (customerId !== void 0) this.customers.set(subscription.id, customerId);
   }
 
   /** Puts a completed checkout session's line items at the provider. */
@@ -82,20 +91,23 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
 
   /**
    * Makes `operation` throw `error`, as a failing provider would: after `allowed` more calls
-   * succeed (default none), for `times` calls (default every one from then on).
+   * succeed (default none), for `times` calls (default every one from then on). With
+   * `endedElsewhere`, the refused call finds its subscription already cancelled by another caller.
    */
   refuse({
     operation,
     error,
     allowed = 0,
     times = Number.POSITIVE_INFINITY,
+    endedElsewhere = false,
   }: {
     operation: Operation;
     error: Error;
     allowed?: number;
     times?: number;
+    endedElsewhere?: boolean;
   }): void {
-    this.refusals.set(operation, { error, allowed, times });
+    this.refusals.set(operation, { error, allowed, times, endedElsewhere });
   }
 
   async getSubscription({
@@ -106,6 +118,17 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     this.throwIfRefused("getSubscription");
     this.reads.push(subscriptionId);
     return this.find(subscriptionId);
+  }
+
+  async listCustomerSubscriptions({
+    customerId,
+  }: {
+    customerId: string;
+  }): Promise<BillingSubscription[]> {
+    this.throwIfRefused("listCustomerSubscriptions");
+    return [...this.held.values()].filter(
+      (subscription) => this.customers.get(subscription.id) === customerId,
+    );
   }
 
   async updateSubscription({
@@ -129,7 +152,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     subscriptionId: string;
     prorate?: boolean;
   }): Promise<BillingSubscription> {
-    this.throwIfRefused("cancelSubscription");
+    this.throwIfRefused("cancelSubscription", subscriptionId);
     const cancelled: BillingSubscription = { ...this.find(subscriptionId), status: "canceled" };
     this.held.set(subscriptionId, cancelled);
     this.cancellations.push(
@@ -196,7 +219,7 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     return preview;
   }
 
-  private throwIfRefused(operation: Operation): void {
+  private throwIfRefused(operation: Operation, subscriptionId?: string): void {
     const refusal = this.refusals.get(operation);
     if (!refusal) return;
     if (refusal.allowed > 0) {
@@ -205,6 +228,9 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     }
     refusal.times -= 1;
     if (refusal.times <= 0) this.refusals.delete(operation);
+    if (refusal.endedElsewhere && subscriptionId) {
+      this.held.set(subscriptionId, { ...this.find(subscriptionId), status: "canceled" });
+    }
     throw refusal.error;
   }
 

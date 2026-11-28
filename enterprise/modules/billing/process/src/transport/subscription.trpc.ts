@@ -15,6 +15,9 @@ import {
   type Currency,
   type DeveloperSeatQuote,
   type DeveloperSeats,
+  type PaymentRecoveryDetails,
+  type PaymentRecoveryPayLink,
+  type PaymentRecoverySummary,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
 } from "@langwatch/enterprise-billing-contract";
@@ -53,6 +56,7 @@ export interface BillingSubscriptionApi {
     billingInterval?: SubscriptionBillingInterval;
     /** Who opened the checkout; given the Billing role when it completes. */
     startedByUserId?: string;
+    retentionDays?: number;
   }): Promise<{ url: string | null }>;
   createBillingPortalSession(input: {
     customerId: string;
@@ -83,6 +87,10 @@ export interface BillingSubscriptionApi {
     quantity: number;
     quotedAt?: number;
   }): Promise<{ success: boolean }>;
+  /** Whether a failed payment is being recovered: none, failing or paused. */
+  paymentRecovery(input: { organizationId: string }): Promise<PaymentRecoverySummary>;
+  paymentRecoveryDetails(input: { organizationId: string }): Promise<PaymentRecoveryDetails>;
+  paymentRecoveryPayLink(input: { organizationId: string }): Promise<PaymentRecoveryPayLink>;
 }
 
 export const BillingSubscriptionApi = moduleApi<BillingSubscriptionApi>()("billing");
@@ -137,6 +145,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
       ...(input.tracesToAdd === undefined ? {} : { tracesToAdd: input.tracesToAdd }),
       ...(input.currency === undefined ? {} : { currency: input.currency }),
       ...(input.billingInterval === undefined ? {} : { billingInterval: input.billingInterval }),
+      ...(input.retentionDays === undefined ? {} : { retentionDays: input.retentionDays }),
     });
   })
 
@@ -216,4 +225,19 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   .withPermission("subscription:manage")
   // The organization's invoices, for the billing page.
   .handle(({ app, input }) => app.listInvoices({ organizationId: input.organizationId }))
+
+  .procedure("paymentRecovery")
+  .withPermission("organization:view")
+  // Whether a failed payment is being recovered, for every member's banner.
+  .handle(({ app, input }) => app.paymentRecovery({ organizationId: input.organizationId }))
+
+  .procedure("paymentRecoveryDetails")
+  .withPermission("subscription:manage")
+  // The open case's invoice, amount and card, for people who can pay it.
+  .handle(({ app, input }) => app.paymentRecoveryDetails({ organizationId: input.organizationId }))
+
+  .procedure("paymentRecoveryPayLink")
+  .withPermission("subscription:manage")
+  // Stripe's page for the open invoice, or the billing page when it cannot be read.
+  .handle(({ app, input }) => app.paymentRecoveryPayLink({ organizationId: input.organizationId }))
   .build();

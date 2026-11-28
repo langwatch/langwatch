@@ -35,6 +35,7 @@ const renderer: LangWatchQLTraceRenderer = {
 const traceSource: LangWatchQLTraceSource = {
   readTraces: async ({ traceIds }) => traceIds.map((id) => trace({ id })),
   readThreadTraces: async () => [trace({ id: "trace-a", threadId: "thread-a" })],
+  readThreadTraceIds: async () => [{ threadId: "thread-a", traceIds: ["trace-a"] }],
 };
 
 function emptyResult(rows: readonly Record<string, unknown>[]): LangWatchQLQueryResult {

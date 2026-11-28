@@ -3,7 +3,7 @@ import { Buffer } from "node:buffer";
 import {
   AGENT_TEST_SET_SUFFIX,
   RUN_ACTOR_LABELS,
-  type RunActor,
+  type RecordedRunActor,
   SimulationRunStatus,
   VOICE_CALL_SCENARIO_SET_ID,
   type SimulationBatchHistory,
@@ -167,7 +167,7 @@ function actorOf(run: FoldedRun): { id: string; label: string } {
 }
 
 /** The batch's actor: the first run naming a person, as the live `anyIf` reads it. */
-function deriveBatchActor(runs: FoldedRun[]): RunActor | null {
+function deriveBatchActor(runs: FoldedRun[]): RecordedRunActor | null {
   const actor = runs.map(actorOf).find((candidate) => candidate.id !== "");
   if (!actor) return null;
   const label = RUN_ACTOR_LABELS.find((known) => known === actor.label);
@@ -883,14 +883,6 @@ export class MemorySimulationRepository extends SimulationRepository {
       ...new Set(this.visibleRuns({ projectId, scenarioSetId }).map((run) => run.scenarioRunId)),
     ].slice(0, RUN_ID_CAP);
     return { runIds, reachedCap: runIds.length === RUN_ID_CAP };
-  }
-
-  async findDistinctExternalSetIds({ projectIds }: { projectIds: string[] }): Promise<Set<string>> {
-    const setIds = this.runsOf(projectIds)
-      .filter(isVisible)
-      .map((run) => run.state.ScenarioSetId)
-      .filter((setId) => !setId.startsWith(INTERNAL_SET_PREFIX) && !isAgentTestSet(setId));
-    return new Set(setIds.map(normalizeSetId));
   }
 
   async countRunsForExport(input: {

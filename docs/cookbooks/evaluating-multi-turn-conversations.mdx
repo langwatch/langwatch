@@ -14,7 +14,17 @@ keywords:
   ]
 ---
 
-In this cookbook, we'll explore a more effective approach to evaluating multi-turn customer support agents. Traditional evaluation methods that use a single input-output pair are insufficient for agents that need to adapt their tool usage as conversations evolve. Instead, we'll implement a simulation-based approach where an LLM evaluates our agent against specific success criteria.
+To evaluate a multi-turn agent, simulate whole conversations and judge each one against success criteria about outcomes, instead of comparing one input with an expected sequence of tool calls. This cookbook builds that in Python for an e-commerce customer support agent: an LLM evaluator passes or fails each criterion with an explanation, and LangWatch logs every run as an experiment with the score, the criteria and the tools used.
+
+## Input/output pairs vs simulation
+
+| Aspect                                    | Input/output pairs                                        | Simulation with success criteria                                      |
+| ----------------------------------------- | --------------------------------------------------------- | --------------------------------------------------------------------- |
+| A test case holds                         | A customer ticket and the expected sequence of tool calls | A customer ticket and the criteria the agent must meet                |
+| What is checked                           | The exact sequence of tools                               | What the agent accomplishes, whatever path it takes                   |
+| Paths to resolution                       | One fixed, predetermined path                             | Several valid paths                                                   |
+| Information found during the conversation | Not accounted for                                         | The agent adapts its tool usage as the conversation evolves           |
+| Result                                    | The tool sequence matches or not                          | Pass or fail per criterion, with an explanation, and an overall score |
 
 ## The Problem with Traditional Evaluation
 
@@ -593,3 +603,8 @@ Key benefits of this approach include:
 As you develop your own multi-turn agents, consider implementing this simulation-based evaluation approach to get a more accurate picture of their performance and to identify specific areas for improvement.
 
 For the full notebook, check it out on: [GitHub](https://github.com/langwatch/cookbooks/blob/main/notebooks/multi-turn-agents.ipynb).
+
+## Further reading
+
+- [How to evaluate multi-turn conversations with your AI agent](https://langwatch.ai/blog/how-to-evaluate-multi-turn-conversations) grades a conversation at three levels (the conversation, the trajectory of tool calls and each turn), before release with a simulated user and after release on real threads.
+- [AI agent testing with simulated users](/agent-testing/overview) runs this kind of simulation with Scenario, in pytest or vitest or from the LangWatch platform.

@@ -74,7 +74,7 @@ Feature: Data privacy policy configuration
     And PII is redacted at the strict level for "web-app"
 
   # The settings page shows an "effective" summary that follows the scope filter:
-  # "All you can see" shows the organization baseline, "This team" the team
+  # "All you can see" shows the organization baseline, "Team [name]" the team
   # baseline, and a project the full cascade, so an admin sees what each tier
   # contributes before a project's own rules apply.
 
@@ -154,6 +154,21 @@ Feature: Data privacy policy configuration
     Given a user who can manage project "web-app" but not the organization
     When that user attempts to set an organization-level privacy rule
     Then the request is rejected as forbidden
+
+  @unit
+  Scenario: A project Member cannot write the project's privacy rule
+    Given a project Member, who may update "web-app" but not manage it
+    When that member attempts to set a project-level privacy rule on "web-app"
+    Then the request is rejected as forbidden, naming project:manage
+    And a project Admin may still set it
+
+  @unit
+  Scenario: A project Member sees the policy that applies but not the project rule to edit
+    Given a rule on "web-app" that restricts trace input to admins
+    When a project Member opens the Data Privacy page for "web-app"
+    Then the page shows the policy in force on "web-app"
+    And it lists no project rule and offers no project to write one at
+    And a project Admin opening the same page sees the rule and may write at "web-app"
 
   @integration
   Scenario: Removing a project rule falls back to the next tier

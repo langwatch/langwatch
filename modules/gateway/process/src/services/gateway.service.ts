@@ -48,6 +48,7 @@ import {
   type GatewayBudgetScope,
 } from "../repositories/gateway-budget.repository.ts";
 import { isGroupNotFound, isMemberNotFound } from "../rules/gateway-organization-peer.rules.ts";
+import { assertProjectInOrganization } from "../rules/gateway-project-scope.rules.ts";
 import type { GatewayCacheRuleService } from "./gateway-cache-rule.service.ts";
 import type { GatewayGuardrailService } from "./gateway-guardrail.service.ts";
 
@@ -443,9 +444,7 @@ export class GatewayService {
     organizationId: string,
   ): Promise<void> {
     const project = await this.projects.findWithTeam(projectId);
-    if (project?.team.organizationId !== organizationId) {
-      throw new GatewayScopeOrgMismatchError("project");
-    }
+    assertProjectInOrganization({ project, organizationId });
   }
 }
 

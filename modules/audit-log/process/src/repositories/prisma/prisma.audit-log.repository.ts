@@ -1,10 +1,13 @@
 import {
+  auditLogExportEntrySchema,
   auditLogHistoryEntrySchema,
   auditLogTargetEntrySchema,
   type AuditLogEntry,
+  type AuditLogExportEntry,
   type AuditLogHistoryEntry,
   type AuditLogTargetEntry,
   type FindAuditLogByTargetKindInput,
+  type FindAuditLogForOrganizationInput,
   type ListAuditLogEntityHistoryInput,
   type RecordedAuditLogEntry,
   type RecordedSinceInput,
@@ -35,6 +38,23 @@ const targetSelect = {
 } as const;
 
 const auditLogTargetEntriesSchema = auditLogTargetEntrySchema.array();
+
+const exportSelect = {
+  id: true,
+  createdAt: true,
+  userId: true,
+  actorUserId: true,
+  organizationId: true,
+  projectId: true,
+  action: true,
+  error: true,
+  ipAddress: true,
+  userAgent: true,
+  targetKind: true,
+  targetId: true,
+} as const;
+
+const auditLogExportEntriesSchema = auditLogExportEntrySchema.array();
 
 /** The entry as a row; a JSON `null` is stored as JSON, not as an absent column. */
 function rowData(entry: AuditLogEntry) {
@@ -97,6 +117,7 @@ export class PrismaAuditLogRepository
         targetKind: input.targetKind,
         targetId: input.targetId,
         createdAt: { gte: new Date(input.sinceMs) },
+        ...(input.organizationId ? { organizationId: input.organizationId } : {}),
       },
       select: { id: true },
     });
@@ -127,5 +148,33 @@ export class PrismaAuditLogRepository
     });
 
     return auditLogTargetEntriesSchema.parse(entries);
+  }
+
+  /** Served by the (organizationId, createdAt) and projectId indexes; ties break by id. */
+  async findForOrganization(
+    input: FindAuditLogForOrganizationInput,
+  ): Promise<AuditLogExportEntry[]> {
+    const after = new Date(input.afterMs);
+    const entries = await this.prisma.auditLog.findMany({
+      where: {
+        AND: [
+          {
+            OR: [
+              { organizationId: input.organizationId },
+              ...(input.projectIds.length > 0 ? [{ projectId: { in: input.projectIds } }] : []),
+            ],
+          },
+          {
+            OR: [{ createdAt: { gt: after } }, { createdAt: after, id: { gt: input.afterId } }],
+          },
+          ...(input.untilMs !== undefined ? [{ createdAt: { lt: new Date(input.untilMs) } }] : []),
+        ],
+      },
+      orderBy: [{ createdAt: "asc" }, { id: "asc" }],
+      take: input.limit,
+      select: exportSelect,
+    });
+
+    return auditLogExportEntriesSchema.parse(entries);
   }
 }

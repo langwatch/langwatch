@@ -1,6 +1,6 @@
 /**
- * Moving from a project with a conversation open to the personal workspace (/me) never reads
- * that conversation under the personal project: each such read answers "not found".
+ * Moving from a project with a conversation open to the personal workspace (/coding-agents)
+ * never reads that conversation under the personal project: each such read answers "not found".
  * @vitest-environment jsdom
  * @see specs/langy/langy-context-awareness.feature
  */
@@ -106,7 +106,7 @@ class PersonalWorkspaceHost extends LangyHostApi {
     return false;
   }
   route(): LangyRouteReading {
-    return { params: {}, query: {}, pathname: "/me" };
+    return { params: {}, query: {}, pathname: "/coding-agents" };
   }
   setQuery() {}
   navigate() {}

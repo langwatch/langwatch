@@ -229,6 +229,81 @@ export class ModelRestrictedForExecutionError extends HandledError {
   }
 }
 
+/**
+ * A model this process has no road to execute: a codex model where no gateway handle was
+ * composed. Permanent, so background callers stop instead of retrying it.
+ */
+export class ModelExecutionUnavailableError extends HandledError {
+  declare readonly code: "model_execution_unavailable";
+
+  readonly model: string;
+  readonly featureKey: string;
+
+  constructor(input: { model: string; featureKey: string }) {
+    super(
+      "model_execution_unavailable",
+      `"${input.model}" cannot be executed by this process for "${input.featureKey}".`,
+      {
+        httpStatus: 400,
+        // The remedy is a settings change (another model for this feature), and no retry helps.
+        fault: "customer",
+        meta: { model: input.model, featureKey: input.featureKey },
+      },
+    );
+    this.name = "ModelExecutionUnavailableError";
+    this.model = input.model;
+    this.featureKey = input.featureKey;
+  }
+}
+
+/**
+ * A named model whose provider this project has not added, or has turned off. Distinct from
+ * `model_provider_disabled`, which carries the cascade scope its swap toast reads.
+ */
+export class ModelProviderUnavailableError extends HandledError {
+  declare readonly code: "model_provider_unavailable";
+
+  constructor(input: { providerKey: string; reason: "not_configured" | "disabled" }) {
+    super(
+      "model_provider_unavailable",
+      input.reason === "disabled"
+        ? `Model provider "${input.providerKey}" is configured but disabled.`
+        : `Model provider "${input.providerKey}" is not configured for this project.`,
+      {
+        httpStatus: 400,
+        // The project's provider settings decide it: a settings change fixes it, no retry does.
+        fault: "customer",
+        meta: { reason: input.reason },
+        ...remediation("model_provider_unavailable"),
+      },
+    );
+    this.name = "ModelProviderUnavailableError";
+  }
+}
+
+/** Refusals no retry can fix: project settings or a provider's content filter decide them. */
+const PERMANENT_AI_CALL_CODES: ReadonlySet<string> = new Set([
+  "ai_content_filtered",
+  "model_execution_unavailable",
+  "model_not_configured",
+  "model_provider_disabled",
+  "model_provider_unavailable",
+  "model_restricted_for_execution",
+  "model_restricted_for_feature",
+]);
+
+/**
+ * Whether an AI call failed for a reason no retry can fix: a configuration refusal, or a
+ * provider rejection (`ai_call_failed`, not retryable) anywhere in the reason chain.
+ */
+export function isPermanentAiCallFailure(error: unknown): boolean {
+  if (!HandledError.isHandled(error)) return false;
+  if (PERMANENT_AI_CALL_CODES.has(error.code)) return true;
+  if (error.code === "ai_call_failed" && !error.retryable) return true;
+
+  return error.reasons.some(isPermanentAiCallFailure);
+}
+
 export class ModelProviderNotFoundError extends HandledError {
   declare readonly code: "model_provider_not_found";
 
@@ -257,11 +332,15 @@ export class ModelProviderCustomKeysMissingError extends HandledError {
 export class ModelProviderInvalidError extends HandledError {
   declare readonly code: "model_provider_invalid";
 
-  constructor(message = "Invalid model provider", reason?: "endpoint_not_allowed") {
+  constructor(
+    message = "Invalid model provider",
+    reason?: "endpoint_not_allowed",
+    refusal?: ProviderEndpointRefusal,
+  ) {
     super("model_provider_invalid", message, {
       httpStatus: 400,
       fault: "customer",
-      ...(reason ? { meta: { reason } } : {}),
+      ...(reason ? { meta: { reason, ...(refusal ? { refusal } : {}) } } : {}),
     });
     this.name = "ModelProviderInvalidError";
   }
@@ -636,6 +715,38 @@ export class ProviderEndpointRedirectedError extends HandledError {
 }
 
 /**
+ * Why the instance's outbound policy refused a base URL. `private_address` and
+ * `on_premise_domain` are the two ALLOWED_PROXY_HOSTS can lift; the rest no setting lifts.
+ */
+export type ProviderEndpointRefusal =
+  | "metadata_endpoint"
+  | "cloud_internal_domain"
+  | "on_premise_domain"
+  | "private_address"
+  | "unresolvable_host"
+  | "invalid_url";
+
+/**
+ * The base URL was refused by the instance's outbound policy, so nothing was sent and
+ * nothing was learned about the key. Not unreachable: the network was never tried.
+ */
+export class ProviderEndpointRefusedError extends HandledError {
+  constructor({ provider, refusal }: { provider: string; refusal: ProviderEndpointRefusal }) {
+    super(
+      "provider_endpoint_refused",
+      `The base URL configured for ${provider} is refused by this instance's outbound policy`,
+      {
+        fault: "customer",
+        httpStatus: 400,
+        meta: { provider, refusal },
+        ...remediation("provider_endpoint_refused"),
+      },
+    );
+    this.name = "ProviderEndpointRefusedError";
+  }
+}
+
+/**
  * The probe never reached the provider, so nothing was learned about the key.
  */
 export class ProviderUnreachableError extends HandledError {
@@ -734,15 +845,23 @@ export class AiCallFailedError extends HandledError {
     role,
     featureDisplayName,
     originalErrorMessage,
+    retryable = true,
+    reasons,
   }: {
     featureKey: string;
     role: ModelRole;
     featureDisplayName: string;
     originalErrorMessage: string;
+    /** False when the provider refused the request itself (a 4xx): a retry gets the same answer. */
+    retryable?: boolean;
+    /** The wrapped failure, so a handled cause keeps its code on the chain. */
+    reasons?: readonly Error[];
   }) {
     super("ai_call_failed", `AI call failed for "${featureKey}".`, {
       httpStatus: 400,
       fault: "provider",
+      retryable,
+      ...(reasons ? { reasons } : {}),
       // Read by the missing-model/AI-failure toast surface. Carried on the
       // handled payload (not only on the legacy `data.cause` sidecar) so the
       // bespoke `aiCallFailedCause` block in `trpc.ts` can be deleted without
@@ -759,6 +878,57 @@ export class AiCallFailedError extends HandledError {
   /** Never `originalErrorMessage`: a provider's text can echo a key, and the key may be ours. */
   toResponseBody(): {
     code: typeof AI_CALL_FAILED_CAUSE;
+    featureKey: string;
+    featureDisplayName: string;
+    role: ModelRole;
+  } {
+    return {
+      code: this.cause,
+      featureKey: this.featureKey,
+      featureDisplayName: this.featureDisplayName,
+      role: this.role,
+    };
+  }
+}
+
+/**
+ * The provider's content filter refused the text it was asked to work on (Azure answers 400
+ * `content_filter`). The model settings are fine and a retry gets the same answer.
+ */
+export const AI_CONTENT_FILTERED_CAUSE = "AI_CONTENT_FILTERED" as const;
+
+export class AiContentFilteredError extends HandledError {
+  declare readonly code: "ai_content_filtered";
+  readonly cause = AI_CONTENT_FILTERED_CAUSE;
+  readonly featureKey: string;
+  readonly role: ModelRole;
+  readonly featureDisplayName: string;
+
+  constructor({
+    featureKey,
+    role,
+    featureDisplayName,
+  }: {
+    featureKey: string;
+    role: ModelRole;
+    featureDisplayName: string;
+  }) {
+    super("ai_content_filtered", `The provider's content filter refused "${featureKey}".`, {
+      httpStatus: 422,
+      fault: "provider",
+      retryable: false,
+      meta: { featureKey, role, featureDisplayName },
+      ...remediation("ai_content_filtered"),
+    });
+    this.name = "AiContentFilteredError";
+    this.featureKey = featureKey;
+    this.role = role;
+    this.featureDisplayName = featureDisplayName;
+  }
+
+  /** Read by the global model-failure interceptor, so a caller with no onError still reports it. */
+  toResponseBody(): {
+    code: typeof AI_CONTENT_FILTERED_CAUSE;
     featureKey: string;
     featureDisplayName: string;
     role: ModelRole;

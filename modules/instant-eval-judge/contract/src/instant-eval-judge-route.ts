@@ -28,8 +28,101 @@ const INSTANT_EVAL_JUDGE_BACKEND_KINDS = [
   "decisions",
   "anthropic_messages",
   "openai_responses",
+  "gemini_generate_content",
 ] as const;
 export type InstantEvalJudgeBackendKind = (typeof INSTANT_EVAL_JUDGE_BACKEND_KINDS)[number];
+
+/** The kinds that answer as an LLM: one question per call, taken as sure. */
+export const INSTANT_EVAL_JUDGE_LLM_KINDS = [
+  "anthropic_messages",
+  "openai_responses",
+  "gemini_generate_content",
+] as const satisfies readonly InstantEvalJudgeBackendKind[];
+export type InstantEvalJudgeLlmKind = (typeof INSTANT_EVAL_JUDGE_LLM_KINDS)[number];
+
+export function isInstantEvalJudgeLlmKind(
+  kind: InstantEvalJudgeBackendKind | undefined,
+): kind is InstantEvalJudgeLlmKind {
+  return kind !== undefined && (INSTANT_EVAL_JUDGE_LLM_KINDS as readonly string[]).includes(kind);
+}
+
+/** A Gemini model id rides in the request path, so it is held to the characters an id uses. */
+const GEMINI_MODEL_ID = /^[A-Za-z0-9][A-Za-z0-9._-]*$/;
+
+/**
+ * The reasoning effort an OpenAI Responses backend may be asked for; unset, the model's own.
+ * Which values a model takes is the provider's, not checked here (ADR-190 decision 12).
+ */
+const INSTANT_EVAL_JUDGE_REASONING_EFFORTS = ["none", "minimal", "low", "medium", "high"] as const;
+export type InstantEvalJudgeReasoningEffort = (typeof INSTANT_EVAL_JUDGE_REASONING_EFFORTS)[number];
+
+/**
+ * A reasoning model counts its reasoning against the output cap, so an effort other than `none`
+ * gets the room OpenAI advises reserving for reasoning (25,000) plus the answer's.
+ */
+export const INSTANT_EVAL_JUDGE_REASONING_MAX_OUTPUT_TOKENS = 32_000;
+
+/**
+ * The shortest timeout a backend asked for an effort other than `none` may have, and its default:
+ * the time a model takes to write the whole cap (about 110 tokens a second). A call cut off sooner
+ * reads no usage, so what the provider charged for it is never billed (ADR-190 decision 12).
+ */
+export const INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS = 300_000;
+
+/**
+ * How fast a reasoning model is taken to write its output, for a backend that sets its own cap:
+ * the slow tenth of measured calls, end to end with the prompt read (ADR-190 decision 12).
+ */
+const REASONING_OUTPUT_TOKENS_PER_SECOND = 50;
+
+const DEFAULT_TIMEOUT_MS = 30_000;
+
+/**
+ * The shortest timeout a reasoning backend may have: the time it takes to write its own output cap
+ * where the table sets one, else the floor for the reasoning cap (ADR-190 decision 12).
+ */
+function instantEvalJudgeReasoningTimeoutFloorMsOf({
+  maxOutputTokens,
+}: {
+  maxOutputTokens?: number | undefined;
+}): number {
+  return maxOutputTokens === undefined
+    ? INSTANT_EVAL_JUDGE_REASONING_TIMEOUT_FLOOR_MS
+    : Math.ceil((maxOutputTokens * 1_000) / REASONING_OUTPUT_TOKENS_PER_SECOND);
+}
+
+/** Whether an effort asks the model to reason, so the reasoning cap and timeout floor apply. */
+export function isInstantEvalJudgeReasoning(
+  effort: InstantEvalJudgeReasoningEffort | undefined,
+): boolean {
+  return effort !== undefined && effort !== "none";
+}
+
+/** The kinds that take a reasoning effort on the wire. */
+const KINDS_TAKING_A_REASONING_EFFORT: readonly InstantEvalJudgeBackendKind[] = [
+  "openai_responses",
+];
+
+/** The kinds whose calls write an answer, so the table may set their output cap. */
+const KINDS_TAKING_AN_OUTPUT_CAP: readonly InstantEvalJudgeBackendKind[] = [
+  "anthropic_messages",
+  "openai_responses",
+  "gemini_generate_content",
+];
+
+/**
+ * The gate's frozen questions, versioned by name, with how many levels each scores on: a
+ * threshold keeps its meaning with its name. The level wording lives in the process package's
+ * instant-eval-judge-gate.rules.ts, whose unit test keeps the two counts equal.
+ */
+export const INSTANT_EVAL_JUDGE_GATE_QUESTIONS = {
+  difficulty_v1: { levelCount: 5 },
+} as const satisfies Record<string, Readonly<{ levelCount: number }>>;
+export type InstantEvalJudgeGateQuestionName = keyof typeof INSTANT_EVAL_JUDGE_GATE_QUESTIONS;
+const GATE_QUESTION_NAMES = Object.keys(INSTANT_EVAL_JUDGE_GATE_QUESTIONS) as [
+  InstantEvalJudgeGateQuestionName,
+  ...InstantEvalJudgeGateQuestionName[],
+];
 
 /** Where the arithmetic flag comes from: the caller, the question regex, or the caller first. */
 const INSTANT_EVAL_JUDGE_ARITHMETIC_SOURCES = ["request", "regex", "request_then_regex"] as const;
@@ -60,7 +153,24 @@ const modeSchema = z.enum(INSTANT_EVAL_JUDGE_MODES);
 const inputViewSchema = z.enum(INSTANT_EVAL_JUDGE_INPUT_VIEWS);
 const backendKindsSchema = z.array(z.enum(INSTANT_EVAL_JUDGE_BACKEND_KINDS)).readonly();
 
-/** One way to answer: a primary, and either an escalation past a threshold or a parallel pair. */
+/**
+ * A difficulty gate: before any answer, a hosted classifier backend scores how hard the case is
+ * on the named question's levels (0 the easiest). A score under `easyBelow` (at most the top
+ * level) sends the question to `primary` alone, anything else (no score too) to `escalateTo`.
+ */
+const routeGateSchema = z
+  .object({
+    backend: z.string().min(1),
+    question: z.enum(GATE_QUESTION_NAMES),
+    easyBelow: z.number().gt(0),
+  })
+  .readonly();
+export type InstantEvalJudgeRouteGate = z.infer<typeof routeGateSchema>;
+
+/**
+ * One way to answer: a primary, and either an escalation past a threshold, a parallel pair, or a
+ * gate that picks between the primary and the escalation before either is asked.
+ */
 const routeEntrySchema = z
   .object({
     primary: z.string().min(1),
@@ -71,6 +181,7 @@ const routeEntrySchema = z
      */
     threshold: z.number().gt(0).lte(1).optional(),
     pairWith: z.string().min(1).optional(),
+    gate: routeGateSchema.optional(),
   })
   .readonly();
 export type InstantEvalJudgeRouteEntry = z.infer<typeof routeEntrySchema>;
@@ -91,10 +202,26 @@ const backendSchema = z
     /** The provider's model id; a Decisions or LLM backend must name one, there is no default. */
     model: z.string().min(1).optional(),
     enabled: z.boolean().default(true),
-    timeoutMs: z.number().int().positive().default(30_000),
+    /**
+     * Unset, 30 s, or the reasoning floor when the backend sets an effort other than `none`: the
+     * time to write its own output cap where it sets one.
+     */
+    timeoutMs: z.number().int().positive().optional(),
     /** Tried in order when this backend cannot answer. */
     fallbacks: z.array(z.string().min(1)).readonly().default([]),
+    /** Sent with every call of an OpenAI Responses backend; unset, the request names none. */
+    reasoningEffort: z.enum(INSTANT_EVAL_JUDGE_REASONING_EFFORTS).optional(),
+    /** An LLM backend's output cap, reasoning included; unset, the leg's default cap. */
+    maxOutputTokens: z.number().int().positive().optional(),
   })
+  .transform(({ timeoutMs, ...backend }) => ({
+    ...backend,
+    timeoutMs:
+      timeoutMs ??
+      (isInstantEvalJudgeReasoning(backend.reasoningEffort)
+        ? instantEvalJudgeReasoningTimeoutFloorMsOf(backend)
+        : DEFAULT_TIMEOUT_MS),
+  }))
   .readonly();
 type InstantEvalJudgeBackend = z.infer<typeof backendSchema>;
 
@@ -162,6 +289,14 @@ const instantEvalJudgeRouteTableSchemaDefinition = z
     routes: perJob(z.record(z.string(), routeSlotSchema)),
     /** Score and category questions' slots; a kind left out takes today's classifier call. */
     kinds: kindsSchema.default({}),
+    /**
+     * The LLM backend that answers a scenario judge's turn decision (go on, or judge now). That
+     * phase is not routed; a table without it answers no turn decision.
+     */
+    scenarioDecision: z
+      .object({ backend: z.string().min(1) })
+      .readonly()
+      .optional(),
   })
   .superRefine((table, ctx) => {
     for (const issue of routeTableIssues(table)) ctx.addIssue({ code: "custom", message: issue });
@@ -193,7 +328,17 @@ function routeTableIssues(table: RouteTableShape): string[] {
     issues.push(...backendIssues({ table, name, backend }));
   }
   issues.push(...kindIssues({ table, slotKeys }));
+  issues.push(...scenarioDecisionIssues(table));
   return issues;
+}
+
+/** The turn decision is the judge's own tool call, which only an LLM backend can take. */
+function scenarioDecisionIssues(table: RouteTableShape): string[] {
+  const name = table.scenarioDecision?.backend;
+  if (name === undefined) return [];
+  if (!table.backends[name]) return [`scenarioDecision: unknown backend ${name}`];
+  if (!isLlmBackendOf(table)(name)) return [`scenarioDecision: ${name} is not an LLM backend`];
+  return [];
 }
 
 /** Each routed kind's default slot and every slot it names, on known jobs and slot keys. */
@@ -220,17 +365,20 @@ function kindIssues({
   return issues;
 }
 
-/** Every slot of the table, yes-or-no and per routed kind, so a check misses none. */
+/**
+ * Every slot of the table, yes-or-no and per routed kind, so a check misses none. With `jobs`,
+ * only the slots those jobs can take: theirs, and each routed kind's default, which any job takes.
+ */
 export function instantEvalJudgeRouteSlotsOf(
   table: InstantEvalJudgeRouteTable,
+  jobs: readonly InstantEvalJudgeJob[] = INSTANT_EVAL_JUDGE_JOBS,
 ): InstantEvalJudgeRouteSlot[] {
-  const slots = INSTANT_EVAL_JUDGE_JOBS.flatMap((job) => Object.values(table.routes[job]));
+  const slots = jobs.flatMap((job) => Object.values(table.routes[job]));
   for (const kind of INSTANT_EVAL_JUDGE_ROUTED_KINDS) {
     const routing = table.kinds[kind];
     if (!routing) continue;
     slots.push(routing.default);
-    for (const job of INSTANT_EVAL_JUDGE_JOBS)
-      slots.push(...Object.values(routing.routes[job] ?? {}));
+    for (const job of jobs) slots.push(...Object.values(routing.routes[job] ?? {}));
   }
   return slots;
 }
@@ -259,8 +407,7 @@ function bucketIssues(buckets: RouteTableShape["buckets"]): string[] {
 /** The kinds that cannot answer without a model id in the table: there is no default. */
 const KINDS_NEEDING_A_MODEL: readonly InstantEvalJudgeBackendKind[] = [
   "decisions",
-  "anthropic_messages",
-  "openai_responses",
+  ...INSTANT_EVAL_JUDGE_LLM_KINDS,
 ];
 
 function backendIssues({
@@ -272,13 +419,51 @@ function backendIssues({
   name: string;
   backend: InstantEvalJudgeBackend;
 }): string[] {
-  const issues: string[] = [];
-  if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
-    issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
+  const issues = backendKindIssues({ name, backend });
+  const floorMs = instantEvalJudgeReasoningTimeoutFloorMsOf(backend);
+  if (isInstantEvalJudgeReasoning(backend.reasoningEffort) && backend.timeoutMs < floorMs) {
+    const cap =
+      backend.maxOutputTokens === undefined
+        ? ""
+        : ` and maxOutputTokens ${backend.maxOutputTokens}`;
+    issues.push(
+      `backend ${name}: reasoningEffort ${backend.reasoningEffort}${cap} needs a timeoutMs of at least ${floorMs}`,
+    );
   }
   for (const fallback of backend.fallbacks) {
     if (!table.backends[fallback]) issues.push(`backend ${name}: unknown fallback ${fallback}`);
     if (fallback === name) issues.push(`backend ${name}: lists itself as a fallback`);
+  }
+  return issues;
+}
+
+/** What the backend's kind allows: a model id, a reasoning effort, an output cap. */
+function backendKindIssues({
+  name,
+  backend,
+}: {
+  name: string;
+  backend: InstantEvalJudgeBackend;
+}): string[] {
+  const issues: string[] = [];
+  if (KINDS_NEEDING_A_MODEL.includes(backend.kind) && !backend.model) {
+    issues.push(`backend ${name}: a ${backend.kind} backend must name its model`);
+  }
+  if (
+    backend.kind === "gemini_generate_content" &&
+    backend.model &&
+    !GEMINI_MODEL_ID.test(backend.model)
+  ) {
+    issues.push(`backend ${name}: a gemini_generate_content model is a bare model id`);
+  }
+  if (
+    backend.reasoningEffort !== undefined &&
+    !KINDS_TAKING_A_REASONING_EFFORT.includes(backend.kind)
+  ) {
+    issues.push(`backend ${name}: a ${backend.kind} backend takes no reasoningEffort`);
+  }
+  if (backend.maxOutputTokens !== undefined && !KINDS_TAKING_AN_OUTPUT_CAP.includes(backend.kind)) {
+    issues.push(`backend ${name}: a ${backend.kind} backend takes no maxOutputTokens`);
   }
   return issues;
 }
@@ -317,9 +502,10 @@ function entryIssues({
   for (const backend of instantEvalJudgeEntryBackends(entry)) {
     if (!table.backends[backend]) issues.push(`${where}: unknown backend ${backend}`);
   }
-  if (entry.escalateTo && entry.threshold === undefined) {
-    issues.push(`${where}: escalateTo needs a threshold`);
+  if (entry.escalateTo && entry.threshold === undefined && !entry.gate) {
+    issues.push(`${where}: escalateTo needs a threshold or a gate`);
   }
+  if (entry.gate) issues.push(...gateIssues({ table, entry, gate: entry.gate, where }));
   if (entry.escalateTo && entry.pairWith) {
     issues.push(`${where}: an entry escalates or pairs, not both`);
   }
@@ -327,6 +513,43 @@ function entryIssues({
     entry.pairWith !== undefined && pairMembersOf({ table, entry }).some(isLlmBackendOf(table));
   if (pairsAnLlm) {
     issues.push(`${where}: a pair or its fallbacks may not be an LLM backend`);
+  }
+  return issues;
+}
+
+/**
+ * A gate picks between the primary and the escalation, so it needs both and neither a threshold
+ * nor a pair; only the hosted classifier answers its question, once, no fallback; its threshold
+ * is at most the question's top level.
+ */
+function gateIssues({
+  table,
+  entry,
+  gate,
+  where,
+}: {
+  table: RouteTableShape;
+  entry: InstantEvalJudgeRouteEntry;
+  gate: InstantEvalJudgeRouteGate;
+  where: string;
+}): string[] {
+  const issues: string[] = [];
+  if (!entry.escalateTo) issues.push(`${where}: a gate needs an escalateTo`);
+  if (entry.threshold !== undefined || entry.pairWith) {
+    issues.push(`${where}: a gate takes no threshold and no pair`);
+  }
+  const topLevel = INSTANT_EVAL_JUDGE_GATE_QUESTIONS[gate.question].levelCount - 1;
+  if (gate.easyBelow > topLevel) {
+    issues.push(
+      `${where}: the gate's easyBelow must be at most ${gate.question}'s top level ${topLevel}`,
+    );
+  }
+  const backend = table.backends[gate.backend];
+  if (backend && backend.kind !== "jev") {
+    issues.push(`${where}: the gate backend ${gate.backend} must be a jev backend`);
+  }
+  if (backend && backend.fallbacks.length > 0) {
+    issues.push(`${where}: the gate backend ${gate.backend} takes no fallbacks`);
   }
   return issues;
 }
@@ -349,14 +572,24 @@ function pairMembersOf({
  */
 function isLlmBackendOf(table: RouteTableShape) {
   return (name: string): boolean => {
-    const kind = table.backends[name]?.kind;
-    return kind === "anthropic_messages" || kind === "openai_responses";
+    return isInstantEvalJudgeLlmKind(table.backends[name]?.kind);
   };
 }
 
-/** Every backend an entry may call, in the order it may call them. */
+/** Whether a backend answers as an LLM: one question per call, taken as sure. */
+export function isInstantEvalJudgeLlmBackend({
+  backend,
+  table,
+}: {
+  backend: string;
+  table: InstantEvalJudgeRouteTable;
+}): boolean {
+  return isLlmBackendOf(table)(backend);
+}
+
+/** Every backend an entry may call, its gate included, in the order it may call them. */
 export function instantEvalJudgeEntryBackends(entry: InstantEvalJudgeRouteEntry): string[] {
-  return [entry.primary, entry.pairWith, entry.escalateTo].filter(
+  return [entry.gate?.backend, entry.primary, entry.pairWith, entry.escalateTo].filter(
     (backend): backend is string => backend !== undefined,
   );
 }
@@ -463,11 +696,14 @@ export type InstantEvalJudgeRouteRequest = z.infer<typeof instantEvalJudgeRouteR
 export interface InstantEvalJudgeRouting {
   /** Verdicts each backend supplied, by backend name. */
   readonly answeredBy: Readonly<Record<string, number>>;
-  /** Questions an unsure or failed primary sent to the escalation. */
+  /**
+   * Questions an unsure or failed primary sent to the escalation. A gate's hard branch is a
+   * routing choice, reported by the `gate:hard` flag, and is not counted here.
+   */
   readonly escalated: number;
   readonly mode: InstantEvalJudgeMode;
   readonly slot: string;
   readonly inputView: InstantEvalJudgeInputView;
-  /** e.g. `escalation_failed`, `fallback:decisions->jev`, `tools_view_refused`. */
+  /** e.g. `escalation_failed`, `fallback:decisions->jev`, `tools_view_refused`, `gate:hard`. */
   readonly flags: readonly string[];
 }

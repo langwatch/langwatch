@@ -4,14 +4,16 @@
  * clickhouse-queries.md's TenantId/partition/dedup rules; throws on unsupported shapes.
  */
 
-import type {
-  AnalyticsAggregation,
-  AnalyticsFilterValue,
-  BuiltAnalyticsQuery,
+import {
+  analyticsFilterRefusal,
+  type AnalyticsAggregation,
+  type AnalyticsFilterValue,
+  type BuiltAnalyticsQuery,
 } from "@langwatch/analytics-contract";
-import { tenantScope } from "@langwatch/clickhouse-client";
+import { tenantScope, tenantSet } from "@langwatch/clickhouse-client";
 import { customMetadataKeyCondition } from "@langwatch/trace-contract";
 
+import { findUnapplicableFilter } from "../../rules/analytics-filter-values.rules.ts";
 import { TRACE_ANALYTICS_HAS_SIGNAL_SQL } from "../../rules/trace-signal.rules.ts";
 import type { TimeseriesQueryInput } from "./clickhouse.aggregation-builder.mapper.ts";
 import {
@@ -235,6 +237,9 @@ function buildSlimFilterClauses(filters: TimeseriesQueryInput["filters"]): {
   params: Record<string, unknown>;
 } {
   if (!filters) return { clauses: [], params: {} };
+  // A value no case below can apply would be dropped and widen the answer.
+  const unapplicable = findUnapplicableFilter(filters);
+  if (unapplicable) throw analyticsFilterRefusal(unapplicable);
 
   const clauses: string[] = [];
   const params: Record<string, unknown> = {};
@@ -316,7 +321,7 @@ function appendSlimFilterClause({
       break;
     }
     case "traces.error": {
-      // ES sends "true"/"false"; map to HasError boolean.
+      // The options endpoint returns "true"/"false"; anything else was refused above.
       const vals = collectStringValues(rawValue);
       if (vals.length === 0) break;
       const wantsErrors = vals.includes("true");
@@ -374,12 +379,12 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   const selectExprs: string[] = [];
   selectExprs.push(
     `CASE
-      WHEN ${ta}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.OccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
-      WHEN ${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
+      WHEN ${ta}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.LatestOccurredAt < {currentEnd:DateTime64(3)} THEN 'current'
+      WHEN ${ta}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.LatestOccurredAt < {previousEnd:DateTime64(3)} THEN 'previous'
     END AS period`,
   );
   if (typeof input.timeScale === "number") {
-    selectExprs.push(`${dateTrunc(`${ta}.OccurredAt`, input.timeScale, timeZone)} AS date`);
+    selectExprs.push(`${dateTrunc(`${ta}.LatestOccurredAt`, input.timeScale, timeZone)} AS date`);
   }
 
   const groupByColumn = buildSlimGroupByExpression(input.groupBy);
@@ -425,8 +430,8 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
   const havingClause =
     groupByColumn && !slimGroupByHandlesUnknown(input.groupBy) ? `HAVING group_key != ''` : "";
 
-  // The fence leads the outer WHERE as one bracket; every OR after it nests deeper, so the
-  // tenant guard never sees a disjunction beside the tenant set.
+  // The windowed fence sits inside dedupedSlim; the outer read takes the tenant set alone, since
+  // its time leaves the dedup as LatestOccurredAt (ADR-201 §3). Every OR nests below the fence.
   const sql = `
     SELECT
       ${selectExprs.join(",\n      ")}
@@ -440,11 +445,11 @@ export function buildSlimTimeseriesQuery(input: TimeseriesQueryInput): BuiltAnal
       }),
       filterPredicates,
     })}
-    WHERE ${tenantScope("OccurredAt")}
+    WHERE ${tenantSet()}
       AND (
-        (${ta}.OccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.OccurredAt < {currentEnd:DateTime64(3)})
+        (${ta}.LatestOccurredAt >= {currentStart:DateTime64(3)} AND ${ta}.LatestOccurredAt < {currentEnd:DateTime64(3)})
         OR
-        (${ta}.OccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.OccurredAt < {previousEnd:DateTime64(3)})
+        (${ta}.LatestOccurredAt >= {previousStart:DateTime64(3)} AND ${ta}.LatestOccurredAt < {previousEnd:DateTime64(3)})
       )
       AND ${ta}.${SLIM_HAS_SIGNAL}
       ${filterPredicates.length > 0 ? `AND ${ta}.${SLIM_MATCHES_FILTERS}` : ""}

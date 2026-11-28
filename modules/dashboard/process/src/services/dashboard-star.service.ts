@@ -50,7 +50,7 @@ export class DashboardStarService {
     const projectId = projectIdSchema.parse(input.projectId);
     const star = dashboardStarSchema.parse(input.star);
     const storedUnder = star.kind === "board" ? await this.#ownerOf({ ...input, star }) : projectId;
-    if (storedUnder === undefined) throw new DashboardNotFoundError(projectId);
+    if (storedUnder === undefined) throw new DashboardNotFoundError({ projectId });
 
     await this.#repository.addStar({
       projectId: storedUnder,

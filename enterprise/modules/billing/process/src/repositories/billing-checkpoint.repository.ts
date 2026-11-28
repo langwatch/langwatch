@@ -56,7 +56,8 @@ export abstract class BillingCheckpointRepository {
     billingMonth: string;
     meter: string;
     lastReportedTotal: number;
-    pendingReportedTotal: number;
+    /** Null when the failure came before any total was chosen, as a failed price read does. */
+    pendingReportedTotal: number | null;
     consecutiveFailures: number;
   }): Promise<void>;
 }

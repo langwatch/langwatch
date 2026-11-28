@@ -1,5 +1,7 @@
 /** Subset of handled-error payload relevant to auth; validates all fields. */
 
+import { isTipForPeople } from "@langwatch/handled-error/presentation";
+
 /** The client-side view of a handled error, after validation. */
 export type AuthHandledError = {
   code: string;
@@ -44,6 +46,7 @@ function safeTips(value: unknown): readonly string[] {
   if (!Array.isArray(value)) return [];
   return value
     .filter((tip): tip is string => typeof tip === "string")
+    .filter(isTipForPeople)
     .slice(0, MAX_TIPS)
     .map(safeProse)
     .filter((tip) => tip.length > 0);

@@ -53,6 +53,7 @@ import {
   type PlatformLicenseAccess,
   type RemoveLicenseResult,
   type IssuedLicenseFilters,
+  type IssuedLicenseChain,
   type IssuedLicensePage,
   type LicenseStatus,
   type PlanInfo,
@@ -142,12 +143,17 @@ import { UpgradeDiagnosticsService } from "../services/upgrade-diagnostics.servi
 /** Seat counts over organization's membership rows, read through its shares (R-C1f, Q9). */
 function seatCountsOver(
   organizations: Pick<MemberSeatRepository, "countMemberSeats">,
-): Pick<LicensingInfrastructure["repository"], "getMemberCount" | "getMembersLiteCount"> {
+): Pick<
+  LicensingInfrastructure["repository"],
+  "getMemberCount" | "getMembersLiteCount" | "getMembersDeveloperCount"
+> {
   return {
     getMemberCount: async (organizationId) =>
       (await organizations.countMemberSeats({ organizationId })).fullMembers,
     getMembersLiteCount: async (organizationId) =>
       (await organizations.countMemberSeats({ organizationId })).liteMembers,
+    getMembersDeveloperCount: async (organizationId) =>
+      (await organizations.countMemberSeats({ organizationId })).developers,
   };
 }
 
@@ -553,6 +559,7 @@ export class LicensingModule implements LicensingApiContract {
     id: string;
     operatorId: string;
     reason: string;
+    unusedOnly?: boolean;
   }): Promise<IssuedLicenseView> {
     return this.#registry.revoke(input);
   }
@@ -561,6 +568,7 @@ export class LicensingModule implements LicensingApiContract {
     id: string;
     maxMembers?: number;
     maxMembersLite?: number;
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth?: number;
     expiresAt: string;
     operatorId: string;
@@ -599,6 +607,10 @@ export class LicensingModule implements LicensingApiContract {
 
   getIssuedLicense(input: { id: string }): Promise<IssuedLicenseView> {
     return this.#registry.getById(input);
+  }
+
+  getIssuedLicenseChain(input: { id: string }): Promise<IssuedLicenseChain> {
+    return this.#registry.getChain(input);
   }
 
   listIssuedLicenses(
@@ -749,6 +761,10 @@ export class LicensingModule implements LicensingApiContract {
 
   countFullSeatsInUse(input: { organizationId: string }): Promise<number> {
     return this.#service.countFullSeatsInUse(input.organizationId);
+  }
+
+  countDevelopersInUse(input: { organizationId: string }): Promise<number> {
+    return this.#service.countDevelopersInUse(input.organizationId);
   }
 
   getConnectedSeats(input: { organizationId: string }): Promise<ConnectedSeats> {

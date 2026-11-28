@@ -102,7 +102,6 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     getRunDataForAllSuites: async () => ({ changed: false, lastUpdatedAt: 0 }),
     getLastUpdatedAt: async () => 0,
     getRunIdsForSet: async () => ({ runIds: [], reachedCap: false }),
-    getDistinctExternalSetIds: async () => new Set(),
     countRunsForExport: async () => 0,
     countUsage: async () => 0,
     countOrganizationRuns: async () => 0,
@@ -119,6 +118,7 @@ function service(clock = new TestClock()): ScenarioServiceContract {
     recordAgentInstance: async () => {},
     recordCutAtLimit: async () => {},
     recordHooks: async () => {},
+    recordRedTeamReport: async () => {},
   } satisfies SimulationService;
 
   return ScenarioServiceContract.create({

@@ -7,6 +7,8 @@ import {
   redactedRequestHead,
   REFUSED_BEFORE_ROUTING,
 } from "./client-error.ts";
+import { NOT_HANDLED_DRAINING, NOT_HANDLED_HEADER } from "./not-handled.ts";
+import { REQUEST_BODY_TIMEOUT_MS } from "./request-body-deadline.ts";
 
 /** The kubelet's path; answered in the thread from the heartbeat, never proxied. */
 export const LIVENESS_PATH = "/healthz";
@@ -25,6 +27,30 @@ export const HEARTBEAT_STALL_BUDGET_MS = 5 * 60 * 1000;
  * request on a turning loop waits as long as its handler takes (a long poll, a slow export).
  */
 export const MAIN_THREAD_PROXY_TIMEOUT_MS = 10_000;
+
+/** Node's own timeouts on a process's public listener, as Node names them (#9666). */
+export const PUBLIC_LISTENER_TIMEOUTS = {
+  /** Above the 60s idle reuse of ALB and nginx, so Node never closes a socket a proxy reuses. */
+  keepAliveTimeout: 65_000,
+  headersTimeout: 66_000,
+  /** Node's 300s; a listener whose routes declare a longer body allowance raises it to theirs. */
+  requestTimeout: REQUEST_BODY_TIMEOUT_MS,
+} as const;
+/**
+ * How long the door goes on reading a body it already answered before it closes, as nginx's
+ * lingering close: until the body ends, a quiet spell, a hard cap or a byte budget, first wins.
+ */
+export const LINGERING_CLOSE = { idleMs: 5_000, maxMs: 30_000, maxBytes: 1024 ** 3 } as const;
+export type LingeringClose = Readonly<{ idleMs: number; maxMs: number; maxBytes: number }>;
+/** A door proxying to another listener never cuts a body first: the listener behind it decides. */
+export const PROXY_DOOR_REQUEST_TIMEOUT_MS = 2 * 60 * 60_000;
+/** The listener's timeouts as read back; `timeout` (idle socket) stays Node's default, off. */
+export type ListenerTimeouts = Readonly<{
+  keepAliveTimeout: number;
+  headersTimeout: number;
+  requestTimeout: number;
+  timeout: number;
+}>;
 
 const BIND_HANDOVER_MS = 10_000;
 /**
@@ -241,7 +267,58 @@ const unavailable = (res, body) => {
   if (res.headersSent) return res.destroy();
   res.writeHead(503, { "Content-Type": "text/plain" }).end(body);
 };
+// A declared body still arriving when an answer is written: Node would read the rest up to the
+// ceiling, so the answer closes the connection instead (a bodiless request is never pending).
+const bodyPending = (req) =>
+  !req.complete && (req.headers["transfer-encoding"] !== undefined || Number(req.headers["content-length"] || 0) > 0);
+const closeWhenBodyPending = (req, res) => {
+  const writeHead = res.writeHead;
+  res.writeHead = function (...args) {
+    if (bodyPending(req)) {
+      this.setHeader("connection", "close");
+      if (args[0] !== 408) lingerThenClose(req);
+    }
+    return writeHead.apply(this, args);
+  };
+};
+// Closing on unread bytes makes the kernel send a reset that wipes the answer from a client still
+// writing, so Node's close after the answer reads and drops the rest first, within the budgets.
+// A 408 closes at once: the slow body is what it refused. Spec: uploads-through-langwatch.feature.
+const lingerThenClose = (req) => {
+  const socket = req.socket;
+  socket.destroySoon = () => {
+    if (socket.writable) socket.end();
+    const startedAt = Date.now();
+    const startedBytes = socket.bytesRead;
+    let seenBytes = startedBytes;
+    let lastByteAt = startedAt;
+    const close = () => {
+      clearInterval(watch);
+      if (socket.writableFinished) socket.destroy();
+      else socket.once("finish", () => socket.destroy());
+    };
+    const watch = setInterval(() => {
+      const now = Date.now();
+      if (socket.bytesRead !== seenBytes) {
+        seenBytes = socket.bytesRead;
+        lastByteAt = now;
+      }
+      const spent =
+        seenBytes - startedBytes >= workerData.linger.maxBytes ||
+        now - lastByteAt >= workerData.linger.idleMs ||
+        now - startedAt >= workerData.linger.maxMs;
+      if (spent) close();
+    }, Math.max(10, Math.min(250, workerData.linger.idleMs / 4)));
+    socket.once("close", () => clearInterval(watch));
+    if (req.complete) return close();
+    req.once("end", close);
+    socket.once("end", close);
+    req.unpipe();
+    req.resume();
+  };
+};
 const server = http.createServer((req, res) => {
+  closeWhenBodyPending(req, res);
   if (req.url === workerData.livenessPath && !proxiesLiveness) {
     const stalled = stalledMs();
     if (stalled > workerData.stallBudgetMs) {
@@ -273,13 +350,15 @@ server.on("clientError", (error, socket) => {
   }
   if (!socket.writable) return socket.destroy();
   const status = workerData.clientErrorStatusLines[code] || "400 Bad Request";
-  socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n");
+  socket.end("HTTP/1.1 " + status + "\\r\\nConnection: close\\r\\n\\r\\n", () => socket.destroy());
 });
 // The thread owns its client's connection, so the main thread's hop-by-hop headers stay behind.
 const endToEnd = (headers) =>
   Object.fromEntries(Object.entries(headers).filter(([name]) => !workerData.hopByHopHeaders.includes(name)));
 const proxy = (req, res) => {
-  const upstream = http.request({ ...target, method: req.method, path: req.url, headers: req.headers, agent: false });
+  // Kept alive, the main thread never closes on body bytes it left unread: the thread closes it.
+  const forwarded = { ...req.headers, connection: "keep-alive" };
+  const upstream = http.request({ ...target, method: req.method, path: req.url, headers: forwarded, agent: false });
   const timer = setInterval(() => {
     if (stalledMs() < workerData.proxyTimeoutMs) return;
     clearInterval(timer);
@@ -292,8 +371,19 @@ const proxy = (req, res) => {
   });
   upstream.on("response", (reply) => {
     clearInterval(timer);
-    res.writeHead(reply.statusCode ?? 502, endToEnd(reply.headers));
+    const headers = endToEnd(reply.headers);
+    // A draining main thread takes no new work: close this connection so the proxy goes elsewhere.
+    if (reply.headers[workerData.notHandledHeader] === workerData.notHandledDraining) {
+      headers.connection = "close";
+    }
+    // An answer before the whole body arrived: the rest is the door's to drop, never forwarded.
+    if (!req.complete) {
+      req.unpipe(upstream);
+      req.resume();
+    }
+    res.writeHead(reply.statusCode ?? 502, headers);
     reply.pipe(res);
+    reply.once("end", () => upstream.destroy());
   });
   upstream.on("error", () => {
     clearInterval(timer);
@@ -319,13 +409,18 @@ server.on("upgrade", (req, socket, head) => {
   upstream.on("error", () => socket.destroy());
   socket.on("error", () => upstream.destroy());
 });
-// Longer than the idle reuse of any proxy in front (ALB and nginx 60s): Node's 5s default closes
-// a socket the proxy is about to reuse, and the proxy answers that request 502.
-server.keepAliveTimeout = 65000;
-server.headersTimeout = 66000;
+// PUBLIC_LISTENER_TIMEOUTS: a proxy's idle reuse outlived; the request body bound is the caller's.
+Object.assign(server, workerData.listenerTimeouts);
 const deadline = Date.now() + workerData.handoverMs;
 const bind = () => server.listen(workerData.port);
-server.on("listening", () => parentPort.postMessage({ type: "listening", address: server.address() }));
+const listenerTimeouts = () => ({
+  keepAliveTimeout: server.keepAliveTimeout,
+  headersTimeout: server.headersTimeout,
+  requestTimeout: server.requestTimeout,
+  timeout: server.timeout,
+});
+server.on("listening", () =>
+  parentPort.postMessage({ type: "listening", address: server.address(), listenerTimeouts: listenerTimeouts() }));
 server.on("error", (error) => {
   if (error.code === "EADDRINUSE" && Date.now() < deadline) {
     setTimeout(bind, 250);
@@ -388,7 +483,7 @@ export function startHeartbeat({ intervalMs }: { intervalMs: number }): Heartbea
 }
 
 type ThreadMessage =
-  | { type: "listening"; address: AddressInfo }
+  | { type: "listening"; address: AddressInfo; listenerTimeouts: ListenerTimeouts }
   | { type: "failed"; code?: string; message: string }
   | { type: "closed" }
   | { type: "lifted" }
@@ -406,6 +501,8 @@ export type LivenessLogger = Readonly<{
 /** The thread that owns a process's public door while its main loop does the work. */
 export type LivenessThread = Readonly<{
   address: AddressInfo;
+  /** The public listener's timeouts as the thread set them. */
+  listenerTimeouts: ListenerTimeouts;
   /** Stops accepting, gives in-flight requests `graceMs`, destroys the rest, ends the thread. */
   close: (options: { graceMs: number }) => Promise<void>;
   /** Takes the failure console down: every request reaches the main thread again. */
@@ -428,6 +525,8 @@ export async function startLivenessThread({
   logger,
   stallBudgetMs = HEARTBEAT_STALL_BUDGET_MS,
   proxyTimeoutMs = MAIN_THREAD_PROXY_TIMEOUT_MS,
+  requestTimeoutMs,
+  linger = LINGERING_CLOSE,
 }: {
   port: number;
   heartbeat: SharedArrayBuffer;
@@ -438,6 +537,9 @@ export async function startLivenessThread({
   logger: LivenessLogger;
   stallBudgetMs?: number;
   proxyTimeoutMs?: number;
+  /** Node's `requestTimeout` on the public port: the listener's own, or a door's two hours. */
+  requestTimeoutMs: number;
+  linger?: LingeringClose;
 }): Promise<LivenessThread> {
   const thread = new Worker(LIVENESS_THREAD_SOURCE, {
     eval: true,
@@ -460,13 +562,18 @@ export async function startLivenessThread({
       clientErrorStatusLines: CLIENT_ERROR_STATUS_LINES,
       quietClientErrors: QUIET_CLIENT_ERROR_CODES,
       hopByHopHeaders: HOP_BY_HOP_HEADERS,
+      notHandledHeader: NOT_HANDLED_HEADER,
+      notHandledDraining: NOT_HANDLED_DRAINING,
+      listenerTimeouts: { ...PUBLIC_LISTENER_TIMEOUTS, requestTimeout: requestTimeoutMs },
+      linger,
     },
   });
   // The main loop keeps its own loopback listener, which is what holds the process open.
   thread.unref();
   let address: AddressInfo;
+  let listenerTimeouts: ListenerTimeouts;
   try {
-    address = await listeningAddress(thread);
+    ({ address, listenerTimeouts } = await listening(thread));
   } catch (error) {
     await thread.terminate();
     throw error;
@@ -481,6 +588,7 @@ export async function startLivenessThread({
   });
   return {
     address,
+    listenerTimeouts,
     proxyTo: async ({ port: proxyPort, proxiesLiveness }) => {
       const proxying = nextMessage({ thread, type: "proxying" });
       thread.postMessage({ type: "proxyTo", port: proxyPort, proxiesLiveness });
@@ -535,14 +643,16 @@ function nextMessage({ thread, type }: { thread: Worker; type: ThreadMessage["ty
   });
 }
 
-function listeningAddress(thread: Worker): Promise<AddressInfo> {
+function listening(
+  thread: Worker,
+): Promise<{ address: AddressInfo; listenerTimeouts: ListenerTimeouts }> {
   return new Promise((resolve, reject) => {
     const onExit = (code: number): void =>
       reject(new Error(`liveness thread exited before listening (code ${code})`));
     const onMessage = (message: ThreadMessage): void => {
       if (message.type === "listening") {
         settle();
-        resolve(message.address);
+        resolve({ address: message.address, listenerTimeouts: message.listenerTimeouts });
       }
       if (message.type === "failed") {
         settle();

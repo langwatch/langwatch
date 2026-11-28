@@ -17,7 +17,7 @@ for skill in $SKILLS; do
   $COMPILER --skills "$skill" --mode docs > "$OUT_DIR/$skill.docs.txt"
 done
 
-RECIPES="debug-instrumentation agent-best-practices debug-with-langwatch eval-triage setup-lw evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability lwql-charts dashboard-widgets find-traces"
+RECIPES="debug-instrumentation agent-best-practices debug-with-langwatch eval-triage setup-lw evaluate-multimodal generate-rag-dataset test-compliance test-cli-usability lwql-charts dashboard-widgets find-traces owasp-red-team"
 
 for recipe in $RECIPES; do
   echo "Compiling recipe $recipe..."
@@ -30,7 +30,7 @@ echo "Done. Generated $(ls -1 $OUT_DIR/*.txt 2>/dev/null | wc -l) files in $OUT_
 # the langyagent image so the in-product assistant loads exactly what the
 # public skill directory publishes (see skills/_compiler/native.ts).
 echo "Generating native (opencode) skills..."
-node skills/_compiler/native.ts
+node skills/_compiler/native.ts --target native
 
 # Mirror the native set into the langyagent Go embed tree. The Dockerfile
 # overlays the same content at image build, so the committed copy only serves
@@ -39,3 +39,8 @@ node skills/_compiler/native.ts
 # the two trees equal.
 echo "Syncing native skills into services/langyagent/internal/assets/skills/..."
 rsync -a --delete skills/_compiled/native/ services/langyagent/internal/assets/skills/
+
+# The CLI's `langwatch skills` bundle (sdks/typescript/scripts/generate-skills-bundle.mjs)
+# embeds this variant: the same render with the login steps Langy leaves out kept in.
+echo "Generating CLI bundle skills..."
+node skills/_compiler/native.ts --target cli

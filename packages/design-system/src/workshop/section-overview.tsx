@@ -41,7 +41,11 @@ export const SECTIONS: { name: string; intro: string; overview: boolean }[] = [
     intro: "The frame around every page: rails and navigation.",
     overview: true,
   },
-  { name: "Brand", intro: "The marks and branded pages.", overview: true },
+  {
+    name: "Brand",
+    intro: "The LangWatch marks, branded pages and branded features such as Braids.",
+    overview: true,
+  },
   {
     name: "Patterns",
     intro: "Whole screens put together: list, settings, drawer with a form.",

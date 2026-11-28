@@ -1,13 +1,16 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import { LISTING_FAILED_REASON } from "@langwatch/enterprise-governance-contract";
+import {
+  isListOnlySourceType,
+  LISTING_FAILED_REASON,
+} from "@langwatch/enterprise-governance-contract";
 import { createLogger, type Logger } from "@langwatch/observability";
 import { type Instant, nowInstant } from "@langwatch/time";
 
 import type { IngestionSourceRepository } from "../../../repositories/ingestion-source.repository.ts";
 import type { AgentDiscoveryService } from "../../agents/services/agent-discovery.service.ts";
 import type { PersonListingService } from "../../identity/services/person-listing.service.ts";
-import { INGESTION_PULL_MAX_ATTEMPTS } from "./ingestion-pull.service.ts";
+import { INGESTION_PULL_MAX_ATTEMPTS, type IngestionPullRun } from "./ingestion-pull.service.ts";
 
 /** Where one listing's outcome lands: the ingestion-pull pipeline's own record commands. */
 export type IngestionPullListingOutcome = {
@@ -52,6 +55,12 @@ type Refused = { outcome: "refused"; reason: string; status: number | null };
 type ListingOutcome<Counts> = { outcome: "listed"; counts: Counts } | Refused;
 
 type AgentCounts = { agentCount: number };
+
+/** What a scheduled run of a list-only source did; any other source is left to its puller. */
+export type ScheduledListingOutcome =
+  | { outcome: "not_list_only" }
+  | { outcome: "listed"; agentCount: number }
+  | Refused;
 type PeopleCounts = { directoryPersonCount: number; withheldPersonCount: number };
 
 const SOURCE_GONE: Refused = { outcome: "refused", reason: "not_found", status: null };
@@ -87,8 +96,8 @@ export class IngestionPullListingService {
     return new IngestionPullListingService({ ...deps, maxAttempts, clock, now, logger });
   }
 
-  listAgents(execution: IngestionPullListingExecution): Promise<void> {
-    return this.settle<AgentCounts>({
+  async listAgents(execution: IngestionPullListingExecution): Promise<void> {
+    await this.settle<AgentCounts>({
       execution,
       what: "Agent",
       list: (sourceId) => this.findAgents(sourceId),
@@ -97,14 +106,52 @@ export class IngestionPullListingService {
     });
   }
 
-  listPeople(execution: IngestionPullListingExecution): Promise<void> {
-    return this.settle<PeopleCounts>({
+  async listPeople(execution: IngestionPullListingExecution): Promise<void> {
+    await this.settle<PeopleCounts>({
       execution,
       what: "People",
       list: (sourceId) => this.findPeople(sourceId),
       recordListed: (args) => this.deps.outcomes.peopleListed(args),
       recordRefused: (args) => this.deps.outcomes.peopleListingRefused(args),
     });
+  }
+
+  /**
+   * A scheduled run of a source that only lists agents lists them instead of pulling, recorded
+   * as that run's agent listing (request id `run:<runId>`). Any other source answers
+   * `not_list_only` and is pulled as before.
+   */
+  async listAgentsOnSchedule({
+    tenantId,
+    attempt,
+    run,
+  }: {
+    tenantId: string;
+    attempt: number;
+    run: IngestionPullRun;
+  }): Promise<ScheduledListingOutcome> {
+    const source = await this.deps.sources.findById(run.sourceId);
+    if (!source || !isListOnlySourceType({ sourceType: source.sourceType })) {
+      return { outcome: "not_list_only" };
+    }
+    const result = await this.settle<AgentCounts>({
+      execution: {
+        tenantId,
+        attempt,
+        listing: {
+          sourceId: run.sourceId,
+          requestId: `run:${run.runId}`,
+          requestedAt: run.scheduledFor,
+        },
+      },
+      what: "Agent",
+      list: (sourceId) => this.findAgents(sourceId),
+      recordListed: (args) => this.deps.outcomes.agentsListed(args),
+      recordRefused: (args) => this.deps.outcomes.agentsListingRefused(args),
+    });
+    return result.outcome === "listed"
+      ? { outcome: "listed", agentCount: result.counts.agentCount }
+      : result;
   }
 
   private async settle<Counts>({
@@ -121,7 +168,7 @@ export class IngestionPullListingService {
     recordRefused: (
       args: IngestionPullListingOutcome & { reason: string; status: number | null },
     ) => Promise<void>;
-  }): Promise<void> {
+  }): Promise<ListingOutcome<Counts>> {
     const { listing } = execution;
     const envelope = {
       tenantId: execution.tenantId,
@@ -141,7 +188,7 @@ export class IngestionPullListingService {
         reason: LISTING_FAILED_REASON,
         status: null,
       });
-      return;
+      return { outcome: "refused", reason: LISTING_FAILED_REASON, status: null };
     }
 
     if (result.outcome === "refused") {
@@ -151,9 +198,10 @@ export class IngestionPullListingService {
         reason: result.reason,
         status: result.status,
       });
-      return;
+      return result;
     }
     await recordListed({ ...envelope, occurredAt: this.deps.clock(), ...result.counts });
+    return result;
   }
 
   /** The message goes to the log only: the durable event carries a reason code, never provider text. */

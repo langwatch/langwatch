@@ -14,6 +14,11 @@ name: Auto-approve for validated Low-Risk or Firefighting Check
 #   3. `firefighting` label present → bot APPROVE, skip everything else.
 #   4. Otherwise → low-risk evaluation (size/path/LLM) → label + comment + approve, or remove label + comment.
 #
+# A label event runs the jobs only when the label is `firefighting`, the one
+# label this workflow reads. Any other label skips every job, so it takes no
+# runner, and it gets its own concurrency group so it cannot cancel a run in
+# progress.
+#
 # Self-healing on push: branch protection's `dismiss_stale_reviews: true`
 # strips ALL approvals on every push, so this workflow re-walks the tree
 # from scratch on every `synchronize` event.
@@ -27,14 +32,15 @@ permissions:
   contents: read
 
 concurrency:
-  group: pr-auto-approve-${{ github.event.pull_request.number }}
+  group: pr-auto-approve-${{ github.event.pull_request.number }}${{ !(github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'firefighting') && format('-other-label-{0}', github.run_id) || '' }}
   cancel-in-progress: true
 
 jobs:
   preflight:
+    timeout-minutes: 5
     # Fork PRs cannot mutate labels/reviews from pull_request_target without secrets;
     # let other CI run but skip every job here rather than fail noisily.
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: github.event.pull_request.head.repo.full_name == github.repository && (github.event.action != 'labeled' && github.event.action != 'unlabeled' || github.event.label.name == 'firefighting')
     runs-on: ubuntu-latest
     outputs:
       head_sha: ${{ steps.ctx.outputs.head_sha }}
@@ -97,6 +103,7 @@ jobs:
             }
 
   firefighting:
+    timeout-minutes: 5
     needs: preflight
     if: >-
       github.event.pull_request.head.repo.full_name == github.repository &&
@@ -156,6 +163,7 @@ jobs:
             core.info(`PR #${prNumber} approved via firefighting override.`);
 
   dismiss-firefighting-approval:
+    timeout-minutes: 5
     # When someone strips the firefighting label, also dismiss the bot's
     # firefighting approval — otherwise an approval granted under one
     # policy stays in place after the trigger for it is gone.

@@ -28,6 +28,7 @@ import type { EventingCommandSender } from "@langwatch/eventing";
 import type { FeatureSetup } from "@langwatch/process";
 import type { SystemMigration } from "@langwatch/system-migrations";
 
+import type { AuthzChannels } from "../channels/authz.channels.ts";
 import type { RecordAggregateReadCommandData } from "../eventing/authz-aggregate-read.events.ts";
 import {
   type AuthzAggregateReadDefinition,
@@ -40,6 +41,8 @@ import {
   type AuthzMemberOffboardedDefinition,
   buildAuthzMemberOffboardedPipeline,
 } from "../eventing/authz-member-offboarded.pipeline.ts";
+import { AuthzAggregateReadAuditService } from "../features/read-audit/services/authz-aggregate-read-audit.service.ts";
+import { AuthzBraidedReadAuditService } from "../features/read-audit/services/authz-braided-read-audit.service.ts";
 import {
   type AttachGrantLedgerInput,
   type AuthzEngineLedger,
@@ -53,8 +56,10 @@ import type { AuthzRepositories } from "../repositories/authz.repositories.ts";
 import { EventingAuthzGrantRepository } from "../repositories/eventing/eventing.authz-grant.repository.ts";
 import { bindingWire } from "../rules/role-binding-read-back.rules.ts";
 import { AuthzAdmissionService } from "../services/authz-admission.service.ts";
-import { AuthzAggregateReadAuditService } from "../services/authz-aggregate-read-audit.service.ts";
 import { AuthzBillingRoleService } from "../services/authz-billing-role.service.ts";
+import { AuthzBraidReleaseService } from "../services/authz-braid-release.service.ts";
+import { AuthzBraidTargetsService } from "../services/authz-braid-targets.service.ts";
+import { AuthzBraidService } from "../services/authz-braid.service.ts";
 import { AuthzCutoverGateService } from "../services/authz-cutover-gate.service.ts";
 import { AuthzGrantIdentityService } from "../services/authz-grant-identity.service.ts";
 import {
@@ -63,7 +68,9 @@ import {
 } from "../services/authz-grants-command-dispatcher.service.ts";
 import { AuthzGrantsService as AuthzGrantWriteService } from "../services/authz-grants.service.ts";
 import { AuthzMemberOffboardedNoticeService } from "../services/authz-member-offboarded-notice.service.ts";
+import { AuthzOrganizationPolicyService } from "../services/authz-organization-policy.service.ts";
 import { AuthzPlatformOperatorsService } from "../services/authz-platform-operators.service.ts";
+import { AuthzProjectMembersService } from "../services/authz-project-members.service.ts";
 import { AuthzSessionVersionService } from "../services/authz-session-version.service.ts";
 import { AuthzUserStandingService } from "../services/authz-user-standing.service.ts";
 import { AuthzService as AuthzPermissionService } from "../services/authz.service.ts";
@@ -93,7 +100,12 @@ export interface AuthzCompatibilityLedger {
   deleteRole(args: AuthzDeleteRoleInput): Promise<void>;
 }
 
-export type AuthzSetup = FeatureSetup<Readonly<{}>, AuthzServerConfig, AuthzRepositories>;
+export type AuthzSetup = FeatureSetup<
+  Readonly<{}>,
+  AuthzServerConfig,
+  AuthzRepositories,
+  AuthzChannels
+>;
 
 /**
  * The legacy import speaks the command vocabulary directly: it supplies
@@ -144,7 +156,8 @@ export class AuthzModule implements AuthzApi {
   static readonly config = authzServerConfig;
   static readonly publicConfig = authzBrowserConfig.project;
   #permissions: AuthzPermissions;
-  #grantIdentity = AuthzGrantIdentityService.create();
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no grant reads. */
+  #grantIdentity: AuthzGrantIdentityService | undefined;
   #grants: AuthzGrantsService;
   /**
    * Both absent on an app built by {@link AuthzModule.fromServices}: a hand
@@ -179,8 +192,20 @@ export class AuthzModule implements AuthzApi {
   #billingRoles: AuthzBillingRoleService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which audits no aggregate read. */
   #aggregateReads: AuthzAggregateReadAuditService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which composes no braid lock. */
+  #braids: AuthzBraidService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which audits no braided read. */
+  #braidedReads: AuthzBraidedReadAuditService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which stores no settings. */
+  #organizationPolicies: AuthzOrganizationPolicyService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which reads no memberships. */
+  #projectMembers: AuthzProjectMembersService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which reads no lineage. */
+  #braidTargets: AuthzBraidTargetsService | undefined;
   /** Absent on an app built by {@link AuthzModule.fromServices}, which records no offboarding. */
   #memberOffboardings: AuthzMemberOffboardedNoticeService | undefined;
+  /** Absent on an app built by {@link AuthzModule.fromServices}, which manages no braid. */
+  #braidRelease: AuthzBraidReleaseService | undefined;
 
   private constructor(
     permissions: AuthzPermissions,
@@ -195,7 +220,14 @@ export class AuthzModule implements AuthzApi {
       platformOperators?: AuthzPlatformOperatorsService;
       billingRoles?: AuthzBillingRoleService;
       aggregateReads?: AuthzAggregateReadAuditService;
+      braids?: AuthzBraidService;
+      braidedReads?: AuthzBraidedReadAuditService;
+      organizationPolicies?: AuthzOrganizationPolicyService;
+      projectMembers?: AuthzProjectMembersService;
+      braidTargets?: AuthzBraidTargetsService;
       memberOffboardings?: AuthzMemberOffboardedNoticeService;
+      grantIdentity?: AuthzGrantIdentityService;
+      braidRelease?: AuthzBraidReleaseService;
       eventing?: Readonly<{
         pipeline: AuthzPipeline;
         dispatcher: AuthzCommandDispatcherService;
@@ -215,7 +247,14 @@ export class AuthzModule implements AuthzApi {
     this.#platformOperators = options.platformOperators;
     this.#billingRoles = options.billingRoles;
     this.#aggregateReads = options.aggregateReads;
+    this.#braids = options.braids;
+    this.#braidedReads = options.braidedReads;
+    this.#organizationPolicies = options.organizationPolicies;
+    this.#projectMembers = options.projectMembers;
+    this.#braidTargets = options.braidTargets;
     this.#memberOffboardings = options.memberOffboardings;
+    this.#grantIdentity = options.grantIdentity;
+    this.#braidRelease = options.braidRelease;
   }
 
   /** authz_aggregate_read: authz records the fact, governance writes the audit row (§9). */
@@ -263,7 +302,7 @@ export class AuthzModule implements AuthzApi {
    * Build AuthZ graph; dispatcher constructed here, connected by eventing
    * (needs pipeline's registered senders). Metrics optional for non-scrape.
    */
-  static create({ config: serverConfig, repositories }: AuthzSetup): AuthzModule {
+  static create({ config: serverConfig, repositories, channels }: AuthzSetup): AuthzModule {
     const dispatcher = AuthzCommandDispatcherService.create();
     const config = authzRuntimeConfig(serverConfig);
     const { epoch } = repositories;
@@ -292,6 +331,7 @@ export class AuthzModule implements AuthzApi {
     // API-key adoption; every decision and listing reads the grants head.
     const permissions = AuthzPermissionService.create({
       repository: repositories.read,
+      policies: repositories.organizationPolicies,
       listing: repositories.listing,
       bindings: repositories.bindings,
       epoch,
@@ -306,6 +346,7 @@ export class AuthzModule implements AuthzApi {
     const billingRoles = AuthzBillingRoleService.create({
       grants: repositories.billingGrants,
       standings: repositories.userStandings,
+      bindings: repositories.bindings,
       ledger,
       permissions,
       newGrantId: newAuthzGrantId,
@@ -322,6 +363,40 @@ export class AuthzModule implements AuthzApi {
       bindings: repositories.bindings,
       permissions,
       offboarded: memberOffboardings,
+      policies: repositories.organizationPolicies,
+    });
+    const braids = AuthzBraidService.create({
+      ledger,
+      reads: repositories.ledgerReads,
+      lineage: repositories.read,
+      locks: repositories.braidLocks,
+      writes: repositories.braidWrites,
+      epoch,
+      permissions,
+    });
+    const braidedReads = AuthzBraidedReadAuditService.create({
+      auditTrail: repositories.auditTrail,
+      lineage: repositories.read,
+      reads: repositories.ledgerReads,
+    });
+    const organizationPolicies = AuthzOrganizationPolicyService.create({
+      policies: repositories.organizationPolicies,
+      epoch,
+      auditTrail: repositories.auditTrail,
+    });
+    const projectMembers = AuthzProjectMembersService.create({
+      lineage: repositories.read,
+      members: repositories.read,
+      decisions: permissions,
+    });
+    const braidTargets = AuthzBraidTargetsService.create({
+      lineage: repositories.read,
+      decisions: permissions,
+    });
+    const braidRelease = AuthzBraidReleaseService.create({
+      flags: channels.flags,
+      lineage: repositories.read,
+      policies: repositories.organizationPolicies,
     });
     const sessionVersions = AuthzSessionVersionService.create({
       versions: repositories.sessionVersions,
@@ -330,10 +405,12 @@ export class AuthzModule implements AuthzApi {
     const pipeline = EventingAuthzAdapter.build({
       authzGrantsWriteStore: repositories.grantProjection,
       authzAuditTrailStore: repositories.auditTrail,
+      authzBraidReads: repositories.ledgerReads,
       sessionVersions,
       userStandings,
       scopeLineage: permissions,
       engineSwitch: cutover,
+      braidChanges: braids,
     });
     const migration = LegacyImportAuthzGrantMigration.create({
       store: repositories.migration,
@@ -352,7 +429,14 @@ export class AuthzModule implements AuthzApi {
       platformOperators,
       billingRoles,
       aggregateReads,
+      braids,
+      braidedReads,
+      organizationPolicies,
+      projectMembers,
+      braidTargets,
       memberOffboardings,
+      grantIdentity: AuthzGrantIdentityService.create({ grants: repositories.ledgerReads }),
+      braidRelease,
       eventing: { pipeline, dispatcher },
     });
   }
@@ -535,11 +619,11 @@ export class AuthzModule implements AuthzApi {
     return this.#permissions.hasPermission(a);
   }
   /**
-   * The one derivation, answered for every module that writes a binding it
-   * does not own the ledger for. It reads nothing and awaits nothing: the id
-   * is a function of the grant's own content.
+   * The one grant id, answered for every module that writes a binding it does
+   * not own the ledger for: derived from the grant's own content, and the
+   * stored one reused, revoked or not.
    */
-  deriveGrantId: AuthzApi["deriveGrantId"] = (a) => this.#grantIdentity.deriveGrantId(a);
+  resolveGrantId: AuthzApi["resolveGrantId"] = (a) => this.grantIdentity().resolveGrantId(a);
   revoke: AuthzApi["revoke"] = (a) => this.#grants.revoke(a);
   offboard: AuthzApi["offboard"] = (a) => this.#grants.offboard(a);
   invalidateOrganization: AuthzApi["invalidateOrganization"] = (a) =>
@@ -629,6 +713,126 @@ export class AuthzModule implements AuthzApi {
       );
     }
     return this.#memberships;
+  }
+
+  // Braid management asks `release_braids`, then the organisation's Braids setting. Listing and
+  // removing ask neither, so an admin can find and end a braid (Alex, 2026-11-18); the screen's
+  // other reads call the `*ForScreen` twins. modules/authz/specs/braids-release-flag.feature
+  listBraids: AuthzApi["listBraids"] = (a) => this.braids().listBraids(a);
+  createBraid: AuthzApi["createBraid"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braids().createBraid(a);
+  };
+  changeBraid: AuthzApi["changeBraid"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braids().changeBraid(a);
+  };
+  removeBraid: AuthzApi["removeBraid"] = (a) => this.braids().removeBraid(a);
+  /** An app composing no audit trail refuses, so a braided read is never shown unaudited. */
+  recordBraidedSpansView: AuthzApi["recordBraidedSpansView"] = (a) =>
+    this.braidedReads().recordBraidedSpansView(a);
+
+  listOrganizationBraids: AuthzApi["listOrganizationBraids"] = (a) =>
+    this.braids().listOrganizationBraids(a);
+  countProjectMembersHolding: AuthzApi["countProjectMembersHolding"] = (a) =>
+    this.projectMembers().countProjectMembersHolding(a);
+  /** The braid dialog's "<n> people will see these spans". */
+  countProjectMembersHoldingForScreen: AuthzApi["countProjectMembersHoldingForScreen"] = async (
+    a,
+  ) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.projectMembers().countProjectMembersHolding(a);
+  };
+  /** The braid dialog's reads another module answers ask this first (`traces.braidPreview`). */
+  assertBraidsReleased: AuthzApi["assertBraidsReleased"] = (a) =>
+    this.braidRelease().assertEnabledForProject(a);
+  listBraidTargets: AuthzApi["listBraidTargets"] = async (a) => {
+    await this.braidRelease().assertEnabledForProject(a);
+    return this.braidTargets().listBraidTargets(a);
+  };
+  getOrganizationPolicy: AuthzApi["getOrganizationPolicy"] = (a) =>
+    this.organizationPolicies().getOrganizationPolicy(a);
+  /** The Braids screen's settings, read while the release is off so Braids can be turned off. */
+  getOrganizationPolicyForScreen: AuthzApi["getOrganizationPolicyForScreen"] = (a) =>
+    this.organizationPolicies().getOrganizationPolicy(a);
+  setBraidsPolicy: AuthzApi["setBraidsPolicy"] = async (a) => {
+    await this.braidRelease().assertReleasedForOrganization(a);
+    return this.organizationPolicies().setBraidsPolicy(a);
+  };
+  /** Turning Braids off only narrows reads, so it is answered while the release is off too. */
+  setBraidsEnabled: AuthzApi["setBraidsEnabled"] = async (a) => {
+    if (a.braidsEnabled) await this.braidRelease().assertReleasedForOrganization(a);
+    return this.organizationPolicies().setBraidsEnabled(a);
+  };
+
+  private braidRelease(): AuthzBraidReleaseService {
+    if (!this.#braidRelease) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it reads no release flag: " +
+          "compose it through AuthzModule.create to manage a braid.",
+      );
+    }
+    return this.#braidRelease;
+  }
+
+  private braidedReads(): AuthzBraidedReadAuditService {
+    if (!this.#braidedReads) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it keeps no audit trail: " +
+          "compose it through AuthzModule.create to audit a braided read.",
+      );
+    }
+    return this.#braidedReads;
+  }
+
+  private organizationPolicies(): AuthzOrganizationPolicyService {
+    if (!this.#organizationPolicies) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it stores no settings: " +
+          "compose it through AuthzModule.create to read or change an organisation's settings.",
+      );
+    }
+    return this.#organizationPolicies;
+  }
+
+  private braidTargets(): AuthzBraidTargetsService {
+    if (!this.#braidTargets) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it reads no lineage: " +
+          "compose it through AuthzModule.create to list a braid's target projects.",
+      );
+    }
+    return this.#braidTargets;
+  }
+
+  private projectMembers(): AuthzProjectMembersService {
+    if (!this.#projectMembers) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it reads no memberships: " +
+          "compose it through AuthzModule.create to count a project's members.",
+      );
+    }
+    return this.#projectMembers;
+  }
+
+  private braids(): AuthzBraidService {
+    if (!this.#braids) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no braid lock: " +
+          "compose it through AuthzModule.create to read or write a braid.",
+      );
+    }
+    return this.#braids;
+  }
+
+  private grantIdentity(): AuthzGrantIdentityService {
+    if (!this.#grantIdentity) {
+      throw new Error(
+        "This AuthzModule was composed from already-built services, so it holds no grant reads: " +
+          "compose it through AuthzModule.create to resolve a grant id.",
+      );
+    }
+    return this.#grantIdentity;
   }
 
   private admissions(): AuthzAdmissionService {

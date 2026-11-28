@@ -78,6 +78,9 @@ const UNDOCUMENTED_SAVED_WORKBENCH_CHARTS =
 const UNDOCUMENTED_CHECKUP =
   "Not yet documented in the API reference: the checkup routes back Settings, Checkup and langwatch doctor on a self-hosted install, and the CLI documentation covers that flow.";
 
+const UNDOCUMENTED_STAFF_ACCESS =
+  "Live surface, intentionally undocumented: LangWatch platform operators' agent access on LangWatch Cloud (ADR-202), used only by langwatch ops access, not an API for integrations.";
+
 const RETIRED_LEGACY_AGENTS =
   "Retired surface, intentionally undocumented: superseded by /api/v1/agents (see the Agents family below); this bare form answers every request with a deprecation notice naming the successor.";
 
@@ -107,6 +110,17 @@ const SKIP_PATHS: Record<string, string> = {
   "/api/docs-session":
     "Live surface, intentionally undocumented: the docs playground's own revoke call for its session key (ADR-185), not an API for integrations.",
   "/api/checkup": UNDOCUMENTED_CHECKUP,
+  "/api/v1/staff-access/functions": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/functions/{functionName}": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/ops/copies": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/ops/organizations": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/ops/organizations/{organization}/usage": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/ops/queues": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests/{requestId}": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests/{requestId}/end": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests/{requestId}/redeem": UNDOCUMENTED_STAFF_ACCESS,
+  "/api/v1/staff-access/requests/{requestId}/withdraw": UNDOCUMENTED_STAFF_ACCESS,
   "/api/checkup/run": UNDOCUMENTED_CHECKUP,
   "/api/gateway/v1/providers": RETIRED_GATEWAY_PROVIDER_BINDINGS,
   "/api/gateway/v1/providers/{id}": RETIRED_GATEWAY_PROVIDER_BINDINGS,
@@ -339,6 +353,20 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
       "Manage AI agent configurations. Create, update, and organize agents that are tracked and evaluated in LangWatch.",
   },
   {
+    name: "Agent Registry",
+    dirName: "governance-agent-registry",
+    pathPrefixes: ["/api/governance/registry"],
+    overviewDescription:
+      "Read every AI agent in your organization with its endpoints, model, instructions, tools and owner, as JSON or as an ARD v0.91 manifest, and follow its changes through the change feed. Needs an organization API key.",
+  },
+  {
+    name: "Agent Kill Switch",
+    dirName: "governance-kill-switch",
+    pathPrefixes: ["/api/governance/agents", "/api/governance/agent-stops"],
+    overviewDescription:
+      "Stop a registry agent on the targets of its stop plan: Databricks serving endpoints, Amazon Bedrock agent aliases and gateway virtual keys. Set each agent's stop plan, request a stop, approve or deny it, read every target's outcome, retry a failed stop and restore the agent. Needs an organization API key on an Enterprise plan with the agent registry. Reads need the governance:view permission and changes need governance:manage.",
+  },
+  {
     name: "Coding Agents",
     dirName: "coding-agents",
     pathPrefixes: ["/api/v1/coding-agent", "/api/coding-agent"],
@@ -508,6 +536,32 @@ const ENDPOINT_GROUPS: EndpointGroup[] = [
     pathPrefixes: ["/api/scim-tokens"],
     overviewDescription:
       "Mint, list and revoke the bearer tokens an identity provider uses to reach the SCIM endpoints. Token values are shown once, when they are created, and never again.",
+  },
+  {
+    name: "OCSF SIEM Export",
+    dirName: "governance-ocsf",
+    pathPrefixes: ["/api/governance/ocsf"],
+    overviewDescription:
+      "Pull governance events, project traces and the audit log as OCSF 1.9.0 API Activity events with an organisation API key, and push OCSF events from your other tools into LangWatch. Each stream pages with a cursor, so a SIEM polls by passing next_cursor back.",
+    endpointOrder: [
+      "GET /api/v1/governance/ocsf/events",
+      "GET /api/v1/governance/ocsf/traces",
+      "GET /api/v1/governance/ocsf/audit",
+      "POST /api/v1/governance/ocsf/ingest",
+    ],
+  },
+  {
+    name: "Security Lake Sources",
+    dirName: "governance-security-lake",
+    pathPrefixes: ["/api/governance/security-lake"],
+    overviewDescription:
+      "Add an AWS Security Lake subscriber as a source, test its queue and read its health. LangWatch reads the subscriber queue on the source's schedule and stores the AI activity it finds as OCSF events.",
+    endpointOrder: [
+      "POST /api/v1/governance/security-lake/sources",
+      "PATCH /api/v1/governance/security-lake/sources/{sourceId}",
+      "POST /api/v1/governance/security-lake/sources/{sourceId}/test",
+      "GET /api/v1/governance/security-lake/sources/{sourceId}/health",
+    ],
   },
   {
     name: "SCIM",

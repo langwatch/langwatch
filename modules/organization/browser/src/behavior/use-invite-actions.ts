@@ -137,6 +137,7 @@ function toInviteInput(invite: MembersForm["invites"][number]) {
       role: team.role,
       ...(team.customRoleId ? { customRoleId: team.customRoleId } : {}),
     })),
+    ...(invite.billingOnly ? { billingOnly: true } : {}),
   };
 }
 
@@ -216,7 +217,11 @@ export function useInviteActions({
   const onSubmit: SubmitHandler<MembersForm> = (data) => {
     const performMutation = performAdminInvite;
     const proceedAfterLiteCheck = () => {
-      if (!data.invites.some((invite) => invite.orgRole === OrganizationUserRole.EXTERNAL)) {
+      // Billing only takes no seat (ADR-205), so only a real Lite invite asks the Lite pool.
+      const asksLiteSeat = data.invites.some(
+        (invite) => invite.orgRole === OrganizationUserRole.EXTERNAL && !invite.billingOnly,
+      );
+      if (!asksLiteSeat) {
         performMutation(data);
         return;
       }

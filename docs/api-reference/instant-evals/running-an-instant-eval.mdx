@@ -25,8 +25,8 @@ Add an `ORDER BY` when your statement carries a `LIMIT`. The run reads your stat
 ```sql
 SELECT
   TraceId,
-  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?') AS refused
-FROM analytics.trace_metrics
+  eval_passed(llm_readable_thread(ConversationId, 16000), 'Did the agent refuse the request?', 0.5) AS refused
+FROM trace_metrics
 WHERE OccurredAt >= subtractDays(now(), 30) AND ConversationId != ''
 GROUP BY TraceId, ConversationId
 ```
@@ -50,6 +50,10 @@ GROUP BY TraceId, ConversationId
 `priceUsd` is what the run costs you and `costUsd` is what it costs us. One classification is made per row, carrying every question the statement asks, so a statement with four eval columns still sends one request per row.
 
 An organization without a paid plan also gets `freeBudgetRemainingUsd`, what is left of its $1 free budget. Once that is spent, a new run and a judged query answer `402` with `instant_eval_free_budget_exhausted`, carrying `spentUsd` and `budgetUsd` in `meta`, until the organization upgrades. The rate is on [Pricing](/pricing#instant-evals).
+
+On any plan, a [gateway budget](/ai-gateway/budgets) set to block on the project, its team or the organization also applies. Once it is reached, a new run and a judged query answer `402` with `instant_eval_gateway_budget_exceeded`, carrying `budgetId`, `scope`, `window`, `limitUsd` and `spentUsd` in `meta`. A run under way stops before its next page and keeps the verdicts it wrote.
+
+A budget set to warn never refuses. A run on your own decision model is checked too, as its provider usage counts against these budgets.
 
 ## Row Limits
 
@@ -97,7 +101,7 @@ Every judgement is also a row in the `judgments` analytics dataset, so a later q
 
 ```sql
 SELECT j.Label AS verdict, count() AS traces
-FROM analytics.judgments AS j
+FROM judgments AS j
 WHERE j.RunId = {run:String} AND j.CreatedAt >= subtractDays(now(), 7)
 GROUP BY verdict
 ORDER BY traces DESC

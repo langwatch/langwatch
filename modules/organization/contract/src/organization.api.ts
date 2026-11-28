@@ -59,6 +59,7 @@ import type {
   UpdateOrganizationTeamWithMembersInput,
 } from "./features/team/team.ts";
 import type { LimitCheckResult, LimitType } from "./license-limit-type.ts";
+import type { OrganizationOpsSnapshot } from "./organization-ops.ts";
 import type {
   PendingInvitationForCaller,
   PendingInvitationsByEmail,
@@ -109,6 +110,7 @@ import type {
   OrganizationJoinSetting,
   SignInSecurityPolicy,
   SignUpVerdict,
+  DocsPlaygroundPolicy,
 } from "./organization.ts";
 import type * as organizationModule from "./organization.ts";
 import type {
@@ -120,6 +122,7 @@ import type {
   PersonalWorkspaceFeaturesInput,
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
+import type { OrganizationSeatPeak } from "./seat-peak.ts";
 
 export interface OrganizationCaller {
   readonly id: string;
@@ -151,6 +154,17 @@ export type OrganizationUpdatedMember = OrganizationRestMemberSummary &
     teams: OrganizationRestMemberTeamBinding[];
     teamsLeftWithoutAdmin: { id: string; name: string }[];
   }>;
+/** One organization as an operator tells it apart from others with the same name. */
+export type OrganizationOperatorSummary = Readonly<{
+  id: string;
+  name: string;
+  slug: string;
+  createdAt: Instant;
+  memberCount: number;
+  /** The addresses of the administrators who can still sign in. */
+  administratorEmails: string[];
+}>;
+
 export type OrganizationProvisioningSummary = Readonly<{
   id: string;
   name: string;
@@ -410,6 +424,17 @@ export interface OrganizationApi {
    */
   findConfiguredSignInSecurityPolicies(): Promise<SignInSecurityPolicy[]>;
   /**
+   * Whether members may connect the docs playground (ADR-185); api-key asks at mint and on every
+   * docs session key it authenticates. An unknown organization reads as off.
+   */
+  getDocsPlaygroundPolicy(input: { organizationId: string }): Promise<DocsPlaygroundPolicy>;
+  /** Turning it off records a fact on which api-key revokes the organisation's live docs keys. */
+  saveDocsPlaygroundPolicy(input: {
+    organizationId: string;
+    docsPlaygroundSessionsEnabled: boolean;
+    changedByUserId?: string | null;
+  }): Promise<void>;
+  /**
    * The organization's pricing model and currency, for workers deciding on its behalf. A system
    * read: no caller. An unknown organization has no model and the schema's default currency.
    */
@@ -427,6 +452,13 @@ export interface OrganizationApi {
   isInstantEvalsOptedIn(input: { organizationId: string }): Promise<boolean>;
   /** The organization's own Instant Evals consent; a second call keeps the first record. */
   recordInstantEvalsOptIn(input: { organizationId: string; userId: string }): Promise<void>;
+  /** Whether an organization admin accepted the PII Redaction Model's price (ADR-201). */
+  isPiiRedactionModelAccepted(input: { organizationId: string }): Promise<boolean>;
+  /** An admin's acceptance of that price (ADR-201); a second call keeps the first record. */
+  recordPiiRedactionModelAcceptance(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<void>;
   /** Replaces the record, leaving every other sign-up answer where it is. */
   writeGuidedOnboardingState(input: {
     organizationId: string;
@@ -841,6 +873,11 @@ export interface OrganizationApi {
   findSeatOccupantsSince(
     input: Readonly<{ organizationId: string; since: number }>,
   ): Promise<OrganizationSeatOccupants>;
+  /**
+   * The most full and Lite Member seats held at once in each month, beside the plan's caps
+   * (ADR-002). For our own team on the ops console; `counted: false` until counting opened.
+   */
+  getSeatPeak(input: Readonly<{ organizationId: string }>): Promise<OrganizationSeatPeak>;
   /** Whether one more of a limited resource fits the organization's plan, for this caller. */
   checkLimit(
     input: Readonly<{ organizationId: string; limitType: LimitType }>,
@@ -940,6 +977,19 @@ export interface OrganizationApi {
    * fleet-wide scans. No limit reads them all; `next` is null on the last page.
    */
   listAllIds(input?: OrganizationIdPageInput): Promise<OrganizationIdPage>;
+  /** Organizations whose name, slug or id holds the query; system organizations left out. */
+  searchForOperators(
+    input: Readonly<{ query: string; limit: number }>,
+  ): Promise<OrganizationOperatorSummary[]>;
+  /** The same summaries for these ids; an id with no organization is left out. */
+  findForOperators(
+    input: Readonly<{ organizationIds: readonly string[] }>,
+  ): Promise<OrganizationOperatorSummary[]>;
+  /**
+   * One organization for a staff investigation: ids, counts and its creation time, never a name,
+   * slug or address (ADR-202, ops functions). Throws `OrganizationNotFoundError`.
+   */
+  getOpsSnapshot(input: Readonly<{ organizationId: string }>): Promise<OrganizationOpsSnapshot>;
 }
 
 export const OrganizationApi = moduleApi<OrganizationApi>()("organization");

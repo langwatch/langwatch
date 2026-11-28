@@ -120,9 +120,9 @@ describe("filter-translator", () => {
         expect(Object.values(result.params)).toContain("metadata.key.with.dots");
       });
 
-      it("matches nothing for a metadata.value filter without a key", () => {
-        expect(translateFilter({ field: "metadata.value", values: ["value"] }).whereClause).toBe(
-          "1=0",
+      it("refuses a metadata.value filter without a key", () => {
+        expect(() => translateFilter({ field: "metadata.value", values: ["value"] })).toThrow(
+          expect.objectContaining({ code: "analytics_filter_key_required" }),
         );
       });
     });
@@ -476,8 +476,12 @@ describe("filter-translator", () => {
         expect(result.whereClause).toContain("(ts.TenantId, ts.TraceId) IN");
         expect(result.whereClause).toContain("{{tenantSet}}");
         expect(result.whereClause).toContain("arrayExists");
-        expect(result.whereClause).toContain("mapContains");
-        expect(result.whereClause).toContain("{metricKeys_0:Array(String)}");
+        expect(result.whereClause).toContain(
+          "hasAny(mapKeys(attrs), {metricKeys_0:Array(String)})",
+        );
+        expect(result.whereClause, "a lambda over the keys copies each map").not.toMatch(
+          /arrayExists\(k ->/,
+        );
         expect(result.params).toHaveProperty("metricKeys_0", ["vote"]);
         expect(result.params).toHaveProperty("eventType_1", "thumbs_up_down");
       });

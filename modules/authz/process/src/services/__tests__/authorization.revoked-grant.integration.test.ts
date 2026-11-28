@@ -17,6 +17,7 @@ import { EventingAuthzLedgerAdapter } from "../../eventing/authz-grant.store.ts"
 import { StubAuthzEpoch } from "../../repositories/__tests__/support/authz-epoch.stub.ts";
 import { EventingAuthzListingRepository } from "../../repositories/eventing/eventing.authz-listing.repository.ts";
 import { EventingAuthzReadRepository } from "../../repositories/eventing/eventing.authz-read.repository.ts";
+import { MemoryAuthzOrganizationPolicyRepository } from "../../repositories/memory/memory.authz-organization-policy.repository.ts";
 import { PrismaAuthzLedgerReadRepository } from "../../repositories/prisma/prisma.authz-ledger-read.repository.ts";
 import { PrismaAuthzManagedGrantRepository } from "../../repositories/prisma/prisma.authz-managed-grant.repository.ts";
 import { PrismaAuthzMembershipStampRepository } from "../../repositories/prisma/prisma.authz-membership-stamp.repository.ts";
@@ -57,9 +58,13 @@ describe.skipIf(!DB_URL)("given an aggregate project with one member and an admi
 
   const door = () => {
     const reader = EventingAuthzReadRepository.create(prisma);
-    const collector = AuthzCollectorService.create({ reader });
+    const collector = AuthzCollectorService.create({
+      policies: MemoryAuthzOrganizationPolicyRepository.create(),
+      reader,
+    });
     return AuthorizationService.create({
       authz: AuthzService.create({
+        policies: MemoryAuthzOrganizationPolicyRepository.create(),
         repository: reader,
         listing: EventingAuthzListingRepository.create(prisma),
         bindings: PrismaAuthzManagedGrantRepository.create({ database: prisma }),

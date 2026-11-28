@@ -36,7 +36,8 @@ describe("given production source", () => {
       const found = report("const ms = Date.now();");
 
       expect(found.map((entry) => entry.messageId)).toEqual(["mintNowMilliseconds"]);
-      expect(found[0].message).toContain("nowInstant().epochMilliseconds");
+      expect(found[0].message).toContain("nowEpochMs()");
+      expect(found[0].message).toContain("nowInstant()");
     });
   });
 

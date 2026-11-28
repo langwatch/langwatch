@@ -30,6 +30,11 @@ export abstract class CustomerIoChannel {
   }): Promise<void>;
   abstract batch(calls: CioBatchCall[]): Promise<void>;
 
+  /** False when every call would be dropped unsent, so a caller can skip work done only for one. */
+  isEnabled(): boolean {
+    return true;
+  }
+
   /**
    * As trackEvent, but rejects when the channel knows Customer.io did not take the track, for the
    * one caller that gives a claim back on failure. A channel that cannot tell resolves as
@@ -37,5 +42,13 @@ export abstract class CustomerIoChannel {
    */
   trackEventOrThrow(input: Parameters<CustomerIoChannel["trackEvent"]>[0]): Promise<void> {
     return this.trackEvent(input);
+  }
+
+  /**
+   * As batch, but rejects when the channel knows Customer.io did not take it; as
+   * trackEventOrThrow.
+   */
+  batchOrThrow(calls: CioBatchCall[]): Promise<void> {
+    return this.batch(calls);
   }
 }

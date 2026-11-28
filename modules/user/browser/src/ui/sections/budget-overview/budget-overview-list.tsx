@@ -64,7 +64,7 @@ export function formatResetDay(resetsAt: string | null): string | null {
 /**
  * How much of a budget is spent, and the two thresholds every surface
  * judges it by — one definition, or the progress bar could turn red while
- * a /me banner still says "approaching".
+ * a /coding-agents banner still says "approaching".
  */
 export function budgetPctUsed(item: BudgetOverviewItemView): number {
   const limit = Number.parseFloat(item.limitUsd);

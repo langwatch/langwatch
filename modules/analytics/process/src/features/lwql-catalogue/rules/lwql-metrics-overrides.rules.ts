@@ -42,7 +42,8 @@ export const METRICS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description: "Cost and latency metrics per simulated trace",
     grain: "one row per (ScenarioRunId, TraceId)",
     timeColumn: "OccurredAt",
-    dedup: { versionColumn: "OccurredAt" },
+    // Latest-in-order: a stock widget reads it (analytics ADR-006).
+    dedup: { versionColumn: "OccurredAt", strategy: "latest-in-order" },
   },
   simulation_run_metrics_rollup: {
     description:

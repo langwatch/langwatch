@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class TeamNotFoundError extends NotFoundError {
   declare readonly code: "team_not_found";
@@ -163,6 +163,20 @@ export class DeveloperSeatNoSharedAccessError extends HandledError {
       },
     );
     this.name = "DeveloperSeatNoSharedAccessError";
+  }
+}
+
+/** A Billing-only member holds the Billing grant and no team (ADR-205). */
+export class BillingOnlyNoTeamAccessError extends HandledError {
+  declare readonly code: "billing_only_no_team_access";
+
+  constructor() {
+    super(
+      "billing_only_no_team_access",
+      "A Billing-only member joins no team; give them a seat role first.",
+      { httpStatus: 409, fault: "customer", ...remediation("billing_only_no_team_access") },
+    );
+    this.name = "BillingOnlyNoTeamAccessError";
   }
 }
 

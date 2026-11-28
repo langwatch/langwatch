@@ -1,0 +1,22 @@
+{{- if .Values.piiRedactionModel.enabled }}
+# Service for the PII redaction model. Only the app and the workers call it,
+# at PII_REDACTION_MODEL_ENDPOINT.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Release.Name }}-pii-redaction-model
+  labels:
+    app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: pii-redaction-model
+spec:
+  type: ClusterIP
+  ports:
+    - port: {{ .Values.piiRedactionModel.service.port }}
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    app.kubernetes.io/name: {{ .Release.Name }}-pii-redaction-model
+    app.kubernetes.io/instance: {{ .Release.Name }}
+{{- end }}

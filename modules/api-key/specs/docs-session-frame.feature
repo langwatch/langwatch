@@ -55,6 +55,19 @@ Feature: The docs session frame keeps the key on the app's origin
     And Cancel answers the docs page that the reader declined
 
   @integration
+  Scenario: A confirmation hidden and shown again waits its delay again
+    Given the frame is showing a confirmation and its delay has passed
+    When the frame is hidden, as when the reader moves to another docs page, and shown again
+    Then a press that began too soon after it showed again is ignored
+
+  @integration
+  Scenario: The frame says when the organisation turned the session off
+    Given the frame is waiting for the consent popup
+    When the popup answers that the organisation turned the playground session off
+    Then the frame says the organisation turned this off, not that the reader declined
+    And the docs page is told it is not connected
+
+  @integration
   Scenario: The frame refuses what it was not built to send
     Given the frame is connected
     When a message from anywhere but its parent at the docs origin asks it to send a request
@@ -70,3 +83,11 @@ Feature: The docs session frame keeps the key on the app's origin
     Then the key is cleared and the docs page is told it is not connected
     And disconnecting or unloading asks the app to revoke the key
     And when a request answers 403 the frame says the reader's access does not allow it
+
+  @integration
+  Scenario: The connection survives moving to another docs page but not a reload
+    Given the playground is connected through the session frame
+    When the reader opens another docs page in the same tab
+    Then the playground is still connected, with the same project and expiry
+    When the reader reloads the page
+    Then the frame has dropped the key and the playground offers to connect again

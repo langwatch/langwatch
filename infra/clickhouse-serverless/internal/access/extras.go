@@ -78,6 +78,7 @@ func checkExtras(u User, r Rules, add func(where, format string, args ...any), w
 	for _, g := range u.Grants {
 		checkGrant(g, r, add, where)
 	}
+	checkCaps(u, r, add, where)
 }
 
 func checkSetting(u User, r Rules, name string, value any, add func(where, format string, args ...any), where string) {
@@ -114,9 +115,9 @@ func checkGrant(g string, r Rules, add func(where, format string, args ...any), 
 }
 
 // planExtras adds the user's own profile and quota to p, and its grants to user.
-func planExtras(p *Planned, u User, user map[string]any) {
-	if len(u.Settings) > 0 {
-		p.Profiles[ProfileName(u.Name)] = Profile{Parent: u.Tier.Name(), Settings: u.Settings}
+func planExtras(p *Planned, u User, user map[string]any, c Constraints) {
+	if len(u.Settings) > 0 || len(u.Caps) > 0 {
+		p.Profiles[ProfileName(u.Name)] = Profile{Parent: u.Tier.Name(), Settings: ownSettings(u, c)}
 		user["profile"] = ProfileName(u.Name)
 	}
 	if q := u.Quota; q != nil {

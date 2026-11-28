@@ -1,5 +1,7 @@
 import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
+import type { ScenarioKind } from "./scenario.ts";
+
 /**
  * The author-assist answered this project one generation too many inside the
  * window. `fault` stays customer: it is their generation rate, and the
@@ -303,5 +305,65 @@ export class ScenarioSimulationWritesUnavailableError extends HandledError {
       { httpStatus: 503, fault: "platform" },
     );
     this.name = "ScenarioSimulationWritesUnavailableError";
+  }
+}
+
+/** A create whose kind and red team config disagree: red_team needs one, standard takes none. */
+export class ScenarioRedTeamConfigError extends HandledError {
+  declare readonly code: "scenario_red_team_config_mismatch";
+
+  constructor(input: { kind: ScenarioKind }) {
+    super(
+      "scenario_red_team_config_mismatch",
+      input.kind === "red_team"
+        ? "A red team scenario needs a red team config"
+        : "A standard scenario takes no red team config",
+      { httpStatus: 422, fault: "customer", meta: { kind: input.kind } },
+    );
+    this.name = "ScenarioRedTeamConfigError";
+  }
+}
+
+/** The judge's request is not one LangWatch Judge (preview) answers; the message says why. */
+export class JudgePreviewRequestInvalidError extends HandledError {
+  declare readonly code: "judge_preview_request_invalid";
+
+  constructor(message: string) {
+    super("judge_preview_request_invalid", message, { httpStatus: 400, fault: "customer" });
+    this.name = "JudgePreviewRequestInvalidError";
+  }
+}
+
+/** LangWatch Judge (preview) may not judge for this project: off, off Cloud or not yet learned. */
+export class JudgePreviewNotAvailableError extends HandledError {
+  declare readonly code: "judge_preview_not_available";
+
+  constructor(message: string) {
+    super("judge_preview_not_available", message, { httpStatus: 403, fault: "customer" });
+    this.name = "JudgePreviewNotAvailableError";
+  }
+}
+
+/** The organization's free budget is spent, so the judge answered nothing. */
+export class JudgePreviewBudgetExhaustedError extends HandledError {
+  declare readonly code: "judge_preview_budget_exhausted";
+
+  constructor(message: string) {
+    super("judge_preview_budget_exhausted", message, { httpStatus: 402, fault: "customer" });
+    this.name = "JudgePreviewBudgetExhaustedError";
+  }
+}
+
+/** Nothing answered the judgement. The run reports an error: a verdict is never made up. */
+export class JudgePreviewUnavailableError extends HandledError {
+  declare readonly code: "judge_preview_unavailable";
+
+  constructor() {
+    super(
+      "judge_preview_unavailable",
+      "LangWatch Judge (preview) could not answer right now, so this run was not judged. Run it again, or pick another judge model.",
+      { httpStatus: 503, retryable: true, fault: "platform" },
+    );
+    this.name = "JudgePreviewUnavailableError";
   }
 }

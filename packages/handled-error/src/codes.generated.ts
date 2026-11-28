@@ -268,6 +268,13 @@ export const goErrorCodes = {
    */
   invalid_dataset: { service: "nlpgo", httpStatus: 400 },
   /**
+   * ErrInvalidImages — signals a turn whose attached images break the limits
+   * in turnimage.go (count, media type, base64 payload, size).
+   *
+   * @source services/langyagent/domain/errors.go
+   */
+  invalid_images: { service: "langyagent", httpStatus: 422 },
+  /**
    * ErrInvalidWorkflow — signals a malformed workflow JSON (cycles, unknown
    * node ids on edges, column-length mismatches in a dataset).
    *

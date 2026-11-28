@@ -49,11 +49,11 @@ describe("the storedObjects tRPC declaration", () => {
       expect(accessOf(storedObjectTrpcTransport)).toEqual([
         {
           kind: "permission-any",
-          permissions: ["traces:view", "scenarios:view", "datasets:view"],
+          permissions: ["traces:view", "scenarios:view", "datasets:view", "langy:view"],
         },
         {
           kind: "permission-any",
-          permissions: ["traces:view", "scenarios:view", "datasets:view"],
+          permissions: ["traces:view", "scenarios:view", "datasets:view", "langy:view"],
         },
         { kind: "permission", permission: "project:update" },
         { kind: "permission", permission: "project:update" },

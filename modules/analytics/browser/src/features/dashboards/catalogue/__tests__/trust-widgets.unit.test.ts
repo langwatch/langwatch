@@ -19,21 +19,21 @@ describe("given the Can I trust my numbers? widgets", () => {
   /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */
   it("counts each field as a filter, so its gap is never the frame's setup view", () => {
     const { code, sql } = buildOf("data-health");
-    for (const filter of [
-      "AND notEmpty(Models)",
-      "AND (TotalCost IS NOT NULL OR empty(Models))",
-      "AND UserId IS NOT NULL",
-      "AND ConversationId IS NOT NULL",
-      "AND notEmpty(Labels)",
-      "AND MetadataOutcome != ''",
+    for (const flag of [
+      "toUInt8(notEmpty(Models)) AS named",
+      "toUInt8(UserId IS NOT NULL) AS user",
+      "toUInt8(ConversationId IS NOT NULL) AS conversation",
+      "toUInt8(notEmpty(Labels) OR CustomerId IS NOT NULL) AS labels",
+      "toUInt8(MetadataOutcome != '') AS outcome",
     ]) {
-      expect(sql.fields).toContain(filter);
+      expect(sql.fields).toContain(flag);
     }
-    expect(sql.fields).toContain("SELECT 'all' AS field");
-    expect(sql.fields).not.toMatch(/SELECT [^']*\b(?:UserId|TotalCost|ConversationId)\b[^\n]*AS/);
-    expect(code).toContain("Missing on ");
-    expect(code).toContain("Sending it unlocks: ");
-    expect(code).toContain('<AllGood title="Every field arrives"');
+    // The result reads only the field, its counts and an example id, never a trace column.
+    expect(sql.fields).toMatch(
+      /^SELECT arrayJoin\(splitByChar\(',', '[a-z_,]+'\)\) AS field,\n  multiIf\(/,
+    );
+    expect(code).toContain('"Cards that need it:\\n"');
+    expect(code).toContain("<AllGood title={report.headline.title}");
   });
 
   /** @scenario "AC166 Can I trust my numbers?: data health names each missing field and what it unlocks" */
@@ -53,13 +53,13 @@ describe("given the Can I trust my numbers? widgets", () => {
     expect(fields.map(({ key }) => key)).toEqual([
       "model",
       "cost",
-      "user",
       "conversation",
+      "user",
       "labels",
       "outcome",
     ]);
-    expect(unlocks.get("cost")).toContain("What is my agent spending?");
-    expect(unlocks.get("cost")).not.toContain("Is my data complete?");
+    expect(unlocks.get("cost")).toContain("How much is my agent costing me?");
+    expect(unlocks.get("cost")).not.toContain("What is my agent not sending yet?");
   });
 
   /** @scenario "AC167 Can I trust my numbers?: cost accuracy counts traces with a model but no price" */
@@ -78,10 +78,12 @@ describe("given the Can I trust my numbers? widgets", () => {
   /** @scenario "AC168 Can I trust my numbers?: noise is traffic that clearly comes from tests, staging and the like" */
   it("reads origins and non-production environments, never health checks or duplicates", () => {
     const { code, sql } = buildOf("noise");
-    expect(sql.sources).toContain("has(['playground', 'evaluation', 'simulation'], t.origin)");
-    expect(sql.sources).toContain("ResourceAttributes['deployment.environment']");
-    expect(sql.sources).toContain("Attributes['metadata.environment']");
-    expect(sql.sources).toContain("JSONExtract(Attributes['langwatch.labels'], 'Array(String)')");
+    expect(sql.sources).toContain("has(['playground', 'evaluation', 'simulation'], Origin)");
+    // Typed columns copied from the maps, never the maps themselves (goose 00128).
+    expect(sql.sources).toContain("lower(DeploymentEnvironment)");
+    expect(sql.sources).toContain("lower(MetadataEnvironment)");
+    expect(sql.sources).toContain("arrayMap((label) -> lower(label), Labels)");
+    expect(sql.sources).not.toContain("Attributes[");
     expect(sql.sources).toContain("'staging'");
     expect(sql.sources).not.toMatch(/health|duplicate/i);
     expect(code).toContain('header: "Of cost"');

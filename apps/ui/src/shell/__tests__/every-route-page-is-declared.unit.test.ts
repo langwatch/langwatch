@@ -8,7 +8,7 @@ import { describe, expect, it } from "vitest";
  * real table against the real modules, so the gap read green until this test.
  */
 import { browserModules } from "../../browser-modules.generated.ts";
-import { uiRouteTable } from "../ui-route-table";
+import { uiMountedRouteTable } from "../ui-route-table";
 import { uiUnservedPageLoaders } from "../ui-unserved-pages";
 
 /** Composed exactly as `main.tsx` composes it: module screens over the app's own. */
@@ -16,7 +16,7 @@ const moduleScreens = installedModuleScreens(browserModules).loaders;
 const loaders = mergeUiPageLoaders({ own: moduleScreens, host: uiUnservedPageLoaders });
 
 describe("given the route table the shell builds its router from", () => {
-  const keys = uiRoutePageKeys(uiRouteTable);
+  const keys = uiRoutePageKeys(uiMountedRouteTable);
 
   it("finds page keys to check", () => {
     expect(keys.length).toBeGreaterThan(50);

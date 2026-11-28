@@ -7,6 +7,7 @@ Mirrors the TypeScript SDK's error hierarchy::
     +-- DatasetApiError (HTTP failures: status_code, operation, original_error)
     +-- DatasetNotFoundError (404)
     +-- DatasetPlanLimitError (403 from resourceLimitMiddleware)
+    +-- DatasetUpsertKeyError (also a ValueError; carries a stable ``code``)
 
 Client-side validation errors (empty name, empty entries, missing files) remain
 as ValueError / FileNotFoundError -- they are NOT API errors.
@@ -63,3 +64,15 @@ class DatasetPlanLimitError(DatasetError):
         self.current = current
         self.max = max
         self.upgrade_url = upgrade_url
+
+
+class DatasetUpsertKeyError(DatasetError, ValueError):
+    """Raised when upsert_records refuses its key before writing anything.
+
+    ``code`` is stable: ``missing_upsert_key``, ``duplicate_upsert_key`` or
+    ``dataset_has_duplicate_key``. The message may change.
+    """
+
+    def __init__(self, message: str, *, code: str) -> None:
+        super().__init__(message)
+        self.code = code

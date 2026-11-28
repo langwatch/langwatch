@@ -19,6 +19,7 @@ import type { LangySessionKeyService } from "../features/session-key/services/la
 import { RedisLangyEffectRepository } from "../repositories/redis/redis.langy-effect.repository.ts";
 import type { LangyTokenBufferRedisRepository } from "../repositories/redis/redis.langy-token-buffer.repository.ts";
 import type { LangyTurnHandoffRedisRepository } from "../repositories/redis/redis.langy-turn-handoff.repository.ts";
+import type { LangyPullRequestsOpenedRecord } from "../rules/langy-ci-follow-up.rules.ts";
 import type { ControlTurnStarter } from "../rules/langy-local-session-contract.rules.ts";
 import type { LangyTitleGenerator } from "../services/langy-title-generator.service.ts";
 import type { LangyAnalyticsEventProjectionRecord } from "./langy-analytics-event.projection.ts";
@@ -32,6 +33,10 @@ import {
   createLangyTurnAdmissionLifecycleSubscriber,
   type LangyConversationUpdateChannel,
 } from "./langy-conversation.subscriber.ts";
+import {
+  createLangyFirstMessageSeenSubscriber,
+  type LangyFirstMessageSeenFacts,
+} from "./langy-first-message-seen.subscriber.ts";
 import {
   createGuidedOnboardingTurnFailedSubscriber,
   type GuidedOnboardingFacts,
@@ -72,6 +77,8 @@ interface EventingLangyConversationAdapterOptions {
   langyConversationProjectionStore: StateProjectionStore<LangyConversationStateData>;
   /** Direct Postgres per-turn operational projection. */
   langyConversationTurnProjectionStore: StateProjectionStore<LangyConversationTurnData>;
+  /** Postgres rows of the pull requests Langy opened, one each. */
+  langyPullRequestStore: AppendStore<LangyPullRequestsOpenedRecord>;
   /** Postgres per-message operational projection. */
   langyMessageProjectionStore: AppendStore<LangyMessageProjectionRecord>;
   /** Content-free ClickHouse event-grain analytics. */
@@ -88,8 +95,11 @@ interface EventingLangyConversationAdapterOptions {
   sessionKeys: Pick<LangySessionKeyService, "mintForUser" | "revoke">;
   /** The folder's owed connect turn (ADR-129); presence is read at handle time. */
   localConnectTurn: { presence: () => LocalConnectTurnPresence; turns: ControlTurnStarter };
-  /** Onboarding's answer for a project, and where its failed turns are recorded as facts. */
-  guidedOnboarding: { reader: GuidedOnboardingReader; facts: GuidedOnboardingFacts };
+  /** Onboarding's answer for a project; where failed turns and first answers are recorded. */
+  guidedOnboarding: {
+    reader: GuidedOnboardingReader;
+    facts: GuidedOnboardingFacts & LangyFirstMessageSeenFacts;
+  };
   /** Who a notification goes to and whether they want it, and notification's Web Push. */
   webPush: Pick<LangyWebPushSubscriberDeps, "users" | "projects" | "notifications">;
 }
@@ -193,6 +203,10 @@ export class EventingLangyConversationAdapter {
       conversations: conversationReader,
       facts: options.guidedOnboarding.facts,
     });
+    const firstMessageSeenSubscriber = createLangyFirstMessageSeenSubscriber({
+      conversations: conversationReader,
+      facts: options.guidedOnboarding.facts,
+    });
     const localConnectTurnSubscriber = createLocalConnectTurnSubscriber({
       presence: options.localConnectTurn.presence,
       conversations: conversationReader,
@@ -210,6 +224,7 @@ export class EventingLangyConversationAdapter {
     return buildLangyConversationPipeline({
       langyConversationProjectionStore: conversationStore,
       langyConversationTurnProjectionStore: options.langyConversationTurnProjectionStore,
+      langyPullRequestStore: options.langyPullRequestStore,
       langyMessageProjectionStore: options.langyMessageProjectionStore,
       langyAnalyticsEventProjectionStore: options.langyAnalyticsEventProjectionStore,
       ...(options.retention === undefined ? {} : { retention: options.retention }),
@@ -219,6 +234,7 @@ export class EventingLangyConversationAdapter {
         broadcastSubscriber,
         admissionLifecycleSubscriber,
         guidedOnboardingTurnFailedSubscriber,
+        firstMessageSeenSubscriber,
         localConnectTurnSubscriber,
         webPushSubscriber,
       ],

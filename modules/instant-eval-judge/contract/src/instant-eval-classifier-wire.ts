@@ -14,8 +14,9 @@ import type {
   InstantEvalVerdict,
 } from "./instant-eval-judge.api.ts";
 
-/** The levels a score question offers, low to high. */
+/** The levels a score question offers, low to high: its named levels' indexes when it has them. */
 function instantEvalScoreLevels(question: InstantEvalScoreQuestion): number[] {
+  if (question.levels) return question.levels.map((_, index) => index);
   const { min, max } = question.range;
   return Array.from({ length: max - min + 1 }, (_, index) => min + index);
 }
@@ -35,6 +36,7 @@ export function toClassifierQuestions(
 }
 
 function toClassifierQuestion(question: InstantEvalQuestion): ClassifierWireQuestion {
+  assertLevelsMatchRange(question);
   if (question.kind === "boolean") {
     const { criteria } = question;
     return {
@@ -49,7 +51,7 @@ function toClassifierQuestion(question: InstantEvalQuestion): ClassifierWireQues
     return {
       type: "score",
       instructions: question.instructions,
-      criteria: instantEvalScoreLevels(question).map(String),
+      criteria: question.levels ?? instantEvalScoreLevels(question).map(String),
     };
   }
   return {
@@ -57,6 +59,20 @@ function toClassifierQuestion(question: InstantEvalQuestion): ClassifierWireQues
     instructions: question.instructions,
     criteria: categoryCriteria(question),
   };
+}
+
+/**
+ * Named levels are read back as 0-based indexes, so a range other than 0 to the last index
+ * would report a score outside it. Refused before any call rather than read wrong.
+ */
+function assertLevelsMatchRange(question: InstantEvalQuestion): void {
+  if (question.kind !== "score" || !question.levels) return;
+  const { min, max } = question.range;
+  if (min !== 0 || max !== question.levels.length - 1) {
+    throw new Error(
+      `Score question "${question.id}" names ${question.levels.length} levels, so its range must be 0 to ${question.levels.length - 1}, not ${min} to ${max}`,
+    );
+  }
 }
 
 function categoryCriteria(question: InstantEvalCategoryQuestion): Record<string, string> {
@@ -153,13 +169,14 @@ function findWeightedScore({
   const levels = instantEvalScoreLevels(question);
   const { probabilities } = answer;
   if (probabilities) {
+    const keyed = {
+      levels,
+      ...(answer.legend ? { legend: answer.legend } : {}),
+      ...(question.levels ? { names: question.levels } : {}),
+    };
     const weighted: { level: number; probability: number }[] = [];
     for (const [key, probability] of Object.entries(probabilities)) {
-      const [level] = findLevelForKey({
-        key,
-        levels,
-        ...(answer.legend ? { legend: answer.legend } : {}),
-      });
+      const [level] = findLevelForKey({ key, ...keyed });
       if (level !== undefined) weighted.push({ level, probability });
     }
     const weight = weighted.reduce((sum, { probability }) => sum + probability, 0);
@@ -170,6 +187,7 @@ function findWeightedScore({
       return [{ score: mean, spread: Math.sqrt(variance) }];
     }
   }
+  // A bare score is a level position; named levels start at 0, so the offset holds for them too.
   return typeof answer.score === "number" ? [{ score: question.range.min + answer.score }] : [];
 }
 
@@ -182,22 +200,52 @@ function findLevelForKey({
   key,
   levels,
   legend,
+  names,
 }: {
   key: string;
   levels: readonly number[];
   legend?: Readonly<Record<string, string>>;
+  /** The question's named levels, when it sent names in place of numbers. */
+  names?: readonly string[];
 }): number[] {
   const named = legend?.[key];
   if (named !== undefined) {
-    const fromLegend = findOfferedLevel({ value: Number(named), levels });
+    const [value] = names ? findNamedLevelIndex({ said: named, names }) : [Number(named)];
+    const fromLegend = findOfferedLevel({ value, levels });
     if (fromLegend.length > 0) return fromLegend;
   }
-  const position = Number(key);
-  if (Number.isInteger(position)) {
-    const fromPosition = findOfferedLevel({ value: levels[position], levels });
+  // Named levels take digit keys only as positions: `Number("")` is 0, the lowest level's index.
+  const isPosition = names ? /^\d+$/.test(key) : Number.isInteger(Number(key));
+  if (isPosition) {
+    const fromPosition = findOfferedLevel({ value: levels[Number(key)], levels });
     if (fromPosition.length > 0) return fromPosition;
   }
-  return findOfferedLevel({ value: Number(key), levels });
+  const [value] = names ? findNamedLevelIndex({ said: key, names }) : [Number(key)];
+  return findOfferedLevel({ value, levels });
+}
+
+/**
+ * The index of the named level a key or legend entry stands for: the level as sent, or its label,
+ * the part before the first colon ("hard: needs multi-step checking" answers to "hard"), both
+ * compared ignoring case and surrounding space (" Hard" answers to "hard").
+ */
+function findNamedLevelIndex({
+  said,
+  names,
+}: {
+  said: string;
+  names: readonly string[];
+}): number[] {
+  const loose = (text: string) => text.trim().toLowerCase();
+  const heard = loose(said);
+  const exact = names.findIndex((name) => loose(name) === heard);
+  if (exact >= 0) return [exact];
+  // A label stands for a level only when it names one: "risk" fits "risk: low" and "risk: high".
+  const byLabel = names.flatMap((name, at) => {
+    const label = loose(name.split(":", 1)[0] ?? name);
+    return heard === label || heard.startsWith(`${label}:`) ? [at] : [];
+  });
+  return byLabel.length === 1 ? byLabel : [];
 }
 
 function findOfferedLevel({

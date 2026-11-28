@@ -9,30 +9,12 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
-import { z } from "zod";
 
 import { PersonalIngestionKeyService } from "../../features/personal/services/personal-ingestion-key.service.ts";
 import { MemoryGovernanceStore } from "../../repositories/memory/memory.governance.store.ts";
 import { MemoryIngestionTemplateRepository } from "../../repositories/memory/memory.ingestion-template.repository.ts";
-import {
-  type GovernanceMcpServer,
-  GovernanceMcpToolsService,
-} from "../governance-mcp-tools.service.ts";
-
-type RegisteredTool = (args: Record<string, unknown>) => Promise<{
-  content: { type: "text"; text: string }[];
-}>;
-
-function recordingServer() {
-  const tools = new Map<string, RegisteredTool>();
-  const server: GovernanceMcpServer = {
-    tool(name, _description, schema, cb) {
-      tools.set(name, (args) => cb(z.object(schema).parse(args)));
-      return undefined;
-    },
-  };
-  return { server, tools };
-}
+import { GovernanceMcpToolsService } from "../governance-mcp-tools.service.ts";
+import { recordingServer } from "./support/recording-mcp-server.fixture.ts";
 
 function registered({ callerUserId, allowed }: { callerUserId?: string; allowed: boolean }) {
   const asked: string[] = [];

@@ -56,6 +56,15 @@ export class IngestionSourceReadService {
     return this.toDto({ row, live, pullRun: null });
   }
 
+  /** The last pull run's error for a scheduled source; null when it never failed or never ran. */
+  async getLastPullOutcome(input: {
+    id: string;
+    organizationId: string;
+  }): Promise<{ lastError: string | null }> {
+    const run = await this.lastPullRun(input);
+    return { lastError: run?.LastRunError ?? null };
+  }
+
   private async lastPullRun({
     id,
     organizationId,

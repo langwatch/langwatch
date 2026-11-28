@@ -6,6 +6,8 @@
 
 import type {
   InstantEvalClassifierLimits,
+  InstantEvalJudgeCostCeiling,
+  InstantEvalJudgeRouteRequest,
   InstantEvalJudgement,
   InstantEvalPricing,
   InstantEvalQuestion,
@@ -26,6 +28,10 @@ export interface InstantEvalClassifyRequest {
   readonly text: string;
   /** Every question about that text, asked in one request. */
   readonly questions: readonly InstantEvalQuestion[];
+  /** The route a routed judged query sends; only LangWatch's cloud judge reads it (ADR-190). */
+  readonly route?: InstantEvalJudgeRouteRequest;
+  /** That query's spend cap, shared by its every request (ADR-190 decision 13). */
+  readonly costCeiling?: InstantEvalJudgeCostCeiling;
 }
 
 export interface InstantEvalJudgeChannel {

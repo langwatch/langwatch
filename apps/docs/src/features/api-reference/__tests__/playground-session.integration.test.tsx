@@ -51,6 +51,7 @@ document.body.innerHTML = `${renderToStaticMarkup(
 await import("../browser/playground.tsx");
 
 const frame = () => document.querySelector<HTMLIFrameElement>("iframe.docs-session-frame");
+const room = () => document.querySelector<HTMLElement>("[data-docs-session-frame]");
 const manualKey = () => document.querySelector<HTMLElement>("[data-docs-manual-key]");
 /* Every message this page posted to the frame, with the origin it addressed. */
 let toFrame: { message: Record<string, unknown>; targetOrigin: string }[] = [];
@@ -116,6 +117,21 @@ afterEach(async () => {
 });
 
 describe("when I open the playground on an endpoint that takes X-Auth-Token", () => {
+  /** @scenario "Show the frame only once it speaks" */
+  it("takes no room until the frame speaks", async () => {
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
+    fromFrame(
+      { kind: "state", connected: true, project: "Evil" },
+      { origin: "https://evil.example" },
+    );
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
+    await settle();
+    expect(room()?.style.height).toBe("0px");
+    expect(frame()?.style.visibility).toBe("hidden");
+    await connectedIn(null);
+    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(true);
+  });
+
   /** @scenario "Embed the app's session frame where a project key answers" */
   it("embeds the app's session frame for this docs origin", () => {
     const url = new URL(frame()?.src ?? "");
@@ -139,24 +155,12 @@ describe("when I open the playground on an endpoint that takes X-Auth-Token", ()
     expect(fetches).toEqual([]);
   });
 
-  /** @scenario "Show the frame only once it speaks" */
-  it("takes no room until the frame speaks", async () => {
-    await act(async () => document.dispatchEvent(new Event("docs:leaving")));
-    await act(async () => document.getElementById("try-it-button")?.click());
-    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
-    fromFrame(
-      { kind: "state", connected: true, project: "Evil" },
-      { origin: "https://evil.example" },
-    );
-    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(false);
-    await connectedIn(null);
-    expect(frame()?.hasAttribute("data-docs-frame-ready")).toBe(true);
-  });
-
   /** @scenario "Embed the app's session frame where a project key answers" */
-  it("sizes the frame as the frame asks", async () => {
+  it("sizes the frame as the frame asks, and its room to hold it", async () => {
     fromFrame({ kind: "height", height: 131.2 });
     expect(frame()?.style.height).toBe("132px");
+    await settle();
+    expect(room()?.style.height).toBe("148px");
   });
 });
 
@@ -291,12 +295,81 @@ describe("when the reader cancels the request in the frame", () => {
   });
 });
 
-describe("when I leave the page", () => {
-  /** @scenario "End the connection when I leave the page" */
-  it("removes the frame, which ends its connection", async () => {
+describe("when I move to another docs page in the same tab", () => {
+  /** @scenario "Keep the connection when I move to another docs page, not across a reload" */
+  it("keeps the one frame and its connection, outside the swapped content", async () => {
     await connectedIn("Checkout agent");
-    await act(async () => document.dispatchEvent(new Event("docs:leaving")));
+    const kept = frame();
+    expect(kept?.closest("[data-docs-session-host]")?.parentElement).toBe(document.body);
+    expect(room()?.contains(kept ?? null)).toBe(false);
+
+    /* A page with no playground: the content swaps, the frame stays, hidden and connected. */
+    const layout = document.createElement("main");
+    await act(async () => {
+      document.dispatchEvent(new Event("docs:leaving"));
+      document.body
+        .querySelectorAll(":scope > :not([data-docs-session-host])")
+        .forEach((node) => node.remove());
+      document.body.prepend(layout);
+      document.dispatchEvent(new Event("docs:navigated"));
+    });
     await settle();
-    expect(frame()).toBeNull();
+    expect(frame()).toBe(kept);
+    expect(frame()?.style.visibility).toBe("hidden");
+    expect(frameConnection()).toEqual({ project: "Checkout agent" });
+
+    /* The next page leaves room for it again: the same frame lies over it, still connected. */
+    const decoy = document.createElement("div");
+    decoy.dataset.docsSessionFrame = "";
+    decoy.getBoundingClientRect = () => new DOMRect(0, 0, 900, 900);
+    const playground = document.createElement("div");
+    playground.dataset.docsPlayground = "";
+    const nextRoom = document.createElement("div");
+    nextRoom.dataset.docsSessionFrame = "";
+    /* jsdom lays nothing out: the room says where a browser would have drawn it. */
+    const drawn = new DOMRect(24, 300, 480, 148);
+    nextRoom.getBoundingClientRect = () => drawn;
+    playground.append(nextRoom);
+    /* Content placed ahead of the playground claims no room: only the playground's counts. */
+    layout.append(decoy, playground);
+    toFrame = [];
+    await act(async () => document.dispatchEvent(new Event("docs:navigated")));
+    await settle();
+    /* Shown again, the frame restarts the press delay of any confirmation it holds. */
+    expect(toFrame.map(({ message }) => message.kind)).toContain("shown");
+    expect(document.querySelectorAll("iframe.docs-session-frame")).toHaveLength(1);
+    expect(frame()).toBe(kept);
+    expect(nextRoom.style.height).not.toBe("0px");
+    expect(frame()?.style.visibility).toBe("");
+    expect([frame()?.style.top, frame()?.style.left, frame()?.style.width]).toEqual([
+      "308px",
+      "24px",
+      "480px",
+    ]);
+    expect(decoy.style.height).toBe("");
+    expect(frameConnection()).toEqual({ project: "Checkout agent" });
+  });
+});
+
+/* After the move above: the frame is held outside the content, so it still answers. */
+describe("when I leave a page while a request waits in the frame", () => {
+  /** @scenario "Leaving a page cancels the requests still waiting in the frame" */
+  it("asks the frame to cancel it and answers that it was not sent", async () => {
+    await connectedIn("Checkout agent");
+    const answer = sendThroughFrame({
+      request: { method: "POST", path: "/api/dataset", headers: {}, body: "{}" },
+      signal: new AbortController().signal,
+    });
+    const [{ message }] = sends() as [(typeof toFrame)[number]];
+
+    document.dispatchEvent(new Event("docs:leaving"));
+
+    await expect(answer).resolves.toEqual({ kind: "failed", reason: "cancelled" });
+    expect(toFrame.at(-1)?.message).toMatchObject({
+      type: "langwatch:docs-frame",
+      version: 1,
+      kind: "cancel",
+      id: message.id,
+    });
   });
 });

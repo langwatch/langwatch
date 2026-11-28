@@ -29,6 +29,8 @@ export type UiCreateTeamDrawerProps = {
 export type UiInviteMemberDrawerProps = {
   open?: boolean;
   initialEmail?: string;
+  /** Opens with this choice picked; `BILLING_ONLY` invites the person who pays (ADR-205). */
+  initialSeat?: "BILLING_ONLY";
 };
 
 /** What a caller hands the person drawer: which member to show. */

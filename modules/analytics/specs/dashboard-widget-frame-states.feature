@@ -45,7 +45,8 @@ Feature: A dashboard widget frame shows what its queries report
       Given a From LangWatch widget named "Cost per trace" on a read-only board
       When its query fails with "query_memory_exceeded" or "query_timeout"
       Then the card says "Couldn't load"
-      And it says "This widget hit a LangWatch limit in the selected period. This is not a problem with your data."
+      And it says "This widget hit a LangWatch limit in the selected period. This is not a problem with your data." on memory
+      And it says "This query took longer than 60 s, the most a widget may take. This is not a problem with your data." on time
       And it offers Retry and no edit action
 
     @integration
@@ -59,7 +60,7 @@ Feature: A dashboard widget frame shows what its queries report
     Scenario: An editable widget that fails on time says its query ran too long
       Given a stored widget on a board the reader can edit
       When its query fails with "query_timeout"
-      Then the card says "The query ran past the time a widget may take."
+      Then the card says "This query took longer than 60 s, the most a widget may take."
 
     @integration
     Scenario: A reader who cannot edit is told to ask someone who can
@@ -72,7 +73,7 @@ Feature: A dashboard widget frame shows what its queries report
     Scenario: A failed limit card carries short words beside the full words
       Given a stored widget that fails on a limit
       When the card shows the failure
-      Then it holds "Hit the memory limit." or "Hit the time limit." hidden from screen readers
+      Then it holds "Hit the memory limit." or "Took longer than 60 s." hidden from screen readers
       And a reader who cannot edit also has "Ask someone to edit it." in the same way
       And the full message and note stay in the title and are what a screen reader reads
 
@@ -162,7 +163,7 @@ Feature: A dashboard widget frame shows what its queries report
     Scenario: A widget that loads for long says it is still loading
       Given a widget on a board
       When none of its queries has answered after 5 seconds
-      Then the skeleton says "Still loading…"
+      Then the skeleton says "Slow query, still running…"
 
     @integration
     Scenario: A refresh keeps the chart, with no skeleton
@@ -393,3 +394,31 @@ Feature: A dashboard widget frame shows what its queries report
       Given a board of three widgets
       When two of them fail for another reason, or one fails on a limit and one for another reason
       Then no warning shows above the board
+
+  Rule: A widget bigger than its card shows that there is more
+
+    @unit
+    Scenario: The frame scrolls a widget taller or wider than its card
+      Given a widget whose content is taller or wider than its card
+      When the board draws it
+      Then the frame scrolls inside the card instead of cutting the content off
+
+    @unit
+    Scenario: The frame's scrollbar stays visible
+      Given a widget that scrolls inside its card
+      When the reader's system hides scrollbars until they scroll, as macOS does
+      Then the frame still draws a visible scrollbar
+
+    @unit
+    Scenario: A shadow marks each edge with more content behind it
+      Given a widget that scrolls inside its card
+      When there is content past an edge of the card
+      Then that edge shows a shadow, and an edge with nothing past it shows none
+
+  Rule: Ask Langy shows the widget at its own size
+
+    @unit
+    Scenario: A short widget stays short beside Langy
+      Given a widget whose card is short, such as a row of numbers
+      When the member asks Langy about it
+      Then the widget beside Langy grows with its card, up to a cap, and trails no empty gap

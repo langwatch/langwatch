@@ -29,6 +29,7 @@ import type {
   ExecuteEvaluationCommand,
   UpsertEvaluationRunCommand,
 } from "./evaluation.commands.ts";
+import type { EvaluatorOutcomeCount, EvaluatorOutcomeCountQuery } from "./evaluation.ops.ts";
 import type {
   MonitorPerformanceForProjectInput,
   MonitorPerformanceQuery,
@@ -36,10 +37,12 @@ import type {
 } from "./evaluation.performance.ts";
 import type {
   EvaluationInputsQuery,
+  EvaluationOutcomesQuery,
   EvaluationRunLookup,
   EvaluationRunsByTraceQuery,
 } from "./evaluation.queries.ts";
 import type {
+  EvaluationOutcomePage,
   EvaluationRunOutcome,
   EvaluationWarmup,
   EvaluatorCatalogue,
@@ -67,6 +70,8 @@ export interface EvaluationApi {
   getRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData>;
   findRunByEvaluationId(input: EvaluationRunLookup): Promise<EvaluationRunData | null>;
   findRunsByTraceId(input: EvaluationRunsByTraceQuery): Promise<EvaluationRunData[]>;
+  /** A page of one project's finished evaluations on a trace, oldest first; for backfills. */
+  listEvaluationOutcomes(input: EvaluationOutcomesQuery): Promise<EvaluationOutcomePage>;
   /** Read through the proof; null when none are stored or the viewer may not read content. */
   findInputs(
     input: EvaluationInputsQuery & { authorization: Authorization; userId: string | null },
@@ -76,6 +81,8 @@ export interface EvaluationApi {
   findMonitorPerformance(
     input: MonitorPerformanceForProjectInput,
   ): Promise<OnlineEvaluationPerformance[]>;
+  /** Online evaluator runs scheduled in `[since, until)` per project: counts and codes only. */
+  countEvaluatorOutcomes(input: EvaluatorOutcomeCountQuery): Promise<EvaluatorOutcomeCount[]>;
 
   // The public evaluation doors: the evaluate paths reach the same capability
   // every other caller does.

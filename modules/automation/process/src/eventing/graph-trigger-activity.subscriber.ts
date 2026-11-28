@@ -2,6 +2,7 @@ import type {
   AutomationEvaluationActivityContext,
   AutomationEvaluationSubscriberEvent,
 } from "@langwatch/automation-contract";
+import { isHandledTransientRefusal } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
@@ -37,14 +38,17 @@ export async function handleGraphTriggerActivity(
       });
     } catch (error) {
       failures++;
-      logger.error(
-        {
-          projectId,
-          triggerId: trigger.id,
-          error: error instanceof Error ? error.message : String(error),
-        },
-        "graphTriggerActivity: evaluation failed",
-      );
+      const fields = {
+        projectId,
+        triggerId: trigger.id,
+        error: error instanceof Error ? error.message : String(error),
+      };
+      // A transient refusal (ClickHouse busy, a store mid-restart) is retried by redelivery.
+      if (isHandledTransientRefusal(error)) {
+        logger.warn(fields, "graphTriggerActivity: evaluation refused for now");
+      } else {
+        logger.error(fields, "graphTriggerActivity: evaluation failed");
+      }
     }
   }
   // Throw AFTER the loop so one trigger's failure doesn't starve the

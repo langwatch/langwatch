@@ -1,3 +1,5 @@
+import type { LangyAsk } from "@langwatch/langy-client";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 /**
  * @vitest-environment jsdom
  * Presence comes off `getScopeGraph`, the first-trace flag off `getHasFirstMessage`. Specs:
@@ -7,7 +9,7 @@ import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import "@testing-library/jest-dom/vitest";
 
-const { getScopeGraph, hasFirstMessage, reading, row } = vi.hoisted(() => {
+const { getScopeGraph, hasFirstMessage, reading, row, lentLangy, feedback } = vi.hoisted(() => {
   const projectRow = { presenceEnabled: true };
   const organizationRow = { presenceEnabled: true };
   const graph = () => [
@@ -27,8 +29,14 @@ const { getScopeGraph, hasFirstMessage, reading, row } = vi.hoisted(() => {
       useQuery: vi.fn(),
     },
     reading: { actor: { id: "user_1" } } as { actor: { id: string } | null },
+    feedback: { succeeded: vi.fn(), warned: vi.fn(), informed: vi.fn(), failed: vi.fn() },
+    lentLangy: { load: (): Promise<LangyAsk> => Promise.reject(new Error("unset")) },
   };
 });
+
+vi.mock("@langwatch/browser-host/lent", () => ({
+  useLentOperations: () => () => lentLangy.load(),
+}));
 
 vi.mock("../trace-api.ts", () => ({
   traceApi: {
@@ -58,13 +66,13 @@ vi.mock("@langwatch/browser-host/capabilities", async (importOriginal) => {
       session,
       navigation: { navigate: vi.fn(), replace: vi.fn() },
       route: { reading: () => ({ params: {}, query: {} }), setQuery: vi.fn() },
-      feedback: { succeeded: vi.fn(), warned: vi.fn(), informed: vi.fn(), failed: vi.fn() },
+      feedback,
     }),
   };
 });
 
 import TraceHostMount from "../trace-host-mount.tsx";
-import { useTraceHost } from "../trace-host.ts";
+import { type TraceLangyAskRequest, useTraceHost } from "../trace-host.ts";
 
 function ProjectReading() {
   const host = useTraceHost();
@@ -160,6 +168,52 @@ describe("TraceHostMount", () => {
 
       expect(screen.getByLabelText("organization presence")).toHaveTextContent("false");
       expect(screen.getByLabelText("project presence")).toHaveTextContent("false");
+    });
+  });
+
+  describe("when the explorer asks Langy about the traces", () => {
+    const REQUEST: TraceLangyAskRequest = {
+      question: "why are these failing?",
+      context: [{ kind: "filter", ref: "@status:error", label: "filtered: @status:error" }],
+    };
+    function Asker() {
+      const host = useTraceHost();
+      return (
+        <button type="button" onClick={() => host.askLangy(REQUEST)}>
+          ask
+        </button>
+      );
+    }
+    function renderAsker() {
+      render(
+        <TraceHostMount>
+          <Asker />
+        </TraceHostMount>,
+      );
+    }
+
+    /** @scenario "Enter hands the question and the search to the panel" */
+    it("hands the question to the Langy panel that Langy lends", async () => {
+      const ask = vi.fn();
+      lentLangy.load = () => Promise.resolve(createApiFixture<LangyAsk>({ ask }, "LangyAsk"));
+      renderAsker();
+
+      screen.getByRole("button", { name: "ask" }).click();
+
+      await vi.waitFor(() => expect(ask).toHaveBeenCalledWith(REQUEST));
+    });
+
+    it("reports a Langy that fails to load instead of dropping the question", async () => {
+      lentLangy.load = () => Promise.reject(new Error("chunk failed"));
+      renderAsker();
+
+      screen.getByRole("button", { name: "ask" }).click();
+
+      await vi.waitFor(() =>
+        expect(feedback.failed).toHaveBeenCalledWith(
+          expect.objectContaining({ fallbackTitle: "Couldn't open Langy" }),
+        ),
+      );
     });
   });
 });

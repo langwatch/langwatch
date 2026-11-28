@@ -1,17 +1,9 @@
-import { EVALUATION_EVENT_TYPES } from "@langwatch/evaluation-contract";
 import type { AppendStore, Event, MapProjectionDefinition } from "@langwatch/eventing";
-import { SIMULATION_RUN_EVENT_TYPES } from "@langwatch/scenario-contract";
-import { SPAN_RECEIVED_EVENT_TYPE } from "@langwatch/trace-contract";
+import { METRIC_DATA_POINT_RECEIVED_EVENT_TYPE } from "@langwatch/metric-contract";
+import { toEpochMs } from "@langwatch/time";
 
 import type { BillableEventRecord } from "../repositories/billable-events-meter.repository.ts";
-
-/**
- * Experiment-run event types as literals: their constant lives in experiment's process
- * half, which a module may not import. Wire values, so they never change without a migration.
- */
-const EXPERIMENT_RUN_STARTED_EVENT_TYPE = "lw.experiment_run.started";
-const EXPERIMENT_RUN_EVALUATOR_RESULT_EVENT_TYPE = "lw.experiment_run.evaluator_result";
-const EXPERIMENT_RUN_TARGET_RESULT_EVENT_TYPE = "lw.experiment_run.target_result";
+import { BILLABLE_EVENT_TYPES, metricSeriesHourKey } from "../rules/billable-event.rules.ts";
 
 /**
  * Frozen: the name is half of the routing key `global:handler:orgBillableEventsMeter`, so
@@ -37,30 +29,28 @@ export class BillableEventsMeterProjection {
   }
 
   /**
-   * The producer's `idempotencyKey` where set (an evaluation's is
+   * A metric point's key is its series and receive hour, so a series bills once an hour.
+   * Otherwise the producer's `idempotencyKey` where set (an evaluation's is
    * `${tenantId}:${evaluationId}:reported`, billed once however often reported), else `event.id`.
    */
   static deduplicationKey(event: Event): string {
+    if (event.type === METRIC_DATA_POINT_RECEIVED_EVENT_TYPE) {
+      const seriesHour = metricSeriesHourKey({
+        tenantId: String(event.tenantId),
+        data: event.data,
+        receivedAtMs: toEpochMs(event.createdAt),
+      });
+      if (seriesHour.outcome === "keyed") return seriesHour.key;
+    }
     return event.idempotencyKey ?? event.id;
   }
 
   build(): MapProjectionDefinition<BillableEventRecord, Event> {
     return {
       name: BILLABLE_EVENTS_METER_PROJECTION_NAME,
-      eventTypes: [
-        SPAN_RECEIVED_EVENT_TYPE,
-
-        // `reported` is the only evaluation event production emits; `scheduled` and
-        // `started` occur only in test presets (issue #5124) and are not subscribed.
-        EVALUATION_EVENT_TYPES.REPORTED,
-
-        EXPERIMENT_RUN_STARTED_EVENT_TYPE,
-        EXPERIMENT_RUN_EVALUATOR_RESULT_EVENT_TYPE,
-        EXPERIMENT_RUN_TARGET_RESULT_EVENT_TYPE,
-
-        SIMULATION_RUN_EVENT_TYPES.STARTED,
-        SIMULATION_RUN_EVENT_TYPES.MESSAGE_SNAPSHOT,
-      ],
+      // `lw.evaluation.reported` is the only evaluation event production emits; `scheduled`
+      // and `started` occur only in test presets (issue #5124) and are not subscribed.
+      eventTypes: [...BILLABLE_EVENT_TYPES],
 
       options: {
         // Wrapped rather than passed bare: a bare static-method reference

@@ -1,12 +1,12 @@
-Feature: Connect your agent from the /me usage home
-  As a /me user whose account already has traces
+Feature: Connect your agent from the /coding-agents usage home
+  As a /coding-agents user whose account already has traces
   I want a "Connect your agent" button on the My Usage home
   So that Langy or my own coding agent can explore where my usage actually went
 
   # Two different jobs, two different controls. The empty-state control on the
   # traces integrate pane is SETUP and keeps the shared "Setup via Agent"
   # label on every surface, personal projects included. "Connect your agent"
-  # is the /me home's EXPLORATION control: it appears only once usage exists
+  # is the /coding-agents home's EXPLORATION control: it appears only once usage exists
   # and points an agent at the reader's own traces and spend.
   #
   # The appearance gate is Project.firstMessage on the personal project, the
@@ -15,23 +15,23 @@ Feature: Connect your agent from the /me usage home
   #
   # The menu mirrors the SetupWithAgent anatomy: Langy first (permission
   # gated), a copy-a-prompt route for the reader's own coding agent, then the
-  # docs guide. The copied prompt leans on the /me credentials work
+  # docs guide. The copied prompt leans on the /coding-agents credentials work
   # (specs/ai-governance/cli-onboarding/me-credentials.feature): the langwatch
   # CLI resolves the device login by itself, so a fresh coding-agent session
   # can paste the prompt and immediately read the user's own usage with no
   # API key and no env vars.
 
   Background:
-    Given a signed-in user on the /me usage home
+    Given a signed-in user on the /coding-agents usage home
 
   @bdd @personal-portal @connect-your-agent @unit
-  Scenario: the /me home hides Connect your agent before the first trace
+  Scenario: the /coding-agents home hides Connect your agent before the first trace
     Given the personal project has never received a trace
     When the My Usage home renders
     Then no "Connect your agent" button is shown
 
   @bdd @personal-portal @connect-your-agent @unit
-  Scenario: the /me home shows Connect your agent once the personal project has traces
+  Scenario: the /coding-agents home shows Connect your agent once the personal project has traces
     Given the personal project has received its first trace
     When the My Usage home renders
     Then the My Usage header carries a "Connect your agent" menu button

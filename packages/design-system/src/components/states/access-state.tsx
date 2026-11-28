@@ -9,6 +9,11 @@ export type AccessStateProps = {
   actions?: ReactNode;
   children?: ReactNode;
   compact?: boolean;
+  /** Inside a card, popover or dialog that already draws the surface: no box of its own, the
+   * icon beside the words, so the lock starts on the host's content edge. Implies `compact`. */
+  inset?: boolean;
+  /** A whole page's only content, often with an illustration: everything on the centre axis. */
+  centered?: boolean;
   "data-testid"?: string;
 };
 
@@ -19,8 +24,33 @@ export function AccessState({
   actions,
   children,
   compact = false,
+  inset = false,
+  centered = false,
   "data-testid": testId,
 }: AccessStateProps) {
+  if (inset) {
+    return (
+      <HStack width="full" gap={3} align="start" data-testid={testId} data-inset="">
+        <AccessStateIcon kind={kind} compact />
+        <Stack gap={3} minWidth={0} flex={1} paddingTop={0.5}>
+          <Stack gap={1} maxWidth="64ch">
+            <Heading as="h2" size="sm">
+              {title}
+            </Heading>
+            <Text color="fg.muted" fontSize="sm" lineHeight="tall">
+              {description}
+            </Text>
+          </Stack>
+          {children && <Box>{children}</Box>}
+          {actions && (
+            <HStack gap={2} flexWrap="wrap">
+              {actions}
+            </HStack>
+          )}
+        </Stack>
+      </HStack>
+    );
+  }
   return (
     <Stack
       width="full"
@@ -30,9 +60,12 @@ export function AccessState({
       borderColor="border.muted"
       borderRadius="xl"
       bg="bg.panel"
+      align={centered ? "center" : undefined}
+      textAlign={centered ? "center" : undefined}
       data-testid={testId}
+      data-centered={centered ? "" : undefined}
     >
-      <Stack gap={4} align="start">
+      <Stack gap={4} align={centered ? "center" : "start"}>
         <AccessStateIcon kind={kind} compact={compact} />
         <Stack gap={2} maxWidth="64ch">
           <Heading as="h2" size={compact ? "sm" : "xl"}>
@@ -43,9 +76,16 @@ export function AccessState({
           </Text>
         </Stack>
       </Stack>
-      {children && <Box>{children}</Box>}
+      {children &&
+        (centered ? (
+          <Stack width="full" align="center">
+            {children}
+          </Stack>
+        ) : (
+          <Box>{children}</Box>
+        ))}
       {actions && (
-        <HStack gap={3} flexWrap="wrap">
+        <HStack gap={3} flexWrap="wrap" justify={centered ? "center" : undefined}>
           {actions}
         </HStack>
       )}

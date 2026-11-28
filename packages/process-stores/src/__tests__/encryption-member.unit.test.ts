@@ -54,6 +54,7 @@ const storesConfig: StoresConfig = {
   queueTenantCap: undefined,
   queueGlobalBudget: undefined,
   clickhouseStatementLaneReserveShare: undefined,
+  clickhousePasswordFile: undefined,
   clickhousePool: {
     override: undefined,
     replicas: undefined,
@@ -65,6 +66,7 @@ const storesConfig: StoresConfig = {
   redis: { dbIndex: undefined },
   objectStorage: {
     backend: "file",
+    uploads: undefined,
     localRoot: "/tmp/langwatch-encryption-member-test",
     s3: { bucket: undefined, endpoint: undefined, region: undefined },
     azure: {

@@ -20,6 +20,11 @@ export {
   type ScriptedStatements,
 } from "./idIndexedClientDouble.ts";
 export { type VendorStatements, vendorQueryClient } from "./vendorQueryClient.ts";
+export {
+  cloneClickHouseDatabase,
+  cloneClickHouseTemplate,
+  TEMPLATE_READY_TABLE,
+} from "./clickhouse-test-templates.ts";
 
 /**
  * The ClickHouse image every container-backed test starts, here and in
@@ -63,6 +68,26 @@ export const TEST_CLICKHOUSE_TUNING = {
     <asynchronous_metric_log remove="1"/>
     <processors_profile_log remove="1"/>
     <query_metric_log remove="1"/>
+    <custom_settings_prefixes>SQL_,custom_</custom_settings_prefixes>
+</clickhouse>
+`,
+} as const;
+
+/**
+ * The container user's grants as the shipped server gives its admin (haven's clickhouse.go,
+ * infra/clickhouse-serverless): LangWatchQL provisioning creates users, row policies and a
+ * named collection. `test` is the user @testcontainers/clickhouse signs in as.
+ */
+export const TEST_CLICKHOUSE_ACCESS_MANAGEMENT = {
+  target: "/etc/clickhouse-server/users.d/zz-lwql-access-management.xml",
+  content: `<clickhouse>
+    <users>
+        <test>
+            <access_management>1</access_management>
+            <named_collection_control>1</named_collection_control>
+            <show_named_collections>1</show_named_collections>
+        </test>
+    </users>
 </clickhouse>
 `,
 } as const;
@@ -96,7 +121,7 @@ export function testClickHouseProfilePins(): {
  * the hash — so bumping this value is what forces new containers when tuning changes.
  */
 export const TEST_CLICKHOUSE_TUNING_LABEL = {
-  "langwatch.test.clickhouse-tuning": "v1",
+  "langwatch.test.clickhouse-tuning": "v2",
 };
 
 export interface TestClickHouseEndpoint {
@@ -229,7 +254,11 @@ async function startContainerEndpoints({
           ...pins.label,
         })
         .withReuse()
-        .withCopyContentToContainer([TEST_CLICKHOUSE_TUNING, pins.file])
+        .withCopyContentToContainer([
+          TEST_CLICKHOUSE_TUNING,
+          TEST_CLICKHOUSE_ACCESS_MANAGEMENT,
+          pins.file,
+        ])
         .withStartupTimeout(120_000)
         .start(),
     ]),

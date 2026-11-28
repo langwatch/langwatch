@@ -4,6 +4,7 @@
  * first real trace. `isRealFirstIngest` guards a re-delivered first trace.
  */
 
+import { isGovernanceOriginTrace } from "@langwatch/enterprise-governance-contract";
 import type { TriggerContext } from "@langwatch/eventing";
 import { createLogger } from "@langwatch/observability";
 import type {
@@ -19,7 +20,7 @@ import {
 
 import type { TraceProjectMilestonesService } from "../services/trace-project-milestones.service.ts";
 
-/** The three things the projectMetadata subscriber does to a project. Narrowed
+/** The four things the projectMetadata subscriber does to a project. Narrowed
  * from the full ProjectApi so background processes can compose just this. */
 interface TraceProjectMetadata {
   findById(id: string): Promise<Project | null>;
@@ -29,6 +30,11 @@ interface TraceProjectMetadata {
    * identifies the same person with in the browser.
    */
   resolveOrgAdmin(projectId: string): Promise<OrgAdminResolution>;
+  /**
+   * The project's organization, undefined when it has none. Unlike
+   * `resolveOrgAdmin`, a failed read throws instead of answering "none".
+   */
+  findOrganizationId(projectId: string): Promise<string | undefined>;
 }
 
 const logger = createLogger("langwatch:trace-processing:project-metadata");
@@ -41,13 +47,16 @@ export const PROJECT_METADATA_WINDOW_MS = 3_000;
 
 export interface ProjectMetadataSubscriberDeps {
   /**
-   * Narrowed from the whole `ProjectApi` to the three capabilities this
+   * Narrowed from the whole `ProjectApi` to the four capabilities this
    * subscriber uses. The published service satisfies the port structurally, so
    * every existing caller passes what it already passed.
    */
   projects: TraceProjectMetadata;
   /** Records the first and later traces as trace's own events (§9); a failure is only logged. */
-  milestones: Pick<TraceProjectMilestonesService, "recordFirstTrace" | "recordTraceReceived">;
+  milestones: Pick<
+    TraceProjectMilestonesService,
+    "recordFirstTrace" | "recordTraceReceived" | "recordProjectTraced"
+  >;
 }
 
 /**
@@ -60,14 +69,15 @@ async function trackFirstTraceIntegrated({
   source,
   tenantId,
   attrs,
+  admin,
 }: {
   deps: ProjectMetadataSubscriberDeps;
   source: FirstTraceSource;
   tenantId: string;
   attrs: Record<string, string>;
+  admin: OrgAdminResolution;
 }): Promise<void> {
-  const { userId, organizationCreatedAt, onboardingVariant } =
-    await deps.projects.resolveOrgAdmin(tenantId);
+  const { userId, organizationId, organizationCreatedAt, onboardingVariant } = admin;
   if (!userId) return;
 
   try {
@@ -80,9 +90,37 @@ async function trackFirstTraceIntegrated({
       occurredAt: source.occurredAt,
       organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
       onboardingVariant,
+      ...(organizationId && { organizationId }),
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record the first trace (non-fatal)");
+  }
+}
+
+/**
+ * The project's first real trace with its organization, admin or not; non-fatal. A failed
+ * organization read records nothing: the fact is keyed per project, so a null would stand for
+ * good, and a redelivery finds the first message set and never comes back here.
+ */
+async function trackProjectTraced({
+  deps,
+  source,
+  tenantId,
+}: {
+  deps: ProjectMetadataSubscriberDeps;
+  source: FirstTraceSource;
+  tenantId: string;
+}): Promise<void> {
+  try {
+    const organizationId = await deps.projects.findOrganizationId(tenantId);
+    await deps.milestones.recordProjectTraced({
+      tenantId,
+      projectId: tenantId,
+      organizationId: organizationId ?? null,
+      occurredAt: source.occurredAt,
+    });
+  } catch (error) {
+    logger.error({ tenantId, error }, "Failed to record the project as traced (non-fatal)");
   }
 }
 
@@ -100,7 +138,7 @@ async function trackTraceReceived({
   tenantId: string;
 }): Promise<void> {
   try {
-    const { userId, organizationCreatedAt, onboardingVariant } =
+    const { userId, organizationId, organizationCreatedAt, onboardingVariant } =
       await deps.projects.resolveOrgAdmin(tenantId);
     if (!userId) return;
 
@@ -111,6 +149,7 @@ async function trackTraceReceived({
       occurredAt: source.occurredAt,
       organizationCreatedAt: organizationCreatedAt?.epochMilliseconds,
       onboardingVariant,
+      ...(organizationId && { organizationId }),
     });
   } catch (error) {
     logger.error({ tenantId, error }, "Failed to record a later trace (non-fatal)");
@@ -191,7 +230,9 @@ async function markFirstMessage({
   // Fired after the metadata write commits, so a failed write retries
   // the event on the project's next trace instead of dropping it.
   if (!project.firstMessage) {
-    await trackFirstTraceIntegrated({ deps, source, tenantId, attrs });
+    await trackProjectTraced({ deps, source, tenantId });
+    const admin = await deps.projects.resolveOrgAdmin(tenantId);
+    await trackFirstTraceIntegrated({ deps, source, tenantId, attrs, admin });
   }
 }
 
@@ -201,12 +242,17 @@ export function projectMetadataGroupKey(event: { tenantId: string }): string {
   return `project-metadata:${event.tenantId}`;
 }
 
-// Skip sample traces from empty-state onboarding and Langy's own turns:
-// neither should flip the integrated flag, dismiss the onboarding card,
-// or reach a CRM milestone as the customer's own first trace.
+// Skip sample traces from empty-state onboarding, Langy's own turns and
+// governance ingest (it lands in the organization's hidden governance
+// project): none should flip the integrated flag, dismiss the onboarding
+// card, or reach a CRM milestone as the customer's own first trace.
 export function isRealFirstIngest(foldState: TraceSummaryData): boolean {
   const origin = foldState.attributes?.["langwatch.origin"];
-  return origin !== "sample" && origin !== LANGY_TRACE_ORIGIN;
+  return (
+    origin !== "sample" &&
+    origin !== LANGY_TRACE_ORIGIN &&
+    !isGovernanceOriginTrace(foldState.attributes)
+  );
 }
 
 // Long dedup TTL ensures at most one database write per project window

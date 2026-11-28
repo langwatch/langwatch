@@ -118,7 +118,7 @@ classify(input: { projectId: string; text: string; questions: readonly InstantEv
 
 #### `judgeQuery`
 
-One synchronous query's judged columns, their texts in place (Alex, 2026-10-06, "Judge cycle"): holds the query token budget's price, judges, records the spend once, then drops the hold. Refuses an exhausted budget or an oversized query before anything is judged.
+One synchronous query's judged columns, texts in place: holds its price (the token budget at the hold rate, or a routed query's cost ceiling at the markup, ADR-190 d13), judges, records the spend once, then drops the hold. Refuses an exhausted budget or oversized query first.
 
 ```typescript
 judgeQuery(input: InstantEvalQueryJudgingInput): Promise<InstantEvalQueryJudging>;
@@ -184,7 +184,7 @@ type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant
 
 Estimate a run
 
-Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:85`.
+Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:86`.
 
 Answers at `/api/v1/instant-evals/estimate`.
 
@@ -206,7 +206,7 @@ interface Response {
 
 List the project's runs, newest first. The project comes from the credential, so a run of another project is never listed. Page through them with before, which takes the created time of the oldest run the previous page carried.
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:105`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:106`.
 
 Answers at `/api/v1/instant-evals`.
 
@@ -224,7 +224,7 @@ type Response = z.infer<typeof instantEvalRunListSchema>; // ../contract/src/ins
 
 Read one run: its status, how many rows it found and judged, how many matched in total and per question, what it could not answer, and the tokens, cost and price the judging came to. An id this project does not hold answers 404 instant_eval_not_found.
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:122`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:123`.
 
 Answers at `/api/v1/instant-evals/:id`.
 
@@ -240,7 +240,7 @@ type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant
 
 Cancel a run
 
-Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:133`.
+Permission `analytics:manage`. Declared at `src/transport/instant-eval.rest.ts:134`.
 
 Answers at `/api/v1/instant-evals/:id/cancel`.
 
@@ -255,7 +255,7 @@ type Response = z.infer<typeof instantEvalRunSchema>; // ../contract/src/instant
 
 Read a run's results
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:157`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:158`.
 
 Answers at `/api/v1/instant-evals/:id/results`.
 
@@ -276,7 +276,7 @@ type Response = z.infer<typeof instantEvalResultsSchema>; // ../contract/src/ins
 
 Sample a run
 
-Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:180`.
+Permission `analytics:view`. Declared at `src/transport/instant-eval.rest.ts:183`.
 
 Answers at `/api/v1/instant-evals/:id/sample`.
 
@@ -377,18 +377,19 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ### Pipeline `instant_eval_processing` (aggregate `instant_eval_run`)
 
-Declared at `src/eventing/instant-eval-processing.pipeline.ts:61`. Events: `instantEvalRequestedEventSchema`, `instantEvalPlannedEventSchema`, `instantEvalPageJudgedEventSchema`, `instantEvalCancelRequestedEventSchema`, `instantEvalFinishedEventSchema`, `instantEvalLatePageBilledEventSchema`.
+Declared at `src/eventing/instant-eval-processing.pipeline.ts:62`. Events: `instantEvalRequestedEventSchema`, `instantEvalPlannedEventSchema`, `instantEvalPageJudgedEventSchema`, `instantEvalCancelRequestedEventSchema`, `instantEvalFinishedEventSchema`, `instantEvalLatePageBilledEventSchema`, `instantEvalPageFailedEventSchema`.
 
 | Kind                | Name                                                                    | Handles                                                        | Declared at                                           |
 | ------------------- | ----------------------------------------------------------------------- | -------------------------------------------------------------- | ----------------------------------------------------- |
-| command             | `requestRun`                                                            | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:76` |
-| command             | `recordPlanned`                                                         | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:77` |
-| command             | `recordPageJudged`                                                      | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:78` |
-| command             | `requestCancel`                                                         | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:84` |
-| command             | `recordFinished`                                                        | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:85` |
-| command             | `recordLatePageBilled`                                                  | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:86` |
-| process manager     | `instantEval`                                                           | intents `billLatePage`, `finish`, `judgePage`, `plan` (outbox) | `src/eventing/instant-eval-processing.pipeline.ts:87` |
-| Postgres projection | `≈ createInstantEvalRunProjection({ store: deps.instantEvalRunStore })` | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:75` |
+| command             | `requestRun`                                                            | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:78` |
+| command             | `recordPlanned`                                                         | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:79` |
+| command             | `recordPageJudged`                                                      | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:80` |
+| command             | `requestCancel`                                                         | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:86` |
+| command             | `recordFinished`                                                        | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:87` |
+| command             | `recordLatePageBilled`                                                  | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:88` |
+| command             | `recordPageFailed`                                                      | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:89` |
+| process manager     | `instantEval`                                                           | intents `billLatePage`, `finish`, `judgePage`, `plan` (outbox) | `src/eventing/instant-eval-processing.pipeline.ts:90` |
+| Postgres projection | `≈ createInstantEvalRunProjection({ store: deps.instantEvalRunStore })` | –                                                              | `src/eventing/instant-eval-processing.pipeline.ts:77` |
 
 ## Configuration
 

@@ -172,10 +172,57 @@ Feature: Unified Audit Log
     Given a row whose actorUserId (or metadata.impersonatorId) names an operator other than its user
     Then the entry reads "<operator> as <user>", marked as an impersonation
 
+  @integration
+  Scenario: LangWatch staff access reads as LangWatch Support with its approver and reason
+    Given a row recorded as "staffAccess.write" acting as "LangWatch Support" with a reason, approved by an operator
+    Then the entry reads "LangWatch Support" as its actor with "Approved by <email>"
+    And its detail shows the approver and the reason
+
+  @unit
+  Scenario: A revoked or expired staff access row names its approver, not whoever ended it
+    Given a "staffAccess.revoked" row Olivia approved and Pedro revoked, and a "staffAccess.expired" row with no actor
+    Then each reads "Approved by" Olivia from the row's metadata
+    And the revoked row shows "Revoked by" Pedro
+
+  @unit
+  Scenario: An exported report keeps the LangWatch staff identity
+    Given a row LangWatch staff wrote
+    Then the exported row carries the staff principal, the approver, the revoker and the reason
+
+  @integration
+  Scenario: An operator's impersonation reads in the customer's audit log
+    Given a row recorded as "admin/impersonate" in the customer's organization, written by an operator with a reason
+    Then the entry names the operator, marked as a LangWatch operator, and reads "Started impersonating a member"
+    And its detail shows the reason
+
   @unit
   Scenario: An audit row reads as a sentence, with the recorded action kept beside it
     Given a row recorded as "authz.grants.attach"
     Then the entry reads "attached grant" after its actor, with the recorded action small and muted beside it
+
+  @unit
+  Scenario: A braid's entries read as braid changes
+    Given rows recorded as "authz.grants.attach" and "authz.grants.revoke" whose target is a braid
+    Then they read "Created braid" and "Removed braid"
+    And the same actions on any other target keep their grant wording
+
+  @unit
+  Scenario: A braid's target chip names its projects, never its grant id
+    Given the audit log opened from a braid with the label "payments-agent → checkout-web"
+    Then the target chip reads "Braid: payments-agent → checkout-web"
+    And a braid link without a label reads "Braid" alone
+
+  @unit
+  Scenario: A braid's entry row names its owner project, never its grant id
+    Given a row whose target is a braid, recorded on the project that owns it
+    Then the line under its phrase reads "Braid owned by <project>", with no rolebinding id
+    And a braid row with no project reads "Braid" alone
+    And any other target keeps its id on that line
+
+  @unit
+  Scenario: An entry row names its target by the name the row recorded
+    Given a row whose metadata records its target's name
+    Then the line under its phrase reads that name, not the target id
 
   @integration
   Scenario: The feed reads by day

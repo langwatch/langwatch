@@ -12,8 +12,12 @@ import { fileURLToPath } from "node:url";
 
 import { type ClickHouseClient, ClickHouseLogLevel, createClient } from "@clickhouse/client";
 import type { LangWatchQLResourceLimits } from "@langwatch/analytics-contract/langwatch-ql-limits";
-import { testClickHouseProfilePins } from "@langwatch/clickhouse-client/testing";
-import { ClickHouseMigrateTask } from "@langwatch/clickhouse-migrations";
+import type { ClickHouseSchemaLock } from "@langwatch/clickhouse-client";
+import {
+  cloneClickHouseTemplate,
+  testClickHouseProfilePins,
+} from "@langwatch/clickhouse-client/testing";
+import { ClickHouseMigrateTask, shippedMigrationsDigest } from "@langwatch/clickhouse-migrations";
 import { ClickHouseContainer, type StartedClickHouseContainer } from "@testcontainers/clickhouse";
 import { PostgreSqlContainer, type StartedPostgreSqlContainer } from "@testcontainers/postgresql";
 import { expect, vi } from "vitest";
@@ -49,6 +53,8 @@ import {
   LangWatchQLServerConfigService,
 } from "./support/langwatch-ql-server-config.service.ts";
 
+/** Every version of the migrated template starts with this; building one drops the others. */
+const MIGRATED_TEMPLATE_PREFIX = "lwql_migrated_template_";
 const postgresMapping = LangWatchQLPostgresMappingService.create();
 
 const postgresViews = LangWatchQLPostgresViewsService.create();
@@ -428,7 +434,11 @@ export async function startLangWatchQLClickHouse({
   // A reused container carries the previous run's objects. Dropping the
   // database first makes every run start from the same state, so a test that
   // creates a fixture object cannot leak into the next run's audits.
-  await applyAsAdmin([`DROP DATABASE IF EXISTS ${names.database}`]);
+  // The facts database is dropped too, or its inserts pile up across reused runs.
+  await applyAsAdmin([
+    `DROP DATABASE IF EXISTS ${names.database}`,
+    ...(facts === "migrated" ? [`DROP DATABASE IF EXISTS ${names.database}_facts`] : []),
+  ]);
   await applyAsAdmin([`CREATE DATABASE ${names.database}`]);
 
   const factDatabase = facts === "migrated" ? `${names.database}_facts` : names.database;
@@ -438,7 +448,13 @@ export async function startLangWatchQLClickHouse({
       : LWQL_FACT_TABLES.map((table) => ({ ...table, database: factDatabase }));
 
   if (facts === "migrated") {
-    await runShippedMigrations({ container, database: factDatabase });
+    await cloneClickHouseTemplate({
+      client: admin,
+      template: `${MIGRATED_TEMPLATE_PREFIX}${shippedMigrationsDigest()}`,
+      supersedes: MIGRATED_TEMPLATE_PREFIX,
+      target: factDatabase,
+      build: ({ database, lock }) => runShippedMigrations({ container, database, lock }),
+    });
   } else {
     await applyAsAdmin(
       Object.entries(FACT_TABLE_DDL).map(
@@ -613,16 +629,18 @@ export const REAL_FACT_TABLES = [
 ] as const;
 
 /**
- * Runs the shipped ClickHouse migrations into their own database. Its own, not the LangWatchQL
- * one: the migrations own every table in the database they run against, and the LangWatchQL
- * database holds the key map and the views. `CLICKHOUSE_CLUSTER` is unset for the duration.
+ * Runs the shipped ClickHouse migrations into the template each suite's facts database is copied
+ * from: the LangWatchQL database holds the key map and the views, the migrations own every table
+ * of theirs. `CLICKHOUSE_CLUSTER` is unset for the duration.
  */
 async function runShippedMigrations({
   container,
   database,
+  lock,
 }: {
   container: StartedClickHouseContainer;
   database: string;
+  lock: ClickHouseSchemaLock;
 }): Promise<void> {
   const url = new URL(container.getConnectionUrl());
   url.pathname = `/${database}`;
@@ -635,6 +653,7 @@ async function runShippedMigrations({
         sharedUrl: url.toString(),
         privateEndpoints: [],
       },
+      lock,
     }).execute();
   } finally {
     if (previousCluster !== undefined) {
@@ -1174,6 +1193,9 @@ export async function seedEveryCatalogSource({
             row[column.name] = tenant.tenantId;
           } else if (column.name === "_retention_days") {
             row[column.name] = 0;
+          } else if (column.name === view.dedup.signColumn) {
+            // A settled view keeps a key only while its signs sum above zero.
+            row[column.name] = 1;
           } else if (column.type.startsWith("DateTime")) {
             row[column.name] = now;
           } else if (sortKey.has(column.name) && SEEDABLE_KEY_TYPE.test(column.type)) {
@@ -1837,6 +1859,8 @@ export interface LangWatchQLPostgresHarness {
   asAdmin(sql: string): Promise<PostgresExecResult>;
   /** Runs SQL as the restricted `ch_reader` role, over TCP with its password. */
   asReader(sql: string): Promise<PostgresExecResult>;
+  /** Runs statements as the superuser, each committing alone, a few `docker exec` calls in all. */
+  applyAsAdmin(statements: string[]): Promise<void>;
   /** Everything the server has logged so far. */
   readLog(): Promise<string>;
   /** Clears the server's table statistics, so the next {@link rowsRead} is a delta. */
@@ -2064,6 +2088,27 @@ export function postgresTenantSeedStatements({
   ];
 }
 
+/** Bytes of SQL per psql call, well under the kernel's limits on one command line. */
+const PSQL_BATCH_BYTES = 100_000;
+
+/** Statements grouped so no psql call's arguments pass {@link PSQL_BATCH_BYTES}. */
+function psqlBatches(statements: readonly string[]): string[][] {
+  const batches: string[][] = [];
+  let current: string[] = [];
+  let bytes = 0;
+  for (const sql of statements) {
+    if (current.length > 0 && bytes + sql.length > PSQL_BATCH_BYTES) {
+      batches.push(current);
+      current = [];
+      bytes = 0;
+    }
+    current.push(sql);
+    bytes += sql.length;
+  }
+  if (current.length > 0) batches.push(current);
+  return batches;
+}
+
 /**
  * Starts PostgreSQL, seeds two tenants' annotations, and provisions the dedicated reader role
  * from the shipped statements. `log_statement='all'` is turned on *before* ClickHouse ever
@@ -2118,13 +2163,27 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
   const asReader = (sql: string) =>
     psql({ sql, user: PG_READER_ROLE, password: PG_READER_PASSWORD });
 
+  // One psql per batch rather than per statement: each `docker exec` costs a fraction of a
+  // second and setup runs hundreds of statements. Each statement is its own -c, so it still
+  // commits on its own, and -b names the one that failed.
   const applyAsAdmin = async (statements: string[]): Promise<void> => {
-    for (const sql of statements) {
-      const result = await asAdmin(sql);
+    for (const batch of psqlBatches(statements)) {
+      const result = await container.exec([
+        "psql",
+        "-U",
+        PG_ADMIN_USER,
+        "-d",
+        PG_DATABASE,
+        "-v",
+        "ON_ERROR_STOP=1",
+        "-v",
+        "VERBOSITY=verbose",
+        "-q",
+        "-b",
+        ...batch.flatMap((sql) => ["-c", sql]),
+      ]);
       if (result.exitCode !== 0) {
-        throw new Error(
-          `lwql PostgreSQL setup failed (${result.exitCode}) for:\n${sql}\n${result.stderr}`,
-        );
+        throw new Error(`lwql PostgreSQL setup failed (${result.exitCode}):\n${result.stderr}`);
       }
     }
   };
@@ -2151,8 +2210,9 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
       `lwql harness: replaying the Prisma migrations failed (psql exit ${migration.exitCode}):\n${migration.stderr}`,
     );
   }
+  // A setting a later session picks up, so it goes alone and the setup after it is logged.
+  await applyAsAdmin([`ALTER DATABASE ${PG_DATABASE} SET log_statement='all'`]);
   await applyAsAdmin([
-    `ALTER DATABASE ${PG_DATABASE} SET log_statement='all'`,
     ...postgresViews
       .approvedViewNames()
       .map((view) => `DROP VIEW IF EXISTS ${PG_SCHEMA}."${view}"`),
@@ -2185,6 +2245,7 @@ export async function startLangWatchQLPostgres(): Promise<LangWatchQLPostgresHar
     readerPassword: PG_READER_PASSWORD,
     asAdmin,
     asReader,
+    applyAsAdmin,
     readLog: () => readContainerLog(container.logs()),
     async resetStatistics() {
       await applyAsAdmin(["SELECT pg_stat_reset()"]);

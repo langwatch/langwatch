@@ -90,7 +90,7 @@ type langWatchCall struct {
 func newLangWatchClient(policy customerEndpointPolicy) *http.Client {
 	return &http.Client{
 		Transport: &http.Transport{
-			DialContext:         policyDialer(policy, 30*time.Second).DialContext,
+			DialContext:         policy.egress.Dialer(30 * time.Second).DialContext,
 			MaxIdleConnsPerHost: 20,
 			IdleConnTimeout:     90 * time.Second,
 			ForceAttemptHTTP2:   true,

@@ -1,6 +1,7 @@
 /** Organization and project settings; personal workspaces cannot be the org's project (ADR-038). */
 
 import { useUiFlags } from "@langwatch/browser-host/feature-flag";
+import { CopyButton } from "@langwatch/design-system/copy-button";
 import { Dialog } from "@langwatch/design-system/dialog";
 import { EmptyValue } from "@langwatch/design-system/empty-value";
 import { IdText } from "@langwatch/design-system/id-text";
@@ -98,6 +99,24 @@ function AdminOnlyBadge() {
   );
 }
 
+/** A project identifier with its copy button always in view, not only on hover (#9710). */
+function CopyableId({ value, name, label }: { value: string; name: string; label: string }) {
+  return (
+    <SettingsFieldValue>
+      <HStack gap={1} minWidth={0}>
+        <IdText value={value} label={label} copyable={false} />
+        <CopyButton
+          type="button"
+          size="xs"
+          value={value}
+          label={name}
+          aria-label={`Copy ${label}`}
+        />
+      </HStack>
+    </SettingsFieldValue>
+  );
+}
+
 function OrganizationIdentityFields({
   canManage,
   control,
@@ -187,7 +206,7 @@ export function ProjectGeneralScreen() {
         <Spacer />
         {host.projectSwitcher()}
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         {sharedProject && host.hasPermission("project:update") ? (
           <ProjectSettingsForm project={sharedProject} />
         ) : null}
@@ -358,7 +377,7 @@ function SettingsForm({
       <PageLayout.Header>
         <PageLayout.Heading>Organization settings</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={6} width="full" align="stretch" paddingTop={4}>
+      <VStack gap={6} width="full" align="stretch">
         <Text textStyle="body" color="fg.muted">
           How your organization is named, where members land, and what they can share.
         </Text>
@@ -707,10 +726,20 @@ function ProjectSettingsForm({ project }: { project: ProjectHostProject }) {
                 })}
               />
             </SettingsField>
-            <SettingsField label="Project ID" hint="Use this ID when authenticating with API keys.">
-              <SettingsFieldValue>
-                <IdText value={project.id} label="project ID" />
-              </SettingsFieldValue>
+            <SettingsField
+              label="Project ID"
+              hint="Use this ID when authenticating with API keys."
+              data-testid="project-id-field"
+            >
+              <CopyableId value={project.id} name="Project ID" label="project ID" />
+            </SettingsField>
+            {/* An older project ID has no prefix and reads like a slug: show both (#9710). */}
+            <SettingsField
+              label="Project slug"
+              hint="Appears in the project's web address. Not used to authenticate."
+              data-testid="project-slug-field"
+            >
+              <CopyableId value={project.slug} name="Project slug" label="project slug" />
             </SettingsField>
             <ProjectDepartmentField
               organizationId={organization?.id ?? ""}

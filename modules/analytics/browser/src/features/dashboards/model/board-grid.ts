@@ -5,6 +5,8 @@
 
 import { CHART_GRID_MARGIN_PX, type ChartGridPlacement } from "../../../model/chart-grid.ts";
 
+export { BOARD_WIDGET_DEFAULT_ROW_SPAN } from "@langwatch/analytics-contract/chart-grid";
+
 /** The height of one board grid row, in px. */
 export const BOARD_GRID_ROW_HEIGHT_PX = 44;
 

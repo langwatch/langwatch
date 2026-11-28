@@ -32,7 +32,7 @@ let lastSearchAuth: string | null = null;
 let lastMonitorsAuth: string | null = null;
 /** When true the device session is revoked server-side: the session-
  * authenticated endpoints AND refresh all 401, exactly as they would after a
- * /me/devices revocation dropped the Redis tokens. */
+ * Devices-tab revocation dropped the Redis tokens. */
 let sessionRevoked = false;
 
 const configPath = () => path.join(stateDir, "config.json");
@@ -99,6 +99,42 @@ const run = (
     child.on("close", (exitCode) => resolve({ stdout, stderr, exitCode }));
   });
 
+/**
+ * What the auth module's `/api/auth/cli/refresh` answers: a rotated device pair, or with a
+ * `project_slug` a child pair capped at that project, 403 for a project the person cannot reach.
+ */
+function refreshAnswer({ body, revoked }: { body: string; revoked: boolean }) {
+  const parsed = JSON.parse(body || "{}") as { refresh_token?: string; project_slug?: string };
+  if (revoked || parsed.refresh_token !== "lw_rt_valid") {
+    return { status: 401, payload: { error: "invalid_grant" } };
+  }
+  const pair = { token_type: "Bearer", expires_in: 3600, refresh_expires_in: 2592000 };
+  if (parsed.project_slug === undefined) {
+    return {
+      status: 200,
+      payload: { ...pair, access_token: "lw_at_valid", refresh_token: "lw_rt_valid" },
+    };
+  }
+  if (parsed.project_slug !== "checkout") {
+    return {
+      status: 403,
+      payload: {
+        error: "forbidden",
+        error_description: "Project not found or you do not have access to it",
+      },
+    };
+  }
+  return {
+    status: 200,
+    payload: {
+      ...pair,
+      access_token: "lw_at_checkout",
+      refresh_token: "lw_rt_checkout",
+      project: { id: "proj_checkout", slug: "checkout", name: "Checkout" },
+    },
+  };
+}
+
 beforeAll(async () => {
   server = http.createServer((req, res) => {
     const url = req.url ?? "";
@@ -130,38 +166,22 @@ beforeAll(async () => {
 
       if (url.startsWith("/api/auth/cli/refresh")) {
         refreshCalls++;
-        const parsed = JSON.parse(body || "{}") as { refresh_token?: string };
-        if (sessionRevoked || parsed.refresh_token !== "lw_rt_valid") {
-          json(401, { error: "invalid_grant" });
-          return;
-        }
-        json(200, {
-          access_token: "lw_at_valid",
-          token_type: "Bearer",
-          expires_in: 3600,
-          refresh_token: "lw_rt_valid",
-          refresh_expires_in: 2592000,
-        });
+        const answered = refreshAnswer({ body, revoked: sessionRevoked });
+        json(answered.status, answered.payload);
         return;
       }
 
-      if (url.startsWith("/api/auth/cli/project-key")) {
-        if (auth !== "Bearer lw_at_valid") {
+      if (url.startsWith("/api/v1/api-keys/full-access")) {
+        if (auth !== "Bearer lw_at_checkout") {
           json(401, { error: "unauthorized" });
           return;
         }
-        const parsed = JSON.parse(body || "{}") as { slug?: string };
-        if (parsed.slug !== "checkout") {
-          json(404, {
-            error: "not_found",
-            error_description: `No project with slug "${parsed.slug}" in your organization`,
-          });
-          return;
-        }
-        json(200, {
-          api_key: "sk-lw-checkout-key",
-          project: { id: "proj_checkout", slug: "checkout", name: "Checkout" },
-        });
+        json(200, { token: "sk-lw-checkout-key" });
+        return;
+      }
+
+      if (url.startsWith("/api/auth/cli/logout")) {
+        json(200, { ok: true });
         return;
       }
 
@@ -268,7 +288,7 @@ describe("device session powers data commands with zero env vars", () => {
       },
     });
 
-    // The device is revoked from /me/devices: Redis tokens are gone, so the
+    // The device is revoked from the Devices tab: Redis tokens are gone, so the
     // session endpoints and refresh all 401.
     sessionRevoked = true;
 
@@ -384,6 +404,6 @@ describe("headless project login", () => {
     const result = await run(["login", "--project", "nope"]);
 
     expect(result.exitCode).toBe(1);
-    expect(result.stderr).toContain('No project with slug "nope"');
+    expect(result.stderr).toContain('No project "nope"');
   });
 });

@@ -69,7 +69,7 @@ export type PersonalContext = {
   budgetOverview: PersonalBudgetOverview;
   spendByDay: { day: string; usd: number; billedUsd: number }[];
   spendByTool: { tool: string; usd: number; billedUsd: number }[];
-  /** Personal project the /me recent-activity table reads from + deep-links into. */
+  /** Personal project the /coding-agents recent-activity table reads from + deep-links into. */
   personalProjectId: string | null;
   personalProjectSlug: string | null;
   /** Whether the personal project read has answered. */

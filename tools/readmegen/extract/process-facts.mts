@@ -278,8 +278,9 @@ function gateOf({ link, ...scope }: Scope & { link: Link }): Gate {
     ? foldList({ expression: value, ...scope })
     : [scalar({ expression: value, ...scope })];
   const resolved = permissions.every((item) => item.resolved);
+  // A named array is asked whole (AND); "any of" is the object form, `kind: "permission-any"`.
   const detail = resolved
-    ? permissions.map((item) => item.value).join(" or ")
+    ? permissions.map((item) => item.value).join(" and ")
     : textOf({ node: value, source: scope.source });
   const target = second ? propertyString({ expression: second, name: "at", ...scope }) : "";
 

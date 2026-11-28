@@ -77,6 +77,7 @@ const VIEWER: readonly AuthzPermission[] = [
   "gatewayLogs:view",
   "gatewayUsage:view",
   "gatewayCacheRules:view",
+  "gatewayA2aTargets:view",
 ];
 
 const MEMBER_ADDITIONS: readonly AuthzPermission[] = [
@@ -137,10 +138,13 @@ const ADMIN_ADDITIONS: readonly AuthzPermission[] = [
   "gatewayCacheRules:update",
   "gatewayCacheRules:delete",
   "gatewayCacheRules:manage",
+  "gatewayA2aTargets:manage",
   "langy:manage",
   "featureFlags:manageExperiments",
   // The playground's completion route asks playground:view (Alex, 2026-10-06, Q97).
   "playground:view",
+  // Project admins may braid out of their own project (Alex, 2026-10-21, ADR-201 §2).
+  "braids:manage",
 ];
 
 /**
@@ -245,7 +249,12 @@ const ORG_MEMBER: readonly AuthzPermission[] = [
 ];
 
 /** What the platform-operator role carries; no other grant confers these. */
-export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = ["ops:view", "ops:manage"];
+export const PLATFORM_OPERATOR_PERMISSIONS: readonly AuthzPermission[] = [
+  "ops:view",
+  "ops:manage",
+  "opsRead:view",
+  "opsCopy:create",
+];
 
 const ROLE_PERMISSION_SETS: Record<BuiltinRoleKey, ReadonlySet<string>> = {
   viewer: new Set(VIEWER),

@@ -8,6 +8,10 @@
 import { useCallback, useEffect, useState } from "react";
 
 import { useVoiceAgentsEnabled } from "../../../../behavior/use-voice-agents-enabled.ts";
+import {
+  EMPTY_JUDGE_TRACE_WAIT_INPUT,
+  hasJudgeTraceWait,
+} from "../../../../model/judge-trace-wait.ts";
 import type { CustomizeChip } from "../../../elements/agent-testing/shared/customize-chips.tsx";
 import type { CaseDraft } from "./use-case-editor.ts";
 
@@ -31,7 +35,10 @@ function blocksOf(draft: CaseDraft): OpenBlocks {
   return {
     parameters: draft.parameters.trim() !== "",
     turns: draft.maxTurns !== null || draft.minTurns !== null,
-    models: draft.simulatorModel !== null || draft.judgeModel !== null,
+    models:
+      draft.simulatorModel !== null ||
+      draft.judgeModel !== null ||
+      hasJudgeTraceWait(draft.traceWait),
     callerVoice: draft.callerVoice !== null,
   };
 }
@@ -81,7 +88,11 @@ export function useCaseCustomizeBlocks({
 
   const removeModels = useCallback(() => {
     setOpen((current) => ({ ...current, models: false }));
-    setDraft({ simulatorModel: null, judgeModel: null });
+    setDraft({
+      simulatorModel: null,
+      judgeModel: null,
+      traceWait: EMPTY_JUDGE_TRACE_WAIT_INPUT,
+    });
   }, [setDraft]);
 
   const removeCallerVoice = useCallback(() => {

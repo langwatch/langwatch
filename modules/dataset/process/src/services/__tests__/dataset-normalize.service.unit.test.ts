@@ -571,6 +571,59 @@ describe("DatasetNormalizeService", () => {
     });
   });
 
+  describe("when the import is refused before the stored file's first read", () => {
+    /** A source whose iterator records being ended, whether or not it was ever read. */
+    const trackedSource = () => {
+      const ended = vi.fn();
+      const bytes: AsyncIterable<Uint8Array> = {
+        [Symbol.asyncIterator]: () => ({
+          next: async () => ({ done: true, value: undefined }),
+          return: async () => {
+            ended();
+            return { done: true, value: undefined };
+          },
+        }),
+      };
+      const getById = vi.fn(async () => ({ metadata: importMetadata(2 * 1024 * 1024), bytes }));
+      return { ended, getById, storedObjects: createApiFixture({ getById }) };
+    };
+
+    /** @scenario "An import refused before its file is read gives the file's connection back" */
+    it("ends the source stream it opened", async () => {
+      const { storage } = makeStorage();
+      const repo = makeRepo({ id: "d1", status: "processing", sourceStoredObjectId: "so1" });
+      const { ended, storedObjects } = trackedSource();
+
+      const handler = normalizeHandler({
+        repository: repo as any,
+        chunks: storage as any,
+        storedObjects,
+        requestBounds: createDatasetTestRequestBoundsWith({ fileBytes: 1024 * 1024 }),
+      });
+
+      await expect(handler(storedObjectPayload)).rejects.toMatchObject({ kind: "file_too_large" });
+      expect(ended).toHaveBeenCalledTimes(1);
+    });
+
+    /** @scenario "An import refused before its file is read gives the file's connection back" */
+    it("opens no source stream when the organization's limits cannot be read", async () => {
+      const { storage } = makeStorage();
+      const repo = makeRepo({ id: "d1", status: "processing", sourceStoredObjectId: "so1" });
+      const { getById, storedObjects } = trackedSource();
+      const unreadable = new Error("limits unavailable");
+
+      const handler = normalizeHandler({
+        repository: repo as any,
+        chunks: storage as any,
+        storedObjects,
+        requestBounds: createApiFixture({ limits: () => Promise.reject(unreadable) }),
+      });
+
+      await expect(handler(storedObjectPayload)).rejects.toBe(unreadable);
+      expect(getById).not.toHaveBeenCalled();
+    });
+  });
+
   describe("when the file holds more rows than the organization's row count limit", () => {
     /** @scenario "An uploaded file with more rows than the row count limit is refused naming the limit" */
     it("fails the dataset as over the row count limit", async () => {

@@ -4,7 +4,11 @@
 
 import { Command, Option } from "commander";
 
-import { setRequestedProject, setRunsOutsideProject } from "../internal/credentialContext";
+import {
+  setRequestedProject,
+  setRunsOutsideProject,
+  setUsesOpsSession,
+} from "../internal/credentialContext";
 import {
   REDACTION_AUDIT_URL,
   SESSION_REDACTION_SUMMARY,
@@ -18,6 +22,7 @@ import { SOURCE_TYPE_BY_TOOL } from "./utils/governance/otel-env-block";
 import { resolveControlPlaneUrl } from "./utils/governance/resolveEndpoint";
 import { sessionContextHookArguments } from "./utils/governance/session-context-agents";
 import { trustLocalDevCa } from "./utils/localDevCa";
+import { applyOpsSessionOption, commandUsesOpsSession } from "./utils/opsSession";
 import {
   applyOutputContext,
   assertFormatIsSupported,
@@ -25,6 +30,7 @@ import {
   resolveActionOutputOptions,
   emitsResult,
   rendersOwnResult,
+  type CommandResult,
   type RawOutputFlags,
 } from "./utils/output";
 import {
@@ -36,6 +42,13 @@ import {
   projectSelectorOf,
   QUERY_PROJECT_FLAG_HELP,
 } from "./utils/projectOption";
+import {
+  DEFAULT_LOOKBACK,
+  endDateHelp,
+  SINCE_HELP,
+  startDateHelp,
+  WIDENED_LOOKBACK,
+} from "./utils/timeWindow";
 
 declare const __CLI_VERSION__: string;
 
@@ -116,6 +129,8 @@ const TRIGGER_FILTERS_HELP =
   'Trace conditions as a JSON object. Unkeyed fields take a list, e.g. {"traces.error":["true"]}. Keyed fields nest the key: evaluations.* keys by MONITOR id (the `id` from `langwatch monitor list`, not the evaluator id), e.g. {"evaluations.passed":{"<monitorId>":["false"]}}; metadata.value keys by metadata key, e.g. {"metadata.value":{"<key>":["true"]}}. A keyed field sent flat is refused';
 
 const REPEAT_FLAG_HELP = "How many times to run each scenario against each target, from 1 to 5.";
+const EXPERIMENT_REPEAT_FLAG_HELP =
+  "How many times to run each dataset row against each target, from 1 to 5. With --wait, the output adds each row's pass rate over its runs.";
 
 const SIMULATOR_MODEL_FLAG_HELP =
   "The model that plays the user in this run. Left out, the project default is used.";
@@ -335,6 +350,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
     setRequestedProject(projectSelectorOf(actionCommand));
     const path = commandPath(actionCommand);
     setRunsOutsideProject(path in COMMANDS_WITHOUT_PROJECT || path in COMMANDS_ACROSS_PROJECTS);
+    setUsesOpsSession(commandUsesOpsSession(actionCommand));
     const endpointFlag: unknown = actionCommand.opts().endpoint;
     trustLocalDevCa({
       endpoint: resolveControlPlaneUrl({
@@ -419,6 +435,7 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   registerScimTokensCommands(program);
   registerOrganizationsCommands(program);
   registerDaemonCommands(program);
+  registerOpsCommands(program);
 
   // The output contract's global flags (`-o/--output`, `--json <fields>`,
   // `--jq`, `--agent`), added here — once, centrally — rather than per
@@ -432,6 +449,10 @@ export function buildProgram({ bin }: { bin?: string } = {}): Command {
   // with no way to name a project. The two exemption lists live with the
   // helper (utils/projectOption.ts).
   applyProjectOption(program);
+
+  // `--ops-session` on every command outside `ops`: the ops session acts on a customer
+  // organization, so a normal command uses it only when asked (ADR-202).
+  applyOpsSessionOption(program);
 
   return program;
 }
@@ -540,7 +561,7 @@ function registerOpenCommands(program: Command): void {
   program
     .command("open [path]")
     .description(
-      "Open the LangWatch app in your browser. No path: /me in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
+      "Open the LangWatch app in your browser. No path: your coding agents page (/me, which newer servers redirect to /coding-agents) in personal mode, project home if LANGWATCH_API_KEY is set. With a path: BASE/<path>.",
     )
     .option("--browser <name>", "browser to open (chrome|chromium|firefox|safari|none|<path>)")
     .action(async (path: string | undefined, options: { browser?: string }) => {
@@ -1081,7 +1102,7 @@ function registerGovernanceCommands(program: Command): void {
   const templatesCmd = governanceCmd
     .command("ingestion-templates")
     .description(
-      "CRUD on IngestionTemplate rows. Reads use aiTools:view; mutations use aiTools:manage.",
+      "CRUD on IngestionTemplate rows, with your device login. Every verb needs aiTools:manage.",
     );
 
   templatesCmd
@@ -1626,13 +1647,22 @@ function registerEvaluatorCommands(program: Command): void {
   emitsResult(
     evaluatorCmd
       .command("create <name>")
-      .description("Create a new evaluator")
-      .requiredOption(
+      .description("Create a new evaluator: a built-in one (--type) or a custom code one (--code)")
+      .option(
         "--type <evaluatorType>",
-        "Evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+        "Built-in evaluator type (e.g. langevals/llm_boolean; see `langwatch evaluator types`)",
+      )
+      .option(
+        "--code <file>",
+        "Python file for a custom code evaluator (a class Code with __call__)",
+      )
+      .option(
+        "--input <name[:type]>",
+        "An input of the code evaluator, type defaulting to str (repeatable)",
+        collectParam,
       )
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
-    async (name: string, options: { type: string }) => {
+    async (name: string, options: { type?: string; code?: string; input?: string[] }) => {
       try {
         const { createEvaluatorCommand: impl } = await import("./commands/evaluators/create.js");
         return await impl(name, options);
@@ -1710,6 +1740,10 @@ function registerExperimentCommands(program: Command): void {
       .command("run <slug>")
       .description("Start an experiment run by slug")
       .option("--wait", "Wait for the experiment to complete before returning")
+      .option(
+        "--fail-on-evaluator-failures",
+        "With --wait, exit 1 when an evaluation fails or errors, a cell errors, or the server reports no evaluator results (the summary still prints)",
+      )
       .option("--param <pair>", PARAM_FLAG_HELP, collectParam)
       .option(
         "--concurrency <n>",
@@ -1720,10 +1754,18 @@ function registerExperimentCommands(program: Command): void {
         "Version of the experiment's saved dataset to run, overriding the version the experiment pins",
         parseDatasetVersionFlag,
       )
+      .option("--repeat <n>", EXPERIMENT_REPEAT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       slug: string,
-      options: { wait?: boolean; param?: string[]; concurrency?: string; datasetVersion?: number },
+      options: {
+        wait?: boolean;
+        failOnEvaluatorFailures?: boolean;
+        param?: string[];
+        concurrency?: string;
+        datasetVersion?: number;
+        repeat?: string;
+      },
     ) => {
       const { runExperimentCommand: impl } = await import("./commands/experiment/run.js");
       return impl(slug, options);
@@ -1958,21 +2000,27 @@ function registerLangyCommands(program: Command): void {
         "Share control of this folder with the Langy session that requested it (what a bare `langwatch langy` does today)",
       )
       .option(
+        "--as <email>",
+        "The email of the person who asked Langy, as the card's command names it; a login that is someone else's offers to sign in as them",
+      )
+      .option(
         "-o, --output <format>",
         "Not available: this command is an interactive session and prints as it goes",
       ),
-  ).action(async (options: { shareControl?: boolean; output?: string }, command: Command) => {
-    // `--json` and `--jq` are global, so they never reach the command's own
-    // options. They are read here and passed on, or the refusal below would
-    // miss them now that the format gate lets this command through.
-    const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
-    const { langyCommand: impl } = await import("./commands/langy/index.js");
-    return impl({
-      ...options,
-      ...(globals.json !== undefined ? { json: true } : {}),
-      ...(globals.jq !== undefined ? { jq: true } : {}),
-    });
-  });
+  ).action(
+    async (options: { shareControl?: boolean; as?: string; output?: string }, command: Command) => {
+      // `--json` and `--jq` are global, so they never reach the command's own
+      // options. They are read here and passed on, or the refusal below would
+      // miss them now that the format gate lets this command through.
+      const globals: { json?: unknown; jq?: unknown } = command.optsWithGlobals();
+      const { langyCommand: impl } = await import("./commands/langy/index.js");
+      return impl({
+        ...options,
+        ...(globals.json !== undefined ? { json: true } : {}),
+        ...(globals.jq !== undefined ? { jq: true } : {}),
+      });
+    },
+  );
 }
 
 function registerAgentCommands(program: Command): void {
@@ -3289,7 +3337,7 @@ function registerQueryCommands(program: Command): void {
       .option("--param <key=value>", "Bound parameter value (repeatable)", collectParam)
       .option("--limit <n>", "Rows to keep from the result")
       .option(
-        "--format <format>",
+        "-f, --format <format>",
         "table (default), json, jsonl (one object per row, JSON columns parsed back) or csv",
         "table",
       )
@@ -3374,8 +3422,9 @@ function registerAnalyticsCommands(program: Command): void {
         "-a, --aggregation <aggregation>",
         "Aggregation type: cardinality, avg, sum, min, max, p95, p99",
       )
-      .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
-      .option("--end-date <date>", "End date (ISO string, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--group-by <field>", "Group by field (e.g. metadata.model)")
       .option("--time-scale <scale>", "Time scale: 'full' for aggregate, or interval in seconds")
       .option(
@@ -3388,6 +3437,7 @@ function registerAnalyticsCommands(program: Command): void {
       aggregation?: string;
       startDate?: string;
       endDate?: string;
+      since?: string;
       groupBy?: string;
       timeScale?: string;
       includeLangy?: boolean;
@@ -3613,17 +3663,20 @@ function registerTraceCommands(program: Command): void {
   rendersOwnResult(
     traceCmd
       .command("search")
-      .description("Search traces with optional text query and date range")
+      .description(
+        `Search traces by text, filter and time window. Reads the last ${DEFAULT_LOOKBACK} by default; when that finds nothing and no window was given, it searches the last ${WIDENED_LOOKBACK} once and says so. An empty answer names the project, window and filters it read`,
+      )
       .option(
         "-q, --query <query>",
-        "Text search query. Plain text only: AND, OR and NOT are matched as words, not as operators",
+        "Text search over the trace input, output and span names; no filter field holds the input or output text. Plain text only: AND, OR and NOT are matched as words, not as operators",
       )
       .option(
         "--filter <filter>",
-        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail". Combined with -q and the other flags. `langwatch trace fields` lists every field',
+        'Trace filter, the language the Trace Explorer search bar speaks: "status:error AND model:gpt-*", "label:production" (the metadata labels), "trace.attribute.langwatch.user_id:alice", "evaluatorVerdict:fail", and a quoted phrase with no field for the input and output text. Combined with -q and the other flags. `langwatch trace fields` lists every field',
       )
-      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
-      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--limit <n>", "Max results to return (default: 25)")
       .option(
         "--origin <origins>",
@@ -3645,9 +3698,12 @@ function registerTraceCommands(program: Command): void {
 
   traceCmd
     .command("export")
-    .description("Export traces as CSV, JSONL, or JSON")
-    .option("--start-date <date>", "Start date (ISO string, default: 7 days ago)")
-    .option("--end-date <date>", "End date (ISO string, default: now)")
+    .description(
+      `Export traces as CSV, JSONL, or JSON. Reads the last ${DEFAULT_LOOKBACK} by default; an empty export says on stderr what it read`,
+    )
+    .option("--start-date <date>", startDateHelp())
+    .option("--end-date <date>", endDateHelp())
+    .option("--since <lookback>", SINCE_HELP)
     .option(
       "-q, --query <query>",
       "Text search query to filter traces. Plain text only: AND, OR and NOT are matched as words, not as operators",
@@ -3672,6 +3728,7 @@ function registerTraceCommands(program: Command): void {
       async (options: {
         startDate?: string;
         endDate?: string;
+        since?: string;
         query?: string;
         origin?: string;
         format?: string;
@@ -3688,7 +3745,9 @@ function registerTraceCommands(program: Command): void {
   rendersOwnResult(
     traceCmd
       .command("get <traceId>")
-      .description("Get full trace details by ID")
+      .description(
+        "Get full trace details by ID. Also accepts a span ID or a scenario run ID, any case. Retries briefly while a just-sent trace is still being stored.",
+      )
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option(
         "-f, --format <format>",
@@ -3723,8 +3782,9 @@ function registerTraceCommands(program: Command): void {
       )
       .option("--prefix <prefix>", "Only values starting with this. Needs a field")
       .option("--limit <n>", "Values to return, 1 to 1000 (default: 50). Needs a field")
-      .option("--start-date <date>", "Start date (ISO string or epoch ms, default: 24h ago)")
-      .option("--end-date <date>", "End date (ISO string or epoch ms, default: now)")
+      .option("--start-date <date>", startDateHelp())
+      .option("--end-date <date>", endDateHelp())
+      .option("--since <lookback>", SINCE_HELP)
       .option("--project <idOrSlug>", PROJECT_FLAG_HELP)
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (field: string | undefined, options: Record<string, string>) => {
@@ -4138,6 +4198,47 @@ function registerTestSuiteCommands(program: Command): void {
     },
   );
 
+  emitsResult(
+    testSuiteCmd
+      .command("templates")
+      .description("List the suite templates: everyday archetypes and red team packs")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async () => {
+      const { listSuiteTemplatesCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl();
+    },
+  );
+
+  emitsResult(
+    testSuiteCmd
+      .command("apply-template <templateId>")
+      .description("Create a test suite from a template, fitted to the agent under test")
+      .requiredOption("--agent-name <name>", "The name of the agent under test")
+      .option("--tool <tool>", "A tool the agent can call. Repeat for more.", collectParam)
+      .option(
+        "--must-never <rule>",
+        "Something the agent must never do. Repeat for more.",
+        collectParam,
+      )
+      .option("--name <name>", "The suite name. Defaults to the template title.")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (
+      templateId: string,
+      options: { agentName: string; tool?: string[]; mustNever?: string[]; name?: string },
+    ) => {
+      const { applySuiteTemplateCommand: impl } =
+        await import("./commands/test-suites/templates.js");
+      return impl({
+        templateId,
+        agentName: options.agentName,
+        tools: options.tool,
+        mustNever: options.mustNever,
+        name: options.name,
+      });
+    },
+  );
+
   rendersOwnResult(
     testSuiteCmd
       .command("run <suite>")
@@ -4197,8 +4298,8 @@ function registerGraphCommands(program: Command): void {
       .option("--dashboard-id <id>", "Dashboard to add the graph to")
       .option("--graph <json>", "Graph definition as JSON")
       .option("--filters <json>", "Filter conditions as JSON")
-      .option("--col-span <n>", "Column span (1-2)")
-      .option("--row-span <n>", "Row span (1-2)")
+      .option("--col-span <n>", "Column span (1-8)")
+      .option("--row-span <n>", "Row span (1-20)")
       .option("-f, --format <format>", "Output format: table (default) or json", "table"),
     async (
       name: string,
@@ -4894,6 +4995,17 @@ function registerOnboardingCommands(program: Command): void {
       const { onboardingCompletePathCommand: impl } =
         await import("./commands/onboarding/complete-path.js");
       return impl(path);
+    },
+  );
+
+  emitsResult(
+    onboardingCmd
+      .command("start <start>")
+      .description("Record the start picked on Langy's governance opener: coding or call")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    async (start: string) => {
+      const { onboardingStartCommand: impl } = await import("./commands/onboarding/start.js");
+      return impl(start);
     },
   );
 }
@@ -6182,6 +6294,215 @@ function registerDaemonCommands(program: Command): void {
       const { daemonStatusCommand: impl } = await import("./commands/daemon.js");
       await impl(options);
     });
+}
+
+/** `--scope` repeats, one value per occurrence. */
+const collectScope = (value: string, previous: string[] = []): string[] => [...previous, value];
+
+function registerOpsCommands(program: Command): void {
+  // `langwatch ops *`: the LangWatch ops agent's passkey-approved staff access (ADR-202).
+  // Hidden: only LangWatch operators hold a requester key.
+  const opsCmd = program
+    .command("ops", { hidden: true })
+    .description("LangWatch staff access for the ops agent, approved by an operator's passkey.");
+
+  const run =
+    <Args extends unknown[]>(
+      load: () => Promise<(...args: Args) => Promise<CommandResult> | CommandResult>,
+    ) =>
+    async (...args: Args): Promise<CommandResult | void> => {
+      try {
+        const impl = await load();
+        return await impl(...args);
+      } catch (error) {
+        const { reportCommandError } = await import("./utils/errorOutput.js");
+        reportCommandError({ error });
+        process.exit(1);
+      }
+    };
+
+  emitsResult(
+    opsCmd
+      .command("setup")
+      .description(
+        "Store the requester key (from the Ops agents page) in a 0600 file beside the CLI config. Reads it from stdin (pbpaste | langwatch ops setup), or asks for it with hidden input in a terminal",
+      ),
+    run(async () => {
+      const { opsSetupCommand } = await import("./commands/ops/setup.js");
+      return () => opsSetupCommand();
+    }),
+  );
+
+  const accessCmd = opsCmd
+    .command("access")
+    .description("Request, inspect and end a staff access session");
+
+  emitsResult(
+    accessCmd
+      .command("request")
+      .description(
+        "Ask an operator to approve access, wait for the passkey approval and store the session in a 0600 file (never .env)",
+      )
+      .option(
+        "--scope <scope>",
+        "ops:read, org:metadata, org:content or org:support; repeat for more (copies use `ops copy`)",
+        collectScope,
+        [],
+      )
+      .option(
+        "--function <name>",
+        "An ops function the session may call (see `ops functions`); repeat for more. org:metadata needs at least one",
+        collectScope,
+        [],
+      )
+      .option("--org <idOrSlug>", "The organization an org:* scope applies to")
+      .option("--reason <text>", "Why the access is needed; shown to the approver and the customer")
+      .option(
+        "--project <idOrSlug>",
+        "Default project for commands run with --ops-session while the session lives",
+      )
+      .option(
+        "--wait",
+        "Poll until the request is decided and redeem it, instead of answering at once",
+      ),
+    run(async () => {
+      const { opsAccessRequestCommand } = await import("./commands/ops/access.js");
+      return (options: {
+        scope?: string[];
+        function?: string[];
+        org?: string;
+        reason?: string;
+        project?: string;
+        wait?: boolean;
+      }) => opsAccessRequestCommand({ ...options, fn: options.function ?? [] });
+    }),
+  );
+
+  emitsResult(
+    accessCmd
+      .command("redeem <requestId>")
+      .description("Finish a request once it is approved")
+      .option(
+        "--project <idOrSlug>",
+        "Default project for commands run with --ops-session while the session lives",
+      ),
+    run(async () => {
+      const { opsAccessRedeemCommand } = await import("./commands/ops/access.js");
+      return (requestId: string, options: { project?: string }) =>
+        opsAccessRedeemCommand({ requestId, project: options.project });
+    }),
+  );
+
+  emitsResult(
+    accessCmd
+      .command("status [requestId]")
+      .description(
+        "Show one request's state on the server, or the local ops session and the requests still waiting",
+      ),
+    run(async () => {
+      const { opsAccessStatusCommand } = await import("./commands/ops/access.js");
+      return (requestId?: string) => opsAccessStatusCommand({ requestId });
+    }),
+  );
+
+  emitsResult(
+    accessCmd
+      .command("withdraw <requestId>")
+      .description("Take back a request nobody approved yet"),
+    run(async () => {
+      const { opsAccessWithdrawCommand } = await import("./commands/ops/access.js");
+      return (requestId: string) => opsAccessWithdrawCommand({ requestId });
+    }),
+  );
+
+  emitsResult(
+    accessCmd
+      .command("end")
+      .description("Revoke the ops session on the server and remove the local session file"),
+    run(async () => {
+      const { opsAccessEndCommand } = await import("./commands/ops/access.js");
+      return () => opsAccessEndCommand();
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("orgs")
+      .description("List organizations across the platform (needs the ops:read scope)")
+      .option("--query <text>", "Filter by name, slug or id")
+      .option("--limit <n>", "Page size, up to 200 (default 50)")
+      .option("--cursor <cursor>", "The nextCursor of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsOrgsCommand } = await import("./commands/ops/read.js");
+      return (options: { query?: string; limit?: string; cursor?: string }) =>
+        opsOrgsCommand(options);
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("functions")
+      .description("List the ops functions the server offers, with what each answers")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsFunctionsCommand } = await import("./commands/ops/functions.js");
+      return () => opsFunctionsCommand();
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("call <name>")
+      .description("Run one ops function the session's approval named")
+      .option("--input <json>", "The function's input as a JSON object")
+      .option("--limit <n>", "Page size for a list answer")
+      .option("--cursor <cursor>", "The nextCursor of the previous page")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsCallCommand } = await import("./commands/ops/functions.js");
+      return (name: string, options: { input?: string; limit?: string; cursor?: string }) =>
+        opsCallCommand({ name, ...options });
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("usage <organization>")
+      .description("One organization's usage summary (needs the ops:read scope)")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsUsageCommand } = await import("./commands/ops/read.js");
+      return (organization: string) => opsUsageCommand({ organization });
+    }),
+  );
+
+  emitsResult(
+    opsCmd
+      .command("copy")
+      .description(
+        "Copy projects with their evaluators, monitors, prompts and datasets from one organization into another; asks one approval per organization",
+      )
+      .requiredOption("--from <idOrSlug>", "The source organization")
+      .requiredOption("--to <idOrSlug>", "The target organization")
+      .option(
+        "--projects <idsOrSlugs>",
+        "Comma-separated source projects; every project when left out",
+      )
+      .option("--reason <text>", "Why the copy is needed; shown to the approver and both customers")
+      .option("--dry-run", "List what would be copied and copy nothing")
+      .option("-f, --format <format>", "Output format: table (default) or json", "table"),
+    run(async () => {
+      const { opsCopyCommand } = await import("./commands/ops/copy.js");
+      return (options: {
+        from: string;
+        to: string;
+        projects?: string;
+        reason?: string;
+        dryRun?: boolean;
+      }) => opsCopyCommand(options);
+    }),
+  );
 }
 
 function registerPromptTags(promptCmd: Command): void {

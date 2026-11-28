@@ -94,7 +94,7 @@ describe("TraceLegacyReadClickHouseRepository", () => {
     ParentTraceId: null,
     ParentIsRemote: null,
     Sampled: true,
-    StartTime: Date.now(),
+    StartTimeMs: Date.now(),
     EndTime: Date.now() + 100,
     DurationMs: 100,
     SpanName: "test-span",

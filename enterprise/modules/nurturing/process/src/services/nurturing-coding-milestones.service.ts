@@ -5,6 +5,7 @@ import type { OrganizationApi } from "@langwatch/organization-contract";
 
 import type {
   NurturingCodingMilestonesRepository,
+  NurturingMilestonesRepository,
   NurturingOrganizationRow,
 } from "../repositories/nurturing-milestones.repository.ts";
 import type { NurturingProjectDirectoryRepository } from "../repositories/nurturing-project-directory.repository.ts";
@@ -27,7 +28,8 @@ type Deliver = (signal: NurturingSignal) => Promise<void>;
 type Fact = CodingAgentSessionStoredEventData;
 
 type CodingDependencies = Readonly<{
-  milestones: NurturingCodingMilestonesRepository;
+  milestones: NurturingCodingMilestonesRepository &
+    Pick<NurturingMilestonesRepository, "findOrganization">;
   projects: NurturingProjectDirectoryRepository;
   /** The one nurturing -> organization edge: who to tell uses_coding_agent on a first session. */
   organizations: Pick<OrganizationApi, "getAllMembers">;

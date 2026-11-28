@@ -16,6 +16,7 @@ import { resolveControlPlaneEndpoint } from "@/cli/utils/governance/resolveEndpo
 import { mintProjectFullAccessKey, SessionApiError } from "@/cli/utils/governance/session-api";
 import { rememberProjectName } from "@/cli/utils/identityNotice";
 import { trustLocalDevCa, untrustedCertHint } from "@/cli/utils/localDevCa";
+import { writeSecretFile } from "@/cli/utils/secret-file";
 import { formatApiErrorMessage } from "@/client-sdk/services/_shared/format-api-error";
 import { DEFAULT_ENDPOINT } from "@/internal/constants";
 import { normalizeEndpoint } from "@/internal/endpoint";
@@ -70,7 +71,7 @@ const updateEnvFile = (apiKey: string): { created: boolean; updated: boolean; pa
   // Check if .env exists
   if (!fs.existsSync(envPath)) {
     // Create new .env file
-    fs.writeFileSync(envPath, `LANGWATCH_API_KEY=${apiKey}\n`);
+    writeSecretFile(envPath, `LANGWATCH_API_KEY=${apiKey}\n`);
     return { created: true, updated: false, path: envPath };
   }
 

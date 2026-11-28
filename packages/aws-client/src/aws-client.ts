@@ -51,6 +51,9 @@ export interface AwsClientConfigInput {
   endpoint?: string | null;
   staticCredentials?: StaticAwsCredentials | null;
   assumeRole?: AssumeRoleCredentials | null;
+  /** Refuse to build without a complete static pair instead of signing with the deployment's own
+   *  identity. Set for every source whose settings a tenant writes. */
+  requireStatic?: boolean;
   /** Turn the SDK's own retry loop off. Callers behind a retry ladder that
    *  counts attempts pass true; everyone else leaves the SDK retrying. */
   disableSdkRetries?: boolean;
@@ -124,6 +127,14 @@ export function staticCredentialsOrUndefined(
     secretAccessKey: secretAccessKey.trim(),
     ...(present(sessionToken) ? { sessionToken: sessionToken.trim() } : {}),
   };
+}
+
+/** A client that must sign with its caller's own keys was built without a complete pair. */
+export class MissingStaticAwsCredentialsError extends Error {
+  constructor() {
+    super("An access key ID and secret access key are required");
+    this.name = "MissingStaticAwsCredentialsError";
+  }
 }
 
 /** How long an assumed session lasts before the provider refreshes it. */
@@ -268,6 +279,7 @@ class AwsTransportPolicy {
     endpoint,
     staticCredentials,
     assumeRole,
+    requireStatic = false,
     disableSdkRetries = false,
   }: AwsClientConfigInput): AwsClientConfig {
     const config: AwsClientConfig = {
@@ -283,6 +295,7 @@ class AwsTransportPolicy {
         region,
         staticCredentials,
         assumeRole,
+        requireStatic,
       },
       this,
     );
@@ -301,10 +314,12 @@ function resolveCredentials(
     region,
     staticCredentials,
     assumeRole,
-  }: Pick<AwsClientConfigInput, "region" | "staticCredentials" | "assumeRole">,
+    requireStatic,
+  }: Pick<AwsClientConfigInput, "region" | "staticCredentials" | "assumeRole" | "requireStatic">,
   transport: AwsTransportPolicy,
 ): AwsClientConfig["credentials"] {
   const staticIdentity = staticCredentialsOrUndefined(staticCredentials);
+  if (requireStatic && !staticIdentity) throw new MissingStaticAwsCredentialsError();
   if (!assumeRole) return staticIdentity;
   const stsHost = present(region)
     ? `sts.${region}.amazonaws.com${region.startsWith("cn-") ? ".cn" : ""}`

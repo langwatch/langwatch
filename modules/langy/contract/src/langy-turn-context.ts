@@ -60,6 +60,7 @@ export const LANGY_TURN_SKILL_IDS = [
   "setup-lw",
   "test-cli-usability",
   "test-compliance",
+  "owasp-red-team",
   "observability.analytics",
   "observability.annotations",
   "evaluations.online-evaluation",
@@ -194,6 +195,10 @@ function describeResource(chip: LangyResourceContext): string | null {
         : null;
     case "trace":
       return ref ? `- the trace they have open, id: ${ref}` : `- ${label}`;
+    case "dashboard":
+      return ref
+        ? `- the dashboard they are on; a chart they ask for here goes on it unless they name a separate board, ref: ${ref}`
+        : `- ${label}`;
     default:
       return ref ? `- the ${chip.kind} they have open, ref: ${ref}` : `- ${label}`;
   }

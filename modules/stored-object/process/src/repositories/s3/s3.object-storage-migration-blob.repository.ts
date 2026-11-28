@@ -7,7 +7,7 @@ import {
   PutObjectCommand,
   S3Client,
 } from "@aws-sdk/client-s3";
-import type { AwsClientProcessRuntime } from "@langwatch/aws-client";
+import { defaultS3Host, s3RegionOf, type AwsClientProcessRuntime } from "@langwatch/aws-client";
 import { ObjectNotFoundError } from "@langwatch/stored-object-contract";
 
 import type { StoredObjectBlobRepository } from "#repositories/stored-object-blob.repository";
@@ -22,11 +22,6 @@ type MigrationS3Configuration = {
   sessionToken?: string;
 };
 
-type MigrationS3RegionConfiguration = {
-  endpoint?: string;
-  region?: string;
-};
-
 /** Task-owned S3 driver backed by the executable's process-owned AWS transport. */
 export class MigrationBlobS3Repository implements StoredObjectBlobRepository {
   static create(input: {
@@ -36,20 +31,10 @@ export class MigrationBlobS3Repository implements StoredObjectBlobRepository {
     return new MigrationBlobS3Repository(input.aws, input.config);
   }
 
-  /**
-   * A custom endpoint that is not AWS gets `"auto"`: an S3-compatible service
-   * has no region, and the SDK refuses to sign without one.
-   */
-  static deriveRegion(config: MigrationS3RegionConfiguration): string | undefined {
-    return (
-      config.region ?? (config.endpoint && !isAwsS3Endpoint(config.endpoint) ? "auto" : undefined)
-    );
-  }
-
   private readonly client: S3Client;
 
   private constructor(aws: AwsClientProcessRuntime, config: MigrationS3Configuration) {
-    const region = MigrationBlobS3Repository.deriveRegion(config);
+    const region = s3RegionOf({ region: config.region, endpoint: config.endpoint });
     this.client = new S3Client({
       ...aws.build({
         region,
@@ -106,26 +91,6 @@ export class MigrationBlobS3Repository implements StoredObjectBlobRepository {
 
   close(): void {
     this.client.destroy();
-  }
-}
-
-function defaultS3Host(region: string | undefined): string {
-  if (!region || region === "auto") return "s3.amazonaws.com";
-
-  const suffix = region.startsWith("cn-") ? ".amazonaws.com.cn" : ".amazonaws.com";
-  return `s3.${region}${suffix}`;
-}
-
-function isAwsS3Endpoint(endpoint: string): boolean {
-  try {
-    const hostname = new URL(endpoint).hostname.toLowerCase();
-    return (
-      hostname === "s3.amazonaws.com" ||
-      hostname.endsWith(".amazonaws.com") ||
-      hostname.endsWith(".amazonaws.com.cn")
-    );
-  } catch {
-    return false;
   }
 }
 

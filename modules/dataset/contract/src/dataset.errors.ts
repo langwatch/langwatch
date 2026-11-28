@@ -356,6 +356,22 @@ export class DatasetChunkCountMissingError extends Error {
   }
 }
 
+/**
+ * A copy that failed after its target dataset existed. It names the target so the caller can
+ * record what was made; every refusal before the target exists is thrown as itself.
+ */
+export class DatasetCopyInterruptedError extends Error {
+  readonly targetDatasetId: string;
+
+  constructor({ targetDatasetId, cause }: { targetDatasetId: string; cause: unknown }) {
+    super(`The copy into dataset ${targetDatasetId} failed after the dataset was created`, {
+      cause,
+    });
+    this.name = "DatasetCopyInterruptedError";
+    this.targetDatasetId = targetDatasetId;
+  }
+}
+
 export class DatasetRecordNotFoundError extends Error {
   constructor(message = "Dataset record not found") {
     super(message);

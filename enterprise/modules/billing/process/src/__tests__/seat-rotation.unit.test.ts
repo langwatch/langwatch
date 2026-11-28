@@ -77,6 +77,7 @@ describe("Growth seat changes", () => {
         items: [
           {
             id: "si_seat",
+            createdAt: 1_700_000_000,
             priceId: prices.GROWTH_SEAT_EUR_MONTHLY,
             unitAmount: SEAT_PRICE_CENTS,
             interval: "month",
@@ -126,6 +127,7 @@ describe("Growth seat changes", () => {
       endDate: null,
       maxMembers: 5,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
       seatsKept: null,
@@ -161,6 +163,7 @@ describe("Growth seat changes", () => {
       host: {
         sendSlackSubscriptionEvent: vi.fn(),
         sendSlackBillingThresholdFailureAlert: vi.fn(),
+        sendSlackAccountPaymentFailed: vi.fn(),
       },
     });
   });
@@ -264,6 +267,21 @@ describe("Growth seat changes", () => {
         formattedKeptRecurringTotal: "€145",
       });
       expect(stripeSubscriptions.previews).toEqual([]);
+    });
+  });
+
+  describe("when the payment provider marks the subscription past due", () => {
+    /** @scenario "A past due subscription can still change its seats" */
+    it("prices and lowers the seats instead of failing as no active subscription", async () => {
+      seedProvider(5, "past_due");
+
+      const quote = await seats.previewProration({ organizationId: "org_1", newTotalSeats: 3 });
+      await seats.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });
+
+      expect(quote).toMatchObject({ amountDueCents: 0, formattedRecurringTotal: "€87" });
+      expect(stripeSubscriptions.updates.map((update) => update.change.items)).toEqual([
+        [{ id: "si_seat", quantity: 3 }],
+      ]);
     });
   });
 

@@ -25,9 +25,9 @@ export function LangyLauncher({ isOpen, onOpen }: { isOpen: boolean; onOpen: () 
   // the bottom-right launcher would sit on top of it (and the table pager).
   // Dodge to the bottom-LEFT corner while a drawer is open; hop back only a
   // beat after the drawer has left, on the same cadence as the panel's dodge.
-  const { currentDrawer } = useDrawer();
+  const { currentDrawer, inPlaceDrawerOpen } = useDrawer();
   const dodgeLeft = useLingeringDodge({
-    active: !!currentDrawer,
+    active: !!currentDrawer || !!inPlaceDrawerOpen,
     releaseDelayMs: LANGY_DODGE_STAGGER_MS,
     immediate: reduceMotion,
   });

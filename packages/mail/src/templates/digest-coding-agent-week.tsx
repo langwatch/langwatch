@@ -6,16 +6,14 @@ import {
   formatCompact,
   formatCount,
   formatMinutes,
-  formatUsd,
 } from "./digest-parts.tsx";
 import { ActionRow, DetailTable } from "./email-layout.tsx";
-import { defineTemplate } from "./registry.ts";
+import { defineTemplate, renderMailTemplate } from "./registry.ts";
 
 export const digestCodingAgentWeekProps = z.object({
   ...digestCommonFields,
   sessions: z.number().int().positive().describe("Coding-agent sessions this week, 5 or more"),
   tokens: z.number().int().nonnegative(),
-  costUsd: z.number().nonnegative(),
   activeMinutes: z.number().nonnegative(),
   linesChanged: z
     .number()
@@ -26,44 +24,62 @@ export const digestCodingAgentWeekProps = z.object({
   commits: z.number().int().nonnegative().optional(),
   pullRequests: z.number().int().nonnegative().optional(),
   topRepo: z.string().min(1).optional().describe("The repository with the most sessions"),
+  totalsAtLeast: z
+    .boolean()
+    .optional()
+    .describe("The week held more metric series than it keeps, so each total is a floor"),
   weekUrl: z.url().describe("Already a tracked redirect"),
 });
 
 export type DigestCodingAgentWeekProps = z.infer<typeof digestCodingAgentWeekProps>;
 
+/** A total missing the series the week dropped reads as a floor. */
+const floorOf = ({
+  totalsAtLeast,
+  text,
+}: {
+  totalsAtLeast: boolean | undefined;
+  text: string;
+}): string => (totalsAtLeast ? `at least ${text}` : text);
+
 export const digestCodingAgentWeekSubject = ({
   sessions,
-  costUsd,
-}: DigestCodingAgentWeekProps): string =>
-  `Your coding agents this week: ${formatCount(sessions)} sessions, ${formatUsd(costUsd)}`;
+  tokens,
+  totalsAtLeast,
+}: DigestCodingAgentWeekProps): string => {
+  const tokensText = floorOf({ totalsAtLeast, text: formatCompact(tokens) });
+  return `Your coding agents this week: ${formatCount(sessions)} sessions, ${tokensText} tokens`;
+};
 
 export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
-  const { sessions, tokens, costUsd, activeMinutes, linesChanged, commits, pullRequests, topRepo } =
-    props;
+  const { sessions, tokens, activeMinutes, linesChanged, commits, pullRequests, topRepo } = props;
+  const floor = (text: string) => floorOf({ totalsAtLeast: props.totalsAtLeast, text });
+  const tokensText = floor(formatCompact(tokens));
 
   return (
     <DigestFrame
-      preview={`${formatCount(sessions)} sessions, ${formatCompact(tokens)} tokens, ${formatUsd(costUsd)}`}
+      preview={`${formatCount(sessions)} sessions, ${tokensText} tokens`}
       heading={`Your coding-agent week, ${props.weekLabel}`}
       hero={{
         value: formatCount(sessions),
-        caption: `coding-agent sessions, ${formatMinutes(activeMinutes)} active`,
+        caption: `coding-agent sessions, ${floor(formatMinutes(activeMinutes))} active`,
       }}
       whatsNew={props.whatsNew}
       reason="You use coding agents with LangWatch."
-      unsubscribeUrl={props.unsubscribeUrl}
+      preferencesUrl={props.preferencesUrl}
     >
       <DetailTable
         rows={[
-          { label: "Cost", value: formatUsd(costUsd) },
-          { label: "Tokens", value: formatCompact(tokens) },
+          { label: "Tokens", value: tokensText },
           ...(linesChanged === undefined
             ? []
-            : [{ label: "Lines changed", value: formatCount(linesChanged) }]),
-          ...(commits === undefined ? [] : [{ label: "Commits", value: formatCount(commits) }]),
+            : [{ label: "Lines changed", value: floor(formatCount(linesChanged)) }]),
+          ...(commits === undefined
+            ? []
+            : [{ label: "Commits", value: floor(formatCount(commits)) }]),
           ...(pullRequests === undefined
             ? []
-            : [{ label: "Pull requests", value: formatCount(pullRequests) }]),
+            : [{ label: "Pull requests", value: floor(formatCount(pullRequests)) }]),
           ...(topRepo ? [{ label: "Top repository", value: topRepo }] : []),
         ]}
       />
@@ -73,7 +89,7 @@ export const DigestCodingAgentWeek = (props: DigestCodingAgentWeekProps) => {
 };
 
 const links = {
-  unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
+  preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
   weekUrl: "https://app.langwatch.ai/api/digest/c/tk_agent3Wf8",
 } as const;
 
@@ -89,7 +105,6 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
       weekLabel: "Sep 22 to 28",
       sessions: 64,
       tokens: 18_400_000,
-      costUsd: 212.4,
       activeMinutes: 1_215,
       linesChanged: 9_870,
       commits: 41,
@@ -108,7 +123,6 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
       weekLabel: "Sep 22 to 28",
       sessions: 5,
       tokens: 420_000,
-      costUsd: 3.85,
       activeMinutes: 48,
       ...links,
     },
@@ -116,7 +130,6 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
       weekLabel: "Sep 22 to 28",
       sessions: 17,
       tokens: 2_900_000,
-      costUsd: 27.1,
       activeMinutes: 312,
       commits: 9,
       topRepo: "northwind/billing",
@@ -124,3 +137,11 @@ export const digestCodingAgentWeekTemplate = defineTemplate({
     },
   },
 });
+
+/** Rendered by the digest module, which owns the envelope and its one-click unsubscribe. */
+export const renderDigestCodingAgentWeekEmail = async (
+  props: DigestCodingAgentWeekProps,
+): Promise<{ subject: string; html: string }> => {
+  const { subject, html } = await renderMailTemplate(digestCodingAgentWeekTemplate, props);
+  return { subject, html };
+};

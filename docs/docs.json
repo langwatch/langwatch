@@ -153,6 +153,8 @@
               },
               "agent-testing/voice-agents",
               "agent-testing/red-teaming",
+              "agent-testing/owasp-red-team",
+              "agent-testing/red-team-templates",
               "agent-testing/red-team-open-source"
             ]
           },
@@ -175,6 +177,7 @@
               "features/querying-your-data",
               "features/dashboards",
               "features/automations",
+              "features/braids",
               "features/topic-clustering",
               "features/embedded-analytics"
             ]
@@ -360,7 +363,8 @@
             "group": "Overview",
             "pages": [
               "integration/overview",
-              "observability/trace-vs-activity-ingestion"
+              "observability/trace-vs-activity-ingestion",
+              "observability/multi-agent-a2a"
             ]
           },
           {
@@ -647,7 +651,8 @@
               "ai-gateway/overview",
               "ai-gateway/quickstart",
               "ai-gateway/cap-spend-per-team",
-              "ai-gateway/concepts"
+              "ai-gateway/concepts",
+              "ai-gateway/a2a-proxy"
             ]
           },
           {
@@ -847,6 +852,13 @@
             ]
           },
           {
+            "group": "Agent Registry",
+            "pages": [
+              "governance/agent-registry",
+              "governance/kill-switch"
+            ]
+          },
+          {
             "group": "Privacy",
             "pages": [
               "ai-governance/no-spy-mode"
@@ -863,7 +875,8 @@
               "ai-governance/ingestion-sources/s3-custom",
               "ai-governance/ingestion-sources/copilot-studio",
               "ai-governance/ingestion-sources/openai-compliance",
-              "ai-governance/ingestion-sources/claude-compliance"
+              "ai-governance/ingestion-sources/claude-compliance",
+              "ai-governance/cloud-agent-discovery"
             ]
           },
           {
@@ -1148,6 +1161,7 @@
             "pages": [
               "api-reference/traces/overview",
               "api-reference/traces/discover-what-the-trace-filter-fields-hold",
+              "api-reference/traces/recommended-trace-wait-for-a-scenario-judge",
               "api-reference/traces/search",
               "api-reference/traces/get-trace",
               "api-reference/traces/get-transcript",
@@ -1398,10 +1412,12 @@
             "pages": [
               "api-reference/test-suites/overview",
               "api-reference/test-suites/list-test-suites",
+              "api-reference/test-suites/list-suite-templates",
               "api-reference/test-suites/create-test-suites",
               "api-reference/test-suites/read-one-test-suite",
               "api-reference/test-suites/update-test-suites",
               "api-reference/test-suites/run-a-test-suite",
+              "api-reference/test-suites/apply-a-suite-template",
               "api-reference/test-suites/delete-test-suites"
             ]
           },
@@ -1436,6 +1452,36 @@
               "api-reference/agents/action-test",
               "api-reference/agents/remove-a-deploy-label-from-an-agent",
               "api-reference/agents/delete-agents"
+            ]
+          },
+          {
+            "group": "Agent Registry",
+            "pages": [
+              "api-reference/governance-agent-registry/overview",
+              "api-reference/governance-agent-registry/list-the-organisation-s-agent-registry",
+              "api-reference/governance-agent-registry/get-the-registry-as-an-ard-manifest",
+              "api-reference/governance-agent-registry/read-the-registry-change-feed",
+              "api-reference/governance-agent-registry/get-the-registry-s-json-schemas",
+              "api-reference/governance-agent-registry/get-the-registry-settings",
+              "api-reference/governance-agent-registry/search-the-registry-ard-search",
+              "api-reference/governance-agent-registry/get-one-registry-agent",
+              "api-reference/governance-agent-registry/list-one-registry-agent-s-versions",
+              "api-reference/governance-agent-registry/save-the-registry-settings"
+            ]
+          },
+          {
+            "group": "Agent Kill Switch",
+            "pages": [
+              "api-reference/governance-kill-switch/overview",
+              "api-reference/governance-kill-switch/list-the-organisation-s-agent-stops",
+              "api-reference/governance-kill-switch/get-an-agent-s-latest-stop",
+              "api-reference/governance-kill-switch/get-an-agent-s-stop-plan",
+              "api-reference/governance-kill-switch/replace-an-agent-s-stop-plan",
+              "api-reference/governance-kill-switch/approve-a-pending-stop",
+              "api-reference/governance-kill-switch/deny-a-pending-stop",
+              "api-reference/governance-kill-switch/restore-a-stopped-agent",
+              "api-reference/governance-kill-switch/retry-a-stop",
+              "api-reference/governance-kill-switch/stop-an-agent"
             ]
           },
           {
@@ -1697,6 +1743,27 @@
             ]
           },
           {
+            "group": "OCSF SIEM Export",
+            "pages": [
+              "api-reference/governance-ocsf/overview",
+              "api-reference/governance-ocsf/export-governance-events-as-ocsf-1-9-0",
+              "api-reference/governance-ocsf/export-project-traces-as-ocsf-1-9-0",
+              "api-reference/governance-ocsf/export-the-audit-log-as-ocsf-1-9-0",
+              "api-reference/governance-ocsf/push-ocsf-events-in-from-another-source"
+            ]
+          },
+          {
+            "group": "Security Lake Sources",
+            "pages": [
+              "api-reference/governance-security-lake/overview",
+              "api-reference/governance-security-lake/add-an-aws-security-lake-source",
+              "api-reference/governance-security-lake/edit-an-aws-security-lake-source",
+              "api-reference/governance-security-lake/test-a-security-lake-source-s-connection",
+              "api-reference/governance-security-lake/read-a-security-lake-source-s-health",
+              "api-reference/governance-security-lake/read-a-security-lake-source"
+            ]
+          },
+          {
             "group": "SCIM",
             "pages": [
               "api-reference/scim/overview",
@@ -1853,7 +1920,7 @@
       "destination": "/api-reference/projects/get-a-dashboard"
     },
     {
-      "source": "/ci/cache/busted/1794371108",
+      "source": "/ci/cache/busted/1794655975",
       "destination": "/introduction"
     },
     {

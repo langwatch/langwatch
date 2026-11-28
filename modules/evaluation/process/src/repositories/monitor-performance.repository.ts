@@ -6,6 +6,8 @@ export type MonitorPerformanceBucket = {
   scoreCount: number;
   passSum: number;
   passCount: number;
+  /** Results per label that day; empty for evaluators that only score or pass. */
+  labelCounts: Record<string, number>;
 };
 
 export type MonitorPerformanceBucketQuery = {
@@ -17,7 +19,27 @@ export type MonitorPerformanceBucketQuery = {
   timeZone: string;
 };
 
+/** One project's runs of one evaluator with one error code ("" for runs that did not error). */
+export type EvaluatorOutcomeRow = {
+  evaluatorId: string;
+  evaluatorType: string;
+  errorCode: string;
+  runs: number;
+  errors: number;
+  skipped: number;
+  lastErrorAt: number | null;
+};
+
+export type EvaluatorOutcomeRowQuery = {
+  tenantId: string;
+  since: number;
+  until: number;
+  limit: number;
+};
+
 /** Private ClickHouse read model for monitor performance. */
 export abstract class MonitorPerformanceRepository {
   abstract findBuckets(input: MonitorPerformanceBucketQuery): Promise<MonitorPerformanceBucket[]>;
+  /** Each run scheduled in `[since, until)` at its latest revision, per evaluator and code. */
+  abstract findOutcomeRows(input: EvaluatorOutcomeRowQuery): Promise<EvaluatorOutcomeRow[]>;
 }

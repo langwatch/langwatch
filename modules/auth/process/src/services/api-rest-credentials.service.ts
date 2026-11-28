@@ -11,6 +11,7 @@ import {
 import {
   assertKeyKind,
   keyCredentialOf,
+  recordProjectCredential,
   routeTemplateOf,
   type RestKeyKind,
   keyPrincipalOfApiKey,
@@ -167,6 +168,10 @@ export class ApiRestCredentialsService {
       const routeScopes = input.legacyKeyScopes;
       const route = routeTemplateOf(input.request);
       if (!(await this.#projectHolds({ credential, permission, route, routeScopes }))) {
+        // The runtime trails a staff key's refusal and needs the key it refused (ADR-202).
+        if (credential.resolved.type === "apiKey" && credential.resolved.isStaffAccessKey) {
+          recordProjectCredential(input.request, credential.resolved);
+        }
         throw this.refusals.project({ credential, permission });
       }
     }
@@ -316,7 +321,8 @@ export class ApiRestCredentialsService {
 
     const organization = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
     if (!organization.ok) throw new ProjectInvalidCredentialsError();
-    const { apiKeyId, userId, organizationId, isLangySessionKey } = organization.resolved;
+    const { apiKeyId, userId, organizationId, isLangySessionKey, isStaffAccessKey } =
+      organization.resolved;
 
     return {
       principal: {
@@ -325,6 +331,7 @@ export class ApiRestCredentialsService {
         userId,
         organizationId,
         ...(isLangySessionKey ? { isLangySessionKey: true } : {}),
+        ...(isStaffAccessKey ? { isStaffAccessKey: true } : {}),
       },
       organizationId,
       markUsed: () => this.apiKeys.markUsed({ id: apiKeyId }),
@@ -426,6 +433,8 @@ export class ApiRestCredentialsService {
 
     const key = await this.apiKeys.resolveOrganizationToken({ token: credentials.token });
     if (!key.ok) return new ProjectInvalidCredentialsError();
+    // A staff key's calls are trailed only behind the staff gate, which this refusal never reaches.
+    if (key.resolved.isStaffAccessKey) return new ProjectRequiredError({ projects: [] });
 
     return new ProjectRequiredError({
       projects: await this.findReachableProjects({

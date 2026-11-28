@@ -18,6 +18,7 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SectionTitle } from "@langwatch/design-system/typography";
 import {
+  canonicalModelId,
   isOwnDecisionModelId,
   LANGWATCH_DECISION_MODEL_ID,
   MODEL_ROLES,
@@ -364,7 +365,7 @@ function ConfigCell({
   onEdit: () => void;
   enabledProviderKeys: Set<string> | null;
   displayNames: Record<string, string>;
-  /** Whether Evals Preview may be offered; not, an unset Instant Evals cell reads "Not set". */
+  /** Whether LangWatch Instant (preview) may be offered; if not, an unset cell reads "Not set". */
   isHostedOffered: boolean;
 }) {
   const isInvalid = (model: string) =>
@@ -413,7 +414,7 @@ function ConfigCell({
             {feature.displayName}
           </Text>
           <ModelChip
-            model={config[feature.key]!}
+            model={canonicalModelId(config[feature.key]!)}
             size="sm"
             invalid={isInvalid(config[feature.key]!)}
             displayNames={chipNames}
@@ -425,9 +426,9 @@ function ConfigCell({
 }
 
 /**
- * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded Evals Preview
- * default, never "Not configured" (ADR-182 decision 1). Where Evals Preview is not offered, unset
- * or pinned to it reads "Not set". Only an own model can need an update: no hosted provider row.
+ * The Instant Evals cell: unset, or an id the catalogue dropped, reads as the faded LangWatch
+ * Instant (preview) default, never "Not configured" (ADR-182 decision 1). Where it is not offered,
+ * unset or pinned to it reads "Not set". Only an own model can need an update: no hosted row.
  */
 function DecisionModelChip({
   model,
@@ -439,7 +440,9 @@ function DecisionModelChip({
   isHostedOffered: boolean;
 }) {
   const shown =
-    isShownDecisionModel(model) && (isHostedOffered || isOwnDecisionModelId(model)) ? model : null;
+    isShownDecisionModel(model) && (isHostedOffered || isOwnDecisionModelId(model))
+      ? canonicalModelId(model)
+      : null;
   if (!shown && !isHostedOffered) {
     return (
       <Badge colorPalette="gray" variant="subtle" data-testid="instant-evals-not-set">

@@ -4,6 +4,7 @@
  */
 
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import type { FacetState } from "@langwatch/trace-contract";
 import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react";
 import { Server } from "lucide-react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -33,7 +34,7 @@ vi.mock("../../../explorer.store.ts", async (importOriginal) => {
 
 import { FacetSection } from "../../../../ui/sections/explorer/filter-sidebar/facet-section.tsx";
 import type * as actualModule from "../../../explorer.store.ts";
-import type { FacetItem, FacetValueState } from "../types.ts";
+import type { FacetItem } from "../types.ts";
 
 // Five preloaded service values — the top-N the discover payload shipped.
 // "finance-team-42" is deliberately NOT among them: it lives only server-side.
@@ -45,7 +46,7 @@ const PRELOADED: FacetItem[] = [
   { value: "inventory", label: "inventory", count: 10 },
 ];
 
-const neutral = (): FacetValueState => "neutral";
+const neutral = (): FacetState => "neutral";
 
 function renderSection(props?: { serverValueSearch?: boolean; items?: FacetItem[] }) {
   return renderWithDesignSystem(

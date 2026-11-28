@@ -34,6 +34,8 @@ type Result struct {
 	Exports  []Export
 	Skipped  []Skipped
 	Failures []Failure
+	// Warnings are gaps that only skip cells, such as no Vertex access token.
+	Warnings []string
 }
 
 // Err is non-nil when a provider with credentials could not be seeded: that is
@@ -47,8 +49,9 @@ func (r Result) Err() error {
 }
 
 // Run provisions the organization and project, then seeds each provider in
-// turn. A bootstrap failure returns an error and no exports; a provider failure
-// is recorded and the remaining providers are still seeded.
+// turn, then mints and exports VERTEX_ACCESS_TOKEN when a service-account key is
+// set. A bootstrap failure returns an error and no exports; a provider failure
+// is recorded and the rest still seed; a refused token only warns.
 func Run(ctx context.Context, opts Options) (Result, error) {
 	if opts.InstanceAdminKey == "" {
 		return Result{}, errors.New("no instance administrator key: set LANGWATCH_INSTANCE_ADMIN_API_KEY on the api and the seed")
@@ -74,6 +77,14 @@ func Run(ctx context.Context, opts Options) (Result, error) {
 			continue
 		}
 		result.Exports = append(result.Exports, Export{Name: p.Provider.Export, Value: secret})
+	}
+	if keyJSON := opts.Env("VERTEX_SERVICE_ACCOUNT_JSON"); keyJSON != "" {
+		token, err := mintVertexToken(ctx, c.http, keyJSON)
+		if err != nil {
+			result.Warnings = append(result.Warnings, fmt.Sprintf("no VERTEX_ACCESS_TOKEN, so the Vertex cache cell skips: %v", err))
+		} else {
+			result.Exports = append(result.Exports, Export{Name: "VERTEX_ACCESS_TOKEN", Value: token})
+		}
 	}
 	return result, nil
 }

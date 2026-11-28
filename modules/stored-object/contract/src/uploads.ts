@@ -71,3 +71,12 @@ export const storedObjectParamsSchema: StoredObjectParamsSchema =
 
 /** The hidden local route's query: the seal `createUpload` put in the URL. */
 export const storedObjectUploadSignatureSchema = z.string().min(1).max(8192).regex(/^\S+$/u);
+
+/**
+ * LangWatch's signed upload route, and how long a body sent to it may take: 5 GiB at about
+ * 6 Mbit/s. The segment admits no dot segment or escape, so no other route borrows it (#9666).
+ */
+export const STORED_OBJECT_UPLOAD_REQUEST_BODY = {
+  path: /^\/api\/stored-objects\/uploads\/[A-Za-z0-9][A-Za-z0-9._-]*\/content$/,
+  timeoutMs: 2 * 60 * 60_000,
+} as const;

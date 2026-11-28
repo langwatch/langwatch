@@ -2,6 +2,7 @@ import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 import {
+  euroUsagePriceErrors,
   OPTIONAL_STRIPE_METER_NAMES,
   OPTIONAL_STRIPE_PRICE_NAMES,
   STRIPE_METER_NAMES,
@@ -313,7 +314,7 @@ export const validateMappings = (
     }
   }
 
-  return errors;
+  return [...errors, ...euroUsagePriceErrors({ file, environment })];
 };
 
 export const mergeWithExisting = (params: {

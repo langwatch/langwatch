@@ -141,7 +141,7 @@ func TestStepsRefusesAChangeToAReleasedDeclaration(t *testing.T) {
 				if f.Entry != stepFile || !strings.Contains(f.Problem, "which release 3.21.0 shipped, and a released step cannot change") {
 					t.Errorf("finding = %+v", f)
 				}
-				if !strings.Contains(f.Fix, "restore the defineMigrationStep block declaring") || !strings.Contains(f.Fix, "git show main:"+stepFile) {
+				if !strings.Contains(f.Fix, "restore the declaration of") || !strings.Contains(f.Fix, "git show main:"+stepFile) {
 					t.Errorf("fix = %q, want the base declaration restored", f.Fix)
 				}
 				if id, _, ok := strings.Cut(strings.TrimPrefix(f.Problem, "declares "), ","); ok {
@@ -281,6 +281,197 @@ func TestStepsFreezesOnlyAReleasedReplayStepCall(t *testing.T) {
 	}
 }
 
+// @scenario "A released id-index step is read from its owner's call in code"
+func TestStepsFreezesEachIdIndexCallOfOneChainOnItsOwn(t *testing.T) {
+	const (
+		gatewayFile = "modules/gateway/process/src/gateway.module.ts"
+		opsFile     = "modules/ops/process/src/ops.module.ts"
+		gatewayOwn  = ".withIdIndexes(GATEWAY_ID_INDEXES, {\n  description: \"Fills gateway.\",\n})"
+		gatewayNext = ".withIdIndexes(SECOND_ID_INDEXES, {\n  step: \"fill-second-id-indexes\",\n  description: \"Fills second.\",\n})"
+		opsOwn      = ".withIdIndexes(OPS_ID_INDEXES, {\n  description: \"Fills ops.\",\n})"
+		opsLog      = ".withIdIndexes([EVENT_LOG_ID_INDEX], {\n  step: \"fill-event-log-id-index\",\n  description: \"Fills the event log.\",\n})"
+		gateway     = "export const gateway = defineProcessModule(\"gateway\")\n  " + gatewayOwn + "\n  " + gatewayNext + ";\n"
+		ops         = "export const ops = defineProcessModule(\"ops\")\n  " + opsOwn + "\n  " + opsLog + ";\n"
+	)
+	// Released: gateway:fill-id-indexes (no step option) and ops:fill-event-log-id-index.
+	// Not released: gateway:fill-second-id-indexes and ops:fill-id-indexes.
+	cases := []struct {
+		name, gateway, ops, want string
+	}{
+		{"the gateway's unreleased second call edited", strings.Replace(gateway, "Fills second.", "Fills more.", 1), ops, ""},
+		{"the gateway's released call edited", strings.Replace(gateway, "Fills gateway.", "Fills more.", 1), ops, "declares gateway:fill-id-indexes"},
+		{"the ops module's unreleased call edited", gateway, strings.Replace(ops, "Fills ops.", "Fills more.", 1), ""},
+		{"the ops module's released call edited", gateway, strings.Replace(ops, "Fills the event log.", "Fills more.", 1), "declares ops:fill-event-log-id-index"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := idIndexFindings(t, map[string][2]string{gatewayFile: {gateway, c.gateway}, opsFile: {ops, c.ops}})
+			if c.want == "" {
+				if len(findings) != 0 {
+					t.Errorf("want no finding, got %+v", findings)
+				}
+				return
+			}
+			if len(findings) != 1 || !strings.Contains(findings[0].Problem, c.want) {
+				t.Errorf("want one finding %q, got %+v", c.want, findings)
+			}
+		})
+	}
+}
+
+// idIndexFindings commits each file's base on main, under a manifest
+// releasing the gateway, ops and coding-agent id-index steps, then each
+// changed head on a branch, and returns the step findings.
+func idIndexFindings(t *testing.T, files map[string][2]string) []migrationorder.Finding {
+	t.Helper()
+	root := initRepo(t)
+	for file, versions := range files {
+		writeAndCommit(t, root, file, versions[0])
+	}
+	writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", `{"release":"3.21.0","steps":[
+  {"id":"gateway:fill-id-indexes","kind":"data","mode":"background","owner":"gateway","description":"g"},
+  {"id":"ops:fill-event-log-id-index","kind":"data","mode":"background","owner":"ops","description":"o"},
+  {"id":"coding-agent:fill-id-indexes","kind":"data","mode":"background","owner":"coding-agent","description":"c"}]}`)
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+	for file, versions := range files {
+		if versions[1] != versions[0] {
+			writeAndCommit(t, root, file, versions[1])
+		}
+	}
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	return migrationorder.CheckSteps(in)
+}
+
+// @scenario "A released id-index step is frozen in its declaring call, not where another step orders after it"
+func TestStepsFreezesAReleasedIdIndexStepInItsDeclaringCall(t *testing.T) {
+	const (
+		gatewayFile = "modules/gateway/process/src/gateway.module.ts"
+		opsFile     = "modules/ops/process/src/ops.module.ts"
+		gatewayCall = ".withIdIndexes(GATEWAY_ID_INDEXES, {\n  after: [\"coding-agent:fill-id-indexes\"],\n  description: \"Fills gateway.\",\n})"
+		opsCall     = ".withIdIndexes([EVENT_LOG_ID_INDEX], {\n  step: \"fill-event-log-id-index\",\n  after: [\"gateway:fill-id-indexes\"],\n})"
+		gateway     = "export const gateway = defineProcessModule(\"gateway\")\n  " + gatewayCall + ";\n"
+		ops         = "export const ops = defineProcessModule(\"ops\")\n  .withEventing(usageEventing)\n  // reads the event log\n  " + opsCall + ";\n"
+	)
+	findingsAfter := func(t *testing.T, gatewayHead, opsHead string) []migrationorder.Finding {
+		t.Helper()
+		return idIndexFindings(t, map[string][2]string{gatewayFile: {gateway, gatewayHead}, opsFile: {ops, opsHead}})
+	}
+	unrelated := strings.Replace(ops, "  .withEventing(usageEventing)\n", "  .withEventing(usageEventing)\n  .withEventing(replayEventing)\n", 1)
+	if findings := findingsAfter(t, gateway, unrelated); len(findings) != 0 {
+		t.Errorf("an unrelated line in the referencing file, want no finding, got %+v", findings)
+	}
+	// coding-agent:fill-id-indexes is only referenced here, never declared.
+	gatewayUnrelated := "import { more } from \"./more\";\n" + gateway
+	if findings := findingsAfter(t, gatewayUnrelated, ops); len(findings) != 0 {
+		t.Errorf("an unrelated line beside a reference to an undeclared step, want no finding, got %+v", findings)
+	}
+	cases := []struct {
+		name, gateway, ops, entry, problem string
+	}{
+		{"the gateway call edited", strings.Replace(gateway, "Fills gateway.", "Fills more.", 1), ops, gatewayFile, "declares gateway:fill-id-indexes"},
+		{"the ops call edited", gateway, strings.Replace(ops, "[EVENT_LOG_ID_INDEX]", "[EVENT_LOG_ID_INDEX, MORE]", 1), opsFile, "declares ops:fill-event-log-id-index"},
+		{"the gateway call removed", "export const gateway = defineProcessModule(\"gateway\");\n", ops, gatewayFile, "released step gateway:fill-id-indexes was removed"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := findingsAfter(t, c.gateway, c.ops)
+			if len(findings) != 1 || findings[0].Entry != c.entry || !strings.Contains(findings[0].Problem, c.problem) {
+				t.Errorf("want one finding on %s %q, got %+v", c.entry, c.problem, findings)
+			}
+		})
+	}
+}
+
+// @scenario "A released id-index step is read from its owner's call in code"
+func TestStepsReadsAReleasedIdIndexStepFromItsOwnersCallInCode(t *testing.T) {
+	const (
+		gatewayFile = "modules/gateway/process/src/gateway.module.ts"
+		opsFile     = "modules/ops/process/src/ops.module.ts"
+		otherFile   = "modules/other/process/src/other.module.ts"
+		gatewayCall = ".withIdIndexes (GATEWAY_ID_INDEXES, {\n  description: \"Fills gateway.\",\n})"
+		opsCall     = ".withIdIndexes([EVENT_LOG_ID_INDEX], {\n  // step: \"old-name\",\n  step: \"fill-event-log-id-index\",\n  after: [\"gateway:fill-id-indexes\"],\n})"
+		gateway     = "export const gateway = defineProcessModule(\"gateway\")\n  " + gatewayCall + ";\n"
+		ops         = "export const ops = defineProcessModule(\"ops\")\n  " + opsCall + ";\n"
+		removed     = "export const gateway = defineProcessModule(\"gateway\");\n"
+		other       = "// mirrors defineProcessModule(\"gateway\")\nexport const other = defineProcessModule(\"other\")\n  " + gatewayCall + ";\n"
+	)
+	edited := strings.Replace(ops, "[EVENT_LOG_ID_INDEX]", "[EVENT_LOG_ID_INDEX, MORE]", 1)
+	wrapped := func(file string) string {
+		return strings.Replace(file, `defineProcessModule("gateway")`, "defineProcessModule(\n  \"gateway\",\n)", 1)
+	}
+	quotedKey := func(quote, file string) string {
+		return strings.Replace(file, "  step:", "  "+quote+"step"+quote+":", 1)
+	}
+	cases := []struct {
+		name, problem, entry string
+		files                map[string][2]string
+	}{
+		{"a space before the bracket", "declares gateway:fill-id-indexes", gatewayFile, map[string][2]string{
+			gatewayFile: {gateway, strings.Replace(gateway, "Fills gateway.", "Fills more.", 1)}, opsFile: {ops, ops},
+		}},
+		{"a comment naming another step", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
+			gatewayFile: {gateway, gateway}, opsFile: {ops, edited},
+		}},
+		{"the call commented out", "released step gateway:fill-id-indexes was removed", gatewayFile, map[string][2]string{
+			gatewayFile: {gateway, strings.Replace(gateway, gatewayCall, "/* "+gatewayCall+" */", 1)}, opsFile: {ops, ops},
+		}},
+		{"another module's identical call", "released step gateway:fill-id-indexes was removed", gatewayFile, map[string][2]string{
+			gatewayFile: {gateway, removed}, opsFile: {ops, ops}, otherFile: {other, other},
+		}},
+		{"a double-quoted step key", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
+			gatewayFile: {gateway, gateway}, opsFile: {quotedKey(`"`, ops), quotedKey(`"`, edited)},
+		}},
+		{"a single-quoted step key", "declares ops:fill-event-log-id-index", opsFile, map[string][2]string{
+			gatewayFile: {gateway, gateway}, opsFile: {quotedKey(`'`, ops), quotedKey(`'`, edited)},
+		}},
+		{"the owner's call wrapped with a trailing comma", "declares gateway:fill-id-indexes", gatewayFile, map[string][2]string{
+			gatewayFile: {wrapped(gateway), wrapped(strings.Replace(gateway, "Fills gateway.", "Fills more.", 1))}, opsFile: {ops, ops},
+		}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			findings := idIndexFindings(t, c.files)
+			if len(findings) != 1 || findings[0].Entry != c.entry || !strings.Contains(findings[0].Problem, c.problem) {
+				t.Errorf("want one finding on %s %q, got %+v", c.entry, c.problem, findings)
+			}
+		})
+	}
+}
+
+// @scenario "An after list with a comment before its colon or its bracket is still a reference"
+func TestStepsTreatsAnAfterListBehindACommentAsAReference(t *testing.T) {
+	const file = "modules/gateway/process/src/gateway.module.ts"
+	for _, after := range []string{"after: /* dependency */ [", "after /* dependency */: [", "after // dependency\n    : ["} {
+		t.Run(after, func(t *testing.T) {
+			base := "export const gateway = defineProcessModule(\"gateway\")\n  .withIdIndexes(GATEWAY_ID_INDEXES, {\n    " + after + "\"coding-agent:fill-id-indexes\"],\n  });\n"
+			head := "import { more } from \"./more\";\n" + base
+			if findings := idIndexFindings(t, map[string][2]string{file: {base, head}}); len(findings) != 0 {
+				t.Errorf("an unrelated line beside a commented after list, want no finding, got %+v", findings)
+			}
+		})
+	}
+}
+
+// @scenario "After-list text in a comment or a string is not an after list"
+func TestStepsIgnoresAfterListTextInACommentOrAString(t *testing.T) {
+	const file = "modules/gateway/process/src/fill.ts"
+	for name, base := range map[string]string{
+		"a comment": "const steps = { // after: [\n  fill: customStep(\"coding-agent:fill-id-indexes\") };\n",
+		"a string":  "const steps = { note: \"after: [\", // \"\n  fill: customStep(\"coding-agent:fill-id-indexes\") };\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			head := "import { more } from \"./more\";\n" + base
+			findings := idIndexFindings(t, map[string][2]string{file: {base, head}})
+			if len(findings) != 1 || findings[0].Entry != file || !strings.Contains(findings[0].Problem, "declares coding-agent:fill-id-indexes") {
+				t.Errorf("an edit to a file naming the step outside an after list, want one finding, got %+v", findings)
+			}
+		})
+	}
+}
+
 // @scenario "A code step no release manifest names yet may still change"
 func TestStepsLeavesAnUnreleasedStepFileAlone(t *testing.T) {
 	root := repoWithStep(t, "")
@@ -299,6 +490,25 @@ func TestStepsLeavesAnUnreleasedStepFileAlone(t *testing.T) {
 	}
 	if findings := migrationorder.CheckSteps(in); len(findings) != 0 {
 		t.Errorf("a released step's test file changed, want no finding, got %+v", findings)
+	}
+}
+
+// @scenario "A file that only names a released step in a comment may still change"
+func TestStepsLeavesAFileThatOnlyMentionsAStepInACommentAlone(t *testing.T) {
+	const appFile = "modules/topic/process/src/app/topic.app.ts"
+	root := initRepo(t)
+	writeAndCommit(t, root, stepFile, "export const step = defineMigrationStep({ id: \"topic:seed-clusters\" });\n")
+	writeAndCommit(t, root, appFile, "/** Step `topic:seed-clusters`: fills clusters. */\n// see 'topic:seed-clusters'\nexport const app = 1;\n")
+	writeAndCommit(t, root, "packages/upgrade/releases/3.21.0.json", releasedManifest)
+	gitIn(t, root, "checkout", "-q", "-b", "feature")
+	writeAndCommit(t, root, appFile, "/** Step `topic:seed-clusters`: fills clusters. */\nexport const app = 2;\n")
+
+	in, err := migrationorder.Repo{Root: root}.Steps(t.Context(), "main")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if findings := migrationorder.CheckSteps(in); len(findings) != 0 {
+		t.Errorf("a file naming the step only in comments changed, want no finding, got %+v", findings)
 	}
 }
 

@@ -4,7 +4,7 @@
  * @see specs/scenarios/run-configuration-on-runs.feature
  */
 
-import type { RunActor, ScenarioRunData } from "@langwatch/scenario-contract";
+import type { RecordedRunActor, ScenarioRunData } from "@langwatch/scenario-contract";
 
 import { targetKeyOfRun } from "../../../../model/suite/run-history-transforms.ts";
 
@@ -34,7 +34,7 @@ export type RunSettings = {
    * started with a project key, and a run recorded before the actor was
    * stamped, both read as null and print no name.
    */
-  actor: RunActor | null;
+  actor: RecordedRunActor | null;
   /**
    * The connected agent instance that served each target, keyed by target
    * key. Only a connected agent records one, so every other target is absent
@@ -141,7 +141,7 @@ function readModel(
  * Who started the batch: the first run that names a person.
  * @see specs/scenarios/run-actor-on-runs.feature
  */
-function readActor(scenarioRuns: ScenarioRunData[]): RunActor | null {
+function readActor(scenarioRuns: ScenarioRunData[]): RecordedRunActor | null {
   for (const run of scenarioRuns) {
     const id = run.metadata?.langwatch?.actorId;
     const label = run.metadata?.langwatch?.actorLabel;
@@ -158,7 +158,7 @@ export function runActorName({
   viewerUserId,
   memberNameById,
 }: {
-  actor: RunActor | null;
+  actor: RecordedRunActor | null;
   viewerUserId: string | null | undefined;
   /** The name each organization member goes by, keyed by their user id. */
   memberNameById?: Map<string, string>;

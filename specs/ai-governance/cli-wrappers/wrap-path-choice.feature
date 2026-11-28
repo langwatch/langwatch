@@ -195,7 +195,7 @@ Feature: CLI wrapper asks the user which path to run when both are allowed
     assistant by publishing that tool's coding-assistant tile (with the gateway
     path on). Once enabled, the wrapper routes a virtual key through the org's
     CONFIGURED provider credentials - it does NOT require a model_provider
-    catalog tile (those gate only the /me one-click mint-your-own-VK surface).
+    catalog tile (those gate only the /coding-agents one-click mint-your-own-VK surface).
 
     @unit
     Scenario: Gateway works from a configured credential without a provider tile

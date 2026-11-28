@@ -1,4 +1,6 @@
+import { EVENT_SOURCING_QUEUE_KEY_NAME } from "@langwatch/eventing";
 import {
+  backfillTenantClaims,
   CachedLuaScript,
   DISCARD_FROM_DLQ_LUA,
   DLQ_INDEX_PRUNE_LUA,
@@ -27,6 +29,7 @@ import type {
   ParkedGroupInfo,
   ParkedTenant,
   QueueInfo,
+  TenantQueueCount,
 } from "@langwatch/ops-contract";
 import { nowInstant } from "@langwatch/time";
 import type IORedis from "ioredis";
@@ -290,6 +293,12 @@ function stripHashTag(name: string): string {
   return name;
 }
 
+/** The tenant segment of a group key, as the dispatcher's Lua reads it: before the first '/'. */
+function groupTenantOf(groupId: string): string {
+  const slash = groupId.indexOf("/");
+  return slash > 0 ? groupId.slice(0, slash) : groupId;
+}
+
 /** Read the retry count from the group's canonical attempt key. */
 function parseRetryCount(attemptRaw: string | null): number | null {
   const attempt = attemptRaw === null ? Number.NaN : parseInt(attemptRaw, 10);
@@ -481,6 +490,23 @@ export class QueueRedisRepository extends QueueRepository {
   }
 
   /** Each queue's total-pending counter, floored by its ready groups, as the drain audit reads. */
+  async fillTenantClaims({
+    cursor,
+    maxScanCalls,
+  }: {
+    cursor: string;
+    maxScanCalls: number;
+  }): Promise<{ cursor: string; listed: number }> {
+    // Replay refuses a Cluster, the index's only reader, so a Cluster has nothing to fill.
+    if (isClusterClient(this.redis)) return { cursor: "0", listed: 0 };
+    return backfillTenantClaims({
+      redis: this.redis,
+      queueName: EVENT_SOURCING_QUEUE_KEY_NAME,
+      cursor,
+      maxScanCalls,
+    });
+  }
+
   async countWaitingJobs(): Promise<number> {
     const queueNames = await this.discoverQueueNames();
     const counts = await Promise.all(
@@ -495,6 +521,122 @@ export class QueueRedisRepository extends QueueRepository {
       }),
     );
     return counts.reduce((sum, count) => sum + count, 0);
+  }
+
+  async countTenantGroups(params: {
+    queueNames: string[];
+    tenantIds: string[];
+    scanBudget: number;
+    jobReadBudget: number;
+  }): Promise<TenantQueueCount[]> {
+    const tenants = new Set(params.tenantIds);
+    const counts = await Promise.all(
+      params.queueNames.map((queueName) =>
+        this.countTenantGroupsInQueue({ ...params, queueName, tenants }),
+      ),
+    );
+    return counts.filter(
+      (count) =>
+        count.pendingGroups + count.blockedGroups + count.activeGroups + count.parkedGroups > 0 ||
+        count.dlqGroups + count.pendingJobs > 0,
+    );
+  }
+
+  private async countTenantGroupsInQueue({
+    queueName,
+    tenants,
+    scanBudget,
+    jobReadBudget,
+  }: {
+    queueName: string;
+    tenants: Set<string>;
+    scanBudget: number;
+    jobReadBudget: number;
+  }): Promise<TenantQueueCount> {
+    const prefix = `${queueName}:gq:`;
+    const isTenantGroup = (groupId: string) => tenants.has(groupTenantOf(groupId));
+    const nowMs = nowInstant().epochMilliseconds;
+
+    const perTenant = this.redis.pipeline();
+    for (const tenantId of tenants) {
+      perTenant.zcard(`${prefix}parked:${tenantId}`);
+      perTenant.zcount(`${prefix}tenant_active_z:${tenantId}`, `(${nowMs}`, "+inf");
+      perTenant.zrange(`${prefix}parked:${tenantId}`, 0, jobReadBudget - 1);
+    }
+    const tenantReplies = (await perTenant.exec()) ?? [];
+    let parkedGroups = 0;
+    let activeGroups = 0;
+    const parkedGroupIds: string[] = [];
+    for (let index = 0; index < tenantReplies.length; index += 3) {
+      parkedGroups += Number(tenantReplies[index]?.[1]) || 0;
+      activeGroups += Number(tenantReplies[index + 1]?.[1]) || 0;
+      parkedGroupIds.push(...((tenantReplies[index + 2]?.[1] as string[] | undefined) ?? []));
+    }
+
+    const [readyGroupIds, blockedGroupIds, dlqGroupIds] = await Promise.all([
+      this.scanMembers({ key: `${prefix}ready`, sorted: true, scanBudget, isTenantGroup }),
+      this.scanMembers({ key: `${prefix}blocked`, sorted: false, scanBudget, isTenantGroup }),
+      this.scanMembers({ key: dlqIndexKey(prefix), sorted: false, scanBudget, isTenantGroup }),
+    ]);
+
+    const waiting = [...readyGroupIds, ...parkedGroupIds].slice(0, jobReadBudget);
+    const jobs = this.redis.pipeline();
+    for (const groupId of waiting) {
+      jobs.zcard(`${prefix}group:${groupId}:jobs`);
+      jobs.zrange(`${prefix}group:${groupId}:jobs`, 0, 0, "WITHSCORES");
+    }
+    const jobReplies = waiting.length === 0 ? [] : ((await jobs.exec()) ?? []);
+    let pendingJobs = 0;
+    let oldestPendingAt: number | null = null;
+    for (let index = 0; index < jobReplies.length; index += 2) {
+      pendingJobs += Number(jobReplies[index]?.[1]) || 0;
+      const head = (jobReplies[index + 1]?.[1] as string[] | undefined) ?? [];
+      const score = head.length >= 2 ? parseFloat(head[1]!) : Number.NaN;
+      if (Number.isFinite(score)) {
+        oldestPendingAt = oldestPendingAt === null ? score : Math.min(oldestPendingAt, score);
+      }
+    }
+
+    return {
+      queueName: stripHashTag(queueName),
+      pendingGroups: readyGroupIds.length,
+      blockedGroups: blockedGroupIds.length,
+      activeGroups,
+      parkedGroups,
+      dlqGroups: dlqGroupIds.length,
+      pendingJobs,
+      oldestPendingAt,
+    };
+  }
+
+  /** The tenant's members of one set, reading at most `scanBudget` members of it. */
+  private async scanMembers({
+    key,
+    sorted,
+    scanBudget,
+    isTenantGroup,
+  }: {
+    key: string;
+    sorted: boolean;
+    scanBudget: number;
+    isTenantGroup: (groupId: string) => boolean;
+  }): Promise<string[]> {
+    const matched = new Set<string>();
+    let cursor = "0";
+    let scanned = 0;
+    do {
+      const [next, members] = sorted
+        ? await this.redis.zscan(key, cursor, "COUNT", SSCAN_BATCH)
+        : await this.redis.sscan(key, cursor, "COUNT", SSCAN_BATCH);
+      cursor = next;
+      const step = sorted ? 2 : 1;
+      for (let index = 0; index < members.length; index += step) {
+        const groupId = members[index]!;
+        scanned++;
+        if (isTenantGroup(groupId)) matched.add(groupId);
+      }
+    } while (cursor !== "0" && scanned < scanBudget);
+    return [...matched];
   }
 
   async scanQueues(params: { queueNames: string[]; topN?: number }): Promise<QueueInfo[]> {

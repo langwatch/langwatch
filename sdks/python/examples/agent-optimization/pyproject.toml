@@ -13,14 +13,9 @@ dependencies = [
 
 [tool.uv]
 package = false
-# exclude-newer-package below needs uv 0.9.25+ (dev/docs/best_practices/dependency-age-gates.md).
+# uv 0.9.25+ supports the exclude-newer-package emergency exceptions (dev/docs/best_practices/dependency-age-gates.md).
 required-version = ">=0.9.25"
 exclude-newer = "7 days"
-
-# Security fix released inside the 7-day window above, admitted up to a fixed
-# date so the rest of the tree keeps the cooldown. Drop it once the date is
-# more than 7 days old (#8958).
-exclude-newer-package = { certifi = "2026-10-21T00:00:00Z" }
 
 # Transitive-dependency security pins, so a re-resolution can't pull a
 # vulnerable version back in.
@@ -32,4 +27,7 @@ constraint-dependencies = [
   "certifi>=2026.10.19", # security: certifi advisory covering <2026.10.19 (#2918)
   "multidict>=6.9.1", # security: multidict advisory covering 6.7.0-6.9.0 (#2747)
   "litellm>=1.100.4", # security: litellm advisory GHSA-7hp6-4w63-5g45, fixed in 1.100.4
+  "pyasn1>=0.6.5", # security: pyasn1 decoder advisories covering <=0.6.4 (#3358-#3361)
+  "filelock>=4.2.1", # security: filelock advisories covering 3.20.4-4.2.0 (#3195)
+  "opentelemetry-api>=1.45.2", # security: quadratic-time traceparent parsing covering <=1.45.1 (#3464)
 ]

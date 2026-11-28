@@ -5,7 +5,7 @@ Provides access to project evaluators with computed fields.
 Uses the generated OpenAPI client for type-safe API communication.
 """
 import urllib.parse
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 import httpx
 
@@ -29,6 +29,10 @@ from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_bo
 from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_body_config import (
     PostApiEvaluatorsBodyConfig,
 )
+from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_body_type import (
+    PostApiEvaluatorsBodyType,
+)
+from langwatch.generated.langwatch_rest_api_client.types import UNSET
 from langwatch.generated.langwatch_rest_api_client.models.post_api_evaluators_response_200 import (
     PostApiEvaluatorsResponse200,
 )
@@ -139,13 +143,27 @@ class EvaluatorApiService:
             )
         return _response_to_dict(ok)
 
-    def create(self, name: str, config: Dict[str, Any]) -> Dict[str, Any]:
+    def create(
+        self,
+        name: str,
+        config: Dict[str, Any],
+        *,
+        type: Literal["evaluator", "code", "workflow"] = "evaluator",
+        workflow_id: Optional[str] = None,
+    ) -> Dict[str, Any]:
         """
-        Create a new evaluator.
+        Create a new evaluator of any kind the platform's editor creates.
 
         Args:
             name: Name for the evaluator (1-255 chars).
-            config: Configuration dict, e.g. {"evaluatorType": "langevals/exact_match", "settings": {}}.
+            config: For a built-in evaluator,
+                {"evaluatorType": "langevals/exact_match", "settings": {}}. For a code
+                evaluator, {"code": "<Python class Code>", "inputs": [{"identifier": "output",
+                "type": "str"}]}; the outputs are the fixed passed, score, label and details.
+                For a workflow evaluator, {}.
+            type: "evaluator" (a built-in type, the default), "code" (a custom Python
+                evaluator) or "workflow" (wraps the workflow named by workflow_id).
+            workflow_id: The workflow a "workflow" evaluator wraps.
 
         Returns:
             Dictionary containing the created evaluator data.
@@ -155,6 +173,8 @@ class EvaluatorApiService:
             body=PostApiEvaluatorsBody(
                 name=name,
                 config=PostApiEvaluatorsBodyConfig.from_dict(config),
+                type_=PostApiEvaluatorsBodyType(type),
+                workflow_id=workflow_id if workflow_id is not None else UNSET,
             ),
         )
         ok = unwrap_response(

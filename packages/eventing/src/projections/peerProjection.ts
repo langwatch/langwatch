@@ -2,8 +2,9 @@ import type { z } from "zod";
 
 import type { ParsingSchema } from "../domain/eventSchemas.ts";
 import type { Event } from "../domain/types.ts";
+import type { TriggerContext, TriggerOptions } from "../pipeline/processManagerDefinition.ts";
 import { ConfigurationError } from "../services/errorHandling.ts";
-import type { FoldProjectionDefinition } from "./foldProjection.types.ts";
+import type { FoldProjectionDefinition, FoldProjectionOptions } from "./foldProjection.types.ts";
 import type { MapProjectionDefinition, MapProjectionOptions } from "./mapProjection.types.ts";
 
 /** One owner event a peer projection consumes: the owner contract's type and data schema. */
@@ -30,6 +31,14 @@ export interface PeerFoldProjectionDeclaration<
   readonly events: Events;
   readonly fold: FoldProjectionDefinition<State, PeerEvent<Events>>;
 }
+
+/** A subscriber on a peer fold: named, handed the event and the fold's committed state. */
+export type PeerFoldSubscriberSpec<State> = TriggerOptions<Event, State> & {
+  readonly name: string;
+  /** Only these owner event types; omit for every event the fold takes. */
+  readonly events?: readonly string[];
+  handler: (event: Event, context: TriggerContext<State>) => Promise<void>;
+};
 
 /** A peer map: the owner events it consumes and the host's own map over them (§9). */
 export interface PeerMapProjectionDeclaration<
@@ -59,7 +68,7 @@ export function peerFoldProjection<State, Events extends readonly PeerEventSchem
     store: fold.store,
     LastEventOccurredAtKey: fold.LastEventOccurredAtKey,
     ...(key && { key: (event: Event) => peer.groupKey(event, key) }),
-    ...(fold.options && { options: fold.options }),
+    ...(fold.options && { options: peerFoldOptions({ options: fold.options, peer }) }),
   };
 }
 
@@ -133,6 +142,20 @@ function peerParser<Events extends readonly PeerEventSchema[]>({
       const parsed = tryParse(event);
       return parsed ? filter(parsed) : true;
     },
+  };
+}
+
+function peerFoldOptions<Events extends readonly PeerEventSchema[]>({
+  options: { enqueue, ...rest },
+  peer,
+}: {
+  options: FoldProjectionOptions<PeerEvent<Events>>;
+  peer: PeerParser<Events>;
+}): FoldProjectionOptions<Event> {
+  const filter = enqueue?.filter;
+  return {
+    ...rest,
+    ...(filter && { enqueue: { filter: (event: Event) => peer.admits(event, filter) } }),
   };
 }
 

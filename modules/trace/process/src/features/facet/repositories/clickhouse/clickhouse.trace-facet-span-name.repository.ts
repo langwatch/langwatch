@@ -7,6 +7,7 @@ const SPAN_NAME_FACET: ExpressionCategoricalDef = {
   group: "span",
   table: "stored_spans",
   expression: "SpanName",
+  lightExpression: "SpanName",
 };
 
 export class ClickHouseTraceFacetSpanNameRepository {

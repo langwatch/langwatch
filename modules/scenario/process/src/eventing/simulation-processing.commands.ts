@@ -6,10 +6,12 @@ import {
   simulationRunCutAtLimitRecordedEventDataSchema,
   simulationRunDeletedEventDataSchema,
   simulationRunHooksRecordedEventDataSchema,
+  simulationRunRedTeamReportRecordedEventDataSchema,
   simulationRunStartedEventDataSchema,
   simulationSetArchivedEventDataSchema,
   simulationTextMessageEndEventDataSchema,
   simulationTextMessageStartEventDataSchema,
+  simulationRunStartKey,
 } from "@langwatch/scenario-contract";
 
 /**
@@ -25,7 +27,8 @@ const StartRunCommand = defineCommand({
   aggregateType: "simulation_run",
   schema: simulationRunStartedEventDataSchema,
   aggregateId: (d) => d.scenarioRunId,
-  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:startRun`,
+  idempotencyKey: (d) =>
+    simulationRunStartKey({ projectId: d.tenantId, scenarioRunId: d.scenarioRunId }),
   spanAttributes: (d) => ({
     "payload.scenarioRun.id": d.scenarioRunId,
     "payload.scenario.id": d.scenarioId,
@@ -110,6 +113,21 @@ const RecordCutAtLimitCommand = defineCommand({
   makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-cut-at-limit`,
 });
 
+const RecordRedTeamReportCommand = defineCommand({
+  commandType: "lw.simulation_run.record_red_team_report",
+  eventType: "lw.simulation_run.red_team_report_recorded",
+  eventVersion: "2026-11-17",
+  aggregateType: "simulation_run",
+  schema: simulationRunRedTeamReportRecordedEventDataSchema,
+  aggregateId: (d) => d.scenarioRunId,
+  idempotencyKey: (d) => `${d.tenantId}:${d.scenarioRunId}:recordRedTeamReport`,
+  spanAttributes: (d) => ({
+    "payload.scenarioRun.id": d.scenarioRunId,
+    "payload.redTeam.outcome": d.report.outcome,
+  }),
+  makeJobId: (d) => `${d.tenantId}:${d.scenarioRunId}:record-red-team-report`,
+});
+
 const RecordHooksCommand = defineCommand({
   commandType: "lw.simulation_run.record_hooks",
   eventType: "lw.simulation_run.hooks_recorded",
@@ -188,6 +206,7 @@ export class SimulationProcessingCommandsAdapter {
   readonly recordAgentInstance = RecordAgentInstanceCommand;
   readonly recordCutAtLimit = RecordCutAtLimitCommand;
   readonly recordHooks = RecordHooksCommand;
+  readonly recordRedTeamReport = RecordRedTeamReportCommand;
   readonly archiveSet = ArchiveSetCommand;
 
   private constructor() {}

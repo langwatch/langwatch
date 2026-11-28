@@ -1,7 +1,11 @@
 import { z } from "zod";
 
 import { capPayloadString } from "../tracePayloadCap.ts";
-import { contentToText, buildToolDefinitionsMessage } from "./claudeCodeContent.ts";
+import {
+  buildToolDefinitionsMessage,
+  contentToText,
+  requestMessageRole,
+} from "./claudeCodeContent.ts";
 import { ClaudeCodeTruncatedRequestService } from "./claudeCodeTruncatedRequest.ts";
 
 const claudeCodeTruncatedRequestService = ClaudeCodeTruncatedRequestService.create();
@@ -77,7 +81,7 @@ export class ClaudeCodeRequestService {
     }
 
     for (const message of parsed.messages) {
-      const role = typeof message.role === "string" ? message.role : "user";
+      const role = requestMessageRole({ role: message.role, content: message.content });
       const content = contentToText(message.content);
       if (content.length === 0) {
         continue;

@@ -44,6 +44,7 @@ type OrganizationInvitationsCreateInput = Readonly<{
     teamIds?: string;
     teams?: readonly Readonly<{ teamId: string; role: string; customRoleId?: string }>[];
     role: OrganizationUserRole;
+    billingOnly?: boolean;
   }>[];
   /** The user recorded as the sender of every invitation in the batch. */
   requestedBy?: string;
@@ -233,6 +234,7 @@ export class OrganizationInvitationsService implements OrganizationInvitations {
         role: invite.role,
         ...(invite.teamIds === undefined ? {} : { teamIds: invite.teamIds }),
         ...(invite.teams === undefined ? {} : { teams: invite.teams.map((team) => ({ ...team })) }),
+        ...(invite.billingOnly ? { billingOnly: true } : {}),
       })),
       ...(input.requestedBy === undefined ? {} : { requestedBy: input.requestedBy }),
       ...(input.user === undefined ? {} : { user: input.user }),

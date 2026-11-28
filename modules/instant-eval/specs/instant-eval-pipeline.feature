@@ -32,11 +32,11 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     And the run finishes with its progress equal to its total
 
   @unit
-  Scenario: The worker mounts one run projection, six commands and the process manager
+  Scenario: The worker mounts one run projection, seven commands and the process manager
     Given the Instant Eval pipeline
     When the worker builds it
     Then the run's counters are projected on a row keyed by the run
-    And the six commands and the run's process manager are mounted
+    And the seven commands and the run's process manager are mounted
     And no map projection or subscriber is mounted, because a page writes its own rows
 
   @unit
@@ -279,10 +279,30 @@ Feature: The Instant Eval run on the queue, plan, judge page by page, finish
     And nothing is written
 
   @unit
-  Scenario: A step failing with a refusal the outbox will not retry fails the run on that attempt
+  Scenario: A run page whose every row was refused for the decision model's key fails with that reason
+    Given a project on its own decision model whose key was refused for every row of a page
+    When the page is judged
+    Then it throws "instant_eval_decision_model_key_invalid", which the outbox will not retry
+    And nothing is written, so the run fails instead of reading as "nothing matched"
+
+  @unit
+  Scenario: A run page with only some rows refused for the key, or skipped for another reason, is recorded
+    Given a page where some rows were refused for the key and the rest answered, or where every row was skipped as "classifier_not_configured"
+    When the page is judged
+    Then the page is recorded with those rows as skips
+
+  @unit
+  Scenario: A run page refused for LangWatch's own key is recorded, not blamed on the customer
+    Given a project on LangWatch's decision model whose key was refused for every row of a page
+    When the page is judged
+    Then the page is recorded with those rows as skips
+
+  @unit
+  Scenario: A step failing with a refusal the outbox will not retry records the page's failure on that attempt
     Given a page step that throws a handled refusal the outbox will not retry, such as "connect_unreachable"
     When it fails on its first attempt
-    Then the run is recorded as failed with that refusal's code
+    Then the page's failure is recorded with that refusal's code
+    And the step writes no finish itself, so the run's process manager finishes the run
     And the step does not throw, so the run never waits on a delivery that will not come
 
   @unit

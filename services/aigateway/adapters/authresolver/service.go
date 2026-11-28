@@ -32,6 +32,7 @@ import (
 	"errors"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"time"
 
 	lru "github.com/hashicorp/golang-lru/v2"
@@ -74,6 +75,9 @@ const (
 	ChangeKindCacheRuleCreated       = "CACHE_RULE_CREATED"
 	ChangeKindCacheRuleUpdated       = "CACHE_RULE_UPDATED"
 	ChangeKindCacheRuleDeleted       = "CACHE_RULE_DELETED"
+	ChangeKindA2ATargetCreated       = "A2A_TARGET_CREATED"
+	ChangeKindA2ATargetUpdated       = "A2A_TARGET_UPDATED"
+	ChangeKindA2ATargetDeleted       = "A2A_TARGET_DELETED"
 )
 
 // CacheChange is one cache-invalidation hint surfaced by ChangePoller.
@@ -101,6 +105,8 @@ type CacheMetrics interface {
 	RecordAuthCacheLookup()
 	RecordAuthCacheHit(tier string)
 	RecordAuthCacheMiss(tier string)
+	RecordAuthCacheRefusal(reason string)
+	RecordAuthCacheStaleServe(source string)
 }
 
 // DefaultLastKnownConfigMaxAge bounds how long after its last confirmation an
@@ -121,6 +127,16 @@ const budgetRefreshRetry = time.Second
 // the label carries one value; it stays a label because the metric names are
 // published and an operator's dashboard should not break to save a string.
 const tierL1 = "l1"
+
+// Refusal reasons and stale-serve sources reported on the auth-cache metrics.
+// They match the label values the metrics adapter documents.
+const (
+	refusalDeniedRevoked  = "denied_vk_revoked"
+	refusalDeniedDisabled = "denied_vk_disabled"
+	refusalFailClosed     = "fail_closed"
+	staleServeLastKnown   = "last_known"
+	staleServeWhileError  = "stale_while_error"
+)
 
 // Service is the auth resolver: one in-memory LRU in front of the control
 // plane.
@@ -147,12 +163,29 @@ type Service struct {
 	configTTL        time.Duration
 
 	// Active orgs whose bundles are currently in L1. Populated on every
-	// storeL1, never cleared explicitly — entries that drop out of L1 via
+	// publishL1, never cleared explicitly — entries that drop out of L1 via
 	// LRU pressure are still safe to poll for; the next request for that
 	// org refreshes via the normal resolve path. Used by the change-feed
 	// loop to know which org cursors to advance. sync.Map (not a regular
-	// map + RWMutex) because polling reads + storeL1 writes interleave.
+	// map + RWMutex) because polling reads + publishL1 writes interleave.
 	activeOrgs sync.Map // key: orgID string, value: *orgCursor
+
+	// denied is the revocation list, kept apart from L1 so no stale-serve
+	// window or eviction can expire it (revocation.go).
+	denied          *lru.Cache[string, denial]
+	deniedKeys      *lru.Cache[[64]byte, string]
+	failClosedAfter time.Duration
+	rechecks        denialRechecks
+	// denyMu orders denials against lifting them; deniedByVK lists the
+	// credentials each denied key carried, so a re-enable walks only those.
+	denyMu     sync.Mutex
+	deniedByVK map[string]map[[64]byte]struct{}
+	// reconfirms holds the fail-closed key re-check running per credential.
+	reconfirmMu sync.Mutex
+	reconfirms  map[[64]byte]*reconfirmCall
+	// invalidations stamps change events per identity so a fetch in flight
+	// across one cannot publish what it read before it (invalidation.go).
+	invalidations *invalidationGuard
 
 	stopCh chan struct{}
 }
@@ -161,6 +194,21 @@ type Service struct {
 // for one organization. Mutated only inside the change-feed loop.
 type orgCursor struct {
 	since string
+	// polledAt is the monoStamp of the last poll the control plane
+	// answered (zero until the first one); the fail-closed rule reads it from
+	// request goroutines.
+	polledAt atomic.Int64
+	// pending lists the keys denied from pages since the backlog began;
+	// the page that ends it promotes them (revocation.go, promotePending).
+	pending map[string]struct{}
+}
+
+// changeFeedPageSize is the most events one /changes answer carries: the
+// control plane's CHANGES_PAGE. A full page means more are waiting.
+const changeFeedPageSize = 500
+
+func newOrgCursor() *orgCursor {
+	return &orgCursor{since: "0"}
 }
 
 // entry tracks both the natural JWT exp ("soft" expiry, bumpable on
@@ -199,7 +247,7 @@ type entry struct {
 	// conditional revalidation still holding the dead period's spend.
 	//
 	// Only a config the gateway actually received clears a roll, and that
-	// arrives as a new entry through storeL1 rather than a mutation here — so
+	// arrives as a new entry through publishL1 rather than a mutation here — so
 	// there is no ack on the refresh path at all. A 304 must not clear one: it
 	// carries no spend, and a 304 taken while the period was still running
 	// would ack a boundary the entry has not reached yet and suppress the roll
@@ -210,6 +258,11 @@ type entry struct {
 	// refresh; budgetRetryAt paces it when that refresh fails.
 	budgetChanges uint64
 	budgetRetryAt time.Time
+	// authStartedAt is when the control-plane call that confirmed this key
+	// began. A revocation seen after it voids the entry (revocation.go).
+	authStartedAt time.Time
+	// reconfirmAt paces the key re-check a fail-closed refusal makes.
+	reconfirmAt atomic.Int64
 }
 
 // markBudgetChanged records that the spend this entry carries is behind.
@@ -384,9 +437,13 @@ const (
 	// has stopped, so no grace window applies and the request is refused with
 	// the key's own error rather than an upstream one.
 	entryKeyExpired
+	// entrySecretEnded holds a rotated key's previous secret past its grace
+	// end. The key still serves its current secret, so the old one is refused
+	// as an unknown key, again with no grace and no control-plane call.
+	entrySecretEnded
 )
 
-// classifyEntry is the one place that decides which of the four an entry is,
+// classifyEntry is the one place that decides which of the five an entry is,
 // so every path through the cache reaches the same verdict about the same
 // bundle. The order matters twice.
 //
@@ -405,6 +462,8 @@ func classifyEntry(e *entry) entryState {
 	switch {
 	case e.keyExpired():
 		return entryKeyExpired
+	case e.bundle != nil && e.bundle.SecretEnded(time.Now()):
+		return entrySecretEnded
 	case !e.softExpired():
 		return entryFresh
 	case !e.hardExpired():
@@ -550,6 +609,13 @@ type Options struct {
 	// linked, a binding reset) takes to be noticed. Default 30s. Negative
 	// disables.
 	LicenseRefusalTTL time.Duration
+	// FailClosedAfter, when positive, refuses a cached key once both its last
+	// control-plane confirmation and its org's last change-feed poll are
+	// older than this. Zero (the default) keeps serving through an outage.
+	FailClosedAfter time.Duration
+	// DenialRecheckInterval is how often a denied key may be re-checked
+	// against the control plane in the background. Default 30s.
+	DenialRecheckInterval time.Duration
 }
 
 // New creates the auth service.
@@ -577,6 +643,9 @@ func New(opts Options) (*Service, error) {
 		opts.ConfigTTL = 0 // disabled
 	}
 
+	if opts.DenialRecheckInterval <= 0 {
+		opts.DenialRecheckInterval = DefaultDenialRecheckInterval
+	}
 	if opts.LicenseRefusalTTL == 0 {
 		opts.LicenseRefusalTTL = 30 * time.Second
 	}
@@ -593,6 +662,22 @@ func New(opts Options) (*Service, error) {
 	if err != nil {
 		return nil, err
 	}
+	denied, err := lru.New[string, denial](denySetSize)
+	if err != nil {
+		return nil, err
+	}
+	deniedKeys, err := lru.New[[64]byte, string](denySetSize)
+	if err != nil {
+		return nil, err
+	}
+	recheckStates, err := lru.New[[64]byte, recheckState](denySetSize)
+	if err != nil {
+		return nil, err
+	}
+	invalidations, err := newInvalidationGuard(opts.LRUSize)
+	if err != nil {
+		return nil, err
+	}
 
 	logger := opts.Logger
 	if logger == nil {
@@ -603,6 +688,11 @@ func New(opts Options) (*Service, error) {
 		l1:                l1,
 		licenseRefusals:   licenseRefusals,
 		licenseRefusalTTL: opts.LicenseRefusalTTL,
+		denied:            denied,
+		deniedKeys:        deniedKeys,
+		failClosedAfter:   opts.FailClosedAfter,
+		rechecks:          denialRechecks{interval: opts.DenialRecheckInterval, state: recheckStates},
+		invalidations:     invalidations,
 		lastKnown:         lastKnown,
 		lastKnownMaxAge:   DefaultLastKnownConfigMaxAge,
 
@@ -616,6 +706,8 @@ func New(opts Options) (*Service, error) {
 		hardGrace:        opts.HardGrace,
 		configTTL:        opts.ConfigTTL,
 		stopCh:           make(chan struct{}),
+		deniedByVK:       map[string]map[[64]byte]struct{}{},
+		reconfirms:       map[[64]byte]*reconfirmCall{},
 	}, nil
 }
 
@@ -626,15 +718,61 @@ func New(opts Options) (*Service, error) {
 // foreground refresh; on transport-class failure serves the stale bundle
 // and bumps soft expiry. On auth-class failure evicts and rejects.
 func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
+	h := hashKey(key)
+	answer, err := s.resolveUngated(ctx, key, h)
+	if err != nil {
+		if classifyRefreshError(err) == classTransportFailure {
+			if denied := s.refusalIfDenied(ctx, h); denied != nil {
+				return nil, denied
+			}
+		}
+		return nil, err
+	}
+	bundle, err := s.admit(ctx, h, answer)
+	if errors.Is(err, domain.ErrAuthUpstream) {
+		if call := s.joinReconfirm(key, h); call != nil {
+			select {
+			case <-call.done:
+				if call.err == nil {
+					answer = call.answer
+					bundle, err = s.admit(ctx, h, answer)
+				} else if classifyRefreshError(call.err) != classTransportFailure {
+					return nil, call.err
+				}
+			case <-ctx.Done():
+			}
+		}
+	}
+	if errors.Is(err, errPendingDenial) {
+		return s.reaskVoided(ctx, key, h)
+	}
+	if errors.Is(err, domain.ErrAuthUpstream) {
+		s.countRefusal(answer.bundle.VirtualKeyID, refusalFailClosed)
+	}
+	if err != nil {
+		return nil, err
+	}
+	if answer.stale != "" {
+		s.recordStaleServe(answer.stale)
+	}
+	return bundle, nil
+}
+
+// resolveUngated is the cache and control-plane walk; Resolve gates its answer.
+func (s *Service) resolveUngated(ctx context.Context, key domain.PresentedKey, h [64]byte) (served, error) {
 	if key.Token == "" {
-		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+		return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	}
 
-	h := hashKey(key)
 	if key.IsLicenseToken() {
 		if err := s.admitLicenseToken(ctx, key, h); err != nil {
-			return nil, err
+			return served{}, err
 		}
+	} else if err := s.refusalIfDenied(ctx, h); err != nil {
+		// A license token's own refusal comes from the control plane and the
+		// license refusal cache, not this list.
+		s.scheduleRecheck(key, h)
+		return served{}, err
 	}
 	s.recordLookup()
 
@@ -655,7 +793,7 @@ type lookup struct {
 
 // resolveCached serves an L1 entry according to its age: fresh entries serve
 // at once, stale ones after a foreground refresh, and the rest are evicted.
-func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*domain.Bundle, error) {
+func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (served, error) {
 	switch classifyEntry(e) {
 	case entryFresh:
 		// Serve, maybe trigger background refresh on near-expiry.
@@ -670,7 +808,7 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*doma
 		} else if e.configStale(s.configTTL) && e.tryBeginConfigRefresh() {
 			go s.refreshConfigBackground(lk.hash, e) //nolint:gosec // G118: intentional fire-and-forget refresh detached from request
 		}
-		return e.bundle, nil
+		return served{bundle: e.bundle, authStart: e.authStart()}, nil
 
 	case entryStale:
 		// Soft-expired but within hard grace. A foreground refresh is
@@ -686,9 +824,14 @@ func (s *Service) resolveCached(ctx context.Context, lk lookup, e *entry) (*doma
 		// a retryable upstream failure that grace keeps serving through.
 		s.recordMiss()
 		s.evictOnLookup(lk.hash, e, "virtual_key_expired")
-		return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{
+		return served{}, herr.New(ctx, domain.ErrKeyExpired, herr.M{
 			"message": domain.KeyExpiredMessage,
 		})
+
+	case entrySecretEnded:
+		s.recordMiss()
+		s.evictOnLookup(lk.hash, e, "previous_secret_ended")
+		return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 
 	default:
 		// Past hard cap: evict, then resolve fresh.
@@ -735,10 +878,18 @@ func (s *Service) recordMiss() {
 	}
 }
 
+func (s *Service) recordStaleServe(source string) {
+	if s.metrics != nil {
+		s.metrics.RecordAuthCacheStaleServe(source)
+	}
+}
+
 // resolveFresh calls the upstream resolver and caches the result.
 // Used for cold misses; not on stale-entry refresh paths (those use
 // refreshOrServeStale for the served-stale fallback).
-func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (*domain.Bundle, error) {
+func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [64]byte) (served, error) {
+	since := s.fetchGeneration()
+	start := time.Now()
 	fallback := s.lastKnownFor(h)
 	fetchCtx := ctx
 	if fallback != nil {
@@ -749,35 +900,52 @@ func (s *Service) resolveFresh(ctx context.Context, key domain.PresentedKey, h [
 	bundle, err := s.resolver.ResolveKey(fetchCtx, key)
 	if err != nil {
 		if fallback != nil && classifyRefreshError(err) == classTransportFailure {
-			if served := s.serveLastKnown(h, lastKnownServe{old: fallback, cause: err}); served != nil {
-				return served, nil
+			if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, cause: err, since: since}); answer != nil {
+				return *answer, nil
 			}
 		}
 		s.lastKnown.Remove(h)
 		s.rememberLicenseRefusal(key, h, err)
-		return nil, err
+		return served{}, err
 	}
 	etag, cfgErr := s.populateConfig(fetchCtx, bundle)
 	if cfgErr == nil {
-		s.storeL1(h, bundle, etag)
-		return bundle, nil
+		s.publishFetched(h, s.newEntry(bundle, etag, start), since)
+		return served{bundle: bundle, authStart: start}, nil
 	}
+	return s.resolveFreshWithoutConfig(ctx, freshWithoutConfig{h: h, fallback: fallback, bundle: bundle, start: start, cfgErr: cfgErr, since: since})
+}
+
+// freshWithoutConfig is a resolve-key answer whose config fetch failed.
+type freshWithoutConfig struct {
+	h        [64]byte
+	fallback *entry
+	bundle   *domain.Bundle
+	start    time.Time
+	cfgErr   error
+	since    uint64
+}
+
+// resolveFreshWithoutConfig is the tail of resolveFresh when resolve-key
+// answered but the config fetch failed: reject, fall back, or fail.
+func (s *Service) resolveFreshWithoutConfig(ctx context.Context, in freshWithoutConfig) (served, error) {
+	h, fallback, bundle, cfgErr := in.h, in.fallback, in.bundle, in.cfgErr
 	if classifyRefreshError(cfgErr) == classAuthRejection {
 		// The key was deleted between resolve-key and the config fetch.
 		s.lastKnown.Remove(h)
-		return nil, cfgErr
+		return served{}, cfgErr
 	}
 	if fallback != nil {
-		if served := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, cause: cfgErr}); served != nil {
-			return served, nil
+		if answer := s.serveLastKnown(h, lastKnownServe{old: fallback, fresh: bundle, freshStart: in.start, cause: cfgErr, since: in.since}); answer != nil {
+			return *answer, nil
 		}
 		if bundle.KeyExpired(time.Now()) {
-			return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
+			return served{}, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
 		}
 	}
 	// Nothing to fall back on. Cache nothing: a bundle without its config is
 	// not a resolution result.
-	return nil, errConfigUnavailable(ctx, cfgErr)
+	return served{}, errConfigUnavailable(ctx, cfgErr)
 }
 
 // lastKnownFor returns the entry the change feed evicted for h when it may
@@ -801,7 +969,7 @@ func (s *Service) lastKnownUsable(e *entry, now time.Time) bool {
 	e.mu.Lock()
 	confirmedAt, hard := e.configConfirmedAt, e.hardExpiresAt
 	e.mu.Unlock()
-	return e.bundle != nil && !e.bundle.KeyExpired(now) &&
+	return e.bundle != nil && !e.bundle.KeyExpired(now) && !e.bundle.SecretEnded(now) &&
 		!now.After(hard) && now.Sub(confirmedAt) <= s.lastKnownMaxAge
 }
 
@@ -811,23 +979,28 @@ func (s *Service) lastKnownUsable(e *entry, now time.Time) bool {
 type lastKnownServe struct {
 	old   *entry
 	fresh *domain.Bundle
-	cause error
+	// freshStart is when the resolve-key call behind fresh began.
+	freshStart time.Time
+	cause      error
+	since      uint64
 }
 
 // serveLastKnown puts an evicted entry back in L1 after a failed refetch and
 // returns its bundle, or nil when the entry stopped being servable while the
-// refetch ran. When resolve-key answered (fresh non-nil), the fresh token and
-// its expiry are kept and only the config comes from the evicted entry. The
+// refetch ran. When resolve-key answered (fresh non-nil), the fresh token, its
+// expiry and its check time are kept; only the config comes from the evicted
+// entry. The
 // new entry carries no ETag, so the next refresh asks for the config
 // outright, and its hard cap never passes lastKnownMaxAge after the last
 // confirmation.
-func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
+func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *served {
 	old, fresh, cause := in.old, in.fresh, in.cause
 	now := time.Now()
 	if !s.lastKnownUsable(old, now) {
 		s.lastKnown.Remove(h)
 		return nil
 	}
+	authStart := old.authStart()
 	old.mu.Lock()
 	bundle, hard := old.bundle, old.hardExpiresAt
 	confirmedAt, acked := old.configConfirmedAt, old.budgetRollAckedFor
@@ -838,6 +1011,7 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
 			s.lastKnown.Remove(h)
 			return nil
 		}
+		authStart = in.freshStart
 		merged := *fresh
 		merged.Config = bundle.Config
 		merged.Credentials = bundle.Credentials
@@ -851,29 +1025,46 @@ func (s *Service) serveLastKnown(h [64]byte, in lastKnownServe) *domain.Bundle {
 	if soft.After(hard) {
 		soft = hard
 	}
-	s.lastKnown.Remove(h)
-	s.l1.Add(h, &entry{
+	restored := &entry{
 		bundle:             bundle,
 		softExpiresAt:      soft,
 		hardExpiresAt:      hard,
 		configFetchedAt:    confirmedAt,
 		configConfirmedAt:  confirmedAt,
 		budgetRollAckedFor: acked,
-	})
+		authStartedAt:      authStart,
+	}
+	if !s.publishFetched(h, restored, in.since) {
+		if s.revokedSince(bundle, in.since) {
+			s.lastKnown.Remove(h)
+			return nil
+		}
+		// A change that keeps the fallback landed during the refetch: serve
+		// the copy without caching it, so the next request asks again.
+		s.logger.Warn("auth_cache_serve_last_known",
+			zap.String("vk_id", bundle.VirtualKeyID),
+			zap.Bool("cached", false),
+			zap.Error(cause),
+		)
+		return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown}
+	}
+	s.lastKnown.Remove(h)
 	s.logger.Warn("auth_cache_serve_last_known",
 		zap.String("vk_id", bundle.VirtualKeyID),
 		zap.Duration("config_age", now.Sub(confirmedAt)),
 		zap.Time("serve_until", hard),
 		zap.Error(cause),
 	)
-	return bundle
+	return &served{bundle: bundle, authStart: authStart, stale: staleServeLastKnown}
 }
 
 // refreshOrServeStale tries to resolve fresh against the control plane.
 // On success replaces the L1 entry. On transport-class failure bumps the
 // stale entry's soft expiry by SoftBump and serves the stale bundle. On
 // auth-class failure evicts the entry and returns the rejection.
-func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (*domain.Bundle, error) {
+func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *entry) (served, error) {
+	since := s.fetchGeneration()
+	start := time.Now()
 	h := lk.hash
 	bundle, err := s.resolver.ResolveKey(ctx, lk.key)
 	cls := classifyRefreshError(err)
@@ -885,7 +1076,7 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 	case classNone:
 		etag, cfgErr := s.populateConfig(ctx, bundle)
 		if classifyRefreshError(cfgErr) == classAuthRejection {
-			return nil, s.evictOnConfigRejection(h, vkID, cfgErr)
+			return served{}, s.evictOnConfigRejection(h, vkID, cfgErr)
 		}
 		if cfgErr != nil {
 			// The control plane authenticated the key but could not hand
@@ -893,10 +1084,10 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			// bundle would surface as no_provider_configured for an org
 			// whose keys are fine — treat it as a transport failure and
 			// serve the stale entry's known-good credentials instead.
-			return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, cfgErr)
+			return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: cfgErr, authStart: start})
 		}
-		s.storeL1(h, bundle, etag)
-		return bundle, nil
+		s.publishFetched(h, s.newEntry(bundle, etag, start), since)
+		return served{bundle: bundle, authStart: start}, nil
 
 	case classAuthRejection:
 		s.l1.Remove(h)
@@ -906,10 +1097,10 @@ func (s *Service) refreshOrServeStale(ctx context.Context, lk lookup, stale *ent
 			zap.String("reason", "auth_rejection"),
 			zap.Error(err),
 		)
-		return nil, err
+		return served{}, err
 
 	default:
-		return s.serveStaleAfterFailure(ctx, h, stale, staleBundle, vkID, hardExpiresAt, cls, err)
+		return s.serveStaleAfterFailure(ctx, staleFailure{h: h, stale: stale, staleBundle: staleBundle, hardExpiresAt: hardExpiresAt, cls: cls, cause: err, authStart: stale.authStart()})
 	}
 }
 
@@ -926,11 +1117,25 @@ func (s *Service) evictOnConfigRejection(h [64]byte, vkID string, err error) err
 	return err
 }
 
+// staleFailure is a stale entry whose foreground refresh failed with cause.
+type staleFailure struct {
+	h             [64]byte
+	stale         *entry
+	staleBundle   *domain.Bundle
+	hardExpiresAt time.Time
+	cls           refreshErrorClass
+	cause         error
+	// authStart is the key confirmation time served with the stale bundle.
+	authStart time.Time
+}
+
 // serveStaleAfterFailure is the transport-failure tail of refreshOrServeStale:
 // bump the stale entry's soft expiry and keep serving it, or evict and fail
 // once the hard grace cap is exhausted. `cause` is what stopped the refresh —
 // a ResolveKey transport error or a config fetch failure after a good auth.
-func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale *entry, staleBundle *domain.Bundle, vkID string, hardExpiresAt time.Time, cls refreshErrorClass, cause error) (*domain.Bundle, error) {
+func (s *Service) serveStaleAfterFailure(ctx context.Context, f staleFailure) (served, error) {
+	h, stale, staleBundle, hardExpiresAt, cls, cause := f.h, f.stale, f.staleBundle, f.hardExpiresAt, f.cls, f.cause
+	vkID := staleBundle.VirtualKeyID
 	newSoft, bumped := stale.bumpSoft(s.softBump)
 	if !bumped {
 		s.l1.Remove(h)
@@ -940,9 +1145,9 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 			zap.Error(cause),
 		)
 		if cls == classNone {
-			return nil, errConfigUnavailable(ctx, cause)
+			return served{}, errConfigUnavailable(ctx, cause)
 		}
-		return nil, cause
+		return served{}, cause
 	}
 	// classNone here means the auth succeeded and the CONFIG fetch failed;
 	// log that instead of a misleading "none" error class.
@@ -962,7 +1167,7 @@ func (s *Service) serveStaleAfterFailure(ctx context.Context, h [64]byte, stale 
 		zap.Duration("hard_grace_remaining", time.Until(hardExpiresAt)),
 		zap.String("refresh_error_class", classLabel),
 	)
-	return staleBundle, nil
+	return served{bundle: staleBundle, authStart: f.authStart, stale: staleServeWhileError}, nil
 }
 
 // populateConfig eagerly fetches the bundle's config and merges it into the
@@ -1006,7 +1211,7 @@ func (s *Service) populateConfig(ctx context.Context, bundle *domain.Bundle) (st
 func errConfigUnavailable(ctx context.Context, err error) error {
 	return herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 		"message": "control plane unavailable while loading this key's provider configuration — retry shortly",
-	}, err)
+	}, err).WithRetryable(true)
 }
 
 // Start launches the background refresh loop and (when configured) the
@@ -1030,15 +1235,24 @@ func (s *Service) Stop() {
 
 // --- Internal ---
 
-// storeL1 caches a bundle whose config was just fetched under configETag, and
-// records its org for the change feed. An empty configETag is the honest state
-// after a response that carried none: the next staleness refresh asks for the
-// config outright rather than revalidating against a token we do not have.
-func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) *entry {
+// carryBudgetChanges marks an unpublished replacement behind when budget
+// changes reached the entry it replaces after its refresh had started, since
+// the figures that refresh read may predate them. It runs before publishL1:
+// marking after publishing lets a reader see the replacement caught up.
+func (e *entry) carryBudgetChanges(from *entry, seenAtStart uint64) *entry {
+	if from.budgetChangeCount() != seenAtStart {
+		e.budgetChanges = 1
+	}
+	return e
+}
+
+// newEntry builds the cache entry for a bundle whose config was fetched under
+// configETag, without publishing it. authStartedAt is when the confirming
+// control-plane call began.
+func (s *Service) newEntry(bundle *domain.Bundle, configETag string, authStartedAt time.Time) *entry {
 	softExpiresAt, hardExpiresAt := entryDeadlines(bundle, s.hardGrace)
 	now := time.Now()
-	s.lastKnown.Remove(h)
-	stored := &entry{
+	return &entry{
 		bundle:             bundle,
 		softExpiresAt:      softExpiresAt,
 		hardExpiresAt:      hardExpiresAt,
@@ -1046,7 +1260,15 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 		configConfirmedAt:  now,
 		configETag:         configETag,
 		budgetRollAckedFor: ackedBoundaryAtBuild(bundle, now),
+		authStartedAt:      authStartedAt,
 	}
+}
+
+// publishL1 makes stored the live entry under h and records its org for the
+// change feed.
+func (s *Service) publishL1(h [64]byte, stored *entry) {
+	bundle := stored.bundle
+	s.lastKnown.Remove(h)
 	s.l1.Add(h, stored)
 	// Record the bundle's org so the change-feed loop knows which orgs
 	// to subscribe to. LoadOrStore is the first-write-wins shape: if
@@ -1054,17 +1276,7 @@ func (s *Service) storeL1(h [64]byte, bundle *domain.Bundle, configETag string) 
 	// don't reset to "0" and re-stream the entire history on every new
 	// bundle for an existing org.
 	if bundle.OrganizationID != "" {
-		s.activeOrgs.LoadOrStore(bundle.OrganizationID, &orgCursor{since: "0"})
-	}
-	return stored
-}
-
-// carryBudgetChanges marks a replacement entry when budget changes reached the
-// entry it replaces after its refresh had already started, since the figures
-// that refresh read may predate them.
-func carryBudgetChanges(from, to *entry, seenAtStart uint64) {
-	if from.budgetChangeCount() != seenAtStart {
-		to.markBudgetChanged()
+		s.activeOrgs.LoadOrStore(bundle.OrganizationID, newOrgCursor())
 	}
 }
 
@@ -1072,22 +1284,23 @@ func carryBudgetChanges(from, to *entry, seenAtStart uint64) {
 // exp it refreshes at, and the hard cap the stale-while-error grace may extend
 // it to.
 //
-// Both are capped at the virtual key's own expiration date when the bundle
-// carries one, because the grace window exists to cover an unreachable control
+// Both are capped at the virtual key's own expiration date, and at a rotated
+// key's previous-secret grace end, when the bundle carries them, because the grace window exists to cover an unreachable control
 // plane and this date needs no control plane to be true. Without the cap, the
 // grace is added to the JWT exp and a key that ran out keeps serving for the
 // length of the window. A bundle with no date is left exactly as it was.
 func entryDeadlines(bundle *domain.Bundle, hardGrace time.Duration) (soft, hard time.Time) {
 	soft = bundle.ExpiresAt
 	hard = bundle.ExpiresAt.Add(hardGrace)
-	if bundle.VirtualKeyExpiresAt.IsZero() {
+	until := bundle.ServesUntil()
+	if until.IsZero() {
 		return soft, hard
 	}
-	if soft.After(bundle.VirtualKeyExpiresAt) {
-		soft = bundle.VirtualKeyExpiresAt
+	if soft.After(until) {
+		soft = until
 	}
-	if hard.After(bundle.VirtualKeyExpiresAt) {
-		hard = bundle.VirtualKeyExpiresAt
+	if hard.After(until) {
+		hard = until
 	}
 	return soft, hard
 }
@@ -1145,18 +1358,38 @@ func (s *Service) orgChangeFeedLoop(ctx context.Context, orgID string, cursor *o
 }
 
 // pollOrgChanges runs one long poll for an org and applies what it returns.
+// A page's denials stay pending while it is applied, and past it while it is
+// full (a replay or a reconnect), until a shorter page or an empty poll ends
+// the backlog: a later event may still re-enable the key.
 func (s *Service) pollOrgChanges(ctx context.Context, orgID string, cursor *orgCursor) error {
 	changes, nextRev, err := s.changePoller.PollChanges(ctx, orgID, cursor.since)
 	if err != nil {
 		return err
 	}
+	backlog := len(changes) >= changeFeedPageSize
 	for _, ch := range changes {
-		s.applyChange(orgID, ch)
+		if deniesKey(ch.Kind) && ch.VirtualKeyID != "" {
+			cursor.notePending(ch.VirtualKeyID)
+		}
+		s.applyFeedChange(orgID, ch, true)
+	}
+	if !backlog && len(cursor.pending) > 0 {
+		s.promotePending(cursor.pending)
+		cursor.pending = nil
 	}
 	if nextRev != "" {
 		cursor.since = nextRev
 	}
+	cursor.polledAt.Store(monoStamp(0))
 	return nil
+}
+
+// notePending records a key denied from a change-feed page.
+func (c *orgCursor) notePending(vkID string) {
+	if c.pending == nil {
+		c.pending = map[string]struct{}{}
+	}
+	c.pending[vkID] = struct{}{}
 }
 
 // isStopping reports, without blocking, whether the service is shutting down.
@@ -1193,43 +1426,28 @@ func (s *Service) waitUnlessStopping(ctx context.Context, d time.Duration) bool 
 // label per branch collapsed distinct kinds onto one word, and a delete
 // that logs "updated" is worse than no label at all.
 func (s *Service) applyChange(organizationID string, ch CacheChange) {
+	s.applyFeedChange(organizationID, ch, false)
+}
+
+// applyFeedChange is applyChange for an event read from a change-feed page
+// when pending is set: its denial is pending (revocation.go, denyPending).
+func (s *Service) applyFeedChange(organizationID string, ch CacheChange, pending bool) {
 	keepLastKnown := !revokesKey(ch.Kind)
+	// Deny before evicting: a refresh racing this event either finds the
+	// denial when its answer is gated, or is evicted below.
+	s.applyDenial(ch, pending)
 	switch ch.Kind {
 	case ChangeKindProviderBindingUpdated:
-		// The control plane emits ModelProvider.id. Config materialization puts
-		// that same ID in Credential.ID; ProviderID is only the provider type
-		// (for example "openai") and is not a cache invalidation join key.
-		//
-		// Matching on the id alone only reaches bundles that already carry
-		// the provider. A provider that was just created, enabled, or granted
-		// a wider scope is in no bundle yet, yet it can join the chain of any
-		// key in its organization, so every bundle of the polled organization
-		// is evicted too. Without that, a key keeps answering
-		// model_provider_not_bound for the new provider until the 60 second
-		// ETag revalidation catches up.
-		if ch.ModelProviderID == "" {
-			return
-		}
-		s.evictWhere(func(b *domain.Bundle) bool {
-			if organizationID != "" && b.OrganizationID == organizationID {
-				return true
-			}
-			for _, c := range b.Config.Credentials {
-				if c.ID == ch.ModelProviderID {
-					return true
-				}
-			}
-			return false
-		}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown})
+		s.evictForProvider(organizationID, ch, keepLastKnown)
 	case ChangeKindBudgetUpdated:
 		// Every debit emits this, so evicting would put a control-plane round
 		// trip in front of the project's next request. The cached bundle keeps
 		// serving and the next request refreshes it in the background.
 		match, target := budgetChangeMatch(organizationID, ch)
-		s.markBudgetChangedWhere(match, evictReason(ch.Kind), target)
+		s.markBudgetChangedWhere(match, evictScope{reason: evictReason(ch.Kind), target: target, guard: []string{budgetGuard(organizationID, ch)}})
 	case ChangeKindBudgetCreated, ChangeKindBudgetDeleted:
 		match, target := budgetChangeMatch(organizationID, ch)
-		s.evictWhere(match, evictScope{reason: evictReason(ch.Kind), target: target, keepLastKnown: keepLastKnown})
+		s.evictWhere(match, evictScope{reason: evictReason(ch.Kind), target: target, keepLastKnown: keepLastKnown, guard: []string{budgetGuard(organizationID, ch)}})
 	case ChangeKindVirtualKeyConfigUpdate, ChangeKindVirtualKeyRotated, ChangeKindVirtualKeyRevoked,
 		ChangeKindVirtualKeyDisabled, ChangeKindVirtualKeyEnabled:
 		if ch.VirtualKeyID == "" {
@@ -1237,7 +1455,7 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		}
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.VirtualKeyID == ch.VirtualKeyID
-		}, evictScope{reason: evictReason(ch.Kind), target: ch.VirtualKeyID, keepLastKnown: keepLastKnown})
+		}, evictScope{reason: evictReason(ch.Kind), target: ch.VirtualKeyID, keepLastKnown: keepLastKnown, guard: []string{keyScope(ch.VirtualKeyID)}})
 	case ChangeKindRoutingPolicyUpdated, ChangeKindRoutingPolicyDeleted:
 		// A bundle carries the resolved routing mode and chain, not the id
 		// of the policy they came from, so there is nothing finer than the
@@ -1245,13 +1463,20 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 		// project.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
 	case ChangeKindCacheRuleCreated, ChangeKindCacheRuleUpdated, ChangeKindCacheRuleDeleted:
 		// Cache rules are org-scoped and baked into every bundle as a
 		// pre-sorted array, with no rule id left on the bundle to join on.
 		s.evictWhere(func(b *domain.Bundle) bool {
 			return b.OrganizationID == organizationID
-		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown})
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: keepLastKnown, guard: []string{orgScope(organizationID)}})
+	case ChangeKindA2ATargetCreated, ChangeKindA2ATargetUpdated, ChangeKindA2ATargetDeleted:
+		// A2A targets ride every bundle of the organization (org-wide and
+		// project ones alike). The block switch must reach callers now, so a
+		// failed refetch never falls back to the bundle that still allowed it.
+		s.evictWhere(func(b *domain.Bundle) bool {
+			return b.OrganizationID == organizationID
+		}, evictScope{reason: evictReason(ch.Kind), target: organizationID, keepLastKnown: false, guard: []string{orgScope(organizationID)}})
 	case ChangeKindVirtualKeyCreated:
 		// Nothing to evict: a key nobody has resolved yet is in no cache, on
 		// this node or any other. Named rather than left to the default so a
@@ -1272,6 +1497,48 @@ func (s *Service) applyChange(organizationID string, ch CacheChange) {
 	}
 }
 
+// evictForProvider evicts the bundles a provider change reaches.
+func (s *Service) evictForProvider(organizationID string, ch CacheChange, keepLastKnown bool) {
+	// The control plane emits ModelProvider.id. Config materialization puts
+	// that same ID in Credential.ID; ProviderID is only the provider type
+	// (for example "openai") and is not a cache invalidation join key.
+	//
+	// Matching on the id alone only reaches bundles that already carry
+	// the provider. A provider that was just created, enabled, or granted
+	// a wider scope is in no bundle yet, yet it can join the chain of any
+	// key in its organization, so every bundle of the polled organization
+	// is evicted too. Without that, a key keeps answering
+	// model_provider_not_bound for the new provider until the 60 second
+	// ETag revalidation catches up.
+	if ch.ModelProviderID == "" {
+		return
+	}
+	s.evictWhere(func(b *domain.Bundle) bool {
+		if organizationID != "" && b.OrganizationID == organizationID {
+			return true
+		}
+		for _, c := range b.Config.Credentials {
+			if c.ID == ch.ModelProviderID {
+				return true
+			}
+		}
+		return false
+	}, evictScope{reason: evictReason(ch.Kind), target: ch.ModelProviderID, keepLastKnown: keepLastKnown, guard: providerGuard(organizationID, ch.ModelProviderID)})
+}
+
+// applyDenial records or lifts the denial a key event carries.
+func (s *Service) applyDenial(ch CacheChange, pending bool) {
+	switch {
+	case ch.VirtualKeyID == "":
+	case ch.Kind == ChangeKindVirtualKeyEnabled:
+		s.clearDenial(ch.VirtualKeyID, "re_enable")
+	case deniesKey(ch.Kind) && pending:
+		s.denyPending(ch.VirtualKeyID, ch.Kind)
+	case deniesKey(ch.Kind):
+		s.deny(ch.VirtualKeyID, ch.Kind)
+	}
+}
+
 // budgetChangeMatch selects the bundles a budget change reaches. Only
 // project-scoped creates and debits carry project_id; every other budget
 // change reaches the polled organization rather than leaving a stale budget
@@ -1283,9 +1550,32 @@ func budgetChangeMatch(organizationID string, ch CacheChange) (func(*domain.Bund
 	return func(b *domain.Bundle) bool { return b.OrganizationID == organizationID }, organizationID
 }
 
+// budgetGuard is the identity a budget change reaches, matching budgetChangeMatch.
+func budgetGuard(organizationID string, ch CacheChange) string {
+	if ch.ProjectID != "" {
+		return projectScope(ch.ProjectID)
+	}
+	return orgScope(organizationID)
+}
+
+// providerGuard is the identities a provider change reaches: the credential
+// and, when known, every bundle of the polled organization.
+func providerGuard(organizationID, providerID string) []string {
+	if organizationID == "" {
+		return []string{credentialScope(providerID)}
+	}
+	return []string{credentialScope(providerID), orgScope(organizationID)}
+}
+
 // markBudgetChangedWhere marks every L1 entry whose bundle matches as behind
 // on spend, without removing any. Peek for the same reason as evictWhere.
-func (s *Service) markBudgetChangedWhere(match func(*domain.Bundle) bool, reason, target string) {
+func (s *Service) markBudgetChangedWhere(match func(*domain.Bundle) bool, scope evictScope) {
+	s.recordInvalidation(invalidation{keys: scope.guard, budgetOnly: true}, func() { s.markMatching(match, scope.reason, scope.target) })
+}
+
+// markMatching is the L1 walk of markBudgetChangedWhere, run under the
+// invalidation lock.
+func (s *Service) markMatching(match func(*domain.Bundle) bool, reason, target string) {
 	marked := 0
 	for _, h := range s.l1.Keys() {
 		e, ok := s.l1.Peek(h)
@@ -1316,6 +1606,13 @@ func revokesKey(kind string) bool {
 	}
 }
 
+// deniesKey reports whether a change kind refuses the key id outright. A
+// rotation keeps the old secret valid through its grace period, so it only
+// drops the fallback (revokesKey) and leaves the decision to the control plane.
+func deniesKey(kind string) bool {
+	return kind == ChangeKindVirtualKeyRevoked || kind == ChangeKindVirtualKeyDisabled
+}
+
 // evictReason turns a change kind into the label its eviction is logged
 // under. One transformation in one place, so every kind reads the same way in
 // auth_cache_change_evict and none of them can drift into a hand-written word
@@ -1339,6 +1636,11 @@ func evictReason(kind string) string {
 // keepLastKnown sets the evicted entries aside as the outage fallback; a key
 // the change made unusable passes false, which also drops any fallback held.
 func (s *Service) evictWhere(match func(*domain.Bundle) bool, scope evictScope) {
+	s.recordInvalidation(invalidation{keys: scope.guard, revokes: !scope.keepLastKnown}, func() { s.evictMatching(match, scope) })
+}
+
+// evictMatching is the L1 walk of evictWhere, run under the invalidation lock.
+func (s *Service) evictMatching(match func(*domain.Bundle) bool, scope evictScope) {
 	keepLastKnown, reason, target := scope.keepLastKnown, scope.reason, scope.target
 	evicted := 0
 	for _, h := range s.l1.Keys() {
@@ -1372,6 +1674,8 @@ type evictScope struct {
 	reason        string
 	target        string
 	keepLastKnown bool
+	// guard names the identities the event reaches; none means every bundle.
+	guard []string
 }
 
 // dropLastKnownWhere discards every outage fallback whose bundle matches.
@@ -1389,6 +1693,8 @@ func (s *Service) dropLastKnownWhere(match func(*domain.Bundle) bool) {
 // AuthRejection evicts; TransportFailure bumps the existing entry.
 func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started *entry) {
 	defer started.endAuthRefresh()
+	since := s.fetchGeneration()
+	start := time.Now()
 	budgetChangesAtStart := started.budgetChangeCount()
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
@@ -1416,7 +1722,7 @@ func (s *Service) refreshBackground(key domain.PresentedKey, h [64]byte, started
 			s.logger.Debug("auth_cache_refresh_dropped_stale", zap.String("vk_id", bundle.VirtualKeyID))
 			return
 		}
-		carryBudgetChanges(started, s.storeL1(h, bundle, etag), budgetChangesAtStart)
+		s.publishFetched(h, s.newEntry(bundle, etag, start).carryBudgetChanges(started, budgetChangesAtStart), since)
 		s.logger.Debug("auth_cache_refresh_success", zap.String("vk_id", bundle.VirtualKeyID))
 
 	case classAuthRejection:
@@ -1490,6 +1796,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 
+	since := s.fetchGeneration()
 	stale, _, _ := e.snapshot()
 	budgetChangesAtStart := e.budgetChangeCount()
 	res, err := s.configFetcher.FetchConfig(ctx, stale.VirtualKeyID, e.refreshConfigETag())
@@ -1515,7 +1822,7 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 	fresh := *stale
 	fresh.Config = res.Config
 	fresh.Credentials = res.Config.Credentials
-	// The key's own end date moves in both directions here, and storeL1 rebuilds
+	// The key's own end date moves in both directions here, and publishL1 rebuilds
 	// both deadlines from it. A response that says nothing about expiry comes
 	// from a control plane older than the field, so the copied date stands: an
 	// absent field read as "no date" would lift the cap off a key whose token
@@ -1537,7 +1844,18 @@ func (s *Service) refreshConfigBackground(h [64]byte, e *entry) {
 		)
 		return
 	}
-	carryBudgetChanges(e, s.storeL1(h, &fresh, res.ETag), budgetChangesAtStart)
+	// A key disabled or revoked while this pod missed the event: drop every
+	// cached copy so the next request asks the control plane and gets its 403.
+	if res.KeyInactive {
+		s.l1.Remove(h)
+		s.lastKnown.Remove(h)
+		s.logger.Warn("auth_cache_hard_evict",
+			zap.String("vk_id", stale.VirtualKeyID),
+			zap.String("reason", "config_key_inactive"),
+		)
+		return
+	}
+	s.publishFetched(h, s.newEntry(&fresh, res.ETag, e.authStart()).carryBudgetChanges(e, budgetChangesAtStart), since)
 	s.logger.Debug("config_ttl_refresh_success", zap.String("vk_id", stale.VirtualKeyID))
 }
 

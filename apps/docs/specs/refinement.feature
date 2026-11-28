@@ -108,10 +108,31 @@ Feature: Actionable documentation and restrained reading surfaces
     But a page opened by a full load shows its content at once, with no rise
 
   @unit
-  Scenario: Reserve a heading's link icon room on touch screens
-    Given a touch screen, where a heading shows its link icon after its text
+  Scenario: Reserve a heading's link icon room after its last word
+    Given a heading of any level shows its link icon after its last word, never over its text
+    And a pointer reader sees the icon on hover or focus, a touch reader always
     Then the heading reserves the icon's room at its end
     And the icon's margins cancel that room, so the heading breaks its lines as if the icon had no width
+
+  @unit
+  Scenario: Find text inside collapsed panels with find-in-page
+    Given an accordion, an expandable field list or an unselected tab holds text
+    Then the prerendered page hides its panel as hidden until found, not as plain hidden
+    And panels that are not collapsible keep plain hidden
+
+  @integration
+  Scenario: A panel find-in-page opens shows as open
+    Given find-in-page opened a collapsed accordion panel or an unselected tab's panel
+    Then the accordion's trigger reports it expanded, and the tab strip selects that panel's tab
+    And a panel opened before the page's script loaded is marked the same way once it loads
+
+  @unit
+  Scenario: Hand a coding agent a prompt for the request
+    Given an API operation with an API key scheme and a JSON body
+    When the reader opens the request examples
+    Then an Agent prompt tab comes before Python, though Python stays the default
+    And its prompt names the method and URL, links the operation's reference and sends the body as JSON
+    And it tells the agent to read the key from LANGWATCH_API_KEY, never hard-coding it
 
   @unit
   Scenario: Answer a followed link at once while the next page loads
@@ -167,6 +188,13 @@ Feature: Actionable documentation and restrained reading surfaces
     When I navigate to a subsection
     Then the active path follows that subsection
     And reduced motion disables the path animation
+  @integration
+  Scenario: Mark the section at the reading line after the page or window changes
+    Given the contents rail lists a page's sections
+    When the reader scrolls a heading past the reading line
+    Then the rail marks that section as current
+    And after an in-place page change or a resize the rail measures the new headings
+    And a scroll that stays in one section changes nothing on the rail
   @e2e
   Scenario: Choose an agent and copy the complete setup prompt
     Given the sidebar command and setup prompt card are visible

@@ -63,6 +63,7 @@ function openAiRow(): ModelProvider {
 function harness({
   stored,
   isFlagOn = true,
+  isJudgePreviewOn = false,
   row = openAiRow(),
   rowsByProvider,
   rowsByScope = {},
@@ -71,6 +72,7 @@ function harness({
   /** The column value, or the error resolving it throws. */
   stored: string | Error;
   isFlagOn?: boolean;
+  isJudgePreviewOn?: boolean;
   row?: ModelProvider | null;
   /** When given, answers per provider instead of the one `row`; an absent provider has no row. */
   rowsByProvider?: Readonly<Record<string, ModelProvider>>;
@@ -109,6 +111,7 @@ function harness({
       return rowsByScope[`${scope.scopeType}:${scope.scopeId}`]?.[provider] ?? null;
     },
     isOwnModelAllowed: async () => isFlagOn,
+    isJudgePreviewAllowed: async () => isJudgePreviewOn,
     now: () => Temporal.Instant.fromEpochMilliseconds(nowMs),
   });
   return {
@@ -133,7 +136,7 @@ function rowOf({
 
 describe("ModelProviderDecisionModelService.resolve", () => {
   describe("when the column is unset", () => {
-    /** @scenario "An unset column runs on LangWatch Evals Preview" */
+    /** @scenario "An unset column runs on LangWatch Instant (preview)" */
     it("answers langwatch", async () => {
       const { service } = harness({
         stored: new ModelNotConfiguredError({ ...UNSET_ERROR.feature, ...UNSET_ERROR.rest }),
@@ -282,7 +285,7 @@ describe("ModelProviderDecisionModelService.resolve", () => {
       });
     });
 
-    /** @scenario "A caller picking LangWatch Evals Preview runs on the hosted model" */
+    /** @scenario "A caller picking LangWatch Instant (preview) runs on the hosted model" */
     it("answers langwatch for the hosted id, whatever the column holds", async () => {
       const { service, providerLookups } = harness({ stored: OPENAI_DECISIONS });
 
@@ -316,12 +319,12 @@ describe("ModelProviderDecisionModelService.resolve", () => {
 });
 
 describe("ModelProviderDecisionModelService.listPickable", () => {
-  /** @scenario "With the flag off only LangWatch Evals Preview is offered" */
+  /** @scenario "With the flag off only LangWatch Instant (preview) is offered" */
   it("offers the hosted model alone when the flag is off", async () => {
     const { service } = harness({ stored: OPENAI_DECISIONS, isFlagOn: false });
 
     expect(await service.listPickable({ projectId: "proj_1" })).toEqual([
-      { value: LANGWATCH_DECISION_MODEL_ID, label: "Evals Preview" },
+      { value: LANGWATCH_DECISION_MODEL_ID, label: "LangWatch Instant (preview)" },
     ]);
   });
 
@@ -443,5 +446,41 @@ describe("ModelProviderDecisionModelService.listPickableForScopes", () => {
     await service.listPickableForScopes({ projectId: "proj_a", scopes: [PROJECT_A] });
 
     expect(providerLookups.length).toBe(new Set(providerLookups).size);
+  });
+});
+
+describe("assertMayStore with LangWatch Judge (preview)", () => {
+  const scopes = [{ scopeType: "ORGANIZATION" as const, scopeId: "org_1" }];
+  const config = { JUDGE: "langwatch/judge-preview" };
+
+  /** @scenario "Saving LangWatch Judge (preview) is refused where its flag is off" */
+  it("refuses a new pick where the flag is off, saying it is not available yet", async () => {
+    const { service } = harness({ stored: "openai/gpt-5.5" });
+
+    await expect(
+      service.assertMayStore({ organizationId: "org_1", config, scopes }),
+    ).rejects.toThrow("LangWatch Judge (preview) is not available for this organization yet");
+  });
+
+  /** @scenario "Saving LangWatch Judge (preview) is refused where its flag is off" */
+  it("lets a config that already held it save its other keys", async () => {
+    const { service } = harness({ stored: "openai/gpt-5.5" });
+
+    await expect(
+      service.assertMayStore({
+        organizationId: "org_1",
+        config: { ...config, DEFAULT: "openai/gpt-5.5" },
+        stored: config,
+        scopes,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  it("stores a new pick where the flag is on", async () => {
+    const { service } = harness({ stored: "openai/gpt-5.5", isJudgePreviewOn: true });
+
+    await expect(
+      service.assertMayStore({ organizationId: "org_1", config, scopes }),
+    ).resolves.toBeUndefined();
   });
 });

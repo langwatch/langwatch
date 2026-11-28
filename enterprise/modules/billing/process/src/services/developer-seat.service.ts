@@ -1,8 +1,9 @@
 /**
  * Developer seats on a live Growth subscription: a separate line at the configured Developer
  * seat price. Adding charges the proration now; lowering moves the line from the next period
- * with no credit. Nothing is sold while no price is configured.
+ * with no credit, and never below the Developers in use. Nothing is sold without a price.
  * @see specs/licensing/seat-buying.feature
+ * @see specs/licensing/seat-quantity-floor.feature
  */
 import {
   type BillingInterval,
@@ -18,6 +19,7 @@ import {
   SubscriptionItemNotFoundError,
   SubscriptionStatus,
 } from "@langwatch/enterprise-billing-contract";
+import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 
 import type { StripeSubscriptionsChannel } from "../channels/stripe-subscriptions.channel.ts";
 import type { SeatEventSubscriptionRepository } from "../repositories/seat-event-subscription.repository.ts";
@@ -26,15 +28,20 @@ import type {
   BillingSubscriptionChange,
 } from "../rules/billing-stripe-shapes.rules.ts";
 import { quotedAmounts, resolveProrationDate } from "../rules/seat-event-quote.rules.ts";
+import { assertSeatsCoverUse } from "../rules/seat-floor.rules.ts";
 
 /** The price per seat per period of a configured price id, in the minor unit. */
 export type PriceUnitAmount = (priceId: string) => number | null;
+
+/** Where the Developers in use are counted; the Developer line never goes below them. */
+export type DevelopersInUseCounter = Pick<LicensingApi, "countDevelopersInUse">;
 
 type DeveloperSeatServiceDeps = {
   stripeSubscriptions: StripeSubscriptionsChannel;
   subscriptions: SeatEventSubscriptionRepository;
   prices: StripePriceMap;
   unitAmountOf: PriceUnitAmount;
+  seatsInUse: DevelopersInUseCounter;
 };
 
 type DeveloperLine = {
@@ -51,12 +58,14 @@ export class DeveloperSeatService {
   private readonly subscriptions: SeatEventSubscriptionRepository;
   private readonly prices: StripePriceMap;
   private readonly unitAmountOf: PriceUnitAmount;
+  private readonly seatsInUse: DevelopersInUseCounter;
 
   private constructor(deps: DeveloperSeatServiceDeps) {
     this.stripeSubscriptions = deps.stripeSubscriptions;
     this.subscriptions = deps.subscriptions;
     this.prices = deps.prices;
     this.unitAmountOf = deps.unitAmountOf;
+    this.seatsInUse = deps.seatsInUse;
   }
 
   static create(deps: DeveloperSeatServiceDeps): DeveloperSeatService {
@@ -124,6 +133,8 @@ export class DeveloperSeatService {
     const line = await this.loadLine(organizationId);
     const { priceId } = this.requireSold(line);
     if ((line.current?.quantity ?? 0) === quantity) return { success: true };
+    const inUse = await this.seatsInUse.countDevelopersInUse({ organizationId });
+    assertSeatsCoverUse({ seat: "developer", requested: quantity, inUse });
     await this.stripeSubscriptions.updateSubscription({
       subscriptionId: line.subscription.id,
       change: developerSeatChange({ line, priceId, quantity, prorationDate }),

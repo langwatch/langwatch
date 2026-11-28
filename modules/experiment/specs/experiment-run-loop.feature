@@ -90,11 +90,11 @@ Feature: An experiment run executes on its pipeline
     Then both carry one idempotency key on the run's own aggregate
 
   @unit
-  Scenario: A run's cell window defaults to main's concurrency knob
+  Scenario: A run falls back to main's concurrency knob when active runs can't be read
     Given a deployment that names EVAL_V3_CONCURRENCY
     When the experiment config is read
-    Then a run with no limit of its own uses that many cells at once
-    And a deployment that names none uses ten
+    Then a run with no limit of its own whose active runs can't be read uses that many cells at once
+    And a deployment that names none falls back to ten
 
   @unit
   Scenario: The run manager sends cells up to the run's concurrency, then one per finished cell

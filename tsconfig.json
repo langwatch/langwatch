@@ -13,6 +13,9 @@
       "path": "./apps/backend"
     },
     {
+      "path": "./apps/docs"
+    },
+    {
       "path": "./apps/haven-web"
     },
     {
@@ -62,6 +65,9 @@
     },
     {
       "path": "./enterprise/modules/demo-data/process"
+    },
+    {
+      "path": "./enterprise/modules/digest/contract"
     },
     {
       "path": "./enterprise/modules/digest/process"
@@ -806,6 +812,15 @@
     },
     {
       "path": "./modules/insight/process"
+    },
+    {
+      "path": "./modules/staff-access/contract"
+    },
+    {
+      "path": "./modules/staff-access/browser"
+    },
+    {
+      "path": "./modules/staff-access/process"
     },
     {
       "path": "./modules/auth/client"

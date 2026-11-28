@@ -214,7 +214,7 @@ func TestResolve_LicenseToken_StaleEntry_RefusalEvictsInsteadOfServingStale(t *t
 	resolver := &registryResolver{answer: refusing(domain.ErrConnectLicenseRevoked)}
 	svc, _ := newService(t, Options{Resolver: resolver, ConfigFetcher: resolver})
 	key := domain.PresentedKey{Token: licenseToken, InstanceID: "instance-a"}
-	svc.storeL1(hashKey(key), freshBundle("vk_connect", time.Now().Add(-time.Minute)), "")
+	seedL1(svc, hashKey(key), freshBundle("vk_connect", time.Now().Add(-time.Minute)), "")
 
 	_, err := svc.Resolve(context.Background(), key)
 

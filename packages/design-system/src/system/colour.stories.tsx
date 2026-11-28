@@ -110,6 +110,18 @@ const chartColours = [
 
 const overlayColours = ["bg.scrim"] as const;
 
+/** A branded feature's colour roles; docs/feature-branding.md. */
+const featureColours = [
+  "feature.braids.lead",
+  "feature.braids.weave",
+  "feature.braids.project.1",
+  "feature.braids.project.2",
+  "feature.braids.project.3",
+  "feature.braids.projectInk.1",
+  "feature.braids.projectInk.2",
+  "feature.braids.projectInk.3",
+] as const;
+
 function Swatch({ token }: { token: string }) {
   return (
     <Stack gap="2">
@@ -188,6 +200,15 @@ function ColourFoundations() {
         <Heading size="sm">Overlay</Heading>
         <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
           {overlayColours.map((token) => (
+            <Swatch key={token} token={token} />
+          ))}
+        </Grid>
+      </Stack>
+
+      <Stack gap="4">
+        <Heading size="sm">Feature brands (Braids)</Heading>
+        <Grid gap="4" templateColumns="repeat(auto-fit, minmax(9rem, 1fr))">
+          {featureColours.map((token) => (
             <Swatch key={token} token={token} />
           ))}
         </Grid>

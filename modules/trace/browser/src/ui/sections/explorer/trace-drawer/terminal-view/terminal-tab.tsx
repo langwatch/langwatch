@@ -1,4 +1,4 @@
-import type { TranscriptEntry } from "@langwatch/coding-agent-contract";
+import { SESSION_NAME_FACT_KEY, type TranscriptEntry } from "@langwatch/coding-agent-contract";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 import { useMemo } from "react";
 
@@ -65,7 +65,7 @@ export function TerminalTab({
     ...turn,
     enabled: spansQuery.isSuccess && spansQuery.data.length === 0,
   });
-  const sessionCostUsd = useSessionCostUsd({ projectId, traceId });
+  const sessionRow = useCodingAgentSession({ projectId, traceId }).data ?? null;
 
   const toolSpans = useMemo(
     () =>
@@ -102,6 +102,8 @@ export function TerminalTab({
 
   const promptLine = promptLineText({
     sessionName,
+    declaredSessionName:
+      sessionRow?.title || resourceQuery.data?.resourceAttributes[SESSION_NAME_FACT_KEY] || null,
     traceId,
     spans: spansQuery.data ?? [],
     entries: session.entries,
@@ -125,7 +127,7 @@ export function TerminalTab({
       scrollback={scrollback}
       earlierTotals={session.earlierTotals}
       sessionStartAtMs={session.sessionStartAtMs}
-      sessionCostUsd={sessionCostUsd}
+      sessionCostUsd={sessionRow?.costUsd ?? null}
       banner={banner}
       promptLine={promptLine}
     />
@@ -135,24 +137,9 @@ export function TerminalTab({
 function TranscriptError() {
   return (
     <VStack align="center" justify="center" height="full" bg={TERMINAL_TOKENS.screenBg}>
-      <Text textStyle="xs" color="fg.error" fontFamily="mono">
+      <Text textStyle="xs" color={TERMINAL_TOKENS.red} fontFamily="mono">
         Couldn&apos;t load this session&apos;s transcript
       </Text>
     </VStack>
   );
-}
-
-/**
- * The whole session's cost for the bottom bar, off the same pre-folded row the Usage
- * tab reads (and the same query, so opening both tabs fetches once).
- */
-function useSessionCostUsd({
-  projectId,
-  traceId,
-}: {
-  projectId: string;
-  traceId: string;
-}): number | null {
-  const sessionQuery = useCodingAgentSession({ projectId, traceId });
-  return sessionQuery.data?.costUsd ?? null;
 }

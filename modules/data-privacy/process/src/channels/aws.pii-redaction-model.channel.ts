@@ -11,14 +11,18 @@ import {
   type PiiDetectionRequest,
 } from "@langwatch/evaluation-contract";
 
+import type { ModelCallContext } from "../rules/pii-redaction-model.rules.ts";
 import {
   PII_DETECTION_PATH,
   presidioDetectionBody,
   readPresidioDetectionAnswer,
 } from "../rules/presidio-exchange.rules.ts";
-import type { PresidioChannel } from "./presidio.channel.ts";
+import type { SplittingPresidioChannel } from "./presidio.channel.ts";
 
-export class AwsPiiRedactionModelChannel implements PresidioChannel {
+export class AwsPiiRedactionModelChannel implements SplittingPresidioChannel {
+  /** Each invocation runs on its own, so a span's pieces never queue (ADR-207 decision 8). */
+  readonly splits = true;
+
   /** `lambda` must be built with `maxAttempts: 1`: a failed call falls back, it is not re-run. */
   static create(input: {
     lambda: Pick<LambdaClient, "send">;
@@ -32,13 +36,16 @@ export class AwsPiiRedactionModelChannel implements PresidioChannel {
     private readonly functionArn: string,
   ) {}
 
-  async detect(input: PiiDetectionRequest): Promise<PiiDetectionOutcome> {
+  async detect(
+    input: PiiDetectionRequest,
+    { context }: { context: ModelCallContext } = { context: "single" },
+  ): Promise<PiiDetectionOutcome> {
     if (input.texts.length === 0) return { kind: "detected", results: [] };
 
     const payload = JSON.stringify({
       rawPath: PII_DETECTION_PATH,
       requestContext: { http: { method: "POST" } },
-      headers: { "content-type": "application/json" },
+      headers: { "content-type": "application/json", "x-langwatch-pii-call-context": context },
       body: presidioDetectionBody(input),
     });
 

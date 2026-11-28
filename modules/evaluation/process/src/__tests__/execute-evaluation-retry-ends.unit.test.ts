@@ -18,9 +18,8 @@ const SKIPPED = expect.objectContaining({
 
 describe("a retried evaluation", () => {
   /** @scenario "A retried evaluation always ends with a result" */
-  it("does not roll the sampling dice again on attempt 2", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    const deps = buildExecutionDeps({ monitor: buildMonitor({ sample: 0.5 }) });
+  it("does not re-check sampling on attempt 2", async () => {
+    const deps = buildExecutionDeps({ monitor: buildMonitor({ sample: 0 }) });
 
     const events = await EvaluationExecutionIntentService.create(deps).handle(
       buildExecuteCommand({ attempt: 2 }),
@@ -37,8 +36,7 @@ describe("a retried evaluation", () => {
 
   /** @scenario "A retried evaluation always ends with a result" */
   it("still drops silently on a first attempt excluded by sampling", async () => {
-    vi.spyOn(Math, "random").mockReturnValue(0.99);
-    const deps = buildExecutionDeps({ monitor: buildMonitor({ sample: 0.5 }) });
+    const deps = buildExecutionDeps({ monitor: buildMonitor({ sample: 0 }) });
 
     const events =
       await EvaluationExecutionIntentService.create(deps).handle(buildExecuteCommand());

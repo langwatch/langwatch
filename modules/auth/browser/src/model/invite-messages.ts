@@ -22,6 +22,13 @@ export const acceptInviteResultSchema = z.object({
     organization: z.object({ name: z.string() }),
   }),
   project: z.object({ slug: z.string() }).nullable().optional(),
+  billingOnly: z.boolean().optional(),
 });
 
 export type AcceptInviteResult = z.infer<typeof acceptInviteResultSchema>;
+
+/** Billing only (ADR-205) opens no project, so it lands on the plan page it was invited to pay. */
+export function landingAfterAccept(accepted: AcceptInviteResult): string {
+  if (accepted.billingOnly) return "/settings/subscription";
+  return accepted.project?.slug ? `/${accepted.project.slug}` : "/";
+}

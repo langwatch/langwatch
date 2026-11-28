@@ -190,6 +190,14 @@ describe("accumulateSpanTiming", () => {
       }),
     ).toEqual({ occurredAt: 5000, totalDurationMs: 0 });
   });
+
+  it("keeps the window when a span sits inside it", () => {
+    const state = emptyState({ occurredAt: 1000, totalDurationMs: 1000 });
+
+    expect(
+      accumulateSpanTiming({ state, span: span({ startTimeUnixMs: 1200, endTimeUnixMs: 1800 }) }),
+    ).toEqual({ occurredAt: 1000, totalDurationMs: 1000 });
+  });
 });
 
 describe("extractSpanStatus", () => {

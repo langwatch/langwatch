@@ -5,18 +5,15 @@
  */
 
 import { useUiAnalytics } from "@langwatch/browser-host/analytics";
-import type { DashboardProject, DashboardScope } from "@langwatch/dashboard-contract";
-import { useRef, useState } from "react";
+import type {
+  DashboardHomeProduct,
+  DashboardProject,
+  DashboardScope,
+} from "@langwatch/dashboard-contract";
 
 import { analyticsApi } from "../../../behavior/analytics-api.ts";
 import { useAnalyticsHost } from "../../../model/analytics-host.ts";
-import { dashboardsPath, untitledBoardName } from "../model/boards.ts";
-import {
-  dashboardCreated,
-  dashboardDeleted,
-  dashboardEdited,
-} from "../model/dashboard-usage-events.ts";
-import { withBlockPickerOpen } from "./use-block-picker-address.ts";
+import { dashboardDeleted, dashboardEdited } from "../model/dashboard-usage-events.ts";
 
 /** One stored board, as the list answers it. */
 export type SavedBoard = {
@@ -28,7 +25,11 @@ export type SavedBoard = {
   /** Null for a board older than creators. */
   createdById: string | null;
   scope: DashboardScope;
+  /** The product whose sidebar lists it, which decides whose data it reads (ADR-002, D2). */
+  homeProduct: DashboardHomeProduct;
   organizationId: string | null;
+  /** The member whose own My dashboard it is; absent from an older server. */
+  myDashboardOfUserId?: string | null;
   /** The owning project, named only where the board is listed in another project. */
   ownerProject: DashboardProject | null;
   /** Whether the member reading the list has starred it. */
@@ -45,7 +46,9 @@ function savedBoardOf({
   description,
   createdById,
   scope,
+  homeProduct,
   organizationId,
+  myDashboardOfUserId,
   ownerProject,
   isStarred,
   updatedAt,
@@ -57,15 +60,14 @@ function savedBoardOf({
     description,
     createdById,
     scope,
+    homeProduct,
     organizationId,
+    myDashboardOfUserId,
     ownerProject,
     isStarred,
     updatedAt,
   };
 }
-
-/** How a new board starts: pinned for its maker, and with "Add a widget" open. */
-export type CreateBoardOptions = { pin?: boolean; addWidget?: boolean };
 
 export function useSavedDashboards() {
   const host = useAnalyticsHost();
@@ -74,17 +76,11 @@ export function useSavedDashboards() {
   const projectId = project?.id ?? "";
   const projectSlug = project?.slug ?? "";
   const utils = analyticsApi.useUtils();
-  // A ref, not the mutation's pending flag: two clicks in one tick, or one landing between the
-  // create answering and the pin starting, would each see "idle" and make a second board.
-  const creating = useRef(false);
-  const [isMakingBoard, setIsMakingBoard] = useState(false);
 
   const list = analyticsApi.boards.getAll.useQuery(
     { projectId, includeOrganization: true },
     { enabled: !!projectId },
   );
-  const create = analyticsApi.boards.create.useMutation();
-  const star = analyticsApi.boards.star.useMutation();
   const rename = analyticsApi.boards.update.useMutation();
   const remove = analyticsApi.boards.delete.useMutation();
 
@@ -96,46 +92,6 @@ export function useSavedDashboards() {
       utils.boards.getAll.invalidate({ projectId }),
       utils.boards.listStarred.invalidate({ projectId }),
     ]);
-
-  /**
-   * Makes a blank board and opens it. `pin` stars it in this project for the maker; a failed
-   * pin still opens the board. `addWidget` opens it with "Add a widget" open.
-   */
-  const createBoard = ({ pin = false, addWidget = false }: CreateBoardOptions = {}) => {
-    if (creating.current) return;
-    creating.current = true;
-    setIsMakingBoard(true);
-    const settle = () => {
-      creating.current = false;
-      setIsMakingBoard(false);
-    };
-    create.mutate(
-      { projectId, name: untitledBoardName({ existingCount: boards.length }) },
-      {
-        onSuccess: async (created) => {
-          analytics.track(dashboardCreated({ createdFrom: "blank" }));
-          try {
-            if (pin) {
-              await star
-                .mutateAsync({ projectId, star: { kind: "board", dashboardId: created.id } })
-                .catch((error: unknown) =>
-                  host.failed({ error, fallbackTitle: "Couldn't pin the dashboard" }),
-                );
-            }
-            void refresh();
-            const path = dashboardsPath({ projectSlug, dashboardId: created.id });
-            host.navigate(addWidget ? withBlockPickerOpen(path) : path);
-          } finally {
-            settle();
-          }
-        },
-        onError: (error) => {
-          settle();
-          host.failed({ error, fallbackTitle: "Couldn't create the dashboard" });
-        },
-      },
-    );
-  };
 
   const renameBoard = ({ dashboardId, name }: { dashboardId: string; name: string }) => {
     rename.mutate(
@@ -180,10 +136,12 @@ export function useSavedDashboards() {
     organizationBoards,
     /** True until the first list answer arrives, so a board lookup never reads "missing" early. */
     isLoading: list.data === void 0 && !list.isError,
+    /** A held list being read again: a board just made elsewhere may not be in it yet. */
+    isRefreshing: list.isFetching,
+    /** Reads the list again now, for a board the address names that the held list lacks. */
+    reread: () => list.refetch(),
     loadError: list.error,
-    isCreating: isMakingBoard || create.isPending || star.isPending,
     isDeleting: remove.isPending,
-    createBoard,
     renameBoard,
     deleteBoard,
   };

@@ -39,9 +39,9 @@ export function trustWidgetBuilds({
   return {
     "data-health": {
       code: dataHealthCode({ unlocks }),
-      queries: { fields: sql.FIELD_COVERAGE_SQL },
+      queries: { fields: sql.FIELD_COVERAGE_SQL, models: sql.UNPRICED_MODELS_SQL },
       width: "half",
-      rows: 7,
+      rows: 9,
     },
     "cost-accuracy": {
       code: COST_ACCURACY_CODE,

@@ -972,6 +972,22 @@ describe("guardProjectId — raw queries (queryRaw / executeRaw)", () => {
         }),
       ).resolves.toBe("ok");
     });
+
+    it("does NOT throw for a tab-separated INSERT that writes its tenant column", async () => {
+      const query = 'INSERT\tINTO\t"GrantUsage"\t("organizationId")\tVALUES ($1)';
+      await expect(
+        runGuard({ model: undefined, action: "executeRaw", args: { query } }),
+      ).resolves.toBe("ok");
+    });
+
+    it("refuses a long run of whitespace after INSERT INTO in linear time", async () => {
+      const query = `insert\tinto\t${"\t".repeat(50_000)}x`;
+      const started = performance.now();
+      await expect(
+        runGuard({ model: undefined, action: "executeRaw", args: { query } }),
+      ).rejects.toThrow(/compares no tenant column/);
+      expect(performance.now() - started).toBeLessThan(500);
+    });
   });
 
   describe("when a raw query only mentions a tenant column", () => {
@@ -1566,6 +1582,104 @@ describe("guardOrganizationId — OrganizationUser", () => {
         }),
       ).rejects.toThrow(/organizationId/);
     });
+  });
+});
+
+describe("guardOrganizationId: nurturing's trace window sweep and member copy", () => {
+  const runOrganizationGuard = (params: GuardParams) =>
+    guardOrganizationId(
+      params,
+      vi.fn(async () => "ok"),
+    );
+  const span = { gt: new Date(1_000), lte: new Date(2_000) };
+
+  describe("when the sweep reads the organizations created in one span", () => {
+    it("permits exactly that read", async () => {
+      await expect(
+        runOrganizationGuard({
+          model: "NurturingOrganizationCreated",
+          action: "findMany",
+          args: { where: { createdAt: span } },
+        }),
+      ).resolves.toBe("ok");
+    });
+
+    it.each([
+      ["an open-ended span", "findMany", { createdAt: { gt: new Date(1_000) } }],
+      ["a write", "deleteMany", { createdAt: span }],
+    ])("refuses %s", async (_name, action, where) => {
+      await expect(
+        runOrganizationGuard({ model: "NurturingOrganizationCreated", action, args: { where } }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
+  describe("when the member copy is read for named members", () => {
+    it("permits the read and refuses a write keyed on the users alone", async () => {
+      const where = { userId: { in: ["user-1", "user-2"] } };
+      await expect(
+        runOrganizationGuard({
+          model: "NurturingOrganizationMember",
+          action: "findMany",
+          args: { where },
+        }),
+      ).resolves.toBe("ok");
+      await expect(
+        runOrganizationGuard({
+          model: "NurturingOrganizationMember",
+          action: "deleteMany",
+          args: { where },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+});
+
+describe("guardOrganizationId: the digest's cohort and weekly folds", () => {
+  const runOrganizationGuard = (params: GuardParams) =>
+    guardOrganizationId(
+      params,
+      vi.fn(async () => "ok"),
+    );
+
+  describe("when the weekly plan reads the enrolled cohort", () => {
+    it("permits the list and refuses a write that names no organization", async () => {
+      await expect(
+        runOrganizationGuard({ model: "DigestCohortOrganization", action: "findMany", args: {} }),
+      ).resolves.toBe("ok");
+      await expect(
+        runOrganizationGuard({
+          model: "DigestCohortOrganization",
+          action: "deleteMany",
+          args: { where: {} },
+        }),
+      ).rejects.toThrow(/organizationId/);
+    });
+  });
+
+  describe("when a weekly fold is read", () => {
+    it.each(["DigestProjectWeek", "DigestUserWeek"])(
+      "permits %s by organization or row id, and refuses a read across organizations",
+      async (model) => {
+        await expect(
+          runOrganizationGuard({
+            model,
+            action: "findMany",
+            args: { where: { organizationId: "org-1", isoWeek: { in: ["2026-W46"] } } },
+          }),
+        ).resolves.toBe("ok");
+        await expect(
+          runOrganizationGuard({ model, action: "findUnique", args: { where: { id: "fold-1" } } }),
+        ).resolves.toBe("ok");
+        await expect(
+          runOrganizationGuard({
+            model,
+            action: "findMany",
+            args: { where: { isoWeek: { in: ["2026-W46"] } } },
+          }),
+        ).rejects.toThrow(/organizationId/);
+      },
+    );
   });
 });
 

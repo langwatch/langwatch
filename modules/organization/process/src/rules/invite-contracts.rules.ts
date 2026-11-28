@@ -92,6 +92,8 @@ export interface CreateAdminInviteInput {
   teamIds: string;
   teamAssignments?: TeamAssignmentInput[];
   requestedBy?: string | null;
+  /** The person who pays: role EXTERNAL, no team, no seat (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /**
@@ -108,6 +110,8 @@ export interface CreateInvitesInviteInput {
     role: string;
     customRoleId?: string;
   }[];
+  /** Stored as EXTERNAL with no team, whatever `role` names (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /** The validated team side of one requested invite. */

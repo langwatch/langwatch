@@ -5,6 +5,7 @@
  * a seat plan's retention from the started fact (round 37 D4).
  */
 import {
+  isDeveloperSeatPrice,
   isGrowthEventsPrice,
   isGrowthSeatEventPlan,
   isGrowthSeatPrice,
@@ -28,7 +29,9 @@ import type {
 import type { BillingSubscriptionRecord } from "../repositories/subscription.repository.ts";
 import { BestEffortService } from "./best-effort.service.ts";
 import type { BillingLifecycleAnnouncerService } from "./billing-lifecycle-announcer.service.ts";
+import type { OverPlanService } from "./over-plan.service.ts";
 import type { SubscriptionItemCalculatorService } from "./subscription-item-calculator.service.ts";
+import { TieredPlanRetirementService } from "./tiered-plan-retirement.service.ts";
 
 const logger = createLogger("langwatch:billing:subscriptionLifecycle");
 
@@ -53,6 +56,8 @@ type BillingSubscriptionLifecycleOptions = {
     BillingLifecycleAnnouncerService,
     "subscriptionActivated" | "subscriptionCancelled" | "pricingModelChanged"
   >;
+  /** Marks an organization that cancels into Free with too many members; absent, none is marked. */
+  overPlan?: Pick<OverPlanService, "downgraded">;
 };
 
 /** What a subscription activation asks licensing about a trial's licence, and its removal. */
@@ -70,7 +75,9 @@ export class BillingSubscriptionLifecycleService {
   private readonly itemCalculator: BillingSubscriptionLifecycleOptions["itemCalculator"];
   private readonly host: BillingWebhookHost;
   private readonly announcer: BillingSubscriptionLifecycleOptions["announcer"];
+  private readonly overPlan: BillingSubscriptionLifecycleOptions["overPlan"];
   private readonly bestEffort = BestEffortService.create();
+  private readonly retirement: TieredPlanRetirementService;
 
   private constructor(options: BillingSubscriptionLifecycleOptions) {
     this.subscriptionRepository = options.subscriptionRepository;
@@ -80,6 +87,13 @@ export class BillingSubscriptionLifecycleService {
     this.itemCalculator = options.itemCalculator;
     this.host = options.host;
     this.announcer = options.announcer;
+    this.overPlan = options.overPlan;
+    this.retirement = TieredPlanRetirementService.create({
+      subscriptions: options.subscriptionRepository,
+      organizations: options.organizationRepository,
+      stripeSubscriptions: options.stripeSubscriptions,
+      ...(options.announcer ? { announcer: options.announcer } : {}),
+    });
   }
 
   async handleSubscriptionDeleted({
@@ -115,6 +129,7 @@ export class BillingSubscriptionLifecycleService {
     await this.announcer?.subscriptionCancelled({
       organizationId: existingSubscription.organizationId,
     });
+    await this.markIfOverPlan(existingSubscription);
 
     await this.bestEffort.run({
       label: "cancellation notification",
@@ -156,8 +171,19 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
 
-    if (subscription.status !== "active" || subscription.ended_at) {
+    // Past due and unpaid keep the paid plan while payment recovery runs (ADR-002).
+    const isInRecovery = subscription.status === "past_due" || subscription.status === "unpaid";
+    if ((subscription.status !== "active" && !isInRecovery) || subscription.ended_at) {
       await this.cancelSubscriptionRecord(existingSubForUpdate);
+
+      return;
+    }
+
+    if (isInRecovery) {
+      logger.info(
+        { stripeSubscriptionId: subscription.id, status: subscription.status },
+        "[stripeWebhook] Subscription in payment recovery; plan kept",
+      );
 
       return;
     }
@@ -176,6 +202,24 @@ export class BillingSubscriptionLifecycleService {
   private async cancelSubscriptionRecord(existing: BillingSubscriptionRecord): Promise<void> {
     await this.subscriptionRepository.cancel({ id: existing.id });
     await this.announcer?.subscriptionCancelled({ organizationId: existing.organizationId });
+    await this.markIfOverPlan(existing);
+  }
+
+  /** A cancellation into Free with too many members withholds new traces; nobody is removed. */
+  private async markIfOverPlan(cancelled: BillingSubscriptionRecord): Promise<void> {
+    const overPlan = this.overPlan;
+    if (!overPlan) return;
+    await this.bestEffort.run({
+      label: "over-plan mark",
+      context: { organizationId: cancelled.organizationId },
+      effect: () =>
+        overPlan.downgraded({
+          organizationId: cancelled.organizationId,
+          subscriptionId: cancelled.id,
+          since: nowInstant(),
+          reason: "cancelled",
+        }),
+    });
   }
 
   /** Reconciles the seat and event quantities Stripe now reports, and notifies on activation. */
@@ -187,10 +231,14 @@ export class BillingSubscriptionLifecycleService {
     existing: BillingSubscriptionRecord;
   }): Promise<void> {
     const shouldNotify = existing.status !== SubscriptionStatus.ACTIVE;
-    const { usersQuantity, tracesQuantity } = this.quantitiesOf({ subscription, existing });
+    const { usersQuantity, tracesQuantity, developerQuantity } = this.quantitiesOf({
+      subscription,
+      existing,
+    });
     const quantitiesResult = await this.subscriptionRepository.updateQuantities({
       id: existing.id,
       ...planQuantities({ members: usersQuantity, messagesPerMonth: tracesQuantity }),
+      ...(developerQuantity === undefined ? {} : { maxMembersDeveloper: developerQuantity }),
     });
     if (quantitiesResult.outcome === "missing_subscription") {
       return;
@@ -198,11 +246,12 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = quantitiesResult.subscription;
 
     await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription updated to active");
-    if (!shouldNotify) {
-      return;
+    if (shouldNotify) {
+      await this.announceSubscriptionStarted(updatedSubscription);
     }
-
-    await this.announceSubscriptionStarted(updatedSubscription);
+    if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
+      await this.retirement.retire({ seat: updatedSubscription });
+    }
   }
 
   /**
@@ -229,20 +278,30 @@ export class BillingSubscriptionLifecycleService {
       organizationId: subscription.organizationId,
       subscriptionId: subscription.id,
       plan: subscription.plan,
+      ...(subscription.maxRetentionDays ? { retentionDays: subscription.maxRetentionDays } : {}),
     });
   }
 
-  /** The seat and trace limits the subscription's own line items imply. */
+  /**
+   * The seat and trace limits the subscription's own line items imply. Developer seats
+   * are stated only on a seat-priced subscription, where no Developer line means none bought.
+   */
   private quantitiesOf({
     subscription,
     existing,
   }: {
     subscription: Stripe.Subscription;
     existing: BillingSubscriptionRecord;
-  }): { usersQuantity: number | null; tracesQuantity: number | null } {
+  }): {
+    usersQuantity: number | null;
+    tracesQuantity: number | null;
+    developerQuantity: number | undefined;
+  } {
     const prices = this.itemCalculator.prices;
     let tracesQuantity: number | null = null;
     let usersQuantity: number | null = null;
+    let seatPriced = false;
+    let developerLine = 0;
     const seatPrices = [
       prices.LAUNCH_USERS,
       prices.ACCELERATE_USERS,
@@ -261,6 +320,9 @@ export class BillingSubscriptionLifecycleService {
       // from the plan limits rather than from the line item.
       if (isGrowthSeatPrice(item.price.id, prices)) {
         usersQuantity = item.quantity ?? 0;
+        seatPriced = true;
+      } else if (isDeveloperSeatPrice(item.price.id, prices)) {
+        developerLine = item.quantity ?? 0;
       } else if (isGrowthEventsPrice(item.price.id, prices)) {
         continue;
       } else if (seatPrices.includes(item.price.id)) {
@@ -278,7 +340,11 @@ export class BillingSubscriptionLifecycleService {
       }
     }
 
-    return { usersQuantity, tracesQuantity };
+    return {
+      usersQuantity,
+      tracesQuantity,
+      developerQuantity: seatPriced ? developerLine : undefined,
+    };
   }
 
   // --- Private helpers ---
@@ -320,15 +386,15 @@ export class BillingSubscriptionLifecycleService {
       return;
     }
     const updatedSubscription = activationResult.subscription;
+    const firstActivation = previousSubscription.status !== SubscriptionStatus.ACTIVE;
 
-    if (previousSubscription.status !== SubscriptionStatus.ACTIVE) {
+    if (firstActivation) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
-
-      if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
-        await this.migrateToSeatEventPlan(updatedSubscription);
-      }
-
       await this.announceSubscriptionStarted(updatedSubscription);
+    }
+    // Every paid Growth invoice checks, so the order Stripe's messages arrive in cannot skip it.
+    if (isGrowthSeatEventPlan(updatedSubscription.plan)) {
+      await this.retirement.retire({ seat: updatedSubscription });
     }
   }
 
@@ -374,39 +440,6 @@ export class BillingSubscriptionLifecycleService {
       );
 
       return false;
-    }
-  }
-
-  /** Retires the plans this seat-event subscription supersedes, once the records agree. */
-  private async migrateToSeatEventPlan(updated: SubscriptionWithOrg): Promise<void> {
-    // Organization sets the pricing model from the fact; a refused fact fails before any row moves.
-    await this.announcer?.pricingModelChanged({
-      organizationId: updated.organizationId,
-      pricingModel: "SEAT_EVENT",
-    });
-    const oldSubscriptions = await this.subscriptionRepository.migrateToSeatEvent({
-      organizationId: updated.organizationId,
-      excludeSubscriptionId: updated.id,
-    });
-
-    // Cancel in Stripe after the records are consistent, outside the transaction.
-    for (const oldSub of oldSubscriptions) {
-      if (!oldSub.stripeSubscriptionId) {
-        continue;
-      }
-
-      try {
-        await this.stripeSubscriptions.cancelSubscription({
-          subscriptionId: oldSub.stripeSubscriptionId,
-          prorate: true,
-        });
-      } catch (err) {
-        logger.error(
-          { stripeSubscriptionId: oldSub.stripeSubscriptionId, err },
-          "[stripeWebhook] CRITICAL: Failed to cancel old Stripe subscription during " +
-            "upgrade. Manual intervention required.",
-        );
-      }
     }
   }
 

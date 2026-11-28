@@ -18,7 +18,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { editSourceNotes } from "../governance-inventory.screen.tsx";
+import { editSourceNotes } from "../inventory/source-edit-rules.ts";
 
 /** What each note is recognisable by, independent of its exact wording. */
 const REPORT_NOTE = /the report is fixed/i;

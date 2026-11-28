@@ -78,6 +78,20 @@ describe("ops server configuration", () => {
     });
   });
 
+  describe("given CLICKHOUSE_OPS_PASSWORD_FILE", () => {
+    it("reads the path when one is set", () => {
+      expect(
+        read({ CLICKHOUSE_OPS_PASSWORD_FILE: "/var/run/clickhouse-ops/password" })
+          .clickhouseOpsPasswordFile,
+      ).toBe("/var/run/clickhouse-ops/password");
+    });
+
+    /** @scenario "A blank CLICKHOUSE_OPS_PASSWORD_FILE is the same as unset" */
+    it("treats a blank value as unset", () => {
+      expect(read({ CLICKHOUSE_OPS_PASSWORD_FILE: " " }).clickhouseOpsPasswordFile).toBeUndefined();
+    });
+  });
+
   describe("given the browser is told what ops answers", () => {
     /** @scenario "The browser learns Cloud admin from what the ops process answered" */
     it("projects the running answer and never the switch or a key", async () => {

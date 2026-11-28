@@ -35,7 +35,7 @@ export type UiTwoStepCeremonies = {
   }): Promise<UiTwoStepAnswer<{ backupCodes: readonly string[] }>>;
 };
 
-/** How linking a further sign-in method ended; `reason` is the provider's refusal to show. */
+/** How linking a further sign-in method ended; `reason` is a plain sentence to show. */
 export type UiLinkSignInMethodOutcome = { ok: true } | { ok: false; reason?: string };
 /** What auth lends for linking another sign-in method to the reader's own account. */
 export type UiSignInMethodLinking = {

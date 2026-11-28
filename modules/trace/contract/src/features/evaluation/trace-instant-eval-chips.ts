@@ -6,7 +6,7 @@
 import type { InstantEvalRunReference, InstantEvalTarget } from "@langwatch/instant-eval-contract";
 import type { LiqeQuery } from "liqe";
 
-import { filterAST, walkAST } from "../query/trace-query-ast.ts";
+import { filterAST, tagsUnderOr, walkAST } from "../query/trace-query-ast.ts";
 import { isEmptyAST, parse, serialize } from "../query/trace-query-parser.ts";
 
 /** The bare field, whose target comes from the lens. */
@@ -54,6 +54,8 @@ interface InstantEvalChip {
   field: string;
   /** The unit judged, resolved from the field or the lens. */
   target: InstantEvalTarget;
+  /** This occurrence has a `NOT` reaching it across an `OR` or a group: no run answers it. */
+  isUnjudgeable: boolean;
 }
 
 /** Every eval chip of the query, with its target resolved against the lens. */
@@ -73,6 +75,7 @@ export function instantEvalChipsOf({
     return [];
   }
   const chips: InstantEvalChip[] = [];
+  const unjudgeable = unjudgeableInstantEvalTags(ast);
   walkAST(ast, (node) => {
     if (node.type !== "Tag" || node.field.type === "ImplicitField") return;
     const field = node.field.name;
@@ -80,7 +83,12 @@ export function instantEvalChipsOf({
     if (node.expression.type !== "LiteralExpression") return;
     const question = String(node.expression.value).trim();
     if (question.length === 0) return;
-    chips.push({ question, field, target: instantEvalTargetOf({ fieldName: field, lensId }) });
+    chips.push({
+      question,
+      field,
+      target: instantEvalTargetOf({ fieldName: field, lensId }),
+      isUnjudgeable: unjudgeable.has(node),
+    });
   });
   return chips;
 }
@@ -145,6 +153,177 @@ export function queryWithoutInstantEvalChip({
   });
 }
 
+/** The field a chip for `target` is spelled with on this lens. */
+function instantEvalFieldFor({
+  target,
+  lensId,
+}: {
+  target: InstantEvalTarget;
+  lensId: string | undefined;
+}): string {
+  if (target === instantEvalTargetForLens(lensId)) return INSTANT_EVAL_FIELD;
+  return (
+    Object.entries(INSTANT_EVAL_TARGET_FIELDS).find(([, candidate]) => candidate === target)?.[0] ??
+    INSTANT_EVAL_FIELD
+  );
+}
+
+/**
+ * The query with each bare chip on `question` that this lens reads as another
+ * target spelled with the field forcing `target`; `NOT` and grouping are kept.
+ * A query that does not parse is returned as it came.
+ */
+export function queryWithInstantEvalChipRetargeted({
+  queryText,
+  question,
+  target,
+  lensId,
+}: {
+  queryText: string;
+  question: string;
+  target: InstantEvalTarget;
+  lensId: string | undefined;
+}): string {
+  const trimmed = queryText.trim();
+  if (instantEvalTargetForLens(lensId) === target) return trimmed;
+  let ast: LiqeQuery;
+  try {
+    // `parse` hands back a cached tree; the walk below writes to its nodes.
+    ast = structuredClone(parse(trimmed));
+  } catch {
+    return trimmed;
+  }
+  const wanted = question.replace(/\s+/g, " ").trim();
+  walkAST(ast, (node) => {
+    if (node.type !== "Tag" || node.field.type !== "Field") return;
+    if (node.field.name !== INSTANT_EVAL_FIELD) return;
+    if (node.expression.type !== "LiteralExpression") return;
+    const value = String(node.expression.value).replace(/\s+/g, " ");
+    if (value.trim() !== wanted) return;
+    node.field = { ...node.field, name: instantEvalFieldFor({ target, lensId }) };
+  });
+  return serialize(ast);
+}
+
+/** Every tag below a `NOT` whose operand holds more than that one tag. */
+function tagsUnderNegatedGroup(
+  ast: LiqeQuery,
+  inGroup = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inGroup) found.add(ast);
+  } else if (ast.type === "UnaryOperator") {
+    let operand = ast.operand;
+    while (operand.type === "ParenthesizedExpression") operand = operand.expression;
+    tagsUnderNegatedGroup(ast.operand, inGroup || operand.type !== "Tag", found);
+  } else if (ast.type === "ParenthesizedExpression") {
+    tagsUnderNegatedGroup(ast.expression, inGroup, found);
+  } else if (ast.type === "LogicalExpression") {
+    tagsUnderNegatedGroup(ast.left, inGroup, found);
+    tagsUnderNegatedGroup(ast.right, inGroup, found);
+  }
+  return found;
+}
+
+/** Every tag with a `NOT` anywhere above it, whatever the parity. */
+function tagsUnderNot(
+  ast: LiqeQuery,
+  inNot = false,
+  found: Set<LiqeQuery> = new Set(),
+): Set<LiqeQuery> {
+  if (ast.type === "Tag") {
+    if (inNot) found.add(ast);
+  } else if (ast.type === "UnaryOperator") {
+    tagsUnderNot(ast.operand, true, found);
+  } else if (ast.type === "ParenthesizedExpression") {
+    tagsUnderNot(ast.expression, inNot, found);
+  } else if (ast.type === "LogicalExpression") {
+    tagsUnderNot(ast.left, inNot, found);
+    tagsUnderNot(ast.right, inNot, found);
+  }
+  return found;
+}
+
+/** Whether one of `nodes` is the chip `field:question`, spacing aside. */
+function holdsChip({
+  nodes,
+  field,
+  question,
+}: {
+  nodes: Iterable<LiqeQuery>;
+  field: string;
+  question: string;
+}): boolean {
+  const wanted = question.replace(/\s+/g, " ").trim();
+  return [...nodes].some(
+    (node) =>
+      node.type === "Tag" &&
+      node.field.type === "Field" &&
+      node.field.name === field &&
+      node.expression.type === "LiteralExpression" &&
+      String(node.expression.value).replace(/\s+/g, " ").trim() === wanted,
+  );
+}
+
+/** The parsed query, or null when it does not parse. */
+function parseOrNull(queryText: string): LiqeQuery | null {
+  try {
+    return parse(queryText.trim());
+  } catch {
+    return null;
+  }
+}
+
+/** The tags under an `OR`, or under a `NOT` that spans other terms. */
+function tangledTags(ast: LiqeQuery): Set<LiqeQuery> {
+  return new Set([...tagsUnderOr(ast), ...tagsUnderNegatedGroup(ast)]);
+}
+
+/**
+ * Whether the chip `field:question` sits below an `OR`, or below a `NOT` that
+ * spans other terms too (`NOT (a AND b)` is `NOT a OR NOT b`). Its run judges
+ * only the other terms, so the text as typed would match rows it never judged.
+ */
+export function hasInstantEvalChipUnderOr({
+  queryText,
+  field,
+  question,
+}: {
+  queryText: string;
+  field: string;
+  question: string;
+}): boolean {
+  const ast = parseOrNull(queryText);
+  return ast !== null && holdsChip({ nodes: tangledTags(ast), field, question });
+}
+
+/**
+ * The tags of `ast` tangled as above with a `NOT` reaching them too, by node, so each occurrence
+ * is judged on its own: a refused `NOT eval:"q"` leaves a positive `eval:"q"` sibling its run.
+ */
+export function unjudgeableInstantEvalTags(ast: LiqeQuery): ReadonlySet<LiqeQuery> {
+  const negated = tagsUnderNot(ast);
+  return new Set([...tangledTags(ast)].filter((node) => negated.has(node)));
+}
+
+/**
+ * Whether a `NOT` reaches the chip `field:question`. With no run behind it such a
+ * chip negates nothing judged, so it would list every row as a non-match.
+ */
+export function isInstantEvalChipNegated({
+  queryText,
+  field,
+  question,
+}: {
+  queryText: string;
+  field: string;
+  question: string;
+}): boolean {
+  const ast = parseOrNull(queryText);
+  return ast !== null && holdsChip({ nodes: tagsUnderNot(ast), field, question });
+}
+
 /**
  * The chip text for a question: the bare field when the target is what the lens
  * judges anyway, the forcing spelling when it is not. Always quoted — a chip
@@ -159,12 +338,7 @@ export function instantEvalChipText({
   target: InstantEvalTarget;
   lensId: string | undefined;
 }): string {
-  const field =
-    target === instantEvalTargetForLens(lensId)
-      ? INSTANT_EVAL_FIELD
-      : (Object.entries(INSTANT_EVAL_TARGET_FIELDS).find(
-          ([, candidate]) => candidate === target,
-        )?.[0] ?? INSTANT_EVAL_FIELD);
+  const field = instantEvalFieldFor({ target, lensId });
   const collapsed = question.replace(/\s+/g, " ").trim();
   return `${field}:"${collapsed.replace(/[\\"]/g, "\\$&")}"`;
 }
@@ -227,9 +401,9 @@ interface ResolvedInstantEvalChip extends InstantEvalChip {
 }
 
 /**
- * The chips of a query matched to the runs the store holds, and the wire map
- * the reads send. A chip without a run is pending: it is sent to no read and
- * compiles to no rows, so the table stays truthful while the run starts.
+ * The chips of a query matched to the runs the store holds, and the wire map the reads send. A
+ * chip without a run is pending: it is sent to no read and compiles to no rows, so the table stays
+ * truthful while the run starts. A chip occurrence no run can answer (`isUnjudgeable`) too.
  */
 export function resolveInstantEvalChips({
   queryText,
@@ -256,7 +430,8 @@ export function resolveInstantEvalChips({
       otherQuery,
       window,
     });
-    const runId = runsByKey[key] ?? null;
+    // A run cannot answer a chip a NOT reaches across an OR, so no read applies it there.
+    const runId = chip.isUnjudgeable ? null : (runsByKey[key] ?? null);
     if (runId) {
       evalRuns[key] = { question: chip.question, target: chip.target, runId };
     }

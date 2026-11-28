@@ -39,6 +39,7 @@ const CREATE_TABLE = `
     Attempts UInt16 DEFAULT 0, LastAttemptAt Nullable(DateTime64(3)),
     LastAttemptError Nullable(String), NextAttemptAt Nullable(DateTime64(3)),
     LastProcessedEventId String, LastEventOccurredAt Nullable(DateTime64(3)),
+    IdLayout LowCardinality(Nullable(String)) DEFAULT NULL,
     _retention_days UInt16 DEFAULT 49
   ) ENGINE = ReplacingMergeTree(UpdatedAt)
   PARTITION BY toYearWeek(ScheduledAt)
@@ -190,10 +191,10 @@ describe("given a trace whose evaluation runs are stored", () => {
         authorization: proof(),
         projectId: "tenant_member_a",
       });
-      expect(narrowed).not.toBeNull();
-      const result = narrowed
-        ? await reads.findByTraceId({ authorization: narrowed, traceId: SHARED_TRACE_ID })
-        : [];
+      const result = await reads.findByTraceId({
+        authorization: narrowed,
+        traceId: SHARED_TRACE_ID,
+      });
 
       expect(result.map((run) => run.evaluatorId)).toEqual(["monitor-a"]);
     });

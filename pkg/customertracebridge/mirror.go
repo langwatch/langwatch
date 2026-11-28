@@ -4,6 +4,7 @@ import (
 	"context"
 
 	"go.opentelemetry.io/otel/attribute"
+	"go.opentelemetry.io/otel/sdk/resource"
 	sdktrace "go.opentelemetry.io/otel/sdk/trace"
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 )
@@ -52,21 +53,24 @@ func (m mirrorExporter) ExportSpans(ctx context.Context, spans []sdktrace.ReadOn
 func (m mirrorExporter) Shutdown(ctx context.Context) error { return m.inner.Shutdown(ctx) }
 
 // mirrorCopy rebuilds a span for the mirror project: re-homed by project id,
-// attributed to the source organization, content gated by tier, markers gone.
+// tagged with its source tenant, content gated by tier, markers gone. The
+// source tenant rides as reserved copy markers that resourceScrubExporter lifts
+// onto the resource, the one place ADR-061 §5 puts it.
 func (m mirrorExporter) mirrorCopy(s sdktrace.ReadOnlySpan, tier string) sdktrace.ReadOnlySpan {
 	stub := tracetest.SpanStubFromReadOnlySpan(s)
 	sourceOrg := spanAttr(s, attrMirrorSourceOrg)
+	sourceProject := spanAttr(s, attrProjectID)
 
-	kept := make([]attribute.KeyValue, 0, len(stub.Attributes)+2)
+	kept := make([]attribute.KeyValue, 0, len(stub.Attributes)+3)
 	for _, a := range stub.Attributes {
-		switch a.Key {
-		case attrMirrorTier, attrMirrorSourceOrg:
+		switch {
+		case isMirrorMarker(a.Key):
 			// reserved markers never travel
 			continue
-		case attrProjectID:
+		case a.Key == attrProjectID:
 			// re-home to the mirror project so the router delivers it there
 			continue
-		case attrInputMessages, attrOutputMessages:
+		case a.Key == attrInputMessages, a.Key == attrOutputMessages:
 			// message bodies ride only at the content tier
 			if tier == mirrorTierStructural {
 				continue
@@ -78,32 +82,62 @@ func (m mirrorExporter) mirrorCopy(s sdktrace.ReadOnlySpan, tier string) sdktrac
 	}
 	kept = append(kept, attrProjectID.String(m.mirrorProjectID))
 	if sourceOrg != "" {
-		// Source-tenant attribution (ADR-053 Track A org identifier). The source
-		// PROJECT id is langwatch.project_id, which the router owns here, so the
-		// gateway leg attributes at the org level; the relay leg carries both.
-		kept = append(kept, attrOrgID.String(sourceOrg))
+		kept = append(kept, attrMirrorCopySourceOrg.String(sourceOrg))
+	}
+	if sourceProject != "" {
+		kept = append(kept, attrMirrorCopySourceProject.String(sourceProject))
 	}
 	stub.Attributes = kept
 	return stub.Snapshot()
+}
+
+// isMirrorMarker reports the reserved ADR-061 keys that steer the mirror leg
+// inside this package and must reach neither project as span attributes.
+func isMirrorMarker(key attribute.Key) bool {
+	switch key {
+	case attrMirrorTier, attrMirrorSourceOrg, attrMirrorCopySourceOrg, attrMirrorCopySourceProject:
+		return true
+	}
+	return false
 }
 
 // withoutMirrorMarkers returns attrs without the reserved mirror markers. It
 // returns attrs itself when there is nothing to remove.
 func withoutMirrorMarkers(attrs []attribute.KeyValue) []attribute.KeyValue {
 	for i, a := range attrs {
-		if a.Key != attrMirrorTier && a.Key != attrMirrorSourceOrg {
+		if !isMirrorMarker(a.Key) {
 			continue
 		}
 		kept := make([]attribute.KeyValue, 0, len(attrs)-1)
 		kept = append(kept, attrs[:i]...)
 		for _, b := range attrs[i+1:] {
-			if b.Key != attrMirrorTier && b.Key != attrMirrorSourceOrg {
+			if !isMirrorMarker(b.Key) {
 				kept = append(kept, b)
 			}
 		}
 		return kept
 	}
 	return attrs
+}
+
+// withMirrorSource adds a mirror copy's source tenant to its policy-built
+// resource, as langwatch.organization_id and langwatch.project_id, the keys the
+// relay's mirror copies carry. A span with no copy markers (every customer
+// copy) keeps the resource unchanged.
+func withMirrorSource(res *resource.Resource, attrs []attribute.KeyValue) *resource.Resource {
+	var source []attribute.KeyValue
+	for _, a := range attrs {
+		switch a.Key {
+		case attrMirrorCopySourceOrg:
+			source = append(source, attrOrgID.String(a.Value.AsString()))
+		case attrMirrorCopySourceProject:
+			source = append(source, attrProjectID.String(a.Value.AsString()))
+		}
+	}
+	if len(source) == 0 {
+		return res
+	}
+	return resource.NewSchemaless(append(res.Attributes(), source...)...)
 }
 
 func spanAttr(s sdktrace.ReadOnlySpan, key attribute.Key) string {

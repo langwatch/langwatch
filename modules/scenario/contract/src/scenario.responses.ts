@@ -239,6 +239,8 @@ const runConfigurationEntrySchemaDefinition = z
         repeatCount: z.number().int().positive(),
         simulatorModel: z.string().nullable(),
         judgeModel: z.string().nullable(),
+        traceQuietPeriodMs: z.number().int().nullish(),
+        traceWaitTimeoutMs: z.number().int().nullish(),
       })
       .strict(),
     runParameters: runParameterValuesSchema,

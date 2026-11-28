@@ -5,8 +5,10 @@
 
 import type { LangWatchQLPassInput, LangWatchQLQueryResult } from "@langwatch/analytics-contract";
 import {
+  estimateJudgedTextTokens,
   INSTANT_EVAL_CLASSIFIER_LIMITS,
   INSTANT_EVAL_PRICING,
+  instantEvalQuestionTokens,
 } from "@langwatch/instant-eval-judge-contract";
 import { describe, expect, it } from "vitest";
 
@@ -78,7 +80,15 @@ class ScriptedTexts implements InstantEvalTextSource {
   }
 }
 
-function harness({ total, bytesPerText = 400 }: { total: number; bytesPerText?: number }) {
+function harness({
+  total,
+  bytesPerText = 400,
+  limits = INSTANT_EVAL_CLASSIFIER_LIMITS,
+}: {
+  total: number;
+  bytesPerText?: number;
+  limits?: typeof INSTANT_EVAL_CLASSIFIER_LIMITS;
+}) {
   const textSource = new ScriptedTexts(bytesPerText);
   const estimates = InstantEvalEstimateService.create({
     rowSource: InstantEvalRowSourceService.create({
@@ -86,7 +96,7 @@ function harness({ total, bytesPerText = 400 }: { total: number; bytesPerText?: 
       access: OPEN_GATE,
     }),
     textSource,
-    judge: { limits: INSTANT_EVAL_CLASSIFIER_LIMITS, pricing: INSTANT_EVAL_PRICING },
+    judge: { limits, pricing: INSTANT_EVAL_PRICING },
   });
 
   return { estimates, textSource };
@@ -111,6 +121,25 @@ describe("given a statement a run was accepted for", () => {
       expect(estimate.avgTokens).toBeGreaterThan(0);
       expect(estimate.totalTokens).toBe(estimate.avgTokens * 200);
       expect(estimate.priceUsd).toBeGreaterThan(estimate.costUsd);
+    });
+
+    it("prices every row with the envelope the judge bills on each request", async () => {
+      const limits = { ...INSTANT_EVAL_CLASSIFIER_LIMITS, requestOverheadTokens: 250 };
+      const { estimates } = harness({ total: 120, bytesPerText: 200, limits });
+
+      const estimate = await estimates.estimateRun({
+        caller: CALLER,
+        protections: PROTECTIONS,
+        accepted: ACCEPTED,
+        rowLimit: 10_000,
+      });
+
+      expect(estimate.avgTokens).toBe(
+        estimateJudgedTextTokens({ text: "x".repeat(200), limits }) +
+          instantEvalQuestionTokens(ACCEPTED.questions.map((asked) => asked.question)) +
+          250,
+      );
+      expect(estimate.totalTokens).toBe(estimate.avgTokens * 120);
     });
 
     /** @scenario "The average token count comes from a sample rather than from every row" */

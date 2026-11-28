@@ -7,7 +7,12 @@ export const EXPERIMENTS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description: "Experiment run results: completion counts, cost, and aggregate scores",
     grain: "one row per (RunId, ExperimentId)",
     timeColumn: "StartedAt",
-    dedup: { versionColumn: "UpdatedAt" },
+    // Latest-in-order: a stock widget reads it (analytics ADR-006).
+    dedup: {
+      versionColumn: "UpdatedAt",
+      strategy: "latest-in-order",
+      tieBreakColumns: ["Version"],
+    },
     columnUnits: {
       TotalDurationMs: "ms",
     },
@@ -16,7 +21,8 @@ export const EXPERIMENTS_OVERRIDES: Record<string, Partial<DatasetOverride>> = {
     description: "Individual item results within an experiment run with evaluations",
     grain: "one row per (RunId, ProjectionId)",
     timeColumn: "OccurredAt",
-    dedup: { versionColumn: "OccurredAt" },
+    // Latest-in-order: a stock widget reads it (analytics ADR-006).
+    dedup: { versionColumn: "OccurredAt", strategy: "latest-in-order" },
     columnUnits: {
       TargetDurationMs: "ms",
       EvaluationDurationMs: "ms",

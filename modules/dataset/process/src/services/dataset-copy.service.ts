@@ -1,15 +1,19 @@
 import {
   copyDatasetInputSchema,
+  DatasetChunkCountMissingError,
+  DatasetCopyInterruptedError,
   type CopyDatasetInput,
   type Dataset,
   type DatasetNameInput,
   type UpsertDatasetInput,
 } from "@langwatch/dataset-contract";
 
+import type { DatasetContent, DatasetSeedRow } from "../app/dataset.app.ts";
+import { assertReady } from "../rules/dataset-chunk-lines.rules.ts";
 import { isSingleFileDataset } from "../rules/dataset-single-file.rules.ts";
 import type { DatasetServiceOptions } from "./dataset.service.ts";
 
-/** How many postgres-backed rows a copy moves at a time. */
+/** How many Postgres rows a copy reads at a time. */
 const COPY_BATCH_ROWS = 200;
 
 type DatasetCopyDeps = {
@@ -17,7 +21,13 @@ type DatasetCopyDeps = {
   getBySlugOrId: (input: { projectId: string; slugOrId: string }) => Promise<Dataset>;
   findNextAvailableName: (input: DatasetNameInput) => Promise<string>;
   upsertDataset: (input: UpsertDatasetInput) => Promise<Dataset>;
-  generateId: () => string;
+  createWithStoredRows: (input: {
+    content: DatasetContent;
+    projectId: string;
+    name: string;
+    columnTypes: Dataset["columnTypes"];
+    rows: AsyncIterable<DatasetSeedRow>;
+  }) => Promise<Dataset>;
 };
 
 /** Copies a dataset into a project under the next free name. */
@@ -39,62 +49,71 @@ export class DatasetCopyService {
       projectId: parsed.targetProjectId,
       proposedName: source.name,
     });
+    if (source.contentLayout !== "s3_jsonl") {
+      return this.deps.createWithStoredRows({
+        content: options.content,
+        projectId: parsed.targetProjectId,
+        name,
+        columnTypes: source.columnTypes,
+        rows: this.sourceRows({ source, projectId: parsed.sourceProjectId }),
+      });
+    }
+
+    // Refuse before the target exists, so a refusal never leaves a half-made copy behind.
+    assertReady(source);
+    if (source.chunkCount === null) throw new DatasetChunkCountMissingError(source.id);
+    // The new dataset is born empty in object storage; the content copy fills its chunks.
     const target = await this.deps.upsertDataset({
       projectId: parsed.targetProjectId,
       name,
       columnTypes: source.columnTypes,
     });
-    if (source.contentLayout === "s3_jsonl" && options.content) {
-      // A new dataset starts inline; the content copy moves it to the chunk layout.
+    try {
       await options.content.copyDataset({
         source,
         sourceProjectId: parsed.sourceProjectId,
         target,
         targetProjectId: parsed.targetProjectId,
       });
-
-      return this.deps.getBySlugOrId({
+      return await this.deps.getBySlugOrId({
         projectId: parsed.targetProjectId,
         slugOrId: target.id,
       });
+    } catch (cause) {
+      throw new DatasetCopyInterruptedError({ targetDatasetId: target.id, cause });
     }
+  }
 
+  /**
+   * Every row of a Postgres or single-file source. A Postgres source is paged, one
+   * batch in memory at a time; a single-file source is read whole.
+   */
+  private async *sourceRows({
+    source,
+    projectId,
+  }: {
+    source: Dataset;
+    projectId: string;
+  }): AsyncGenerator<DatasetSeedRow> {
+    const { options } = this.deps;
     if (isSingleFileDataset(source) && options.singleFile) {
-      const entries = await options.singleFile.findAllEntries({ dataset: source });
-      for (let start = 0; start < entries.length; start += COPY_BATCH_ROWS) {
-        await options.records.createMany({
-          datasetId: target.id,
-          projectId: parsed.targetProjectId,
-          entries: entries
-            .slice(start, start + COPY_BATCH_ROWS)
-            .map((entry) => ({ id: this.deps.generateId(), ...entry })),
-        });
+      for (const entry of await options.singleFile.findAllEntries({ dataset: source })) {
+        yield { entry };
       }
-
-      return target;
+      return;
     }
 
-    // Every row, one batch in memory at a time.
     let cursorId: string | undefined;
-    let copied = COPY_BATCH_ROWS;
-    while (copied === COPY_BATCH_ROWS) {
-      const batch = await options.records.findPage({
+    let page: Awaited<ReturnType<typeof options.records.findPage>>;
+    do {
+      page = await options.records.findPage({
         datasetId: source.id,
-        projectId: parsed.sourceProjectId,
+        projectId,
         limit: COPY_BATCH_ROWS,
         cursorId,
       });
-      if (batch.length > 0) {
-        await options.records.createMany({
-          datasetId: target.id,
-          projectId: parsed.targetProjectId,
-          entries: batch.map((record) => ({ id: this.deps.generateId(), ...record.entry })),
-        });
-      }
-      copied = batch.length;
-      cursorId = batch.at(-1)?.id;
-    }
-
-    return target;
+      for (const record of page) yield { entry: record.entry };
+      cursorId = page.at(-1)?.id;
+    } while (page.length === COPY_BATCH_ROWS);
   }
 }

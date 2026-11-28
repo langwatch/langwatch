@@ -8,6 +8,7 @@ compatibility: Works with Claude Code and similar AI assistants. The `langwatch`
 
 import CliInstall from "../_shared/cli-install.mdx";
 import CliSetup from "../_shared/cli-setup.mdx";
+import ProviderCostComparisonLogin from "../_shared/provider-cost-comparison-login.mdx";
 
 # Price Your Real Usage Mix Against Other Providers
 
@@ -17,7 +18,7 @@ Price-card comparisons lie by omission: a provider that halves the per-token pri
 
 <CliInstall />
 
-Personal coding-agent usage needs `langwatch login --device` on a laptop; a project key in `LANGWATCH_API_KEY` stands in for that login only for its own project. A team or application project needs `--project <slug>` on the read commands, which a project key refuses for any project but its own, so reaching one still needs `langwatch login --device`.
+<ProviderCostComparisonLogin />
 
 <CliSetup />
 

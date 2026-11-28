@@ -7,7 +7,12 @@ import {
 import { z } from "zod";
 
 import { customMetadataSchema, langWatchSpanSchema } from "../../trace-format.schemas.ts";
-import { TRACE_NAME_MAX_LENGTH, TRACE_NAME_MIN_LENGTH } from "../../trace.constants.ts";
+import {
+  EVALUATION_OUTCOME_OCCURRED_AT_MAX_MS,
+  EVALUATION_OUTCOME_TEXT_MAX_LENGTH,
+  TRACE_NAME_MAX_LENGTH,
+  TRACE_NAME_MIN_LENGTH,
+} from "../../trace.constants.ts";
 import { normalizedSpanSchema } from "../../trace.spans.ts";
 import { logTraceContributionSchema } from "../span/trace-log-contribution.ts";
 
@@ -94,6 +99,34 @@ export const assignTopicCommandDataSchema: AssignTopicCommandDataSchema =
   assignTopicCommandDataSchemaDefinition;
 
 export type AssignTopicCommandData = z.infer<typeof assignTopicCommandDataSchema>;
+
+/**
+ * Records one evaluation's outcome on its trace. `occurredAt` is the trace's OccurredAt, and
+ * `idempotencyKey` names the evaluation event (or backfill row) the outcome came from.
+ */
+const recordEvaluationOutcomeCommandDataSchemaDefinition = z.object({
+  tenantId: z.string(),
+  traceId: z.string().min(1),
+  occurredAt: z.number(),
+  idempotencyKey: z.string().min(1),
+  evaluationId: z.string().min(1),
+  evaluatorName: z.string().max(EVALUATION_OUTCOME_TEXT_MAX_LENGTH).nullable(),
+  isGuardrail: z.boolean(),
+  status: z.enum(["processed", "error", "skipped"]),
+  passed: z.boolean().nullable(),
+  label: z.string().max(EVALUATION_OUTCOME_TEXT_MAX_LENGTH).nullable(),
+  evaluationOccurredAt: z.number().int().nonnegative().max(EVALUATION_OUTCOME_OCCURRED_AT_MAX_MS),
+  sourceEventId: z.string().min(1),
+});
+export interface RecordEvaluationOutcomeCommandDataSchema extends Named<
+  typeof recordEvaluationOutcomeCommandDataSchemaDefinition
+> {}
+export const recordEvaluationOutcomeCommandDataSchema: RecordEvaluationOutcomeCommandDataSchema =
+  recordEvaluationOutcomeCommandDataSchemaDefinition;
+
+export type RecordEvaluationOutcomeCommandData = z.infer<
+  typeof recordEvaluationOutcomeCommandDataSchema
+>;
 
 export const recordLogContributionCommandDataSchema = logTraceContributionSchema;
 export type RecordLogContributionCommandData = z.infer<

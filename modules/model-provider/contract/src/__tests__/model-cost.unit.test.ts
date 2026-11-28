@@ -213,15 +213,17 @@ describe("estimateCost", () => {
   });
 
   describe("when characters, seconds and tokens all arrive together", () => {
-    it("sums every term", () => {
-      const mixed: ModelCostRate = {
-        model: "mixed/model",
-        regex: "^mixed\\/model$",
-        inputCostPerToken: 0.000004,
-        outputCostPerToken: 0.000016,
-        inputCostPerCharacter: 0.000015,
-        inputCostPerSecond: 0.0001,
-      };
+    const mixed: ModelCostRate = {
+      model: "mixed/model",
+      regex: "^mixed\\/model$",
+      inputCostPerToken: 0.000004,
+      outputCostPerToken: 0.000016,
+      inputCostPerCharacter: 0.000015,
+      inputCostPerSecond: 0.0001,
+    };
+
+    /** @scenario "A span with tokens and a duration is charged for its tokens only" */
+    it("charges the tokens only, never the characters or seconds on top", () => {
       expect(
         estimateCost({
           llmModelCost: mixed,
@@ -230,7 +232,30 @@ describe("estimateCost", () => {
           inputCharacters: 4000,
           audioSeconds: 30,
         }),
-      ).toBeCloseTo(100 * 0.000004 + 20 * 0.000016 + 4000 * 0.000015 + 30 * 0.0001, 10);
+      ).toBeCloseTo(100 * 0.000004 + 20 * 0.000016, 10);
+    });
+
+    it("charges characters over seconds when the rate has no token rate", () => {
+      const noTokens: ModelCostRate = {
+        model: "speech/model",
+        regex: "^speech\\/model$",
+        inputCostPerCharacter: 0.000015,
+        inputCostPerSecond: 0.0001,
+      };
+      expect(
+        estimateCost({ llmModelCost: noTokens, inputCharacters: 4000, audioSeconds: 30 }),
+      ).toBeCloseTo(4000 * 0.000015, 10);
+    });
+
+    it("charges seconds when seconds are the only unit priced", () => {
+      const perSecond: ModelCostRate = {
+        model: "whisper/model",
+        regex: "^whisper\\/model$",
+        inputCostPerSecond: 0.0001,
+      };
+      expect(
+        estimateCost({ llmModelCost: perSecond, inputTokens: 100, audioSeconds: 30 }),
+      ).toBeCloseTo(30 * 0.0001, 10);
     });
   });
 

@@ -6,6 +6,8 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import {
+  boardSchema,
+  dashboardHomeProductSchema,
   dashboardIdSchema,
   dashboardNameSchema,
   dashboardProjectSchema,
@@ -36,6 +38,8 @@ export const dashboardTrpcSummarySchema: DashboardTrpcSummarySchema =
 const boardTrpcSummarySchemaDefinition = z
   .object({
     ...dashboardTrpcSummarySchema.shape,
+    homeProduct: dashboardHomeProductSchema,
+    myDashboardOfUserId: boardSchema.shape.myDashboardOfUserId,
     isStarred: z.boolean(),
     /** The project that owns an Organization board listed in another project; null at home. */
     ownerProject: dashboardProjectSchema.nullable(),
@@ -56,6 +60,9 @@ export const dashboardTrpcDetailSchema: DashboardTrpcDetailSchema =
 
 /** `create` / `rename` / `delete` / `getOrCreateFirst`: the raw stored row. */
 export const dashboardTrpcRowSchema = dashboardSchema;
+
+/** Every `boards.*` write and `getById`: the stored Dashboards board with its home product. */
+export const boardTrpcRowSchema = boardSchema;
 
 const dashboardOrderSchema = z.number().int().nonnegative();
 

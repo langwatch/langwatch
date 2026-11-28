@@ -34,7 +34,7 @@ export function WidgetLoadingFace({ slow }: { slow: boolean }) {
       <output>
         {slow ? (
           <Text textStyle="caption" color="fg.muted" textAlign="center">
-            Still loading…
+            Slow query, still running…
           </Text>
         ) : (
           <VisuallyHidden>Loading</VisuallyHidden>

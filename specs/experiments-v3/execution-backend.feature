@@ -462,6 +462,13 @@ Feature: Evaluation execution - Backend
     And a cell missing either timestamp shows no duration
 
   @unit
+  Scenario: A fractional duration is stored as whole milliseconds
+    Given a result whose duration has a fraction of a millisecond
+    When the result is stored
+    Then its duration is rounded to the nearest whole millisecond
+    And a negative duration is stored as zero
+
+  @unit
   Scenario: A coded engine failure reaches the cell on the handled channel
     Given a node that failed with a code the engine names
     When the failure is mapped

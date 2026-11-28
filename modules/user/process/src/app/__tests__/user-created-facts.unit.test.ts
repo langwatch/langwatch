@@ -11,11 +11,13 @@ import {
   EventUtils,
   InMemoryProcessStore,
 } from "@langwatch/eventing";
+import { fromDate } from "@langwatch/time";
 import {
   USER_AGGREGATE_TYPE,
   USER_DEACTIVATED_EVENT_TYPE,
   USER_LIFECYCLE_EVENT_VERSION,
   USER_REACTIVATED_EVENT_TYPE,
+  UserNotFoundError,
 } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
@@ -125,6 +127,36 @@ function appOverStore({ busDown = false }: { busDown?: boolean } = {}) {
   return { app, database, processStore };
 }
 
+/** A row as Better Auth's storage adapter writes it on a social or SSO sign-up: no fact with it. */
+function writeBetterAuthRow({
+  database,
+  id,
+  createdAt,
+}: {
+  database: MemoryUserDatabase;
+  id: string;
+  createdAt: Date;
+}): void {
+  database.writeUser({
+    id,
+    name: "Social",
+    email: `${id}@example.com`,
+    emailVerified: false,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: fromDate(createdAt),
+    updatedAt: fromDate(createdAt),
+    lastLoginAt: null,
+    deactivatedAt: null,
+    lastHomePath: null,
+    tracesExplorerTourDismissedAt: null,
+    passkeyNudgeDismissedAt: null,
+    twoFactorEnabled: false,
+    joinOfferDismissedDomains: [],
+    notificationPreferences: {},
+  });
+}
+
 describe("user's created fact", () => {
   describe("when an account is minted", () => {
     /** @scenario "Every account mint records user's created fact" */
@@ -146,6 +178,78 @@ describe("user's created fact", () => {
         ),
       ).toEqual(
         [directory.id, credential.id, passkey.id].map((userId) => ({
+          type: "recordCreated",
+          data: { tenantId: userId, userId, occurredAt: expect.any(Number) },
+        })),
+      );
+    });
+  });
+
+  describe("when Better Auth wrote the account itself", () => {
+    /** @scenario "An account Better Auth wrote records user's created fact once" */
+    it("commits one created fact, stamped with the row's stored creation, however often asked", async () => {
+      const { app, database, processStore } = appOverStore();
+      const createdAt = new Date("2026-11-01T10:00:00Z");
+      writeBetterAuthRow({ database, id: "social-1", createdAt });
+
+      await app.recordCreated({ id: "social-1" });
+      await app.recordCreated({ id: "social-1" });
+
+      expect(await userFactsIn({ processStore, userIds: ["social-1"] })).toEqual([
+        {
+          type: "recordCreated",
+          data: { tenantId: "social-1", userId: "social-1", occurredAt: createdAt.getTime() },
+        },
+      ]);
+    });
+
+    // Carrying no `backfilled` flag is what lets ops' first-user seed take it
+    // (modules/ops, "The first user of a self-hosted install becomes a platform operator").
+    /** @scenario "An account Better Auth wrote is a sign-up to the first-user seed" */
+    it("records the fact as a sign-up, never as a backfill", async () => {
+      const { app, database, processStore } = appOverStore();
+      writeBetterAuthRow({ database, id: "first-1", createdAt: new Date() });
+
+      await app.recordCreated({ id: "first-1" });
+
+      expect(await userFactsIn({ processStore, userIds: ["first-1"] })).toEqual([
+        {
+          type: "recordCreated",
+          data: { tenantId: "first-1", userId: "first-1", occurredAt: expect.any(Number) },
+        },
+      ]);
+    });
+
+    /** @scenario "An account Better Auth wrote records user's created fact once" */
+    it("refuses an id with no account, so the caller can log it", async () => {
+      const { app } = appOverStore();
+
+      await expect(app.recordCreated({ id: "missing" })).rejects.toBeInstanceOf(UserNotFoundError);
+    });
+  });
+
+  describe("when an account minted here is also asked to record its created fact", () => {
+    /** @scenario "Every account mint records user's created fact" */
+    it("keeps one created fact for each of password, passkey and directory (SCIM) accounts", async () => {
+      const { app, processStore } = appOverStore();
+      const credential = await app.registerCredentialAccount({
+        name: "Cred",
+        email: "cred@example.com",
+        password: "first",
+        addressConfirmed: true,
+      });
+      const passkey = await app.createPasskeyUser({ email: "key@example.com" });
+      const directory = await app.create({ name: "Scim", email: "scim@example.com" });
+      const userIds = [credential.id, passkey.id, directory.id];
+
+      for (const id of userIds) await app.recordCreated({ id });
+
+      expect(
+        (await userFactsIn({ processStore, userIds })).filter(
+          ({ type }) => type === "recordCreated",
+        ),
+      ).toEqual(
+        userIds.map((userId) => ({
           type: "recordCreated",
           data: { tenantId: userId, userId, occurredAt: expect.any(Number) },
         })),

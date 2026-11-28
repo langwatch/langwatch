@@ -29,7 +29,7 @@ export type DatasetPreviewRow = { id?: string; isSelected?: boolean } & Record<s
 const CHECKBOX_WIDTH_PX = 36;
 const ROW_NUMBER_WIDTH_PX = 48;
 /** Below this a column's header and values clip, so the card scrolls sideways instead. */
-const MIN_COLUMN_WIDTH_PX = 140;
+const MIN_COLUMN_WIDTH_PX = 160;
 
 const stringifyPreviewValue = (value: unknown): string => {
   if (value === null || value === void 0) return "";
@@ -221,7 +221,7 @@ export function DatasetPreviewTable({
             {table.getHeaderGroups().map((headerGroup) => (
               <tr key={headerGroup.id}>
                 {headerGroup.headers.map((header) => (
-                  <th key={header.id}>
+                  <th key={header.id} title={header.column.columnDef.meta?.columnName}>
                     {header.isPlaceholder
                       ? null
                       : flexRender(header.column.columnDef.header, header.getContext())}
@@ -333,15 +333,20 @@ function buildPreviewColumns({
       columnHelper.accessor((row) => row.dataset[column.id], {
         id: `dataset.${column.id}`,
         header: () => (
-          <HStack gap={1}>
-            <ColumnTypeIcon type={column.type} />
-            <Text textStyle="label">{column.name}</Text>
+          <HStack gap={1} minWidth={0}>
+            <Box as="span" display="inline-flex" flexShrink={0}>
+              <ColumnTypeIcon type={column.type} />
+            </Box>
+            <Text textStyle="label" truncate minWidth={0}>
+              {column.name}
+            </Text>
           </HStack>
         ),
         cell: (info) => info.getValue(),
         meta: {
           columnType: "dataset",
           columnId: column.id,
+          columnName: column.name,
           dataType: column.type,
         },
       }) as ColumnDef<DatasetTableRowData>,

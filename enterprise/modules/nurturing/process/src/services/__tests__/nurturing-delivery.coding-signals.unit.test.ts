@@ -11,19 +11,23 @@ import { beforeEach, describe, expect, it } from "vitest";
 
 import { HttpCustomerIoChannel } from "../../channels/http/http.customer-io.channel.ts";
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import type { NurturingClaimRepository } from "../../repositories/nurturing-claim.repository.ts";
 import { NurturingDeliveryService } from "../nurturing-delivery.service.ts";
 import { NurturingService } from "../nurturing.service.ts";
 import { unplacedMemberFacts } from "./nurturing-member-facts.test-helpers.ts";
+import { peopleWithEmails } from "./nurturing-person-email.test-helpers.ts";
 
 const T0 = Date.UTC(2026, 9, 20, 12);
 const unixSeconds = (ms: number) => Math.floor(ms / 1000);
 
-/** Customer.io over a recording fetch: each call is kept as its path and body. */
+/** Customer.io over a recording fetch: each call is kept as its path and body, a batch's items unpacked. */
 function customerIo() {
   const sent: { path: string; body: Record<string, unknown> }[] = [];
   const service = NurturingService.create({
+    users: peopleWithEmails(),
     channel: HttpCustomerIoChannel.create({
       config: { customerIoApiKey: "key", customerIoRegion: "us" },
       fetchFn: async (url: string | URL | Request, init?: RequestInit) => {
@@ -33,17 +37,18 @@ function customerIo() {
       },
     }),
   });
+  const callsOf = (type: "identify" | "track") =>
+    sent.flatMap(({ path, body }) => {
+      if (path === `/v1/${type}`) return [body];
+      if (path !== "/v1/batch") return [];
+      return (body.batch as { type: string; traits?: unknown; userId: string }[]).filter(
+        (item) => item.type === type,
+      );
+    });
   return {
     service,
-    identifies: () =>
-      sent.flatMap(({ path, body }) => {
-        if (path === "/v1/identify") return [body];
-        if (path !== "/v1/batch") return [];
-        return (body.batch as { type: string; traits: unknown; userId: string }[]).filter(
-          (item) => item.type === "identify",
-        );
-      }),
-    tracks: () => sent.filter((call) => call.path === "/v1/track").map((call) => call.body),
+    identifies: () => callsOf("identify"),
+    tracks: () => callsOf("track"),
   };
 }
 
@@ -65,9 +70,11 @@ class ClockedClaims implements NurturingClaimRepository {
 function deliveryOver(claims: NurturingClaimRepository, cio = customerIo()) {
   const posthog = MemoryPostHogChannel.create();
   const delivery = NurturingDeliveryService.create({
+    erasedUsers: MemoryNurturingErasedUserRepository.create(),
     claims,
     users: createApiFixture<UserApi>({}),
     memberFacts: unplacedMemberFacts(),
+    members: MemoryNurturingOrganizationMemberRepository.create(),
     customerIo: cio.service,
     posthog,
   });
@@ -179,7 +186,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "admin-1",
-          traits: { coding_last_session_at: 1_792_497_600 },
+          traits: { coding_last_session_at: 1_792_497_600, email: "admin-1@example.com" },
         }),
       ]);
     });
@@ -213,8 +220,8 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       await settle();
 
       expect(cio.identifies().map((call) => call.traits)).toEqual([
-        { coding_last_session_at: unixSeconds(T0) },
-        { coding_last_session_at: unixSeconds(T0 + 301_000) },
+        { coding_last_session_at: unixSeconds(T0), email: "admin-1@example.com" },
+        { coding_last_session_at: unixSeconds(T0 + 301_000), email: "admin-1@example.com" },
       ]);
     });
   });
@@ -244,7 +251,10 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([
-        expect.objectContaining({ userId: "admin-1", traits: { coding_active_days: 3 } }),
+        expect.objectContaining({
+          userId: "admin-1",
+          traits: { coding_active_days: 3, email: "admin-1@example.com" },
+        }),
       ]);
     });
   });
@@ -259,7 +269,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
 
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
-          traits: { coding_agent_types: ["claude_code", "codex"] },
+          traits: { coding_agent_types: ["claude_code", "codex"], email: "admin-1@example.com" },
         }),
       ]);
       expect(cio.tracks()).toEqual([]);
@@ -277,7 +287,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "admin-1",
-          traits: { coding_terminal_types: ["ghostty", "vscode"] },
+          traits: { coding_terminal_types: ["ghostty", "vscode"], email: "admin-1@example.com" },
         }),
       ]);
       expect(cio.tracks()).toEqual([]);
@@ -293,7 +303,10 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([
-        expect.objectContaining({ userId: "admin-1", traits: { coding_repo_count: 2 } }),
+        expect.objectContaining({
+          userId: "admin-1",
+          traits: { coding_repo_count: 2, email: "admin-1@example.com" },
+        }),
       ]);
       expect(cio.tracks()).toEqual([]);
     });
@@ -341,7 +354,10 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       await settle();
 
       expect(cio.identifies()).toEqual([
-        expect.objectContaining({ userId: "admin-1", traits: { coding_session_days_first_3: 2 } }),
+        expect.objectContaining({
+          userId: "admin-1",
+          traits: { coding_session_days_first_3: 2, email: "admin-1@example.com" },
+        }),
       ]);
       expect(cio.tracks()).toEqual([]);
     });
@@ -358,8 +374,14 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "admin-1",
-          traits: { coding_first_session_at: unixSeconds(T0), coding_agent_types: ["claude_code"] },
+          traits: {
+            coding_first_session_at: unixSeconds(T0),
+            coding_agent_types: ["claude_code"],
+            email: "admin-1@example.com",
+          },
         }),
+        // The identify the first-session track rides behind.
+        { type: "identify", userId: "admin-1", traits: { email: "admin-1@example.com" } },
       ]);
     });
 
@@ -390,7 +412,7 @@ describe("NurturingDeliveryService coding-agent signals", () => {
       expect(
         cio
           .identifies()
-          .filter((call) => JSON.stringify(call.traits) === '{"uses_coding_agent":true}')
+          .filter((call) => "uses_coding_agent" in (call.traits as object))
           .map((call) => call.userId),
       ).toEqual(["admin-1", "member-2"]);
     });
@@ -432,9 +454,13 @@ describe("NurturingDeliveryService coding-agent signals", () => {
           .filter((call) => call.userId === "member-2")
           .map((call) => call.traits),
       ).toEqual([
-        { integration_method: "platform" },
-        { coding_first_session_at: unixSeconds(T0), coding_agent_types: ["claude_code"] },
-        { uses_coding_agent: true },
+        { integration_method: "platform", email: "member-2@example.com" },
+        {
+          coding_first_session_at: unixSeconds(T0),
+          coding_agent_types: ["claude_code"],
+          email: "member-2@example.com",
+        },
+        { uses_coding_agent: true, email: "member-2@example.com" },
       ]);
     });
 
@@ -485,7 +511,7 @@ describe("NurturingDeliveryService app-open signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "user-1",
-          traits: { app_last_opened_at: 1_792_497_600 },
+          traits: { app_last_opened_at: 1_792_497_600, email: "user-1@example.com" },
         }),
       ]);
     });
@@ -521,7 +547,8 @@ describe("NurturingDeliveryService app-open signals", () => {
       await deliver(delivery, pageViewed(T0 + 3_599_000));
       await settle();
 
-      expect([cio.identifies().length, cio.tracks().length]).toEqual([1, 1]);
+      // Each track rides behind an identify of its own.
+      expect([cio.identifies().length, cio.tracks().length]).toEqual([2, 1]);
     });
 
     it("sends both again after the hour", async () => {
@@ -530,7 +557,7 @@ describe("NurturingDeliveryService app-open signals", () => {
       await deliver(delivery, pageViewed(T0 + 3_601_000));
       await settle();
 
-      expect([cio.identifies().length, cio.tracks().length]).toEqual([2, 2]);
+      expect([cio.identifies().length, cio.tracks().length]).toEqual([4, 2]);
     });
   });
 
@@ -583,8 +610,10 @@ describe("NurturingDeliveryService usage page signals", () => {
       expect(cio.identifies()).toEqual([
         expect.objectContaining({
           userId: "user-1",
-          traits: { usage_page_viewed_at: 1_792_497_600 },
+          traits: { usage_page_viewed_at: 1_792_497_600, email: "user-1@example.com" },
         }),
+        // The identify the usage_page_viewed track rides behind.
+        { type: "identify", userId: "user-1", traits: { email: "user-1@example.com" } },
       ]);
     });
 
@@ -618,12 +647,16 @@ describe("NurturingDeliveryService usage page signals", () => {
       await settle();
 
       expect(cio.identifies().map((call) => call.traits)).toEqual([
-        { usage_page_viewed_at: unixSeconds(T0) },
-        { usage_page_viewed_at: unixSeconds(yearLater) },
+        { usage_page_viewed_at: unixSeconds(T0), email: "user-1@example.com" },
+        { email: "user-1@example.com" },
+        { usage_page_viewed_at: unixSeconds(yearLater), email: "user-1@example.com" },
       ]);
       expect(cio.tracks()).toHaveLength(1);
     });
   });
+
+  const usageUpdates = (cio: ReturnType<typeof customerIo>) =>
+    cio.identifies().filter((call) => "usage_page_viewed_at" in (call.traits as object));
 
   describe("when the person opens two different usage pages inside an hour", () => {
     let claims: ClockedClaims;
@@ -642,7 +675,7 @@ describe("NurturingDeliveryService usage page signals", () => {
       await openUsagePage(delivery, T0 + 3_599_000, "settings_plans");
       await settle();
 
-      expect(cio.identifies()).toHaveLength(1);
+      expect(usageUpdates(cio)).toHaveLength(1);
     });
 
     it("identifies again after the hour", async () => {
@@ -650,7 +683,7 @@ describe("NurturingDeliveryService usage page signals", () => {
       await openUsagePage(delivery, T0 + 3_601_000, "settings_plans");
       await settle();
 
-      expect(cio.identifies()).toHaveLength(2);
+      expect(usageUpdates(cio)).toHaveLength(2);
     });
   });
 
@@ -664,7 +697,8 @@ describe("NurturingDeliveryService usage page signals", () => {
       await settle();
 
       expect(cio.identifies().map((call) => call.traits)).toEqual([
-        { app_last_opened_at: unixSeconds(T0) },
+        { app_last_opened_at: unixSeconds(T0), email: "user-1@example.com" },
+        { email: "user-1@example.com" },
       ]);
       expect(cio.tracks().map((call) => call.event)).toEqual(["sessions_page_viewed"]);
     });
@@ -746,11 +780,11 @@ describe("NurturingDeliveryService own coding sessions", () => {
       await settle();
 
       expect(traitsOf(cio, "own_coding_first_session_at")).toEqual([
-        { own_coding_first_session_at: unixSeconds(T0) },
+        { own_coding_first_session_at: unixSeconds(T0), email: "owner-1@example.com" },
       ]);
       expect(traitsOf(cio, "own_coding_last_session_at")).toEqual([
-        { own_coding_last_session_at: unixSeconds(T0) },
-        { own_coding_last_session_at: unixSeconds(T0 + 301_000) },
+        { own_coding_last_session_at: unixSeconds(T0), email: "owner-1@example.com" },
+        { own_coding_last_session_at: unixSeconds(T0 + 301_000), email: "owner-1@example.com" },
       ]);
       expect(cio.identifies().map((call) => call.userId)).toEqual([
         "owner-1",

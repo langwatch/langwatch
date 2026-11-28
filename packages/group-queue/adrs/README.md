@@ -10,6 +10,7 @@ These decisions define the reusable Group Queue framework:
 - [Staged job identity](./080-staged-job-identity.md)
 - [Coalesced batch bisection](./090-coalesced-batch-bisection.md)
 - [Terminal drop completes the slot](./091-terminal-drop-completes-the-slot.md)
+- [Tenant claims index](./092-tenant-claims-index.md)
 
 Product queue policy lives with its owning feature or in the central
 [application ADR index](../../../dev/docs/adr/README.md).

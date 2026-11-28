@@ -62,3 +62,29 @@ export interface EvaluationInputsQuerySchema extends Named<
 export const evaluationInputsQuerySchema: EvaluationInputsQuerySchema =
   evaluationInputsQuerySchemaDefinition;
 export type EvaluationInputsQuery = z.infer<typeof evaluationInputsQuerySchema>;
+
+/** Where a page of evaluation outcomes resumes: after this (occurredAt, evaluationId). */
+const evaluationOutcomeCursorSchemaDefinition = z.object({
+  occurredAt: z.number().int(),
+  evaluationId: z.string(),
+});
+export interface EvaluationOutcomeCursorSchema extends Named<
+  typeof evaluationOutcomeCursorSchemaDefinition
+> {}
+export const evaluationOutcomeCursorSchema: EvaluationOutcomeCursorSchema =
+  evaluationOutcomeCursorSchemaDefinition;
+export type EvaluationOutcomeCursor = z.infer<typeof evaluationOutcomeCursorSchema>;
+
+/** One project's finished evaluations on a trace since `sinceMs`, in (occurredAt, id) order. */
+const evaluationOutcomesQuerySchemaDefinition = z.object({
+  tenantId: z.string(),
+  sinceMs: z.number().int(),
+  after: evaluationOutcomeCursorSchema.nullable(),
+  limit: z.number().int().positive().max(1000),
+});
+export interface EvaluationOutcomesQuerySchema extends Named<
+  typeof evaluationOutcomesQuerySchemaDefinition
+> {}
+export const evaluationOutcomesQuerySchema: EvaluationOutcomesQuerySchema =
+  evaluationOutcomesQuerySchemaDefinition;
+export type EvaluationOutcomesQuery = z.infer<typeof evaluationOutcomesQuerySchema>;

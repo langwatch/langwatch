@@ -1,7 +1,7 @@
 /**
- * Counts every LangWatchQL run by caller and outcome, and records its time and the rows it read,
- * and logs a refused or failed one. Metric labels are the caller and the outcome only, never a
- * project, dashboard or widget id, so the series stay few.
+ * Counts every LangWatchQL run by caller and outcome, records its time and the rows it read, and
+ * logs a refused or failed one at its fault's level. Metric labels are the caller and the outcome
+ * only, never a project, dashboard or widget id, so the series stay few.
  * @see modules/dashboard/specs/dashboards-telemetry.feature
  */
 
@@ -15,6 +15,7 @@ import {
 } from "@langwatch/observability/metrics";
 
 import {
+  langWatchQLFailureLevel,
   langWatchQLFailureOutcome,
   langWatchQLTelemetryCaller,
   langWatchQLTelemetryFields,
@@ -88,22 +89,33 @@ export class LangWatchQLRunTelemetryService {
   }: {
     telemetry: LangWatchQLRunTelemetry | undefined;
     sql: string;
-  }): Readonly<Record<string, string>> {
+  }): Readonly<Record<string, string | readonly string[]>> {
     return langWatchQLTelemetryFields({ telemetry, sql, queryHashKey: this.queryHashKey });
   }
 
-  /** A run refused or failed anywhere on its way: logged and counted under its error code. */
+  /**
+   * A run refused or failed anywhere on its way: counted under its error code, and logged at its
+   * fault's level with the projects it ran over, so a failing customer can be found by project.
+   */
   recordFailed({
     telemetry,
     sql,
     error,
+    projectIds = [],
   }: {
     telemetry: LangWatchQLRunTelemetry | undefined;
     sql: string;
     error: unknown;
+    projectIds?: readonly string[];
   }): void {
     const outcome = langWatchQLFailureOutcome(error);
     this.runs.inc({ caller: langWatchQLTelemetryCaller(telemetry), outcome });
-    logger.info({ ...this.fieldsFor({ telemetry, sql }), outcome }, "LangWatchQL failed");
+    const fields = langWatchQLTelemetryFields({
+      telemetry,
+      sql,
+      queryHashKey: this.queryHashKey,
+      projectIds,
+    });
+    logger[langWatchQLFailureLevel(error)]({ ...fields, outcome }, "LangWatchQL failed");
   }
 }

@@ -35,7 +35,7 @@ export class SecretsChain {
     return this.with({
       describe: "env",
       read: (id) => Promise.resolve(presentOrAbsent(this.environment[id])),
-      scan: (prefix) => Promise.resolve(presentUnder(prefix, Object.entries(this.environment))),
+      scan: (prefix) => Promise.resolve(setUnder(prefix, Object.entries(this.environment))),
     });
   }
 
@@ -216,7 +216,7 @@ async function scanDotenvPrefix(
 ): Promise<ReadonlyMap<string, string>> {
   const found = new Map<string, string>();
 
-  for (const [name, value] of presentUnder(prefix, await readDotenvLines(file))) {
+  for (const [name, value] of setUnder(prefix, await readDotenvLines(file))) {
     if (!found.has(name)) found.set(name, value);
   }
 
@@ -243,8 +243,11 @@ async function readDotenvLines(file: string): Promise<[string, string][]> {
   });
 }
 
-/** The set, non-empty entries whose name starts with `prefix`; an empty prefix names none. */
-function presentUnder(
+/**
+ * The set entries whose name starts with `prefix`; an empty prefix names none. An empty value is
+ * kept, unlike a single read's: a family's owner refuses that name rather than treat it as unset.
+ */
+function setUnder(
   prefix: string,
   entries: Iterable<readonly [string, string | undefined]>,
 ): Map<string, string> {
@@ -253,10 +256,8 @@ function presentUnder(
   if (prefix === "") return found;
 
   for (const [name, value] of entries) {
-    const present = presentOrAbsent(value);
-
-    if (name.startsWith(prefix) && present !== undefined && !found.has(name)) {
-      found.set(name, present);
+    if (name.startsWith(prefix) && value !== undefined && !found.has(name)) {
+      found.set(name, value);
     }
   }
 

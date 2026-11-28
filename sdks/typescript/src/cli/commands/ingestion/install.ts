@@ -6,7 +6,12 @@ import {
   type ClaudePluginEnsureAction,
   ensureLangwatchClaudePlugin,
 } from "@/cli/utils/governance/claude-plugin";
-import { isLoggedIn, loadConfig, saveConfig } from "@/cli/utils/governance/config";
+import {
+  isLoggedIn,
+  loadConfig,
+  saveConfig,
+  warnUnsavedCredential,
+} from "@/cli/utils/governance/config";
 import { installOpencodeSessionContextPlugin } from "@/cli/utils/governance/opencode-plugin";
 import { buildOtelEnvBlock, TOOL_BY_SOURCE_TYPE } from "@/cli/utils/governance/otel-env-block";
 import {
@@ -158,11 +163,9 @@ async function runInstall(
   );
   const envBlock = buildEnvBlock(tool, endpoint, token);
 
-  // A fresh mint revokes the tool's previous key, so the config cache is now
-  // stale and everything reading it (the wrapper's reuse path, the
-  // session-context hook's fallback target) would authenticate with a dead
-  // key. Best-effort: a config we cannot write is not a reason to fail an
-  // install that worked.
+  // A fresh mint makes the cached key stale for everything reading the cache (the wrapper's reuse
+  // path, the session-context hook's fallback target). The mint already checked the config can be
+  // written, so a failure here is rare; it is reported rather than failing an install that worked.
   if (minted) {
     try {
       saveConfig({
@@ -172,9 +175,8 @@ async function runInstall(
           [tool]: { secret: token, prefix },
         },
       });
-    } catch {
-      // The env block above is still valid; only the cache went unwritten.
-      void 0;
+    } catch (error) {
+      warnUnsavedCredential(`the ${tool} ingest key`, error);
     }
   }
 

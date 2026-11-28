@@ -2,7 +2,12 @@ import type { TriggerMatchRecordedEventData } from "@langwatch/automation-contra
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
+import type { AutomationMatchRecordMetricsSink } from "../features/runaway/services/automation-match-record-metrics.service.ts";
 import type { AutomationTriggerMatchRecorder } from "../features/settlement/services/automation-trigger-match-dispatcher.service.ts";
+import {
+  isStaleEvaluationEvent,
+  isTerminalEvaluationStatus,
+} from "../rules/evaluation-match-dedup.rules.ts";
 import type { AutomationEvaluationTraceSummary } from "../services/automation-evaluation-subscriber.service.ts";
 import type { AutomationEvaluationTriggerFilter } from "../services/automation-evaluation-trigger-filter.service.ts";
 
@@ -34,6 +39,7 @@ type EvaluationAlertTriggerMatchDeps = {
   traces: AutomationEvaluationTraceSummary;
   triggerMatches: AutomationTriggerMatchRecorder;
   evaluationFilters: AutomationEvaluationTriggerFilter;
+  metrics: Pick<AutomationMatchRecordMetricsSink, "countRecorded">;
 };
 
 export async function handleEvaluationAlertTriggerMatch(
@@ -41,17 +47,9 @@ export async function handleEvaluationAlertTriggerMatch(
   event: EvaluationEvent,
   context: { tenantId: string; state: EvaluationState },
 ): Promise<void> {
-  // Stale by processing time: a monitor evaluation's occurredAt is its span end (business time)
-  const processedAt = event.createdAt ?? event.occurredAt;
-  if (processedAt < nowInstant().epochMilliseconds - 60 * 60 * 1000) return;
+  if (isStaleEvaluationEvent({ event, now: nowInstant().epochMilliseconds })) return;
   const evaluation = context.state;
-  if (
-    evaluation.status !== "processed" &&
-    evaluation.status !== "error" &&
-    evaluation.status !== "skipped"
-  ) {
-    return;
-  }
+  if (!isTerminalEvaluationStatus(evaluation.status)) return;
   if (!evaluation.traceId) return;
   const traceId = evaluation.traceId;
   const traceSummary = await deps.traces.findSummary({
@@ -66,6 +64,7 @@ export async function handleEvaluationAlertTriggerMatch(
     return;
   }
   const triggers = await deps.automation.findActiveTraceTriggersForProject(context.tenantId);
+  let recorded = 0;
   for (const trigger of triggers.filter((candidate) =>
     deps.evaluationFilters.readsEvaluations(candidate),
   )) {
@@ -83,5 +82,7 @@ export async function handleEvaluationAlertTriggerMatch(
       traceDebounceMs: trigger.traceDebounceMs,
       notificationCadence: trigger.notificationCadence,
     });
+    recorded++;
   }
+  deps.metrics.countRecorded({ path: "evaluation", count: recorded });
 }

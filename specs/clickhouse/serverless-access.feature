@@ -86,6 +86,49 @@ Feature: clickhouse-serverless gives every login a tier, rotates passwords and a
     When the access users are planned
     Then that user is left out with a warning naming the setting, and every other user is planned as before
 
+  @unit @e2e
+  Scenario: A user's own cap renders as a constraint in its own profile
+    Given a read user whose caps set max_rows_to_read, max_result_bytes and max_execution_time
+    When the access users are planned
+    Then the user's own profile sets each capped setting to its cap
+    And constrains it from 1 to the cap, so 0 (no limit) is refused too
+    And a lower value in the user's own settings stays its value under the cap
+
+  @unit @e2e
+  Scenario: A user cannot raise its own cap
+    Given a user with a cap on max_rows_to_read
+    When it sets a higher value, or 0, with SET or in a query's settings
+    Then ClickHouse refuses the query with a settings constraint violation
+
+  @unit
+  Scenario: A cap looser than its tier is refused, naming the user
+    Given the default profile or a user's tier renders a maximum for a setting
+    And the user's cap on that setting is above it, or the setting is pinned
+    When ch-config loads the access file
+    Then it fails with an error naming the user, the setting and the limit it passes
+    And the cap is never clamped to the limit
+    And a cap on a setting no rendered profile limits takes any value above 0
+
+  @unit
+  Scenario: A cap the image cannot render is refused
+    Given a user whose caps name a setting outside the cappable list, a protected setting, a value of 0 or below, a fraction, or a value the server would refuse
+    Or whose own settings give a capped setting a value above the cap, 0, or not a number
+    When ch-config loads the access file
+    Then it fails with an error naming the offending entry
+
+  @unit
+  Scenario: The sidecar keeps the last good users when an edit loosens a tier with a cap
+    Given the sidecar runs with a good access file
+    When an edit gives a user a cap above its tier's limit
+    Then the edit is refused and logged
+    And the last good users stay rendered and keep being re-planned, so a password past its valid_until still expires
+
+  @unit
+  Scenario: An access file without caps renders as it did before caps existed
+    Given an access file whose users carry settings, a quota and grants but no caps
+    When the access users are planned
+    Then the users file is byte for byte what the image rendered before caps existed
+
   @unit
   Scenario: An install adds to or replaces the default policy in its access file
     Given an access file whose policy adds a grant privilege and a restricted database, and replaces the quota limits and protected settings

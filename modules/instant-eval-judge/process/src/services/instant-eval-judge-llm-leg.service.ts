@@ -24,7 +24,10 @@ import {
 } from "../rules/instant-eval-judge-route.rules.ts";
 import { findInstantEvalLlmVerdicts } from "../rules/instant-eval-judge-sureness.rules.ts";
 
-type InstantEvalJudgeLlmCall = Pick<InstantEvalLlmJudgeRequest, "wire" | "model" | "timeoutMs">;
+type InstantEvalJudgeLlmCall = Pick<
+  InstantEvalLlmJudgeRequest,
+  "wire" | "model" | "timeoutMs" | "reasoningEffort" | "maxOutputTokens"
+>;
 
 /** The answers read, and the last reason a question went unanswered. */
 type InstantEvalJudgeLlmLegAnswers = Readonly<{
@@ -41,8 +44,8 @@ type InstantEvalJudgeLlmLegInput = Readonly<{
   text: string;
   signal: AbortSignal | undefined;
   logger: Pick<Logger, "error">;
-  /** Bills one answer's tokens into the run's spend. */
-  paid: (spend: { inputTokens: number; outputTokens: number }) => void;
+  /** Bills one answer's tokens into the run's spend; `isUsageUnread` when none came back. */
+  paid: (spend: { inputTokens: number; outputTokens: number; isUsageUnread?: boolean }) => void;
 }>;
 
 export class InstantEvalJudgeLlmLegService {
@@ -100,7 +103,9 @@ export class InstantEvalJudgeLlmLegService {
         { ...call, job, question, text },
         ...(signal ? [signal] : []),
       );
-      this.input.paid({ inputTokens: answer.inputTokens, outputTokens: answer.outputTokens });
+      const { inputTokens, outputTokens } = answer;
+      const isUsageUnread = answer.outcome === "skipped" && answer.isUsageUnread === true;
+      this.input.paid({ inputTokens, outputTokens, ...(isUsageUnread ? { isUsageUnread } : {}) });
       return answer;
     } catch (error) {
       if (signal?.aborted) throw error;

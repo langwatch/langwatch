@@ -1,6 +1,12 @@
 /** The per-organization switch that routes strict PII analysis to the model. */
 export const PII_REDACTION_MODEL_FLAG = "release_pii_redaction_model_enabled";
 
+/** The organizations whose model calls are recorded at a price of zero (ADR-201 decision 7). */
+export const PII_REDACTION_MODEL_FREE_FLAG = "release_pii_redaction_model_free";
+
+/** The organizations whose long strict spans are split across model calls (ADR-207 v3). */
+export const PII_REDACTION_MODEL_SPLIT_FLAG = "release_pii_redaction_model_split_enabled";
+
 /**
  * When a model call is aborted and its batch goes to Presidio. The two calls share no budget:
  * Presidio then gets its own 60 s timer, so a batch can wait up to 110 s before Google DLP.
@@ -14,6 +20,21 @@ export const PII_REDACTION_MODEL_TIMEOUT_MS = 50_000;
  * every batch the full time cap, one after another.
  */
 export const PII_REDACTION_MODEL_BREAKER_COOLDOWN_MS = 2 * 60_000;
+
+/** Which call to the one model endpoint this is: a whole batch, or a piece of a split span. */
+export type ModelCallContext = "single" | "split";
+
+/** What differs by context: the time a batch has, and the calls a process runs at once. */
+type ModelCallRules = Readonly<{ budgetMs: number; slots: number | null }>;
+
+/**
+ * Every per-context rule (ADR-207 decision 9); each context also has its own breaker. A split
+ * span has 50 s for all its calls and takes free slots, never queueing; a single call is unlimited.
+ */
+export const MODEL_CALL_RULES: Readonly<Record<ModelCallContext, ModelCallRules>> = {
+  single: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: null },
+  split: { budgetMs: PII_REDACTION_MODEL_TIMEOUT_MS, slots: 6 },
+};
 
 /** A function ARN, optionally qualified by an alias or version; the region is the fourth field. */
 const LAMBDA_FUNCTION_ARN =
@@ -53,14 +74,52 @@ export function batchCharactersOf(texts: readonly string[]): number {
   return texts.reduce((total, text) => total + text.length, 0);
 }
 
-/**
- * Above this many characters in a batch's texts, it goes to Presidio, never split: time grows with
- * every character (4 s for 2k, 40 to 56 s for 20k). It also keeps each invoke far under Lambda's
- * 6 MB synchronous limit, so the channel does not check that limit.
- */
-export const PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS = 8_000;
+/** The failure's class name only: a refusal's message may quote the analysed text. */
+export function failureName(error: unknown): string {
+  return error instanceof Error ? error.name : typeof error;
+}
 
-/** Whether a batch is too long for the model to answer inside its time cap. */
-export function isBatchTooLongForModel(texts: readonly string[]): boolean {
-  return batchCharactersOf(texts) > PII_REDACTION_MODEL_MAX_BATCH_CHARACTERS;
+/** A timeout or a throttle means the model is unavailable now; anything else is a refusal. */
+export function failureOutcomeOf(error: unknown): "timeout" | "throttled" | "error" {
+  if (isTimeout(error)) return "timeout";
+  if (isThrottled(error)) return "throttled";
+  return "error";
+}
+
+/** An abort at the time cap: the Lambda SDK and fetch both name it AbortError. */
+function isTimeout(error: unknown): boolean {
+  return error instanceof Error && (error.name === "AbortError" || error.name === "TimeoutError");
+}
+
+/** Lambda's own throttle, which the SDK names after the error code since it is not retried. */
+function isThrottled(error: unknown): boolean {
+  return (
+    error instanceof Error &&
+    (error.name === "TooManyRequestsException" || error.name === "ThrottlingException")
+  );
+}
+
+/** A batch's texts and their spared flags, and the whole batch they came from. */
+type NarrowableBatch = {
+  texts: readonly string[];
+  spareNamesAndPlaces?: readonly boolean[] | undefined;
+  batchTexts?: readonly string[] | undefined;
+};
+
+/** The batch narrowed to the texts at `pending`, keeping the whole batch for its price and id. */
+export function narrowedToPending<T extends NarrowableBatch>({
+  input,
+  pending,
+}: {
+  input: T;
+  pending: readonly number[];
+}): T {
+  if (pending.length === input.texts.length) return input;
+  const spared = input.spareNamesAndPlaces;
+  return {
+    ...input,
+    texts: pending.map((index) => input.texts[index] ?? ""),
+    spareNamesAndPlaces: spared && pending.map((index) => spared[index] ?? false),
+    batchTexts: input.texts,
+  };
 }

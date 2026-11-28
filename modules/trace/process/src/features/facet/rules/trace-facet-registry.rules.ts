@@ -3,6 +3,8 @@ import type { CategoricalRead, RangeRead } from "@langwatch/trace-contract";
 import type { TraceFilterWhere } from "../../../rules/trace-filter-hidden-origins.rules.ts";
 
 export type FacetTable = "trace_summaries" | "evaluation_runs" | "stored_spans";
+/** A table holding a facet table's light columns and no attribute map. */
+export type LightFacetTable = "span_analytics";
 type FacetGroup = "trace" | "evaluation" | "span" | "metadata" | "prompt";
 
 export interface FacetQueryContext {
@@ -41,6 +43,8 @@ interface BaseFacetDef {
 export interface ExpressionCategoricalDef extends BaseFacetDef {
   kind: "categorical";
   expression: string;
+  /** The same value on the table's light twin, which a batched read prefers inside its floor. */
+  lightExpression?: string;
   /**
    * In-memory accessor mirroring expression for filter compilation.
    */
@@ -72,8 +76,16 @@ type CategoricalFacetDef = ExpressionCategoricalDef | QueryBuilderCategoricalDef
 
 export type FacetDefinition = CategoricalFacetDef | RangeFacetDef | DynamicKeysDef;
 
+/** A facet table's light twin: same rows from its floor on, without the attribute map. */
+export interface LightFacetTwin {
+  table: LightFacetTable;
+  timeColumn: string;
+}
+
 /** The facets a backend offers, and the time column each of its tables is windowed on. */
 export interface FacetCatalog {
   registry: readonly FacetDefinition[];
   timeColumns: Readonly<Record<FacetTable, string>>;
+  /** Tables a batched read may swap for a light twin when every facet in it has one. */
+  lightTwins?: Readonly<Partial<Record<FacetTable, LightFacetTwin>>>;
 }

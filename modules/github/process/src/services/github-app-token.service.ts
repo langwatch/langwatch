@@ -6,6 +6,8 @@ import { differenceInSeconds, nowInstant } from "@langwatch/time";
 import type {
   GithubAppClient,
   GithubAppTokenCache,
+  GithubCheckRunSummary,
+  GithubCheckSuiteSummary,
   GithubInstallationDetails,
   GithubInstallationToken,
   GithubPullRequestSummary,
@@ -14,8 +16,10 @@ import type {
 import { GithubInstallationNotFoundError } from "../channels/github-api.channel.ts";
 import type { GithubTokenCacheRepository } from "../repositories/github-token-cache.repository.ts";
 import {
+  GITHUB_READ_CHECKS_PERMISSIONS,
   GITHUB_READ_PULL_PERMISSIONS,
   GITHUB_WRITE_PERMISSIONS,
+  permissionsWithinGrant,
 } from "../rules/github-app-permissions.rules.ts";
 import type { GithubHost } from "../rules/github-host.rules.ts";
 import { githubHostOf } from "../rules/github-host.rules.ts";
@@ -81,9 +85,10 @@ export class GithubAppTokenService implements GithubAppTokenCache {
 
   async mintInstallationToken(input: MintInstallationTokenInput): Promise<GithubInstallationToken> {
     const permissions = input.permissions ?? GITHUB_WRITE_PERMISSIONS;
+    // Keyed by what was asked for, so the grant is read only when a token is minted.
     const scopeKey = this.computeRepoScopeKey({
       repositoryIds: input.repositoryIds,
-      permissions,
+      permissions: { ...input.optionalPermissions, ...permissions },
     });
     const cacheKey = {
       host: this.host.getHost(),
@@ -105,8 +110,9 @@ export class GithubAppTokenService implements GithubAppTokenCache {
       }
 
       const minted = await this.api.mintInstallationToken({
-        ...input,
-        permissions,
+        installationId: input.installationId,
+        ...(input.repositoryIds ? { repositoryIds: input.repositoryIds } : {}),
+        permissions: await this.grantedPermissions({ ...input, permissions }),
       });
       const ttlSec =
         differenceInSeconds(minted.expiresAt, nowInstant().epochMilliseconds) -
@@ -156,6 +162,39 @@ export class GithubAppTokenService implements GithubAppTokenCache {
       owner: input.owner,
       repo: input.repo,
       number: input.number,
+    });
+  }
+
+  async readCommitChecks(input: {
+    installationId: string;
+    repositoryId: string;
+    owner: string;
+    repo: string;
+    sha: string;
+  }): Promise<{ suites: GithubCheckSuiteSummary[]; runs: GithubCheckRunSummary[] }> {
+    const minted = await this.mintInstallationToken({
+      installationId: input.installationId,
+      repositoryIds: [input.repositoryId],
+      permissions: GITHUB_READ_CHECKS_PERMISSIONS,
+    });
+    const commit = { token: minted.token, owner: input.owner, repo: input.repo, sha: input.sha };
+    const [suites, runs] = await Promise.all([
+      this.api.listCommitCheckSuites(commit),
+      this.api.listCommitCheckRuns(commit),
+    ]);
+    return { suites, runs };
+  }
+
+  /** The required permissions, plus the optional ones as far as the installation granted them. */
+  private async grantedPermissions(
+    input: MintInstallationTokenInput & { permissions: Record<string, string> },
+  ): Promise<Record<string, string>> {
+    if (!input.optionalPermissions) return input.permissions;
+    const details = await this.api.getInstallation(input.installationId);
+    return permissionsWithinGrant({
+      required: input.permissions,
+      optional: input.optionalPermissions,
+      granted: details.permissions,
     });
   }
 

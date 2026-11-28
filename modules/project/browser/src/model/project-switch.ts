@@ -6,18 +6,27 @@
 
 type Named = { readonly name: string };
 
-export type ProjectSwitchProject = Named & { readonly id: string; readonly slug: string };
+export type ProjectSwitchProject = Named & {
+  readonly id: string;
+  readonly slug: string;
+  readonly kind?: string;
+};
+
+export type ProjectSwitchTeam = Named & {
+  readonly id: string;
+  readonly isPersonal?: boolean;
+  readonly ownerUserId?: string | null;
+  readonly projects: readonly ProjectSwitchProject[];
+};
 
 export type ProjectSwitchOrganization = Named & {
   readonly id: string;
-  readonly teams: readonly (Named & {
-    readonly id: string;
-    readonly projects: readonly ProjectSwitchProject[];
-  })[];
+  readonly teams: readonly ProjectSwitchTeam[];
 };
 
 export type ProjectSwitchGroup = {
   readonly key: string;
+  readonly organizationId: string;
   readonly title: string;
   readonly projects: readonly ProjectSwitchProject[];
 };
@@ -29,21 +38,62 @@ function byName(first: Named, second: Named): number {
   return a > b ? 1 : 0;
 }
 
+/** An admin may open a colleague's personal workspace by link, but ADR-038 keeps it unlisted. */
+function isListed(team: ProjectSwitchTeam, userId: string | undefined): boolean {
+  return !team.isPersonal || (!!userId && team.ownerUserId === userId);
+}
+
 /**
- * One group per team, organizations and projects by name; the title drops a team
- * named as its organization.
+ * One group per team, the active organization first, then by name. Within one organization
+ * a group is titled by its team, as the top bar does; across several, by organization and
+ * team (dropping a team named as its organization). Empty and colleagues' personal teams stay out.
  */
 export function projectSwitchGroups(
   organizations: readonly ProjectSwitchOrganization[],
+  {
+    userId,
+    organizationId,
+  }: { userId?: string | undefined; organizationId?: string | null | undefined } = {},
 ): ProjectSwitchGroup[] {
-  return organizations.toSorted(byName).flatMap((organization) =>
-    organization.teams.map((team) => ({
-      key: team.id,
-      title:
-        team.name === organization.name ? organization.name : `${organization.name} - ${team.name}`,
-      projects: team.projects.toSorted(byName),
-    })),
-  );
+  const listed = organizations
+    .map((organization) => ({
+      organization,
+      teams: organization.teams.filter(
+        (team) => team.projects.length > 0 && isListed(team, userId),
+      ),
+    }))
+    .filter(({ teams }) => teams.length > 0);
+  const acrossOrganizations = listed.length > 1;
+  return listed
+    .toSorted(
+      (first, second) =>
+        Number(second.organization.id === organizationId) -
+          Number(first.organization.id === organizationId) ||
+        byName(first.organization, second.organization),
+    )
+    .flatMap(({ organization, teams }) =>
+      teams.map((team) => ({
+        key: team.id,
+        organizationId: organization.id,
+        title: groupTitle({ organization, team, acrossOrganizations }),
+        projects: team.projects.toSorted(byName),
+      })),
+    );
+}
+
+function groupTitle({
+  organization,
+  team,
+  acrossOrganizations,
+}: {
+  organization: Named;
+  team: Named;
+  acrossOrganizations: boolean;
+}): string {
+  if (!acrossOrganizations) return team.name;
+  return team.name === organization.name
+    ? organization.name
+    : `${organization.name} - ${team.name}`;
 }
 
 /**

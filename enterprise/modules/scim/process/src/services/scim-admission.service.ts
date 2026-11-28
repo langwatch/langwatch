@@ -57,7 +57,10 @@ export class ScimAdmissionService {
     );
   }
 
-  /** A retried create still repairs the grant beside an existing membership. */
+  /**
+   * A retried create still repairs the grant beside an existing membership; its losing write
+   * rolls back, so only the first create records the member-created fact.
+   */
   async admit({
     userId,
     organizationId,

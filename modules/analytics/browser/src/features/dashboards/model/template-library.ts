@@ -1,20 +1,23 @@
 /**
- * The templates finder: every catalogue template with what its card shows, the pool an agent
- * type picks, the trunk sections, and the address that carries the search and chips so a link
- * shares the view. The narrowing itself is the shared catalogue filter.
+ * The templates finder: every catalogue template with what its card shows, most needed first,
+ * the pool an agent type picks, the trunk sections, and the address that carries the search and
+ * chips so a link shares the view. The narrowing itself is the shared catalogue filter.
  * @see modules/dashboard/specs/dashboards-finder.feature
  */
 
-import { CHART_GRID_COLUMNS } from "../../../model/chart-grid.ts";
+import { CHART_GRID_DEFAULT_COL_SPAN } from "../../../model/chart-grid.ts";
 import {
   AGENT_KINDS,
   type AgentKind,
   CATALOGUE_TEMPLATES,
   CATALOGUE_WIDGETS,
+  focusTemplateId,
+  GALLERY_VARIANTS,
   type CatalogueTemplate,
   implementedWidget,
   type QuestionType,
   stackWidgets,
+  TEMPLATE_VARIANTS,
   TRUNKS,
   type Trunk,
 } from "../catalogue/index.ts";
@@ -23,6 +26,7 @@ import {
   type BoardTemplate,
   type BoardTemplateWidget,
 } from "../templates/index.ts";
+import { BOARD_WIDGET_DEFAULT_ROW_SPAN } from "./board-grid.ts";
 import {
   type CatalogueFilters,
   type CatalogueItem,
@@ -41,7 +45,6 @@ export const TEMPLATE_PREVIEW_IDS: ReadonlySet<string> = new Set([
   "models",
   "asks",
   "answers",
-  "unanswered",
   "breaks",
   "speed",
   "tools",
@@ -62,7 +65,6 @@ export const TEMPLATE_PREVIEW_IDS: ReadonlySet<string> = new Set([
   "answers__extraction",
   "answers__tools-agent",
   "answers__generative",
-  "unanswered__rag",
   "breaks__tools-agent",
   "speed__voice",
   "release__rag",
@@ -125,8 +127,13 @@ const PLACEHOLDERS: Readonly<Record<QuestionType, PreviewPlaceholder>> = {
   prove: "tile",
 };
 
-/** An unbuilt widget has no size yet; it is sketched half wide, at the shortest card height. */
-const UNBUILT_LAYOUT = { gridColumn: 0, gridRow: 0, colSpan: CHART_GRID_COLUMNS / 2, rowSpan: 3 };
+/** An unbuilt widget has no size yet; it is sketched at the default new-widget footprint. */
+const UNBUILT_LAYOUT = {
+  gridColumn: 0,
+  gridRow: 0,
+  colSpan: CHART_GRID_DEFAULT_COL_SPAN,
+  rowSpan: BOARD_WIDGET_DEFAULT_ROW_SPAN,
+};
 
 function previewOf(template: CatalogueTemplate): TemplatePreview {
   if (TEMPLATE_PREVIEW_IDS.has(template.id)) {
@@ -175,24 +182,49 @@ function libraryTemplate({
 const isHidden = ({ scope, focusKind }: CatalogueTemplate): boolean =>
   scope === "org" || focusKind === "coding";
 
-const CATALOGUE_BY_ID = new Map(CATALOGUE_TEMPLATES.map((template) => [template.id, template]));
+const CATALOGUE_BY_ID = new Map(
+  [...CATALOGUE_TEMPLATES, ...TEMPLATE_VARIANTS].map((template) => [template.id, template]),
+);
 
-/** Every template the finder knows, built or not, each base followed by its focus templates. */
-export const TEMPLATE_LIBRARY: readonly LibraryTemplate[] = BOARD_TEMPLATES.flatMap((board) => {
-  const template = CATALOGUE_BY_ID.get(board.id);
-  return template && !isHidden(template) ? [libraryTemplate({ board, template })] : [];
-});
+function libraryOf(boards: readonly BoardTemplate[]): LibraryTemplate[] {
+  return boards.flatMap((board) => {
+    const template = CATALOGUE_BY_ID.get(board.id);
+    return template && !isHidden(template) ? [libraryTemplate({ board, template })] : [];
+  });
+}
+
+/** Every template the finder lists, built or not, one per job, most needed first. */
+export const TEMPLATE_LIBRARY: readonly LibraryTemplate[] = libraryOf(BOARD_TEMPLATES);
+
+/** Each template adapted to an agent kind, listed in its place when that kind is picked. */
+const KIND_LIBRARY: readonly LibraryTemplate[] = libraryOf(GALLERY_VARIANTS);
+
+const isReady = ({ board }: LibraryTemplate) => board.comingSoon === void 0;
 
 /** The templates that can be made today; one still missing widget code is not offered. */
-const READY_TEMPLATES = TEMPLATE_LIBRARY.filter(({ board }) => board.comingSoon === void 0);
+const READY_TEMPLATES = TEMPLATE_LIBRARY.filter(isReady);
+
+/** The template made for one agent kind: its variant for that kind, else itself if made for it. */
+function madeFor({
+  template,
+  agentKind,
+}: {
+  template: LibraryTemplate;
+  agentKind: AgentKind;
+}): LibraryTemplate[] {
+  const variantId = focusTemplateId({ baseId: template.board.id, kind: agentKind });
+  const variant = KIND_LIBRARY.find(({ board }) => board.id === variantId);
+  if (variant) return [variant];
+  return template.focusKind === agentKind ? [template] : [];
+}
 
 /**
- * The templates a finder view offers: every ready template when no agent type is picked,
- * else only the ones made for that type.
+ * The templates a finder view offers: every ready template when no agent type is picked, else
+ * the ones made for that type, each adapted to it, in the same order.
  */
 export function finderPool({ agentKind }: { agentKind?: AgentKind }): readonly LibraryTemplate[] {
   if (!agentKind) return READY_TEMPLATES;
-  return READY_TEMPLATES.filter(({ focusKind }) => focusKind === agentKind);
+  return TEMPLATE_LIBRARY.flatMap((template) => madeFor({ template, agentKind })).filter(isReady);
 }
 
 /** One trunk's templates on the finder. */
@@ -207,11 +239,11 @@ export function templateSections({
   return catalogueSections({ items: templates, keys: TRUNKS, keyOf: ({ trunk }) => trunk });
 }
 
+/** Only the chips: the finder has no search box of its own, the ask bar is the one. */
 const QUERY_KEYS = {
-  search: "q",
   trunk: "trunk",
   agentKind: "agent",
-} as const satisfies Record<keyof CatalogueFilters, string>;
+} as const satisfies Record<Exclude<keyof CatalogueFilters, "search">, string>;
 
 const oneOf = <Value extends string>({
   raw,
@@ -228,7 +260,7 @@ export function templateFiltersFromQuery(
   const trunk = oneOf({ raw: query[QUERY_KEYS.trunk], values: TRUNKS });
   const agentKind = oneOf({ raw: query[QUERY_KEYS.agentKind], values: AGENT_KINDS });
   return {
-    search: query[QUERY_KEYS.search] ?? "",
+    search: "",
     ...(trunk ? { trunk } : {}),
     ...(agentKind ? { agentKind } : {}),
   };
@@ -244,7 +276,6 @@ export function templateFiltersQuery({
 }): Record<string, string | undefined> {
   return {
     ...query,
-    [QUERY_KEYS.search]: filters.search || void 0,
     [QUERY_KEYS.trunk]: filters.trunk,
     [QUERY_KEYS.agentKind]: filters.agentKind,
   };

@@ -22,8 +22,10 @@ import { ChevronsDownUp, ChevronsUpDown, CircleSlash, Inbox } from "lucide-react
 import { type ReactNode, useState } from "react";
 
 import type { ScenarioRunState } from "../../../behavior/simulations/use-run-state-stream.ts";
+import { redTeamReportOf } from "../../../model/red-team-report.ts";
 import { type RunHooksView, runHooksViewOf } from "../../../model/run-hooks.ts";
 import { hasNoResults } from "../../../model/scenario-run-status.utils.ts";
+import { RedTeamReportPanel } from "../../blocks/red-team-report-panel.tsx";
 import { CopyIdChip } from "../../elements/copy-id-chip.tsx";
 import { CutAtLimitBadge, isCutAtLimitOf } from "../../elements/cut-at-limit-badge.tsx";
 import { ParameterRow, SECRET_VALUE_MASK } from "../../elements/parameter-row.tsx";
@@ -160,6 +162,7 @@ export function RunDetailView({
     status: scenarioState.status,
   });
   const openHookTrace = (traceId: string) => openDrawer("traceV2Details", { traceId });
+  const redTeamReport = redTeamReportOf(scenarioState.metadata);
   const hasSetupBand = hooks.setup !== null || hooks.noHooks;
   const showsNoResponse = shouldShowNoResponse && !hooks.notScored;
 
@@ -306,31 +309,34 @@ export function RunDetailView({
               Not scored. Setup did not finish, so no turn ran and no pass rate counts this run.
             </Text>
           ) : (
-            <Box
-              borderRadius="xl"
-              overflow="hidden"
-              borderWidth="1px"
-              borderColor="border.muted"
-              boxShadow="sm"
-            >
-              <SimulationConsole
-                results={scenarioState.results}
-                scenarioName={scenarioState.name ?? undefined}
-                status={scenarioState.status}
-                durationInMs={scenarioState.durationInMs}
-                titleBarActions={
-                  scenarioState.results ? (
-                    <CopyButton
-                      value={formatResultsForCopy(scenarioState.results)}
-                      label="Results"
-                      size="2xs"
-                      color="fg.subtle"
-                      _hover={{ color: "fg.subtle", bg: "bg.panel" }}
-                    />
-                  ) : undefined
-                }
-              />
-            </Box>
+            <VStack align="stretch" gap={3}>
+              {redTeamReport ? <RedTeamReportPanel report={redTeamReport} /> : null}
+              <Box
+                borderRadius="xl"
+                overflow="hidden"
+                borderWidth="1px"
+                borderColor="border.muted"
+                boxShadow="sm"
+              >
+                <SimulationConsole
+                  results={scenarioState.results}
+                  scenarioName={scenarioState.name ?? undefined}
+                  status={scenarioState.status}
+                  durationInMs={scenarioState.durationInMs}
+                  titleBarActions={
+                    scenarioState.results ? (
+                      <CopyButton
+                        value={formatResultsForCopy(scenarioState.results)}
+                        label="Results"
+                        size="2xs"
+                        color="fg.subtle"
+                        _hover={{ color: "fg.subtle", bg: "bg.panel" }}
+                      />
+                    ) : undefined
+                  }
+                />
+              </Box>
+            </VStack>
           )}
         </RunDetailSection>
 

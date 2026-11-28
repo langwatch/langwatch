@@ -54,13 +54,25 @@ app:
     bucket: "your-dataset-bucket"
     providers:
       awsS3:
+        # Your bucket's region (rendered as S3_REGION). Recommended for AWS: unset,
+        # AWS_REGION or the AWS profile wins (so it must match the bucket), else
+        # LangWatch asks AWS once where the bucket lives (GovCloud and China must set it). For MinIO
+        # or other S3-compatible services, set the region the service expects, or
+        # remove the whole region block (both lines) to sign as "auto".
+        region:
+          value: "<your-bucket-region>"
         accessKeyId:
           secretKeyRef: { name: "your-secret", key: "accessKeyId" }
         secretAccessKey:
           secretKeyRef: { name: "your-secret", key: "secretAccessKey" }
-        # For MinIO or other S3-compatible services:
+        # For MinIO or other S3-compatible services. With direct uploads (the
+        # default), browsers and SDK clients upload to this address, so it must
+        # be one they can reach, not a cluster-internal service name:
         # endpoint:
-        #   value: "https://minio.internal:9000"
+        #   value: "https://minio.your-domain.com"
+    # Set to through-langwatch when browsers cannot reach the endpoint above
+    # (see "When browsers cannot reach the bucket" below):
+    # uploads: through-langwatch
   storedObjects:
     localFilesystem:
       enabled: false
@@ -70,7 +82,7 @@ With object storage enabled, none of the local-storage constraints apply: no per
 
 Two requirements for the bucket:
 
-1. **CORS**: the browser uploads dataset files directly to the bucket, so your CORS policy must allow `PUT` requests from your LangWatch app origin:
+1. **Reachable, with CORS**: by default the browser and the SDKs upload files directly to the bucket. The endpoint must be reachable from your users' browsers and from wherever your SDK clients run, and its CORS policy must allow `PUT` requests from your LangWatch app origin:
 
 ```json
 {
@@ -85,6 +97,35 @@ Two requirements for the bucket:
 ```
 
 2. **Lifecycle rule**: in-progress uploads are staged under the `staging/` prefix before being committed. Add a lifecycle rule that expires objects under `staging/` after 1 to 7 days so abandoned uploads do not accumulate.
+
+### When browsers cannot reach the bucket
+
+If your object storage is only reachable inside the cluster (an in-cluster MinIO, SeaweedFS or any S3-compatible service at a cluster address such as `http://s3.storage.svc.cluster.local:9000`), direct uploads fail in the browser with an error naming that host, for example:
+
+```text
+Failed to upload the file to object storage at s3.storage.svc.cluster.local:9000 (network or CORS error)
+```
+
+Send uploads through LangWatch instead. Browsers and SDK clients then upload to LangWatch, which streams the bytes into the bucket:
+
+```yaml
+app:
+  dataplane:
+    uploads: through-langwatch
+```
+
+The chart renders this as `STORED_OBJECTS_UPLOADS=through-langwatch` on the app and the workers. It works for both the `awsS3` and `azureBlob` providers. No CORS rule is needed in this mode. Upload addresses are built from `app.http.baseHost` (rendered as `BASE_HOST`), so set it to the address your users open LangWatch at, for example `https://langwatch.your-domain.com`, not the chart's `http://localhost:5560` default. LangWatch's storage check fails with `direct_upload_unavailable` when no address is set.
+
+Uploads can be up to 5 GiB, so the path in front of LangWatch must accept large, slow request bodies:
+
+- **ingress-nginx** (`ingress.className: nginx`): the chart renders a second Ingress, `<release>-uploads-ingress`, for `/api/stored-objects/uploads` on your app hosts. It turns request buffering off, allows bodies up to 5121m and waits up to 3600 s. Without it, nginx would refuse any file above its 1m default.
+
+  Your `ingress.annotations` still apply to it, except rewrites and `server-snippet`; override any of its settings with `ingress.uploads.annotations`. If you already route exactly `/api/stored-objects/uploads` yourself in `ingress.hosts`, the chart leaves that host out and your route needs these settings.
+
+  If your ingress-nginx class has another name, or `className` is empty and the cluster default is ingress-nginx, set `ingress.uploads.enabled: true`. A class whose name contains `nginx` gets the same settings; with an empty `className`, put them in `ingress.uploads.annotations`.
+- **Other ingress controllers and load balancers**: uploads go through your app Ingress. Raise its request body limit to at least 5 GiB and its request timeouts to cover your slowest upload. Or set `ingress.uploads.enabled: true` and put your controller's settings for the upload path in `ingress.uploads.annotations`.
+
+LangWatch itself allows an upload body up to two hours, enough for 5 GiB at about 6 Mbit/s.
 
 On EKS with IRSA, put the role on the ServiceAccount the app and workers use (`global.serviceAccount`). The migration runs inside a workers pod, so it uses the same identity.
 

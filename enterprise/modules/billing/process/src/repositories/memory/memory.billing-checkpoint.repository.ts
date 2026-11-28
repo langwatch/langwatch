@@ -94,7 +94,8 @@ export class MemoryBillingCheckpointRepository extends BillingCheckpointReposito
     billingMonth: string;
     meter: string;
     lastReportedTotal: number;
-    pendingReportedTotal: number;
+    /** Null when the failure came before any total was chosen, as a failed price read does. */
+    pendingReportedTotal: number | null;
     consecutiveFailures: number;
   }): Promise<void> {
     this.write(params, {

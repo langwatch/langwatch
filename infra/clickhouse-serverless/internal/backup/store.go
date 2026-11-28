@@ -162,17 +162,28 @@ func (s *SQLStore) Replicas(ctx context.Context) (Replicas, error) {
 		return Replicas{Total: 1, Self: 0, Reachable: []int{0}}, nil
 	}
 	cluster, err := chclient.Rows[struct {
-		Self uint8  `json:"is_self"`
-		Host string `json:"host"`
+		Shard   uint32 `json:"shard_num"`
+		Replica uint32 `json:"replica_num"`
+		Self    uint8  `json:"is_self"`
+		Host    string `json:"host"`
 	}](ctx, s.Client, ReplicasSQL(s.Tables.Cluster))
 	if err != nil {
 		return Replicas{}, fmt.Errorf("reading cluster %s: %w", s.Tables.Cluster, err)
 	}
-	r := Replicas{Total: len(cluster), Self: -1}
-	for i, c := range cluster {
-		if c.Self == 1 && r.Self < 0 {
-			r.Self = i
+	// ClickHouse 26.8 can list each replica twice in system.clusters; a
+	// position is one (shard, replica), as clusterAllReplicas numbers them.
+	r := Replicas{Self: -1}
+	seen := map[[2]uint32]bool{}
+	for _, c := range cluster {
+		key := [2]uint32{c.Shard, c.Replica}
+		if seen[key] {
+			continue
 		}
+		seen[key] = true
+		if c.Self == 1 && r.Self < 0 {
+			r.Self = r.Total
+		}
+		r.Total++
 	}
 	if r.Total == 0 || r.Self < 0 {
 		return Replicas{}, fmt.Errorf("cluster %s does not list this server", s.Tables.Cluster)

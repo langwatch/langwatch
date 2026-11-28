@@ -18,6 +18,8 @@ const stored = (id: string, team: unknown) => ({
   createdAt: created,
   teamId: `team-of-${id}`,
   isPersonal: false,
+  ownerUserId: null,
+  firstMessage: false,
   departmentId: null,
   presenceEnabled: true,
   archivedAt: null,

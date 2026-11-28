@@ -7,6 +7,7 @@
 import type {
   CliDeviceActionResult,
   CliDeviceApproval,
+  CliDeviceClient,
   CliDeviceCodeLookup,
 } from "../model/api-key-host.ts";
 
@@ -17,9 +18,15 @@ type LookupBody = {
   credential_type: "device_session" | "project_api_key";
   /** Absent from deployments that predate `--management`. */
   management?: boolean;
+  /** Absent from deployments that predate known clients. */
+  client?: string | null;
 };
 
-type ErrorBody = { error?: string; error_description?: string };
+type ErrorBody = { error?: string; error_description?: string; client?: string };
+
+function knownClientOf(value: string | null | undefined): CliDeviceClient | null {
+  return value === "laze" ? "laze" : null;
+}
 
 async function readJson<T>(response: Response): Promise<T> {
   return (await response.json()) as T;
@@ -36,7 +43,10 @@ export async function lookupCliDeviceCode(userCode: string): Promise<CliDeviceCo
     return { outcome: "failed", message: error instanceof Error ? error.message : "network error" };
   }
   if (response.status === 404) return { outcome: "unknown" };
-  if (response.status === 410) return { outcome: "expired" };
+  if (response.status === 410) {
+    const body = await readJson<ErrorBody>(response).catch((): ErrorBody => ({}));
+    return { outcome: "expired", client: knownClientOf(body.client) };
+  }
   if (!response.ok) {
     const body = await readJson<ErrorBody>(response).catch((): ErrorBody => ({}));
     return {
@@ -52,6 +62,7 @@ export async function lookupCliDeviceCode(userCode: string): Promise<CliDeviceCo
     expiresAt: body.expires_at,
     credentialType: body.credential_type,
     management: body.management === true,
+    client: knownClientOf(body.client),
   };
 }
 

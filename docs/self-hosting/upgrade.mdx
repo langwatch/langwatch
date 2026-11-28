@@ -12,8 +12,9 @@ description: "How to upgrade a self-hosted LangWatch to the latest version: what
 1. **Check release notes** for breaking changes at [github.com/langwatch/langwatch/releases](https://github.com/langwatch/langwatch/releases)
 2. **Back up your databases**: see [Backups](/self-hosting/configuration/backups)
 3. **Test in a staging environment** before upgrading production
-4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable and invalidates API keys. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
-5. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
+4. **Keep `CREDENTIALS_SECRET` unchanged.** A new value makes stored provider keys and integration secrets unreadable, and also invalidates API keys unless `API_KEY_PEPPER` is set. To replace it, follow [Rotating the credentials secret](/self-hosting/security#rotating-the-credentials-secret) as a separate change, not during an upgrade
+5. **On AWS S3, set the bucket's region.** Datasets are stored in object storage from this release. On AWS S3 with any credentials (access keys, IRSA or an instance role), set `app.dataplane.providers.awsS3.region` (`S3_REGION`) to your bucket's region, unless `AWS_REGION`, the AWS profile or a regional endpoint (`s3.<region>.amazonaws.com`) already names it. Otherwise LangWatch asks AWS where the bucket lives on first use, which works for commercial regions; GovCloud and China must set the region
+6. **Write the version 2 queue format first.** This release reads only version 2 GroupQueue jobs and drops a job an older release wrote in the earlier format. Before upgrading, set `GROUP_QUEUE_ENVELOPE_WRITES_ENABLED=true` on the running release and roll it out, or pause traffic and let the queue drain. After the upgrade, remove that variable and `ES_FOLD_TRUST_ABSENT_MISS`: this release reads neither
 
 ### The ClickHouse `default` user on chart-managed installs
 
@@ -182,7 +183,7 @@ helm search repo langwatch/langwatch --versions
 # x-release-please-start-version
 helm upgrade langwatch langwatch/langwatch \
   --namespace langwatch \
-  --version 3.23.0 \
+  --version 3.31.0 \
   -f values-production.yaml
 # x-release-please-end
 ```
@@ -336,6 +337,7 @@ A rollback never runs migrations and never needs a down migration. Every migrati
 - The previous version starts on the newer schema.
 - The Upgrades page shows **Rolled back** while the older version runs. Background steps that an older version can undo are reopened, and run again after you upgrade again.
 - Data the newer version wrote stays. Features the older version does not know about are unavailable until you upgrade again.
+- The agent registry's change feed and `/versions` skip an event type the running version does not know, so they keep answering after a rollback. LangWatch 3.25 and earlier refuse such an event, so a release adds a feed event type only once every version it can roll back to skips unknown types.
 
 ### Helm
 
@@ -395,7 +397,7 @@ ingress:
       secretName: gateway-tls
 ```
 
-With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
+With `className: nginx` the chart still adds the streaming and timeout annotations to the gateway Ingress, and now sets a 32 MB body limit. The paths are fixed at `/v1` (Prefix), `/a2a` (Prefix) and `/health` (Exact). For other paths, such as `/v1beta`, write your own route. If you relied on a cert-manager issuer only on the gateway Ingress, add it to `ingress.annotations` or `ingress.gateway.annotations`.
 
 A values file that still sets `gateway.ingress.*` fails to render with a message naming `ingress.gateway.host`, so the Ingress cannot disappear on upgrade without an error. `gateway.ingress.enabled: false` on its own is accepted. If you route to the gateway another way, remove the block and set `gateway.publicUrl`. See [Routing and ingress controllers](/self-hosting/deployment/routing).
 

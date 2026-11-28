@@ -290,27 +290,35 @@ export class PrismaGithubPullRequestsRepository extends GithubPullRequestsReposi
       recheckAfter: input.recheckAfter && toDate(input.recheckAfter),
       attempts: input.attempts,
     };
-    await this.prisma.githubBranchPullRequestCheck.upsert({
-      where: {
-        organizationId_repositoryHost_repositoryFullName_headBranch: {
+    const write = () =>
+      this.prisma.githubBranchPullRequestCheck.upsert({
+        where: {
+          organizationId_repositoryHost_repositoryFullName_headBranch: {
+            organizationId: input.organizationId,
+            repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(input.repositoryHost),
+            repositoryFullName,
+            headBranch: input.headBranch,
+          },
+        },
+        create: {
           organizationId: input.organizationId,
           repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(input.repositoryHost),
           repositoryFullName,
           headBranch: input.headBranch,
+          ...bookkeeping,
+          lastRequestedAt: toDate(input.lastRequestedAt ?? input.lastCheckedAt),
         },
-      },
-      create: {
-        organizationId: input.organizationId,
-        repositoryHost: PrismaGithubPullRequestsRepository.normalizeHost(input.repositoryHost),
-        repositoryFullName,
-        headBranch: input.headBranch,
-        ...bookkeeping,
-        lastRequestedAt: toDate(input.lastRequestedAt ?? input.lastCheckedAt),
-      },
-      update: input.lastRequestedAt
-        ? { ...bookkeeping, lastRequestedAt: toDate(input.lastRequestedAt) }
-        : bookkeeping,
-    });
+        update: input.lastRequestedAt
+          ? { ...bookkeeping, lastRequestedAt: toDate(input.lastRequestedAt) }
+          : bookkeeping,
+      });
+    try {
+      await write();
+    } catch (error) {
+      // A concurrent first write inserted the row between the upsert's read and its insert.
+      if (!PrismaGithubPullRequestsRepository.isUniqueViolation(error)) throw error;
+      await write();
+    }
   }
 
   /**

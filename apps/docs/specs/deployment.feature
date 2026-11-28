@@ -29,6 +29,12 @@ Feature: Publish the documentation as a static site
     Then no redirect is published for it
 
   @unit
+  Scenario: The inline scripts keep the hashes the Content-Security-Policy allows
+    Given the docs host's Content-Security-Policy allows inline scripts only by their sha256 hash
+    When the theme or code-language script changes
+    Then a test fails and names the hash the host's policy must allow instead
+
+  @unit
   Scenario: Build with materialized Git LFS assets
     Given docs images, videos and fonts may be stored with Git LFS
     When the documentation checkout has its asset bytes

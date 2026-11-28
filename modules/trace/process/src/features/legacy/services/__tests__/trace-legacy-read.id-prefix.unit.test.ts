@@ -7,9 +7,18 @@ import type { Protections, Trace, TraceCanonicalisationService } from "@langwatc
  */
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const { mockGetTracesWithSpans, mockResolveTraceIdByPrefix } = vi.hoisted(() => ({
+const {
+  mockGetTracesWithSpans,
+  mockResolveTraceIdByPrefix,
+  mockFromStoredSpans,
+  mockBySpanId,
+  mockByScenarioRunId,
+} = vi.hoisted(() => ({
   mockGetTracesWithSpans: vi.fn(),
   mockResolveTraceIdByPrefix: vi.fn(),
+  mockFromStoredSpans: vi.fn(),
+  mockBySpanId: vi.fn(),
+  mockByScenarioRunId: vi.fn(),
 }));
 
 vi.mock("langwatch", () => ({
@@ -27,10 +36,8 @@ import { MemoryTraceEditOverlayRepository } from "../../../../repositories/memor
 import { TraceEditOverlayService } from "../../../edit-overlay/services/trace-edit-overlay.service.ts";
 import type { TraceLegacyReadRepository } from "../../repositories/trace-legacy-read.repository.ts";
 import type { LegacyTraceMappingService } from "../legacy-trace-mapping.service.ts";
-import {
-  AmbiguousTraceIdPrefixError,
-  TraceLegacyReadService,
-} from "../trace-legacy-read.service.ts";
+import { AmbiguousTraceIdPrefixError } from "../trace-alternate-id.service.ts";
+import { TraceLegacyReadService } from "../trace-legacy-read.service.ts";
 
 const PROJECT_ID = "project_test";
 const OWN_READ = ownProof({ projectId: PROJECT_ID });
@@ -75,6 +82,7 @@ function makeService(): TraceLegacyReadService {
     traceRead: createApiFixture<TraceLegacyReadRepository>(
       {
         resolveTraceIdByPrefix: mockResolveTraceIdByPrefix,
+        resolveTraceIdsByScenarioRunId: mockByScenarioRunId,
         findTraceSummaries: vi.fn(),
         findCustomersAndLabels: vi.fn(),
         findDistinctFieldNames: vi.fn(),
@@ -86,6 +94,8 @@ function makeService(): TraceLegacyReadService {
     mapping: createApiFixture<LegacyTraceMappingService>(
       {
         findTracesWithSpans: mockGetTracesWithSpans,
+        findTraceFromStoredSpans: mockFromStoredSpans,
+        findTraceIdsBySpanId: mockBySpanId,
         findTracesWithSpansByThreadIds: vi.fn(),
         listAllTracesForProject: vi.fn(),
         findTracesByThreadId: vi.fn(),
@@ -101,6 +111,9 @@ beforeEach(() => {
   vi.clearAllMocks();
   mockGetTracesWithSpans.mockResolvedValue([]);
   mockResolveTraceIdByPrefix.mockResolvedValue([]);
+  mockFromStoredSpans.mockResolvedValue([]);
+  mockBySpanId.mockResolvedValue([]);
+  mockByScenarioRunId.mockResolvedValue([]);
 });
 
 describe("given a project with traces stored in ClickHouse", () => {
@@ -226,6 +239,150 @@ describe("given a project with traces stored in ClickHouse", () => {
         }),
       ).resolves.toBeUndefined();
       expect(mockResolveTraceIdByPrefix).not.toHaveBeenCalled();
+    });
+  });
+
+  describe("when the id is upper case and padded", () => {
+    /** @scenario An uppercase or padded trace id is normalised */
+    it("reads the lower-case hex id", async () => {
+      mockGetTracesWithSpans.mockResolvedValue([trace(FULL_TRACE_ID)]);
+
+      const result = await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: `  ${FULL_TRACE_ID.toUpperCase()}\n`,
+        protections,
+      });
+
+      expect(result?.trace_id).toBe(FULL_TRACE_ID);
+      expect(mockGetTracesWithSpans.mock.calls[0]![0].traceIds).toEqual([FULL_TRACE_ID]);
+    });
+
+    it("keeps the case of a non-hex SDK id", async () => {
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: " Trace_ABC ",
+        protections,
+      });
+
+      expect(mockGetTracesWithSpans.mock.calls[0]![0].traceIds).toEqual(["Trace_ABC"]);
+    });
+  });
+
+  describe("when the summary is not written yet but spans are stored", () => {
+    it("answers the trace built from its spans, marked still ingesting", async () => {
+      mockFromStoredSpans.mockResolvedValue([trace(FULL_TRACE_ID)]);
+
+      const result = await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: FULL_TRACE_ID,
+        protections,
+      });
+
+      expect(result?.trace_id).toBe(FULL_TRACE_ID);
+      expect(result?.stillIngesting).toBe(true);
+    });
+  });
+
+  describe("when the id is a span id", () => {
+    it("answers the trace holding the span, saying how it was found", async () => {
+      const spanId = "8f1c2d3e4a5b6c7d";
+      mockBySpanId.mockResolvedValue([FULL_TRACE_ID]);
+      mockGetTracesWithSpans
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([trace(FULL_TRACE_ID)]);
+
+      const result = await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: spanId,
+        protections,
+      });
+
+      expect(result?.trace_id).toBe(FULL_TRACE_ID);
+      expect(result?.lookup).toEqual({ requestedId: spanId, resolvedFrom: "span_id" });
+    });
+  });
+
+  describe("when no read finds the id", () => {
+    const reads = () => ({
+      exact: mockGetTracesWithSpans.mock.calls.length,
+      fromSpans: mockFromStoredSpans.mock.calls.length,
+      prefix: mockResolveTraceIdByPrefix.mock.calls.length,
+      scenarioRun: mockByScenarioRunId.mock.calls.length,
+      spanId: mockBySpanId.mock.calls.length,
+    });
+
+    /** @scenario A miss reads only what the id can be */
+    it("reads a full trace id once and its stored spans once, and scans no span ids", async () => {
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: "f".repeat(32),
+        protections,
+      });
+
+      expect(reads()).toEqual({ exact: 1, fromSpans: 1, prefix: 0, scenarioRun: 0, spanId: 0 });
+    });
+
+    it("scans span ids only for an id shaped like one", async () => {
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: "trace-from-a-custom-sdk",
+        protections,
+      });
+
+      expect(reads()).toEqual({ exact: 1, fromSpans: 1, prefix: 0, scenarioRun: 0, spanId: 0 });
+    });
+
+    it("scans span ids for an OTel span id, after its prefix read", async () => {
+      await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: "8f1c2d3e4a5b6c7d",
+        protections,
+      });
+
+      expect(reads()).toEqual({ exact: 1, fromSpans: 1, prefix: 1, scenarioRun: 0, spanId: 1 });
+    });
+  });
+
+  describe("when the id is a scenario run id", () => {
+    const runId = "scenariorun_0005FFcHZ7IBvPE1OSWymml0ikKqB";
+
+    it("answers the one trace the run produced", async () => {
+      mockByScenarioRunId.mockResolvedValue([FULL_TRACE_ID]);
+      mockGetTracesWithSpans
+        .mockResolvedValueOnce([])
+        .mockResolvedValueOnce([trace(FULL_TRACE_ID)]);
+
+      const result = await makeService().findById({
+        authorization: OWN_READ,
+        projectId: PROJECT_ID,
+        traceId: runId,
+        protections,
+      });
+
+      expect(result?.lookup).toEqual({ requestedId: runId, resolvedFrom: "scenario_run_id" });
+      expect(mockBySpanId).not.toHaveBeenCalled();
+    });
+
+    /** @scenario A scenario run with several traces lists them */
+    it("refuses with every trace id when the run produced several", async () => {
+      const traces = [FULL_TRACE_ID, "a".repeat(32)];
+      mockByScenarioRunId.mockResolvedValue(traces);
+
+      const failure = await makeService()
+        .findById({ authorization: OWN_READ, projectId: PROJECT_ID, traceId: runId, protections })
+        .catch((error: unknown) => error);
+
+      expect(failure).toMatchObject({
+        code: "scenario_run_has_many_traces",
+        meta: { scenarioRunId: runId, candidateTraceIds: traces },
+      });
     });
   });
 });

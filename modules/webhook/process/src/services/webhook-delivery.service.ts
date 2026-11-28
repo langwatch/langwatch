@@ -191,7 +191,11 @@ export class WebhookDeliveryService {
           }
         })
         .onWake((state, context) => {
-          const target = deriveEndpointFlushTarget(state, context.key);
+          const target = deriveEndpointFlushTarget({
+            state,
+            key: context.key,
+            organizationId: context.projectId,
+          });
           if (!target) {
             return { state };
           }

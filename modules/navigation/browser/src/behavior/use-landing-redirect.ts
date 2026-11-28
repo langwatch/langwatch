@@ -9,6 +9,7 @@ import { resolveLandingDestination } from "../model/resolve-landing-destination.
 import { resolveOrglessDestination } from "../model/resolve-orgless-destination.ts";
 import { navigationApi } from "./navigation-api.ts";
 import { useLlmOpsProjectSlug } from "./use-llm-ops-project-slug.ts";
+import { useOrganizationLibrary } from "./use-product-home.ts";
 import { useReachableProducts } from "./use-reachable-products.ts";
 
 /** What the server home resolver answered, flattened for the pickers. */
@@ -60,6 +61,8 @@ interface LandingInput {
    * last-visited substitution could land on a personal workspace.
    */
   projectHomeSlug: string | null;
+  /** Undefined while the organization's Dashboards flags load. */
+  hasOrganizationLibrary: boolean | undefined;
   isOrgless: boolean;
   /** Whether a reader with no organization is an administrator back from an SSO test sign-in. */
   testArrival: { isPending: boolean; isTestArrival: boolean };
@@ -80,14 +83,20 @@ function productLandingDestination({
   reachableProducts,
   rememberedProduct,
   projectHomeSlug,
+  hasOrganizationLibrary,
 }: LandingInput): string | null {
   if (!resolved.isReady || isReachableLoading) return null;
+  // A remembered Dashboards waits for the library's flags, so `/` never picks the wrong home;
+  // a pinned home needs no wait.
+  const waitsForLibrary = rememberedProduct === "dashboards" && hasOrganizationLibrary === void 0;
+  if (!resolved.isOverride && waitsForLibrary) return null;
   return resolveLandingDestination({
     pinnedPath: resolved.isOverride ? resolved.destination : null,
     rememberedProduct,
     reachableProducts,
     serverHomeDestination: resolved.destination,
     projectSlug: projectHomeSlug,
+    hasOrganizationLibrary: hasOrganizationLibrary === true,
   });
 }
 
@@ -145,6 +154,7 @@ export function useLandingRedirect(): void {
     enabled: true,
   });
   const llmOpsProjectSlug = useLlmOpsProjectSlug();
+  const hasOrganizationLibrary = useOrganizationLibrary();
   const replaceOnce = useReplaceOnce();
   const isOrgless = belongsToNoOrganization({
     isWorkspaceResolving: isLoading,
@@ -173,6 +183,7 @@ export function useLandingRedirect(): void {
             : null,
           projectSlug: project?.slug ?? null,
           projectHomeSlug: llmOpsProjectSlug,
+          hasOrganizationLibrary,
           isOrgless,
           testArrival: {
             // A failed read falls through to the bootstrap screen rather than holding the redirect.
@@ -197,5 +208,6 @@ export function useLandingRedirect(): void {
     isReachableLoading,
     reachableProducts,
     llmOpsProjectSlug,
+    hasOrganizationLibrary,
   ]);
 }

@@ -24,6 +24,7 @@ concurrency:
 
 jobs:
   changes:
+    timeout-minutes: 5
     runs-on: ubuntu-latest
     outputs:
       relevant: ${{ steps.detect.outputs.relevant }}
@@ -45,6 +46,7 @@ jobs:
           filters: |
             relevant:
               - 'infra/docker/Dockerfile.go-services'
+              - 'modules/model-provider/contract/src/catalog/model-catalog*.json'
               - 'services/nlpgo/**'
               - 'cmd/service/**'
               - 'pkg/**'
@@ -80,6 +82,7 @@ jobs:
           cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=max,scope=langwatch-nlp' || '' }}
 
   langwatch-nlp-complete:
+    timeout-minutes: 5
     needs: [changes, docker-build]
     if: always()
     runs-on: ubuntu-latest

@@ -4,18 +4,36 @@
  * @see specs/lwql/api.feature
  */
 
-import { parseConnectionUrl } from "@langwatch/clickhouse-migrations";
+import {
+  parseConnectionUrl,
+  resolveClickHouseMigrationTaskConfig,
+} from "@langwatch/clickhouse-migrations";
 import { createLogger } from "@langwatch/observability";
+import { privateRouteNameOf } from "@langwatch/process-stores";
 import { PROJECT_ID_PAGE_LIMIT, type ProjectApi } from "@langwatch/project-contract";
 import { Task } from "@langwatch/task";
 
 import { lwqlAppFunctionNames } from "../features/app-functions/rules/langwatch-ql-app-function-catalog.rules.ts";
-import { canProvisionAppFunctions } from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import {
+  APP_FUNCTION_KEEPER_STORE_PATH,
+  canProvisionAppFunctions,
+  readAppFunctionStoreProbe,
+} from "../features/app-functions/rules/langwatch-ql-app-function-store.rules.ts";
+import {
+  LWQL_PROJECT_KEYS_VIEW,
+  LWQL_SCOPED_READER_GROUP,
+  LWQL_SCOPED_SCHEMA,
+} from "../features/provisioning/rules/lwql-scoped-view.rules.ts";
 import {
   LangWatchQLCollectionBindingService,
+  LWQL_RENDERED_NAMED_COLLECTION,
   type LwqlAccessModelMode,
   type LwqlCollectionProbe,
 } from "../features/provisioning/services/langwatch-ql-collection-binding.service.ts";
+import {
+  LangWatchQLPostgresGapsService,
+  type LwqlPostgresGap,
+} from "../features/provisioning/services/langwatch-ql-postgres-gaps.service.ts";
 import {
   LangWatchQLProductionProvisioningService,
   LWQL_POSTGRES_READER_ROLE,
@@ -23,8 +41,8 @@ import {
 import {
   LangWatchQLSelfProvisioningService,
   type LwqlAppOwnedDrift,
-  type LwqlPostgresGap,
   type LwqlSelfProvisionRequest,
+  LwqlPrivateCollectionAbsentError,
 } from "../features/provisioning/services/langwatch-ql-self-provisioning.service.ts";
 import { ClickHouseLangWatchQLProvisioningRepository } from "../repositories/clickhouse/clickhouse.langwatch-ql-provisioning.repository.ts";
 import type { LwqlProvisioningDatabase } from "../repositories/langwatch-ql-postgres.repository.ts";
@@ -42,13 +60,28 @@ import {
   postgresErrorCodeFields,
   statementKind,
 } from "../rules/langwatch-ql-config-store.rules.ts";
+import {
+  classifyLwqlSetupFailure,
+  findKeyPeppers,
+  type LwqlSecretFamilyLookup,
+  type LwqlSecretLookup,
+  resolveLwqlSource,
+  withChainedSecrets,
+} from "../rules/lwql-default-credentials.rules.ts";
+import { parsePrivateReaderPasswords } from "../rules/lwql-private-reader.rules.ts";
 import type { LangWatchQLNames } from "../services/langwatch-ql-access-model.service.ts";
 import { LangWatchQLSqlModeClusterGuardService } from "../services/langwatch-ql-sql-mode-cluster-guard.service.ts";
+import {
+  assertRenderedPrivateServer,
+  type LwqlPrivateEndpoint,
+  provisionLwqlPrivateTargets,
+} from "./lwql-private-targets.task.ts";
 
 const lwqlProvisioning = LangWatchQLProductionProvisioningService.create();
 const clusterGuard = LangWatchQLSqlModeClusterGuardService.create();
 const selfProvisioning = LangWatchQLSelfProvisioningService.create();
 const collectionBinding = LangWatchQLCollectionBindingService.create();
+const postgresGaps = LangWatchQLPostgresGapsService.create();
 
 /** One global key: the self-provision convergence is a singleton, not per tenant. */
 const LWQL_SELF_PROVISION_LOCK_KEY = "lwql:self-provision";
@@ -62,8 +95,12 @@ const logger = createLogger("langwatch:task:lwql-provision");
 type LwqlProjectKeys = Pick<ProjectApi, "listLwqlKeys">;
 
 /** Every project's LangWatchQL key, read from the project module a page at a time. */
-async function allLwqlKeys({ projects }: { projects: LwqlProjectKeys }) {
-  const keys = [];
+async function allLwqlKeys({
+  projects,
+}: {
+  projects: LwqlProjectKeys;
+}): Promise<{ id: string; lwqlKey: string }[]> {
+  const keys: { id: string; lwqlKey: string }[] = [];
   let after: string | undefined;
   do {
     const page = await projects.listLwqlKeys({ after, limit: PROJECT_ID_PAGE_LIMIT });
@@ -173,20 +210,9 @@ export function fillLwqlProjectKeys({
   });
 }
 
-/** The replica layout that decides whether a `CREATE FUNCTION` reaches every replica. */
-async function readAppFunctionLayout(repository: LangWatchQLProvisioningRepository) {
-  const [replicas, setting] = await Promise.all([
-    repository.queryRows(
-      "SELECT toString(max(total_replicas)) AS max_total_replicas FROM system.replicas",
-    ),
-    repository.queryRows(
-      "SELECT value FROM system.server_settings WHERE name = 'user_defined_zookeeper_path'",
-    ),
-  ]);
-  return {
-    maxTotalReplicas: Number(replicas[0]?.max_total_replicas ?? "0") || 0,
-    userDefinedZookeeperPath: typeof setting[0]?.value === "string" ? setting[0].value : "",
-  };
+/** The replicas and the Keeper store that decide whether a `CREATE FUNCTION` reaches every one. */
+function readAppFunctionLayout(repository: LangWatchQLProvisioningRepository) {
+  return readAppFunctionStoreProbe({ queryRows: (sql) => repository.queryRows(sql) });
 }
 
 async function appFunctionsProvisionable(
@@ -197,13 +223,13 @@ async function appFunctionsProvisionable(
     if (canProvisionAppFunctions(probe)) return true;
     logger.error(
       { maxTotalReplicas: probe.maxTotalReplicas },
-      "lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and no user_defined_zookeeper_path, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path in the server config and redeploy; LangWatchQL app functions stay refused until then",
+      `lwql self-provisioning skipped the app functions: this ClickHouse has more than one replica and Keeper holds no SQL function store at ${APP_FUNCTION_KEEPER_STORE_PATH}, so a CREATE FUNCTION would reach one replica only. Set user_defined_zookeeper_path to ${APP_FUNCTION_KEEPER_STORE_PATH} in the server config of every replica and restart; LangWatchQL app functions stay refused until then`,
     );
     return false;
   } catch (error) {
     logger.error(
       { error: clickHouseErrorSummary(error) },
-      "lwql self-provisioning could not read the replica layout from system.replicas and system.server_settings; the app functions are left out until it can",
+      "lwql self-provisioning could not read the replica layout from system.replicas or the function store from system.zookeeper; the app functions are left out until it can",
     );
     return false;
   }
@@ -503,9 +529,16 @@ const POSTGRES_FAILED_MESSAGES: Record<ProvisioningFailureLevel, string> = {
   warn: "lwql reconvergence statement failed",
 };
 
+/** A converge's PostgreSQL statements: the shared batch, then the scoped batch run apart. */
+interface LwqlPostgresBatches {
+  readonly shared: readonly string[];
+  readonly scoped: readonly string[];
+}
+
 /**
- * A deploy's whole half: every approved view, then the reader role with its revokes and grants.
- * A check's gaps: only the absent views, then additive grants on each gap, never a revoke.
+ * Both start with the scoped-reader group's revokes. A deploy: every view and the reader role, then
+ * the scoped schema, every copy and the group's guarded grants. A check: the absent views and the
+ * gap grants, then only the copies it found absent or unscoped, and the guarded grants.
  */
 function postgresStatements({
   plan,
@@ -513,33 +546,131 @@ function postgresStatements({
 }: {
   plan: LwqlConvergencePlan;
   gaps: readonly LwqlPostgresGap[] | undefined;
-}): string[] {
+}): LwqlPostgresBatches {
   const schema = plan.schema;
   const readerRole = LWQL_POSTGRES_READER_ROLE;
+  const revokeFirst = lwqlProvisioning.postgresScopedReaderRevokeFirstStatements({ schema });
+  const scopedGrants = lwqlProvisioning.postgresScopedReaderGrantStatements({ schema });
   if (gaps === undefined) {
-    return [
-      ...lwqlProvisioning.postgresApprovedViewStatements({ schema, readerRole }),
-      // After the views: the reader role's grants name them.
-      ...selfProvisioning.postgresReaderStatements({
-        readerPassword: plan.request.postgresReaderPassword,
-        schema,
-      }),
-    ];
+    return {
+      shared: [
+        ...revokeFirst,
+        ...lwqlProvisioning.postgresApprovedViewStatements({ schema, readerRole }),
+        // After the views: the reader role's grants name them.
+        ...selfProvisioning.postgresReaderStatements({
+          readerPassword: plan.request.postgresReaderPassword,
+          schema,
+        }),
+      ],
+      scoped: [
+        ...lwqlProvisioning.postgresScopedViewStatements({ schema }),
+        ...scopedGrants,
+        // After the group's grants: a failure in the new view must not skip them.
+        ...lwqlProvisioning.postgresProjectKeysStatements({ schema }),
+      ],
+    };
   }
-  const absent = gaps.filter((gap) => gap.absent).map((gap) => gap.view);
+  const shared = postgresGaps.sharedGaps({ gaps });
+  const absent = shared.filter((gap) => gap.absent).map((gap) => gap.view);
   const views = (approvedViews: string[]) => selfProvisioning.postgresDatasets({ approvedViews });
-  return [
-    ...lwqlProvisioning.postgresApprovedViewStatements({
-      schema,
-      readerRole,
-      views: views(absent),
-    }),
-    ...lwqlProvisioning.postgresReaderGrantStatements({
-      schema,
-      role: readerRole,
-      views: views(gaps.map((gap) => gap.view)),
-    }),
-  ];
+  return {
+    shared: [
+      ...revokeFirst,
+      ...lwqlProvisioning.postgresApprovedViewStatements({
+        schema,
+        readerRole,
+        views: views(absent),
+      }),
+      ...lwqlProvisioning.postgresReaderGrantStatements({
+        schema,
+        role: readerRole,
+        views: views(shared.map((gap) => gap.view)),
+      }),
+    ],
+    scoped: [
+      ...lwqlProvisioning.postgresScopedViewStatements({
+        schema,
+        views: views(postgresGaps.scopedCopiesToRebuild({ gaps })),
+      }),
+      ...scopedGrants,
+      ...(postgresGaps.needsProjectKeys({ gaps })
+        ? lwqlProvisioning.postgresProjectKeysStatements({ schema })
+        : []),
+    ],
+  };
+}
+
+/**
+ * Names what still keeps the scoped-reader group from its copies: an absent scoped schema, one
+ * another installation owns, or copies it cannot select. Best-effort: a failed read logs only.
+ */
+async function warnScopedReaderGaps({
+  database,
+  schema,
+}: {
+  database: LwqlProvisioningDatabase;
+  schema: string;
+}): Promise<void> {
+  try {
+    const state = await PrismaLangWatchQLPostgresRepository.create(database).findScopedViewState({
+      appSchema: schema,
+      group: LWQL_SCOPED_READER_GROUP,
+      views: [...selfProvisioning.approvedPostgresViews(), LWQL_PROJECT_KEYS_VIEW],
+    });
+    if (!state.groupExists) return;
+    if (state.scopedSchema === "absent") {
+      logger.warn(
+        { scopedSchema: LWQL_SCOPED_SCHEMA },
+        "the scoped-reader schema lwql_scoped is absent and the app role could not create it, so the scoped-reader group reads nothing: grant the app role CREATE on the database, or pre-create the schema as the upgrade runbook says",
+      );
+      return;
+    }
+    if (state.scopedSchema === "foreign") {
+      logger.warn(
+        { scopedSchema: LWQL_SCOPED_SCHEMA, appSchema: schema },
+        "the scoped-reader schema lwql_scoped is not marked as this installation's, so no copy was written and the scoped-reader group was granted nothing: set its comment as the upgrade runbook says",
+      );
+      return;
+    }
+    const unreadable = state.copies
+      .filter((copy) => !(copy.exists && copy.passesGuard && copy.granted))
+      .map((copy) => copy.view);
+    if (unreadable.length > 0) {
+      logger.warn(
+        { views: unreadable },
+        "the scoped-reader group has no SELECT on these copies: they are absent or fail the scoped-view check",
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },
+      "lwql could not read the scoped-reader group's grants",
+    );
+  }
+}
+
+/**
+ * The scoped batch, after the shared one and apart from it: a failure logs at warn and never
+ * fails the converge. The revokes already ran, so a copy left behind is ungranted (fail closed).
+ */
+async function convergeScopedCopies({
+  database,
+  plan,
+  statements,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+  statements: readonly string[];
+}): Promise<void> {
+  try {
+    await runPostgresStatements({ database, statements: [...statements] });
+  } catch (error) {
+    logger.warn(
+      postgresFailureFields({ error, secret: plan.request.postgresReaderPassword }),
+      "lwql could not write the scoped-reader copies; the shared views converged and the group keeps no grant on a copy that fails the scoped-view check",
+    );
+  }
+  await warnScopedReaderGaps({ database, schema: plan.schema });
 }
 
 async function convergePostgres({
@@ -553,9 +684,11 @@ async function convergePostgres({
   failureLevel: ProvisioningFailureLevel;
   gaps: readonly LwqlPostgresGap[] | undefined;
 }): Promise<unknown> {
+  let scoped: readonly string[];
   try {
-    await runPostgresStatements({ database, statements: postgresStatements({ plan, gaps }) });
-    return undefined;
+    const batches = postgresStatements({ plan, gaps });
+    await runPostgresStatements({ database, statements: [...batches.shared] });
+    scoped = batches.scoped;
   } catch (error) {
     logger[failureLevel](
       postgresFailureFields({ error, secret: plan.request.postgresReaderPassword }),
@@ -563,6 +696,8 @@ async function convergePostgres({
     );
     return error;
   }
+  await convergeScopedCopies({ database, plan, statements: scoped });
+  return undefined;
 }
 
 /** Both halves under the lock; a PostgreSQL failure is raised only once ClickHouse has run. */
@@ -601,21 +736,47 @@ async function convergeLocked({
 }
 
 /**
- * Converges the whole model and never throws: a refusal is a loud log and a fail-closed endpoint
- * (ADR-159). `failOnError` rethrows so the upgrade run fails (Alex, 2026-10-09); `only`, the
- * reconvergence check's drift, converges just the objects it names and logs at warn.
+ * Derived passwords mean the operator never asked for LangWatchQL, so a failure says why and
+ * never fails the upgrade (analytics-lwql-default-credentials.feature).
  */
-export async function convergeLwqlAccessModel({
-  database,
-  plan,
-  failOnError = false,
-  only,
-}: {
+function warnDerivedSetupFailure({ error }: { error: unknown }): void {
+  const summary = clickHouseErrorSummary(error);
+  const failure = classifyLwqlSetupFailure({
+    error,
+    summary: `code ${summary.code ?? "none"}, ${summary.type}`,
+  });
+  logger.warn(
+    { kind: failure.kind, store: failure.store, error: summary },
+    `LangWatchQL could not provision its restricted identity: ${failure.reason}. Dashboards, the SQL workbench and Instant Evals stay unavailable until that is fixed, or until LWQL_CLICKHOUSE_PASSWORD and LWQL_POSTGRES_READER_PASSWORD are set with an identity provisioned as the self-hosting docs describe. Continuing.`,
+  );
+}
+
+/**
+ * Converges the whole model and never throws: a refusal is a loud log and a fail-closed endpoint
+ * (ADR-159). `failOnError` rethrows so the upgrade run fails (Alex, 2026-10-09), except under
+ * derived passwords, which only warn; `only`, the reconvergence check's drift, logs at warn.
+ */
+export async function convergeLwqlAccessModel(input: LwqlConvergenceInput): Promise<void> {
+  await attemptLwqlConvergence(input);
+}
+
+export interface LwqlConvergenceInput {
   database: LwqlProvisioningDatabase;
   plan: LwqlConvergencePlan;
   failOnError?: boolean;
+  /** The passwords came from the key pepper, not from the operator: a failure only warns. */
+  isDerived?: boolean;
   only?: LwqlAppOwnedDrift;
-}): Promise<void> {
+}
+
+/** {@link convergeLwqlAccessModel}, saying whether the model converged (false: it was logged). */
+async function attemptLwqlConvergence({
+  database,
+  plan,
+  failOnError = false,
+  isDerived = false,
+  only,
+}: LwqlConvergenceInput): Promise<boolean> {
   const { names } = plan;
   try {
     const sourceDatabase = plan.sourceDatabase();
@@ -629,7 +790,12 @@ export async function convergeLwqlAccessModel({
       fn: () => convergeLocked({ database, plan, only, sourceDatabase }),
     });
     logger.info("LangWatchQL self-provisioning complete");
+    return true;
   } catch (error) {
+    if (isDerived) {
+      warnDerivedSetupFailure({ error });
+      return false;
+    }
     if (only) {
       logger.warn(
         { error: clickHouseErrorSummary(error) },
@@ -642,6 +808,7 @@ export async function convergeLwqlAccessModel({
       );
     }
     if (failOnError) throw error;
+    return false;
   }
 }
 
@@ -654,12 +821,19 @@ async function readPostgresGaps({
   schema: string;
 }): Promise<LwqlAppOwnedDrift["postgres"]> {
   try {
-    const found = await PrismaLangWatchQLPostgresRepository.create(database).findApprovedViews({
+    const repository = PrismaLangWatchQLPostgresRepository.create(database);
+    const views = selfProvisioning.approvedPostgresViews();
+    const found = await repository.findApprovedViews({
       schema,
       role: LWQL_POSTGRES_READER_ROLE,
-      views: selfProvisioning.approvedPostgresViews(),
+      views,
     });
-    return selfProvisioning.findPostgresGaps({ found });
+    const scoped = await repository.findScopedViewState({
+      appSchema: schema,
+      group: LWQL_SCOPED_READER_GROUP,
+      views: [...views, LWQL_PROJECT_KEYS_VIEW],
+    });
+    return postgresGaps.findGaps({ found, scoped });
   } catch (error) {
     logger.warn(
       { error: clickHouseErrorSummary(error), ...postgresErrorCodeFields(error) },
@@ -732,16 +906,41 @@ function connectionLimitFields(databaseUrl: string | undefined): { connectionLim
   }
 }
 
+/** The private routes, or none: a malformed route variable warns and never fails the upgrade. */
+function privateEndpointsOf({
+  source,
+}: {
+  source: Record<string, string | undefined>;
+}): readonly LwqlPrivateEndpoint[] {
+  try {
+    return resolveClickHouseMigrationTaskConfig({ ...source }).privateEndpoints;
+  } catch (error) {
+    // The error name only: a route's text can carry its credentials.
+    logger.warn(
+      { error: error instanceof Error ? error.name : typeof error },
+      "LangWatchQL private provisioning skipped: the ClickHouse route variables could not be read",
+    );
+    return [];
+  }
+}
+
 async function runLwqlProvisioningTask({
   database,
-  source,
+  source: environment,
+  lookup,
+  lookupFamily,
   failOnError,
 }: {
   database: LwqlProvisioningDatabase;
   failOnError: boolean;
   /** The environment the launching process was configured with. */
   source: Record<string, string | undefined>;
+  lookup: LwqlSecretLookup | undefined;
+  lookupFamily: LwqlSecretFamilyLookup | undefined;
 }): Promise<void> {
+  const { source, isDerived } = resolveLwqlSource(
+    await withChainedSecrets({ environment, lookup, lookupFamily }),
+  );
   const selfProvision = selfProvisioning.request({ source });
   if (!selfProvision.requested) {
     logger.info("LWQL not configured, skipping");
@@ -755,24 +954,98 @@ async function runLwqlProvisioningTask({
     return;
   }
 
-  await convergeLwqlAccessModel({
-    database,
-    failOnError,
-    plan: {
-      request: selfProvision,
-      names: lwqlProvisioning.names({ connection: selfProvision.connection }),
-      sourceDatabase: () =>
-        parseConnectionUrl({
-          connectionUrl: source.CLICKHOUSE_URL,
-          clusterName: source.CLICKHOUSE_CLUSTER,
-        }).database,
-      schema: lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL),
-      ...connectionLimitFields(source.DATABASE_URL),
-      settings: source,
-      openRepository: () =>
-        ClickHouseLangWatchQLProvisioningRepository.open({ url: source.CLICKHOUSE_URL }),
-    },
+  const plan: LwqlConvergencePlan = {
+    request: selfProvision,
+    names: lwqlProvisioning.names({ connection: selfProvision.connection }),
+    sourceDatabase: () =>
+      parseConnectionUrl({
+        connectionUrl: source.CLICKHOUSE_URL,
+        clusterName: source.CLICKHOUSE_CLUSTER,
+      }).database,
+    schema: lwqlProvisioning.postgresSchemaFromDatabaseUrl(source.DATABASE_URL),
+    ...connectionLimitFields(source.DATABASE_URL),
+    settings: source,
+    openRepository: () =>
+      ClickHouseLangWatchQLProvisioningRepository.open({ url: source.CLICKHOUSE_URL }),
+  };
+  const isConverged = await attemptLwqlConvergence({ database, failOnError, isDerived, plan });
+  if (!isConverged) {
+    logger.warn("LangWatchQL private provisioning skipped: the shared converge did not complete");
+    return;
+  }
+  await provisionLwqlPrivateTargets({
+    endpoints: privateEndpointsOf({ source }),
+    sharedUrl: source.CLICKHOUSE_URL,
+    keyPepper: findKeyPeppers(source)[0],
+    readerPasswords: parsePrivateReaderPasswords({ source, nameOf: privateRouteNameOf }),
+    shared: plan,
+    converge: (privatePlan) => convergeLwqlPrivateClickHouse({ database, plan: privatePlan }),
   });
+}
+
+/**
+ * One private server's ClickHouse half, after the shared converge and under its lock, so two
+ * replicas never interleave; no PostgreSQL work. Config's `lwql_postgres` holds the login, and
+ * a server without it stays refused. The access model follows the shared run's mode (ADR-200).
+ */
+export async function convergeLwqlPrivateClickHouse({
+  database,
+  plan,
+}: {
+  database: LwqlProvisioningDatabase;
+  plan: LwqlConvergencePlan;
+}): Promise<void> {
+  await withSelfProvisionLock({
+    database,
+    connectionLimit: plan.connectionLimit,
+    fn: () =>
+      withProvisioningRepository({
+        open: plan.openRepository,
+        fn: (repository) => convergeLwqlPrivateRepository({ repository, plan }),
+      }),
+  });
+}
+
+export async function convergeLwqlPrivateRepository({
+  repository,
+  plan,
+}: {
+  repository: LangWatchQLProvisioningRepository;
+  plan: LwqlConvergencePlan;
+}): Promise<void> {
+  const { names, request } = plan;
+  const server = await repository.readCollectionState({
+    database: names.database,
+    candidates: [LWQL_RENDERED_NAMED_COLLECTION],
+  });
+  if (!server.available.includes(LWQL_RENDERED_NAMED_COLLECTION)) {
+    throw new LwqlPrivateCollectionAbsentError({ collection: LWQL_RENDERED_NAMED_COLLECTION });
+  }
+  const configStoreEntities = await repository.inventoryConfigStore({ names });
+  const includeAppFunctions = await appFunctionsProvisionable(repository);
+  // Rendered: the reader comes from the server's users.d, so no access entity is written here.
+  const mode = selfProvisioning.accessModelMode({ source: plan.settings });
+  if (mode === "sql") {
+    await clusterGuard.assertSafe({
+      query: (sql) => repository.queryRows(sql),
+      source: plan.settings,
+    });
+  } else {
+    await assertRenderedPrivateServer({ repository, names });
+  }
+  const statements = selfProvisioning.clickHouseStatements({
+    names,
+    restrictedPassword: request.connection.password,
+    sourceDatabase: plan.sourceDatabase(),
+    postgres: { endpoint: request.endpoint, readerPassword: "" },
+    // The scoped copies are the only relation the per-customer login reads.
+    schema: LWQL_SCOPED_SCHEMA,
+    includeAppFunctions,
+    mode,
+    externalCollection: LWQL_RENDERED_NAMED_COLLECTION,
+    postgresKeyMap: true,
+  });
+  await repository.runStatements({ configStoreEntities, failureLevel: "error", statements });
 }
 
 /**
@@ -788,6 +1061,8 @@ export class LwqlProvisionTask extends Task {
     private readonly inputs: {
       database: () => LwqlProvisioningDatabase;
       source: Record<string, string | undefined>;
+      lookup: LwqlSecretLookup | undefined;
+      lookupFamily: LwqlSecretFamilyLookup | undefined;
       skipped: boolean;
       failOnError: boolean;
     },
@@ -803,17 +1078,30 @@ export class LwqlProvisionTask extends Task {
   static create({
     database,
     source,
+    lookup,
+    lookupFamily,
     skipped = false,
     failOnError = false,
   }: {
     database: () => LwqlProvisioningDatabase;
     /** The environment the launching process was configured with. */
     source: Record<string, string | undefined>;
+    /** The runner's secrets chain, so the passwords match what the api and worker derive. */
+    lookup?: LwqlSecretLookup;
+    /** The same chain's families, so each private reader's own password is the api's. */
+    lookupFamily?: LwqlSecretFamilyLookup;
     skipped?: boolean;
     /** The upgrade's reconciler fails its run on a refusal; boot keeps the default. */
     failOnError?: boolean;
   }): LwqlProvisionTask {
-    return new LwqlProvisionTask({ database, source, skipped, failOnError });
+    return new LwqlProvisionTask({
+      database,
+      source,
+      lookup,
+      lookupFamily,
+      skipped,
+      failOnError,
+    });
   }
 
   async run(_input: { args: readonly string[]; signal: AbortSignal }): Promise<void> {
@@ -824,6 +1112,8 @@ export class LwqlProvisionTask extends Task {
     await runLwqlProvisioningTask({
       database: this.inputs.database(),
       source: this.inputs.source,
+      lookup: this.inputs.lookup,
+      lookupFamily: this.inputs.lookupFamily,
       failOnError: this.inputs.failOnError,
     });
   }

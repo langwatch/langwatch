@@ -48,6 +48,8 @@ import {
 import { isSayToolPart } from "../../../tools/model/langy-say-tool.ts";
 import { isSecretSnippetToolPart } from "../../../tools/model/langy-secret-snippet-tool.ts";
 import {
+  isAnsweredByGitHubConnectCard,
+  isSandboxCredentialFault,
   type LangyToolErrorPresentation,
   presentLangyToolError,
   readerMustAct,
@@ -181,8 +183,13 @@ function partToCall(part: ToolPartLike, name: string): CapabilityToolCall {
 
 /**
  * A line that ANNOUNCES a failure — anchored to the start of one on purpose.
+ * `Error:` must be unindented: successful reads indent it as a field label.
  */
-const CLI_FAILURE_LINE = /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)/im;
+const CLI_FAILURE_LINE =
+  /^[\s>]*(?:✖|failed to\b|request failed\b|self_signed_cert_in_chain\b)|^error:/im;
+
+/** The leading exit code of a sandbox console (`renderBashOutput`); it wins over the line check. */
+const CONSOLE_EXIT_CODE = /^exit code: (\d+)(?:\n|$)/;
 
 /** The raw text an output carries, bare or in the `{ text }` envelope. */
 function outputText(output: unknown): string | undefined {
@@ -227,6 +234,8 @@ function renderedToolFailure(part: ToolPartLike): boolean {
   const envelope = typeof raw === "string" ? document : raw;
   const consoleText = cliConsoleTextOf(envelope);
   if (consoleText === null) return false;
+  const exitCode = CONSOLE_EXIT_CODE.exec(consoleText)?.[1];
+  if (exitCode !== undefined) return exitCode !== "0";
   return CLI_FAILURE_LINE.test(consoleText);
 }
 
@@ -796,6 +805,8 @@ function keepsItsCard({
   isLastStep: boolean;
 }): boolean {
   if (failure.call.state === "output-denied") return true;
+  // Not even as the step the turn ended on: the turn's connect card is that ask.
+  if (isAnsweredByGitHubConnectCard(failure.presentation)) return false;
   if (readerMustAct({ presentation: failure.presentation, toolName: failure.sourceToolName }))
     return true;
   if (isReaderDecision({ call: failure.call, presentation: failure.presentation })) return true;
@@ -1032,6 +1043,10 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
   const { call, presentation } = failure;
   const described = describeToolCall({ name: call.name, input: call.input });
   const { message, detail } = presentation;
+  // Langy's own key or the sandbox's gh failing prints login steps; dev mode's raw data has them.
+  const hidesOutput =
+    isSandboxCredentialFault({ presentation, toolName: failure.sourceToolName }) ||
+    isAnsweredByGitHubConnectCard(presentation);
   // Copy the raw block already carries (a plain error's own text) is not said twice. The block
   // shows the failure without colour codes, so it agrees with the presentation's raw.
   const raw = presentation.raw ?? toolResultText(call) ?? "";
@@ -1054,13 +1069,13 @@ function FailedActivityRow({ failure, devMode }: { failure: FailedToolCall; devM
       detail={described.detail}
       opened={
         <>
-          {explainsBeyondRaw ? (
+          {explainsBeyondRaw || hidesOutput ? (
             <Text textStyle="2xs" color="fg.muted">
               {presentation.message}
               {presentation.detail ? ` ${presentation.detail}` : ""}
             </Text>
           ) : null}
-          <OpenedToolCall call={call} />
+          <OpenedToolCall call={call} showResult={!hidesOutput} />
           {presentation.code ? <LangyFailureReference code={presentation.code} /> : null}
           {hasToolErrorActions(presentation) ? (
             <LangyToolErrorActions presentation={presentation} />
@@ -1287,7 +1302,7 @@ function parseWholeJson(text: string): { value: unknown } | undefined {
 /**
  * One finished call, opened: what ran, and then what came back.
  */
-function OpenedToolCall({ call }: { call: ToolCall }) {
+function OpenedToolCall({ call, showResult = true }: { call: ToolCall; showResult?: boolean }) {
   const command = commandOf(call.input);
   return (
     <VStack align="stretch" gap={1}>
@@ -1296,7 +1311,7 @@ function OpenedToolCall({ call }: { call: ToolCall }) {
           $ {command}
         </Text>
       ) : null}
-      <ToolResultBlock call={call} />
+      {showResult ? <ToolResultBlock call={call} /> : null}
     </VStack>
   );
 }

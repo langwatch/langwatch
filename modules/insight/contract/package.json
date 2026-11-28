@@ -21,6 +21,7 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@langwatch/ksuid": "workspace:*",
     "@langwatch/module": "workspace:*",
     "zod": "catalog:"
   },

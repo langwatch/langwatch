@@ -227,8 +227,8 @@ export names, under hashed names: screenshots as AVIF and WebP at 840 and 1680px
 videos as AV1 WebM and H.264 MP4 with a WebP poster (ffmpeg, cached in
 `node_modules/.cache/docs-media`). Logos, the favicon and the social card keep
 their names, with a short cache lifetime. These are hosting requirements, not cloud
-configuration emitted by the compiler. The existing Mintlify release workflow
-and DNS cutover remain separate decisions.
+configuration emitted by the compiler. The cutover from Mintlify is done: these
+docs are served on langwatch.ai/docs and the Mintlify release workflow is gone.
 
 ## Static-first performance
 

@@ -76,6 +76,20 @@ Feature: Isolated Scenario execution
     And the run is refused before it starts when the token lacks one the target needs
 
   @unit
+  Scenario: A scenario run started with a service key is minted under that key
+    Given a suite, run plan or agent test started over the REST API with an API key that belongs to no person
+    When the run is queued
+    Then the run records the starting key but no person
+    And the run's child key is minted under the starting key, holding only permissions that key holds
+    And the run is refused before it starts when the key lacks one the target needs
+
+  @integration
+  Scenario: A run started with a service key reads its own project's traces
+    Given the child key of a run started with an API key that belongs to no person
+    When the scenario judge reads a trace of the run's project with that child key
+    Then the read passes the door on both the legacy and the v1 trace route
+
+  @unit
   Scenario: A scenario run started with a CLI access token is bounded by the person alone
     Given a member who starts a suite or run plan with a project-bound CLI or hosted MCP access token
     When the run's child key is minted

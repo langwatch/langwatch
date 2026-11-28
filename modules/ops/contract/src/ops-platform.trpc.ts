@@ -20,6 +20,9 @@ import {
 } from "./blob-store.ts";
 import {
   opsFeatureFlagKeyInputSchema,
+  opsFeatureFlagTargetListSchema,
+  opsFindFeatureFlagTargetsInputSchema,
+  opsSearchFeatureFlagTargetsInputSchema,
   opsOkOutputSchema,
   opsSetFeatureFlagInputSchema,
   opsSetFeatureFlagRulesInputSchema,
@@ -43,6 +46,16 @@ export const opsPlatformTrpc = defineTrpcContract("ops")
   .mutation("setFeatureFlagRules")
   .withInput(opsSetFeatureFlagRulesInputSchema)
   .withOutput(opsOkOutputSchema)
+
+  /** Organizations, projects or users a targeting rule may name, by name, slug, id or email. */
+  .query("searchFeatureFlagTargets")
+  .withInput(opsSearchFeatureFlagTargetsInputSchema)
+  .withOutput(opsFeatureFlagTargetListSchema)
+
+  /** The ids stored rules name, with the details that tell them apart; unknown ids are left out. */
+  .query("findFeatureFlagTargets")
+  .withInput(opsFindFeatureFlagTargetsInputSchema)
+  .withOutput(opsFeatureFlagTargetListSchema)
 
   .mutation("clearFeatureFlag")
   .withInput(opsFeatureFlagKeyInputSchema)

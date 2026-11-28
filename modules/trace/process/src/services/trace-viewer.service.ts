@@ -15,8 +15,10 @@ import {
   type CustomersAndLabelsResult,
   type DistinctFieldNamesResult,
   type PromptStudioSpanResult,
+  type ThreadTraceIds,
 } from "@langwatch/trace-contract";
 
+import type { TraceByIdRead } from "../features/legacy/rules/trace-id-lookup.rules.ts";
 import type { TraceViewerProtectionService } from "./trace-viewer-protection.service.ts";
 
 /** The legacy trace read, as tRPC transports use it. Declared here to let
@@ -31,7 +33,7 @@ export interface TraceLegacyRead {
     traceId: string;
     protections: unknown;
     opts?: { full?: boolean; withEditOverlay?: boolean };
-  }): Promise<Trace | undefined>;
+  }): Promise<TraceByIdRead | undefined>;
 
   /** The project's list/search read, keyset-paged by `scrollId`. */
   getAllTracesForProject(
@@ -90,6 +92,15 @@ export interface TraceLegacyRead {
     protections: unknown;
     opts?: { full?: boolean; withEditOverlay?: boolean; maxTraces?: number };
   }): Promise<Trace[]>;
+
+  /** The trace ids of several conversations, one list per conversation, oldest first. */
+  getTraceIdsByThreadIds(params: {
+    /** The own-only proof the store read goes through. */
+    authorization: Authorization;
+    projectId: string;
+    threadIds: string[];
+    maxTraces?: number;
+  }): Promise<ThreadTraceIds[]>;
 
   /** The evaluator verdicts on a page of traces, keyed by trace id. */
   getEvaluationsMultiple(

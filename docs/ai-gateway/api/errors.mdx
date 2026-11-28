@@ -112,6 +112,35 @@ When only the status and the message are available, the gateway writes the same 
   responses.
 </Note>
 
+## A2A proxy errors
+
+Calls to `/a2a/{target}` answer in the A2A binding the caller used. A JSON-RPC call gets a JSON-RPC error with `error.code`, `error.message` and `error.data.reason`. An HTTP+JSON call gets the HTTP status and a body with `error.code` (the status), `error.status`, `error.message` and `error.reason`. Branch on the reason.
+
+| Reason                        | JSON-RPC code | HTTP | Cause                                                                              |
+| ----------------------------- | ------------- | ---- | ---------------------------------------------------------------------------------- |
+| `a2a_invalid_request`         | -32600        | 400  | The body or path is not a valid A2A request.                                       |
+| `a2a_operation_not_supported` | -32601        | 404  | The method and path is not an A2A operation.                                       |
+| `a2a_target_blocked`          | -32011        | 403  | An administrator blocked the A2A agent.                                            |
+| `a2a_content_blocked`         | -32012        | 403  | A guardrail blocked the message or the reply.                                      |
+| `a2a_target_not_found`        | -32013        | 404  | No such A2A agent in the project, or the key is not on its allow list.             |
+| `a2a_scan_unavailable`        | -32014        | 503  | The guardrail scan could not complete and the key fails closed.                    |
+| `a2a_upstream_unreachable`    | -32015        | 502  | The A2A agent did not answer, redirected, or its stream broke off.                 |
+| `a2a_unauthenticated`         | -32016        | 401  | The request carried no virtual key.                                                |
+| `a2a_registry_unavailable`    | -32017        | 503  | The gateway could not read the key's A2A agents.                                   |
+| `a2a_content_unscannable`     | -32018        | 422  | The request is not JSON the guardrail scan can read. A reply like that gets 502.   |
+| `a2a_payload_too_large`       | -32019        | 413  | The request body is over 1 MiB. A reply or stream event over 1 MiB gets 502.       |
+| `a2a_too_many_requests`       | -32020        | 429  | The key has 8 A2A calls in flight.                                                 |
+| `a2a_rate_limited`            | -32021        | 429  | The key is over its requests-per-minute or requests-per-day limit.                 |
+| `a2a_budget_exceeded`         | -32022        | 402  | A budget on the key is used up.                                                    |
+| `a2a_target_not_https`        | -32023        | 502  | The gateway calls customer endpoints over https only and the agent's URL is http.  |
+| `a2a_public_url_unset`        | -32024        | 503  | The gateway has no `A2A_PUBLIC_BASE_URL`, so it refuses Agent Card calls.          |
+
+The gateway calls an A2A agent under the same egress rule as provider endpoints. With `BLOCK_LOCAL_HTTP_CALLS` on, a private address is refused (`a2a_upstream_unreachable`) unless the host in the agent's URL is in `ALLOWED_PROXY_HOSTS`.
+
+An entry in `ALLOWED_PROXY_HOSTS` matches only the host the URL names, never an address that a name resolves to: to admit an agent whose URL names an IP address, list that IP address; to admit one whose URL names a hostname, list the hostname.
+
+A query parameter the agent's registered URL sets always wins: the gateway drops a caller parameter of the same name.
+
 ## Streaming errors
 
 Once the stream is open the status is already `200`, so a failure arrives as a terminal `event: error` frame and the stream ends:

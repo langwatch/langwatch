@@ -180,7 +180,7 @@ export const NO_MATCHING_AGENTS_COPY: GovernanceEmptyStateCopy = {
   icon: SearchX,
   headline: "No agent matches these filters",
   description:
-    "Every agent in this organization is filtered out by the source or ownership you picked.",
+    "Every agent in this organization is filtered out by the source, posture or ownership you picked.",
   actionLabel: "Clear filters",
   // Quieter, and the one case on this page that is. Clearing a filter creates
   // nothing: it is the way back from a narrow view, not a call to action, and

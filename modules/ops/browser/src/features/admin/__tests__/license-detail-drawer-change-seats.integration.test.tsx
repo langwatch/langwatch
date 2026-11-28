@@ -3,7 +3,7 @@
  * Changing seats from the license drawer: the operator reads what happened
  * and the registry is reread. Spec: specs/self-hosting/connected-services/license-registry.feature
  */
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 import { renderWithOpsHost } from "../../../testing.tsx";
@@ -25,11 +25,13 @@ function license(overrides: Partial<License> = {}): License {
     maxMembers: 50,
     maxMembersLite: 5,
     liteSeatsUnlimited: false,
+    maxMembersDeveloper: null,
     issuedAt: ISSUED,
     expiresAt: TERM_END,
     source: "BACKOFFICE",
     revokedAt: null,
     revokedReason: null,
+    supersededAt: null,
     replacesId: null,
     services: [],
     seatRateCents: null,
@@ -49,21 +51,35 @@ function license(overrides: Partial<License> = {}): License {
   };
 }
 
-type DrawerState = { license: License | undefined; invalidate: ReturnType<typeof vi.fn> };
+type DrawerState = {
+  license: License | undefined;
+  invalidate: ReturnType<typeof vi.fn>;
+  revoke: ReturnType<typeof vi.fn>;
+};
 
-const state = vi.hoisted((): DrawerState => ({ license: undefined, invalidate: vi.fn() }));
+const state = vi.hoisted((): DrawerState => ({
+  license: undefined,
+  invalidate: vi.fn(),
+  revoke: vi.fn(),
+}));
 
 vi.mock("../../../behavior/ops-api.ts", () => ({
   api: {
     useContext: () => ({ licenseRegistry: { invalidate: state.invalidate } }),
     licenseRegistry: {
-      getById: {
-        useQuery: () => ({ data: state.license, error: null, isLoading: false }),
+      getChain: {
+        useQuery: () => ({
+          data: state.license ? { licenses: [state.license] } : undefined,
+          error: null,
+          isLoading: false,
+        }),
       },
       updateTerms: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       resetInstanceBinding: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       linkToOrganization: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
-      revoke: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
+      revoke: {
+        useMutation: () => ({ mutate: vi.fn(), mutateAsync: state.revoke, isPending: false }),
+      },
       issue: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       registerLegacy: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
       reissue: { useMutation: () => ({ mutate: vi.fn(), isPending: false }) },
@@ -93,25 +109,32 @@ describe("LicenseDetailDrawer, changing seats", () => {
   describe("given an operator raised the seats of a linked license", () => {
     beforeEach(() => {
       state.invalidate.mockClear();
+      state.revoke.mockReset();
+      state.revoke.mockResolvedValue({});
       state.license = license();
       renderWithOpsHost(
         <LicenseDetailDrawer licenseId="il_1" onClose={vi.fn()} onRevoke={vi.fn()} />,
       );
-      // "Change seats" shows the first "Seats" field; Reissue's is the second.
-      fireEvent.change(screen.getAllByLabelText("Seats")[0]!, { target: { value: "58" } });
       fireEvent.click(screen.getByRole("button", { name: "Change seats" }));
+      fireEvent.change(screen.getByLabelText("Full seats"), { target: { value: "58" } });
+      fireEvent.click(screen.getByRole("button", { name: "Change to 58 seats" }));
     });
 
     /** @scenario "An operator changes the seats of a running license" */
-    it("tells the operator billing invoices the added seats, and shows the signed license once", () => {
+    it("tells the operator billing invoices the added seats, and shows the signed license once", async () => {
+      expect(await screen.findByDisplayValue(SIGNED)).toBeTruthy();
       expect(screen.getByTestId("change-seats-result").textContent).toBe(
         "Seats raised from 50 to 58. The install picks the new license up on its next sync or when an admin presses refresh. Billing invoices the added seats, prorated to the end of the term; the Billing section shows the outcome.",
       );
-      expect(screen.getByDisplayValue(SIGNED)).toBeTruthy();
     });
 
     it("rereads the registry, as main's section did", () => {
-      expect(state.invalidate).toHaveBeenCalledTimes(1);
+      expect(state.invalidate).toHaveBeenCalled();
+    });
+
+    it("stops the unused key, since no install holds it", async () => {
+      await waitFor(() => expect(state.revoke).toHaveBeenCalledTimes(1));
+      expect(state.revoke.mock.calls[0]?.[0]).toMatchObject({ id: "il_1" });
     });
   });
 });

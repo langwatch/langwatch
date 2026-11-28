@@ -1,4 +1,4 @@
-import { nowInstant, toEpochMs } from "@langwatch/time";
+import { nowEpochMs, toEpochMs } from "@langwatch/time";
 
 import type { AggregateType } from "../domain/aggregateType.ts";
 import { createTenantId } from "../domain/tenantId.ts";
@@ -24,9 +24,9 @@ export function recordToEvent<EventType extends Event>(
     timestampMs = record.EventTimestamp;
   } else if (typeof record.EventTimestamp === "string") {
     const parsed = toEpochMs(record.EventTimestamp);
-    timestampMs = Number.isNaN(parsed) ? nowInstant().epochMilliseconds : parsed;
+    timestampMs = Number.isNaN(parsed) ? nowEpochMs() : parsed;
   } else {
-    timestampMs = nowInstant().epochMilliseconds;
+    timestampMs = nowEpochMs();
   }
 
   const payload = parseEventPayload(record.EventPayload);

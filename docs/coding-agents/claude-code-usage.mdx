@@ -36,7 +36,7 @@ If you read local usage with `ccusage`, this is the same accounting with the con
 
 ## Read your sessions
 
-Open **Sessions** at [/me/sessions](https://app.langwatch.ai/me/sessions). One row per session, with the context it carried, how often it compacted, how long it worked against how long it waited on you, and what it cost.
+Open **Sessions** at [/coding-agents/sessions](https://app.langwatch.ai/coding-agents/sessions). One row per session, with the context it carried, how often it compacted, how long it worked against how long it waited on you, and what it cost.
 
 <Frame caption="One row per session. Context and Compactions show which sessions ran heavy, and Pull requests shows what each one shipped.">
   ![Claude Code sessions list](/images/coding-agents/sessions-list.png)
@@ -73,7 +73,7 @@ A tool call the agent was denied stays in the replay, marked as denied, so a ses
 
 ## Cost per pull request
 
-**Pull requests** at [/me/pull-requests](https://app.langwatch.ai/me/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
+**Pull requests** at [/coding-agents/pull-requests](https://app.langwatch.ai/coding-agents/pull-requests) sums every session that drove a branch, over the pull request's whole life and across everyone who worked on it. That is the number to compare against what the change was worth.
 
 <Frame caption="Cost per pull request, summed across every session and contributor that touched the branch.">
   ![Cost per pull request](/images/coding-agents/pull-requests-list.png)
@@ -103,7 +103,7 @@ You can point it at its own history too, through the [skills directory](https://
 
 Answer **Using an API key** at the first-run question instead. Paste your `sk-ant-` key at **Settings → Model providers**, and `langwatch claude` routes every call through the LangWatch AI Gateway with a virtual key.
 
-This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/me → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
+This path adds no extra cost and gives you two things the subscription path cannot. Cost comes from Anthropic's own response rather than from Claude Code's estimate, and a personal budget at **/coding-agents → Settings** is enforced rather than advisory: requests fail with `budget_exceeded` once you cross it. On a subscription you get alerts at 80% and 100%, because a proxy cannot gate subscription calls.
 
 Everything above this section looks the same on either path.
 

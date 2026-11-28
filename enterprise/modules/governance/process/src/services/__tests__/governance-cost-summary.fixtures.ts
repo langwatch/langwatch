@@ -7,16 +7,14 @@ import { Temporal } from "@langwatch/time";
 
 import { GovernanceCostNoticesService } from "../../features/cost/services/governance-cost-notices.service.ts";
 import { GovernanceCostSummaryService } from "../../features/cost/services/governance-cost-summary.service.ts";
-import type {
-  GovernanceSeatReportRow,
-  OcsfSeatReportReader,
-} from "../../repositories/clickhouse/clickhouse.ocsf-events.repository.ts";
+import type { OcsfSeatReportReader } from "../../repositories/clickhouse/clickhouse.ocsf-events.repository.ts";
 import type { IngestionSourceRepository } from "../../repositories/ingestion-source.repository.ts";
 import {
   type MemoryGovernanceCostCell,
   MemoryGovernanceCostRollupRepository,
 } from "../../repositories/memory/memory.governance-cost-rollup.repository.ts";
 import { MemoryIngestionSourceRepository } from "../../repositories/memory/memory.ingestion-source.repository.ts";
+import type { GovernanceSeatReportRow } from "../../rules/ocsf-seat-report.rules.ts";
 
 export const NOW = Temporal.Instant.from("2026-09-25T12:00:00Z");
 export const TENANT = "governance-project";

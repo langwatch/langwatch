@@ -23,6 +23,7 @@ import type {
   SignUpVerdict,
 } from "@langwatch/organization-contract";
 import { fromDate, nowInstant } from "@langwatch/time";
+import type { UserApi } from "@langwatch/user-contract";
 import type { BetterAuthOptions } from "better-auth";
 import { APIError } from "better-auth/api";
 
@@ -55,6 +56,8 @@ export type BetterAuthHookCollaborators = Readonly<{
   ssoMigration: SsoMigrationCallbackApi;
   /** Where a refused link leaves a proposal an administrator resolves (ADR-117 §3). */
   linkProposals: LinkProposals;
+  /** Where an account Better Auth wrote itself has its created fact recorded. */
+  users: Pick<UserApi, "recordCreated">;
 }>;
 
 /** Organization reads and writes the hooks make through organization's own Api. */
@@ -225,9 +228,31 @@ const joinSsoOrganization = async ({
 };
 
 /**
- * Called after a new user is created. Records the sign-up for nurturing,
- * then auto-onboards the user into an SSO-matched organization through the
- * organization's seat-checked admission, which writes the matching grant.
+ * Better Auth writes social and single sign-on accounts past user's mints, so the created fact
+ * that carries the address to Customer.io is asked for here. A throw here fails the sign-in after
+ * the commit, so a failure is logged by account id instead: the account exists either way.
+ */
+async function recordAccountCreated({
+  users,
+  userId,
+}: {
+  users: BetterAuthHookCollaborators["users"];
+  userId: string;
+}): Promise<void> {
+  try {
+    await users.recordCreated({ id: userId });
+  } catch (err) {
+    logger.error(
+      { err, userId },
+      "Failed to record the new account's created fact (sign-in still succeeds)",
+    );
+  }
+}
+
+/**
+ * Called after a new user is created. Records the sign-up for nurturing and the account's created
+ * fact, then auto-onboards the user into an SSO-matched organization through the organization's
+ * seat-checked admission, which writes the matching grant.
  */
 export const afterUserCreate = async ({
   user,
@@ -238,6 +263,8 @@ export const afterUserCreate = async ({
 }): Promise<void> => {
   // Nurturing tracks PostHog signed_up under the user id, the distinct_id posthog-js uses.
   collaborators.announcements.signUpNurturing({ userId: user.id });
+  // Before the verified-email gate: an unverified sign-up is still a new account.
+  await recordAccountCreated({ users: collaborators.users, userId: user.id });
 
   // Only a verified email proves the signup controls the mailbox an ssoDomain
   // or invite match would admit; credential signups are always created

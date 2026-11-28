@@ -23,7 +23,7 @@ Always pass `--experiment <slug>` to `ui call`. The open page knows which experi
 - The user's baseline column is never edited. Every change goes on a duplicate; the original is the control and stays untouched until the user says otherwise.
 - Edit prompt drafts on the workbench (`workbench.setTargetPrompt`), never the prompt library. Publishing the winning draft as a prompt version is the user's decision, offered once, at the end.
 - Never delete the user's work. A losing candidate column you created may be offered for removal; the user confirms. Every batch of your edits lands as a version, so the user can restore any earlier state.
-- Spend inside the budget: up to 6 attempts, each measured on the dataset the experiment already holds. Ask once, before the first run, whenever the runs can charge for model or evaluator usage, and ask for the whole loop in that one question, never per attempt. Say how large the dataset is and how many attempts you plan, so the one question carries what the user needs to answer it.
+- Set an attempts budget before the first run: decide how many attempts the problem is worth, given the dataset size and what one run costs, and say the number and the reason in one line. Revise it as the results come in, and measure every attempt on the dataset the experiment already holds. Ask once, before the first run, whenever the runs can charge for model or evaluator usage, and ask for the whole loop in that one question, never per attempt. Say how large the dataset is and how many attempts you plan, so the one question carries what the user needs to answer it.
 - Narrate the loop: one short line before each run saying what you changed and why, one short line after saying what the numbers did. Silence during a two minute run reads as a hang.
 
 ## Step 0: read the state
@@ -72,9 +72,9 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
 **Say what you are about to do, in one line, before each numbered step below.** The user is watching a page, not a log. Between two of your commands they see a status line and nothing else, and a step that takes two minutes without a word reads as a stall. One short sentence each time is enough: what you are doing and why this attempt. Write it before the command, not after: a line that arrives with the result explains a wait that is already over.
 
 1. **Score the baseline first.** Read the results the state already holds for the baseline column, or run that column on a 10 row subset to get them, with step 6's command and the baseline's `targetId`. The score counts only when the rows carry processed results. A cell reading "Waiting on", or one whose error names unresolved inputs (`evaluator_no_inputs_resolved`), is a mapping problem rather than a prompt problem: fix the mappings and run again before anything else. Read the error code and details first, because a row can also fail on the provider or at run time, and neither is fixed by remapping. A pass rate that lands before the mappings are set is empty judged against empty, and it reads as 100%. One exception: `langevals/select_best_compare` scores one column against another, so it has nothing to read until a candidate exists. With that evaluator, do step 3 first and let the first comparison run score the baseline and the candidate together.
-2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed --format json` for row level detail. Read the actual outputs against the expected ones.
+2. **Read the failures, not the score.** `langwatch experiment results <slug> --filter failed --format json` for row level detail. Read the actual outputs against the expected ones. When the target samples at non-zero temperature, run the baseline more than once before you trust which rows fail: a row that fails on one run and passes on another is variation, and the hypothesis comes from the rows that fail every time. Set a few failing rows aside without reading them, so you can check later that the fix carries to rows it was not built from.
 3. **Duplicate the baseline,** now that it has a score you trust. `langwatch ui call workbench.duplicateTarget --payload '{"targetId":"<id>"}' --experiment <slug>`. The copy inherits the attached evaluator and the baseline's mappings, repointed at itself, so it is scored from its first run. Its id comes from the answer. Refer to it as the candidate.
-4. **State a hypothesis in one sentence:** the failure pattern and the edit that should fix it. If you cannot name a pattern, you have not read enough rows.
+4. **State a hypothesis in one sentence:** the failure pattern, the edit that should fix it, and which rows it predicts will move. If you cannot name a pattern, you have not read enough rows. An edit that names the dataset's questions, answers or keywords is fitted to those rows, not a fix: state the principle that covers the whole class.
 5. **Edit the candidate's draft only.** The draft executes without touching the prompt library. Send the payload through a file, never inline: a prompt is prose, one apostrophe in it ends the shell's quoting, and the rest of your prompt then arrives as separate arguments and the edit is lost.
 
    ```bash
@@ -93,7 +93,7 @@ Every write here is confirmed by its answer, not by the command exiting. The `re
 
    **Quote the denominator next to the figure,** as "30 of 40 rows". A rate over a `completedRows` short of `totalRows` describes part of the dataset. Equal counts are not enough on their own: two columns can each answer 30 rows and answer different ones, because a scoped run picks its rows by `rowIndices`. Before you compare pass rate, cost or latency, run both columns over the whole dataset, or over one explicit `rowIndices` set you give them both. Otherwise the comparison is between two different dataset slices and says nothing.
 
-   Cost and latency are part of the answer, not a footnote.
+   Cost and latency are part of the answer, not a footnote. A gain smaller than the spread between two runs of the same column is not a win, and a candidate that lifts the rows you read but not the rows you set aside is fitted to them.
 
 8. **Go again.** Unless a stop condition holds, form the next hypothesis from the rows that still fail and repeat from step 4. Do not ask permission to continue and do not offer to continue: continuing is the job. When prompt edits stop paying, spend one attempt on a duplicate running a different model (`workbench.updateTargetModel`) as a cost and quality trade, and compare it like any other attempt.
 
@@ -117,7 +117,7 @@ Do not start the run with `--wait`. It blocks for as long as the run takes, and 
 
 ## Stop conditions
 
-Stop and report when any of these holds: the pass rate reaches the user's goal or 100%; three consecutive attempts fail to beat the best candidate; you have spent the 6 attempt budget; the remaining failures are dataset problems (a wrong golden answer is reported as such, never prompt-fitted around); or the user says stop. Stopping with numbers is success; churning is not.
+Stop and report when any of these holds: the pass rate reaches the user's goal or 100%; attempts keep failing to beat the best candidate and no new hypothesis is worth another run; you have spent the attempts budget you set; the remaining failures are dataset problems (a wrong golden answer is reported as such, never prompt-fitted around); or the user says stop. Stopping with numbers is success; churning is not.
 
 If the scoring service errors on every cell, say so plainly, score the outputs against the golden answers yourself, and label the numbers as your own read rather than the evaluator's. A broken scorer is a reason to caveat the report, not a reason to stop the loop.
 

@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/analytics-contract";
 import type { Authorization } from "@langwatch/authorization";
 import type { Instant } from "@langwatch/time";
+import type { SpanAnalyticsFloor } from "@langwatch/trace-contract";
 
 export interface AnalyticsTimeseriesQuery {
   readonly table: AnalyticsTable;
@@ -24,6 +25,8 @@ export interface AnalyticsTimeseriesQuery {
   readonly previousPeriodStartDate: Instant;
   readonly adjustedTimeScale: number | "full" | undefined;
   readonly maxResultRows: number | undefined;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  readonly spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }
 
 export interface AnalyticsLegacyReadInput {
@@ -33,6 +36,8 @@ export interface AnalyticsLegacyReadInput {
   readonly startDate: number;
   readonly endDate: number;
   readonly filters?: AnalyticsFilters;
+  /** Where span_analytics is complete; absent or null, span types come from stored_spans. */
+  readonly spanAnalyticsFloor?: SpanAnalyticsFloor | null;
 }
 
 export interface AnalyticsFeedbackPageReadInput extends AnalyticsLegacyReadInput {

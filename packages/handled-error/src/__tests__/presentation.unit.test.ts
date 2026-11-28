@@ -74,6 +74,17 @@ describe("explainHandledError", () => {
       expect(description).toBe('There\'s no field called "trace.durationn".');
     });
 
+    it("adds the hint the trace filter gave for an unknown field", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "filter_field_unknown",
+          meta: { field: "metadata.labels", hint: "Did you mean @label?" },
+        }),
+      );
+
+      expect(description).toBe('There\'s no field called "metadata.labels". Did you mean @label?');
+    });
+
     /** @scenario "meta is read only where the client knows its shape" */
     it("titles a refused test fire as not sent, its reason naming the fix", () => {
       const { title, description } = explainHandledError(
@@ -85,6 +96,27 @@ describe("explainHandledError", () => {
 
       expect(title).toBe("Test message not sent");
       expect(description).toBe("Slack no longer accepts this webhook.");
+    });
+
+    /** @scenario "The refusal names the Developer seats and the minimum" */
+    it("names Developer seats when a Developer seat change is refused", () => {
+      const { title, description } = explainHandledError(
+        shape({
+          code: "seat_quantity_below_in_use",
+          meta: { seat: "developer", requested: 1, minimum: 2 },
+        }),
+      );
+
+      expect(title).toBe("That's too few seats");
+      expect(description).toBe("Nothing changed. Choose at least 2 developer seats.");
+    });
+
+    it("keeps the full-seat wording when the refusal names no seat kind", () => {
+      const { description } = explainHandledError(
+        shape({ code: "seat_quantity_below_in_use", meta: { requested: 0, minimum: 1 } }),
+      );
+
+      expect(description).toBe("Nothing changed. Choose at least 1 seat.");
     });
 
     /** @scenario "meta is read only where the client knows its shape" */
@@ -245,16 +277,33 @@ describe("explainHandledError", () => {
       );
     });
 
-    it("names simulations for a scenario set refusal", () => {
+    /** @scenario "The run refusal tells the caller how to upgrade" */
+    it("names the monthly run allowance and the upgrade for a scenario run refusal", () => {
       const { description } = explainHandledError(
         shape({
           code: "resource_limit_exceeded",
           httpStatus: 403,
-          meta: { limitType: "scenarioSets", current: 3, max: 3 },
+          meta: { limitType: "scenarioRuns", current: 100, max: 100 },
         }),
       );
 
-      expect(description).toContain("3 simulations");
+      expect(description).toContain("100 scenario runs a month");
+      expect(description).toContain("Upgrade your plan");
+    });
+
+    /** @scenario The suite cap refusal names suites */
+    it("names suites when the suite cap refused a template apply", () => {
+      const { description } = explainHandledError(
+        shape({
+          code: "resource_limit_exceeded",
+          httpStatus: 403,
+          meta: { limitType: "scenarioSets", current: 3, max: 3, countedAs: "testSuites" },
+        }),
+      );
+
+      expect(description).toBe(
+        "Your plan includes 3 suites. Upgrade to create more. Everything you already have keeps working.",
+      );
     });
 
     it("keeps the generic plan-limit line for every other allowance", () => {
@@ -1209,6 +1258,54 @@ describe("model_provider_invalid", () => {
   });
 });
 
+describe("provider_endpoint_refused", () => {
+  const explain = (refusal: string) =>
+    explainHandledError(
+      shape({ code: "provider_endpoint_refused", meta: { provider: "openai", refusal } }),
+    );
+
+  /** @scenario "A base URL refused by the outbound policy is reported as refused, not as unreachable" */
+  it("says the outbound policy refused a cloud domain and that a DNS name of your own works", () => {
+    const { title, description } = explain("cloud_internal_domain");
+
+    expect(title).toBe("This instance doesn't send requests to that base URL");
+    expect(description).toContain("outbound policy");
+    expect(description).toContain("DNS name of your own");
+    expect(`${title} ${description}`).not.toMatch(
+      /couldn't reach|network connection|nothing answered/i,
+    );
+  });
+
+  /** @scenario "A private base URL refused by the outbound policy names the setting that allows it" */
+  it.each(["private_address", "on_premise_domain"])(
+    "names ALLOWED_PROXY_HOSTS for a %s refusal",
+    (refusal) => {
+      expect(explain(refusal).description).toContain("ALLOWED_PROXY_HOSTS");
+    },
+  );
+
+  /** @scenario "A private base URL refused by the outbound policy names the setting that allows it" */
+  it("never offers ALLOWED_PROXY_HOSTS for a refusal it cannot lift", () => {
+    expect(explain("cloud_internal_domain").description).not.toContain("ALLOWED_PROXY_HOSTS");
+    expect(explain("metadata_endpoint").description).not.toContain("ALLOWED_PROXY_HOSTS");
+  });
+});
+
+describe("model_provider_invalid with a policy refusal", () => {
+  /** @scenario "A save refused for its base URL says why in the form" */
+  it("explains the refusal the same way the probe does, and that nothing was saved", () => {
+    const { description } = explainHandledError(
+      shape({
+        code: "model_provider_invalid",
+        meta: { reason: "endpoint_not_allowed", refusal: "cloud_internal_domain" },
+      }),
+    );
+
+    expect(description).toContain("nothing was saved");
+    expect(description).toContain("DNS name of your own");
+  });
+});
+
 describe("webhook_endpoint_invalid", () => {
   /** @scenario "A refused cloud metadata destination says why on save" */
   it("says the address is reserved when it is a metadata address", () => {
@@ -1301,6 +1398,27 @@ describe("budget_exceeded", () => {
       expect(copy.description).toBe(
         "Requests are blocked until the limit is raised. An admin can raise it in AI Gateway budgets.",
       );
+    });
+  });
+});
+
+describe("instant_eval_gateway_budget_exceeded", () => {
+  const stopped = (meta: Record<string, unknown>) =>
+    explainHandledError(
+      shape({ code: "instant_eval_gateway_budget_exceeded", httpStatus: 402, meta }),
+    );
+
+  describe("when the refusal names a known scope", () => {
+    it("names whose budget stopped the run", () => {
+      expect(stopped({ scope: "team" }).title).toBe(
+        "Your team's gateway budget stopped Instant Evals",
+      );
+    });
+  });
+
+  describe("when the scope is one the registry does not name", () => {
+    it("keeps the plain headline and never echoes the value", () => {
+      expect(stopped({ scope: "toString" }).title).toBe("A gateway budget stopped Instant Evals");
     });
   });
 });

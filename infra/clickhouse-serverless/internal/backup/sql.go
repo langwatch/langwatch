@@ -137,7 +137,7 @@ func (t Tables) ListSQL(limit int) string {
 
 // ReplicasSQL lists the cluster's replicas in order and marks this server.
 func ReplicasSQL(cluster string) string {
-	return "SELECT toUInt8(is_local) AS is_self, host_name AS host FROM system.clusters WHERE cluster = " +
+	return "SELECT shard_num, replica_num, toUInt8(is_local) AS is_self, host_name AS host FROM system.clusters WHERE cluster = " +
 		quoteString(cluster) + " ORDER BY shard_num, replica_num"
 }
 

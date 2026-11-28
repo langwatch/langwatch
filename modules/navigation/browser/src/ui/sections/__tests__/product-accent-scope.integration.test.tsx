@@ -59,8 +59,8 @@ describe("ProductAccentScope", () => {
   describe("given the route the host services read", () => {
     /** @scenario "The address in view names the product whose accent every surface reads" */
     it.each([
-      ["/me", "me|product.me"],
-      ["/me/configure", "me|product.me"],
+      ["/coding-agents", "me|product.me"],
+      ["/coding-agents/configure", "me|product.me"],
       ["/demo/traces", "llm-ops|product.llm-ops"],
       ["/gateway/virtual-keys", "gateway|product.gateway"],
       ["/governance", "governance|product.governance"],
@@ -91,7 +91,7 @@ describe("ProductAccentScope", () => {
     /** @scenario "A page, the open drawer and a portalled menu read the same accent" */
     it("reads the page's product outside the page's DOM subtree", () => {
       const { container } = renderWithDesignSystem(
-        <At pathname="/me">
+        <At pathname="/coding-agents">
           <Reading id="page" />
           <PortalReading id="portal" />
         </At>,
@@ -107,7 +107,7 @@ describe("ProductAccentScope", () => {
     it("changes the accent and keeps the typed draft on the same input", async () => {
       const user = userEvent.setup();
       const view = renderWithDesignSystem(
-        <At pathname="/me">
+        <At pathname="/coding-agents">
           <Reading id="page" />
           <Draft />
         </At>,

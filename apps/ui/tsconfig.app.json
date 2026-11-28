@@ -27,6 +27,9 @@
       "path": "../../modules/suite/browser/tsconfig.build.json"
     },
     {
+      "path": "../../modules/staff-access/browser/tsconfig.build.json"
+    },
+    {
       "path": "../../modules/slack/browser/tsconfig.build.json"
     },
     {
@@ -37,6 +40,9 @@
     },
     {
       "path": "../../modules/scenario/browser/tsconfig.build.json"
+    },
+    {
+      "path": "../../packages/react-rum/tsconfig.build.json"
     },
     {
       "path": "../../modules/prompt/browser/tsconfig.build.json"
@@ -159,10 +165,10 @@
       "path": "../../packages/browser/tsconfig.build.json"
     },
     {
-      "path": "../../modules/automation/browser/tsconfig.build.json"
+      "path": "../../modules/automation/contract/tsconfig.build.json"
     },
     {
-      "path": "../../modules/automation/contract/tsconfig.build.json"
+      "path": "../../modules/automation/browser/tsconfig.build.json"
     },
     {
       "path": "../../modules/authz/browser/tsconfig.build.json"
@@ -199,6 +205,9 @@
     },
     {
       "path": "../../packages/api/tsconfig.build.json"
+    },
+    {
+      "path": "../../modules/user/contract/tsconfig.build.json"
     }
   ],
   // Dependencies the build does not import get no reference; tsconfig.test.json holds test-only ones (tsconfig-shape-codemod).

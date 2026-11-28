@@ -97,8 +97,11 @@ class EvaluatorStats:
     name: str
     passed: int
     failed: int
+    # 0 when the evaluator gave no verdict; check passed + failed before showing it.
     pass_rate: float
     avg_score: Optional[float] = None
+    # Cells where the evaluator crashed and gave no verdict; 0 on older servers.
+    errored: int = 0
 
 
 @dataclass
@@ -117,6 +120,9 @@ class ExperimentRunSummary:
     total_failed: int = 0
     pass_rate: float = 0.0
     total_cost: float = 0.0
+    # False when the server sent no evaluator results (an older server); the opt-in
+    # gate then fails rather than read silence as success.
+    evaluators_reported: bool = True
 
 
 @dataclass(repr=False)
@@ -217,7 +223,11 @@ class ExperimentRunResult:
 
         return pd.DataFrame()
 
-    def print_summary(self, exit_on_failure: Optional[bool] = None) -> None:
+    def print_summary(
+        self,
+        exit_on_failure: Optional[bool] = None,
+        fail_on_evaluator_failures: bool = False,
+    ) -> None:
         """
         Print a CI-friendly summary and optionally exit with code 1 on failure.
 
@@ -225,14 +235,33 @@ class ExperimentRunResult:
             exit_on_failure: If True, calls sys.exit(1) when there are failures.
                            If False, never exits.
                            If None (default), auto-detects: exits in scripts/CI, doesn't exit in notebooks.
+            fail_on_evaluator_failures: If True, also exit 1 when an evaluator returned a
+                           failing verdict or errored instead of judging, or when the server
+                           sent no evaluator results. Off by default, so existing CI keeps
+                           its exit code.
         """
         _print_summary(self)
 
         # Auto-detect: don't exit in notebooks, exit in scripts/CI
         should_exit = exit_on_failure if exit_on_failure is not None else not _is_notebook()
 
-        if should_exit and self.failed > 0:
+        tallies_missing = fail_on_evaluator_failures and not self.summary.evaluators_reported
+        if tallies_missing:
+            print(_MISSING_TALLIES_MESSAGE, file=sys.stderr)
+        evaluations_failed = tallies_missing or (
+            fail_on_evaluator_failures and self.failed_evaluations > 0
+        )
+        if should_exit and (self.failed > 0 or evaluations_failed):
             sys.exit(1)
+
+    @property
+    def failed_evaluations(self) -> int:
+        """Failed plus errored evaluations across the run, from the per-evaluator tallies.
+
+        A crashed evaluator checked nothing, so it counts against the opt-in gate: an
+        evaluator that errors on every row must not leave CI green.
+        """
+        return sum(e.failed + e.errored for e in self.summary.evaluators)
 
     def __repr__(self) -> str:
         status_icon = {"completed": "OK", "failed": "FAIL", "stopped": "STOPPED"}.get(
@@ -267,6 +296,7 @@ class ExperimentRunResult:
                 "pass_rate": e.pass_rate,
                 "passed": e.passed,
                 "failed": e.failed,
+                "errored": e.errored,
                 "avg_score": e.avg_score,
             })
 
@@ -625,6 +655,7 @@ def _build_result(
                 failed=e.get("failed", 0),
                 pass_rate=e.get("passRate", 0),
                 avg_score=e.get("avgScore"),
+                errored=e.get("errored", 0),
             )
         )
 
@@ -641,6 +672,7 @@ def _build_result(
         total_failed=total_failed,
         pass_rate=pass_rate,
         total_cost=summary_data.get("totalCost", 0),
+        evaluators_reported="evaluators" in summary_data,
     )
 
     return ExperimentRunResult(
@@ -655,6 +687,12 @@ def _build_result(
         experiment_slug=experiment_slug,
         api_key=api_key,
     )
+
+
+_MISSING_TALLIES_MESSAGE = (
+    "No evaluator results in the run summary, so evaluator failures cannot be checked. "
+    "Update the LangWatch server, or drop the evaluator failure gate."
+)
 
 
 def _print_summary(result: ExperimentRunResult) -> None:
@@ -688,7 +726,13 @@ def _print_summary(result: ExperimentRunResult) -> None:
         print("─" * 60)
         print("  EVALUATORS:")
         for evaluator in summary.evaluators:
-            print(f"    {evaluator.name}: {evaluator.pass_rate:.1f}% pass rate")
+            # A pass rate over no verdicts would read as "all failed"; say what happened.
+            if evaluator.passed + evaluator.failed > 0:
+                print(f"    {evaluator.name}: {evaluator.pass_rate:.1f}% pass rate")
+            else:
+                print(f"    {evaluator.name}: no verdicts")
+            if evaluator.errored:
+                print(f"      Errored: {evaluator.errored}")
             if evaluator.avg_score is not None:
                 print(f"      Avg score: {evaluator.avg_score:.2f}")
 

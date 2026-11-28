@@ -7,6 +7,7 @@ import {
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
   BillingSubscriptionRepository,
+  type SupersededSubscription,
 } from "../subscription.repository.ts";
 import type { MemoryBillingOrganization, MemoryBillingStore } from "./memory.billing.store.ts";
 
@@ -74,6 +75,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       endDate: null,
       maxMembers: null,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
       lastPaymentFailedDate: null,
       seatsKept: null,
@@ -146,7 +148,11 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       endDate: nowInstant(),
       maxMembers: null,
       maxMembersLite: null,
+      maxMembersDeveloper: null,
       maxMessagesPerMonth: null,
+      paymentRecoveryInvoiceId: null,
+      paymentRecoveryStartedAt: null,
+      paymentRecoveryNoticeDay: null,
     }));
   }
 
@@ -154,27 +160,25 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     // No-op, as the Prisma twin is: the `isTrial` column does not exist yet.
   }
 
-  async migrateToSeatEvent(input: {
+  async findSupersededBySeatEvent(input: {
     organizationId: string;
     excludeSubscriptionId: string;
-  }): Promise<{ stripeSubscriptionId: string | null }[]> {
-    const superseded = this.store.subscriptions.filter(
-      (subscription) =>
-        subscription.organizationId === input.organizationId &&
-        subscription.id !== input.excludeSubscriptionId &&
-        subscription.status !== CANCELLED &&
-        subscription.stripeSubscriptionId !== null &&
-        TIERED_PLANS.includes(subscription.plan),
+  }): Promise<SupersededSubscription[]> {
+    return this.store.subscriptions.flatMap(
+      ({ id, organizationId, status, plan, stripeSubscriptionId }) => {
+        if (organizationId !== input.organizationId || id === input.excludeSubscriptionId)
+          return [];
+        if (!TIERED_PLANS.includes(plan) || stripeSubscriptionId === null) return [];
+        return [{ id, stripeSubscriptionId, cancelledInRecords: status === CANCELLED }];
+      },
     );
-
-    for (const subscription of superseded) await this.cancel({ id: subscription.id });
-
-    return superseded.map(({ stripeSubscriptionId }) => ({ stripeSubscriptionId }));
   }
 
   async updateQuantities(input: {
     id: string;
     maxMembers: number | null;
+    /** Undefined leaves the stored cap alone: only a seat-priced subscription states it. */
+    maxMembersDeveloper?: number;
     maxMessagesPerMonth: number | null;
   }): Promise<BillingSubscriptionWithOrganization> {
     const updated = this.update(input.id, (subscription) => ({
@@ -182,6 +186,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       status: ACTIVE,
       lastPaymentFailedDate: null,
       maxMembers: input.maxMembers,
+      maxMembersDeveloper: input.maxMembersDeveloper ?? subscription.maxMembersDeveloper,
       maxMessagesPerMonth: input.maxMessagesPerMonth,
     }));
 

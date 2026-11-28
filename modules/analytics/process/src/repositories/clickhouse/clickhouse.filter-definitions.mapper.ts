@@ -1,5 +1,6 @@
 import type { FilterField } from "@langwatch/analytics-contract";
 import { evaluationRunDataSchema } from "@langwatch/evaluation-contract";
+import type { SpanAnalyticsSource } from "@langwatch/trace-contract";
 
 import {
   ATTRIBUTE_KEYS,
@@ -10,8 +11,12 @@ import {
   buildTraceScopeJoin,
   buildTraceSummariesConditions,
   extractStandardResults,
+  spanTypeOptionsSource,
 } from "./clickhouse.filter-query-helpers.mapper.ts";
-import type { ClickHouseFilterDefinition } from "./clickhouse.filter-shapes.mapper.ts";
+import type {
+  ClickHouseFilterDefinition,
+  ClickHouseFilterQueryParams,
+} from "./clickhouse.filter-shapes.mapper.ts";
 
 /** Label values that represent pass/fail status rather than classification labels. */
 const STATUS_LABEL_VALUES = ["succeeded", "failed"] as const;
@@ -42,6 +47,48 @@ function buildEvaluatorIdClickHouseFilter(additionalWhere: string): ClickHouseFi
     },
     extractResults: extractStandardResults,
   };
+}
+
+/**
+ * The spans.type picker over span_analytics' plain `SpanType`, with the stored_spans map read
+ * only before a split floor. A span without a type is '' in both tables.
+ */
+function buildLightSpanTypeOptionsQuery(
+  params: ClickHouseFilterQueryParams,
+  source: SpanAnalyticsSource,
+): string {
+  const scopeJoin = buildTraceScopeJoin(params);
+  const branch = ({ table, column, bound }: { table: string; column: string; bound: string }) => `
+          SELECT ${column} AS field
+          FROM ${table}
+          WHERE ${buildStoredSpansConditions(params)}${bound}
+            AND ${column} != ''
+            ${buildQueryFilter(column, params)}
+            ${scopeJoin}`;
+  const from = "fromUnixTimestamp64Milli({spanAnalyticsFrom:UInt64})";
+  const branches =
+    source.kind === "split"
+      ? [
+          branch({
+            table: "span_analytics",
+            column: "SpanType",
+            bound: ` AND StartTime >= ${from}`,
+          }),
+          branch({
+            table: "stored_spans",
+            column: "SpanAttributes['langwatch.span.type']",
+            bound: ` AND StartTime < ${from}`,
+          }),
+        ]
+      : [branch({ table: "span_analytics", column: "SpanType", bound: "" })];
+  return `
+        SELECT field, field AS label, count() AS count
+        FROM (${branches.join("\n          UNION ALL")}
+        )
+        GROUP BY field
+        ORDER BY field ASC
+        LIMIT 10000
+      `;
 }
 
 /**
@@ -338,6 +385,8 @@ export const clickHouseFilters: Record<FilterField, ClickHouseFilterDefinition |
   "spans.type": {
     tableName: "stored_spans",
     buildQuery: (params) => {
+      const source = spanTypeOptionsSource(params);
+      if (source.kind !== "stored_spans") return buildLightSpanTypeOptionsQuery(params, source);
       const scopeJoin = buildTraceScopeJoin(params);
       return `
         SELECT

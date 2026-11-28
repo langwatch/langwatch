@@ -401,6 +401,14 @@ Feature: haven CLI surface
       And no password appears in the output
 
     @unit
+    Scenario: The browser never prints what a credential field holds
+      Given a page with a password, one-time-code or new-password field that holds a value
+      When the agent reads the page through a snapshot, a diff, eval output or a network body
+      Then the field's value reads "***"
+      And a long credential value is hidden wherever else it appears on the page
+      And other field values, such as an email, are printed as they are
+
+    @unit
     Scenario Outline: auth and mfa point under browser
       When the agent runs "<old>"
       Then it exits 64 with "now: <new>"

@@ -1,6 +1,12 @@
 import { moduleApi } from "@langwatch/module";
 
-import type { RetentionPolicySnapshot, RetentionStorageUsage } from "./data-retention.snapshot.ts";
+import type {
+  OrganizationRetention,
+  OrganizationStorageEstimate,
+  RetentionPolicySnapshot,
+  RetentionStorageUsage,
+  StoredPastRetention,
+} from "./data-retention.snapshot.ts";
 import type {
   IdIndexRetentionRaiseInput,
   KillRetroactiveMutationInput,
@@ -73,12 +79,34 @@ export interface DataRetentionApi {
   getScopeStorageUsage(
     input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<RetentionStorageUsage>;
+  getStoredPastRetention(
+    input: { projectId: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<StoredPastRetention>;
+  /** Asks the worker to rewrite every project's stored rows under the scope to its period. */
+  applyScopeRetentionToStoredData(
+    input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
+  ): Promise<void>;
+  /** Asked `subscription:upgrade` at the door; the total spans all the organization's projects. */
+  getOrganizationStorageEstimate(input: {
+    organizationId: string;
+  }): Promise<OrganizationStorageEstimate>;
+  /** Asked `organization:view` at the door: the organization rule's traces days, or the default. */
+  getOrganizationRetention(input: { organizationId: string }): Promise<OrganizationRetention>;
   previewScopeRemoval(
     input: { organizationId?: string; scope: ScopeAssignment } & RetentionCallerInput,
   ): Promise<ResolvedRetention>;
   changeScopeRetention(
     input: {
       organizationId?: string;
+      scope: ScopeAssignment;
+      category: RetentionCategory;
+      retentionDays: number;
+    } & RetentionCallerInput,
+  ): Promise<RetentionPolicy>;
+  /** Asked `subscription:manage` at the door: any length, a billed one included. */
+  changeBilledScopeRetention(
+    input: {
+      organizationId: string;
       scope: ScopeAssignment;
       category: RetentionCategory;
       retentionDays: number;

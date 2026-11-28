@@ -97,6 +97,10 @@ export class TestObjectStorage implements GovernanceObjectStore {
     };
   }
 
+  async readBytes(input: Parameters<GovernanceObjectStore["readText"]>[0]): Promise<Uint8Array> {
+    return new TextEncoder().encode(await this.readText(input));
+  }
+
   async readText(input: {
     bucket: string;
     key: string;
@@ -120,11 +124,12 @@ class TestSource implements IngestionPullSourceReader {
   }
 }
 
+/** The page arrives whole; the test's double observes it one row at a time. */
 class TestSink implements GovernanceOcsfEventSink {
   constructor(private readonly insert: (input: GovernanceOcsfEventInput) => Promise<void>) {}
 
-  insertEvent(input: GovernanceOcsfEventInput): Promise<void> {
-    return this.insert(input);
+  async insertEvents(rows: GovernanceOcsfEventInput[]): Promise<void> {
+    for (const row of rows) await this.insert(row);
   }
 }
 

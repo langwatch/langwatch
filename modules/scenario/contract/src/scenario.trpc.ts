@@ -17,6 +17,10 @@ import { z } from "zod";
 
 import { runNoteSchema } from "./features/run/run-note.ts";
 import {
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
+} from "./features/run/run-trace-wait.ts";
+import {
   SIMULATION_RUN_EVENT_TYPES,
   SIMULATION_SET_EVENT_TYPES,
 } from "./features/simulation/simulation-event.constants.ts";
@@ -52,7 +56,12 @@ import {
   scenarioRunScheduledSchema,
   scenarioVersionPageSchema,
 } from "./scenario.responses.ts";
-import { scenarioSchema } from "./scenario.ts";
+import {
+  redTeamConfigSchema,
+  scenarioKindSchema,
+  scenarioSchema,
+  scenarioTemplateMarkerRefusalSchema,
+} from "./scenario.ts";
 import { scenarioVersionDetailSchema } from "./scenario.version.ts";
 import { scenarioFieldValuesSchema } from "./suite-fields.ts";
 import { callerVoiceConfigSchema } from "./voice/caller-voice.config.ts";
@@ -84,6 +93,9 @@ const scenarioTrpcCreateSchemaDefinition = z.object({
   // default (scenarios.user_simulator / scenarios.judge).
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  // How long the judge waits for the agent's trace; null leaves it to the project.
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish(),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish(),
   // The parameters the scenario declares, each with an optional description
   // and default. A run supplies values for these names.
   parameters: scenarioParameterDefinitionsSchema.optional(),
@@ -97,6 +109,10 @@ const scenarioTrpcCreateSchemaDefinition = z.object({
   // send the default config to clear. Never null: a plain null is not a
   // valid Prisma JSON write.
   callerVoice: callerVoiceConfigSchema.optional(),
+  // A red_team scenario requires redTeam; a standard one refuses it.
+  kind: scenarioKindSchema.optional(),
+  redTeam: redTeamConfigSchema.optional(),
+  sourceTemplateId: scenarioTemplateMarkerRefusalSchema,
 });
 export interface ScenarioTrpcCreateSchema extends Named<
   typeof scenarioTrpcCreateSchemaDefinition
@@ -113,6 +129,8 @@ const scenarioTrpcUpdateSchemaDefinition = z.object({
   labels: z.array(z.string()).optional(),
   simulatorModel: z.string().nullish(),
   judgeModel: z.string().nullish(),
+  traceQuietPeriodMs: traceQuietPeriodMsSchema.nullish(),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema.nullish(),
   parameters: scenarioParameterDefinitionsSchema.optional(),
   maxTurns: z.number().int().min(1).max(100).nullish(),
   minTurns: z.number().int().min(0).max(100).nullish(),

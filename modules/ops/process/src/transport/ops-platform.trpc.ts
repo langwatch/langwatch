@@ -41,6 +41,14 @@ export const opsPlatformTrpcTransport: TrpcRouterDeclaration<OpsApi, typeof opsP
       return acknowledged;
     })
 
+    .procedure("searchFeatureFlagTargets")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.searchFeatureFlagTargets(input))
+
+    .procedure("findFeatureFlagTargets")
+    .withPermission("ops:view", { at: "platform" })
+    .handle(({ app, input }) => app.findFeatureFlagTargets(input))
+
     .procedure("clearFeatureFlag")
     .withPermission("ops:manage", { at: "platform" })
     .handle(async ({ app, input, actor }) => {

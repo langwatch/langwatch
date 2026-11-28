@@ -1,4 +1,4 @@
-import { RedirectRefusedError } from "@langwatch/egress";
+import { egressRefusalReason, RedirectRefusedError } from "@langwatch/egress";
 import {
   MASKED_KEY_PLACEHOLDER,
   ProviderKeyMissingError,
@@ -9,7 +9,10 @@ import {
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HttpModelProviderCredentialProbeService } from "../http-model-provider-credential-probe.service.ts";
-import type { ModelProviderEgress } from "../ssrf-model-provider-egress.service.ts";
+import {
+  SsrfModelProviderEgressService,
+  type ModelProviderEgress,
+} from "../ssrf-model-provider-egress.service.ts";
 
 // Mocks the guarded egress port, not `global.fetch` — the real SSRF fence would make every
 // assertion about DNS. The redirect refusal still uses the egress's real error type.
@@ -17,6 +20,7 @@ const mockFetch = vi.fn();
 const egress: ModelProviderEgress = {
   fetch: (...args: unknown[]) => mockFetch(...args),
   isRedirectRefusal: (error: unknown) => error instanceof RedirectRefusedError,
+  endpointRefusal: (error: unknown) => egressRefusalReason(error) ?? "not_refused",
   assertDestination: async () => {},
 };
 
@@ -1229,6 +1233,46 @@ describe("given a check that never reached the provider", () => {
 
       expect(codeOf(result)).toBe("provider_endpoint_redirected");
       expect(codeOf(result)).not.toBe("provider_unreachable");
+    });
+  });
+
+  describe("given a base URL the outbound policy refuses", () => {
+    // The real fence, not the stand-in: the refusal has to be recognised by the type the
+    // validator actually throws. Both URLs are refused before any DNS lookup.
+    const fenced = (blockLocal: boolean) =>
+      SsrfModelProviderEgressService.create({
+        policy: { blockLocal, allowedHosts: [], verifyTls: true },
+      });
+
+    /** @scenario "A base URL refused by the outbound policy is reported as refused, not as unreachable" */
+    it("reports a load balancer name on amazonaws.com as refused by the policy", async () => {
+      const result = await HttpModelProviderCredentialProbeService.validateProviderApiKey({
+        provider: "openai",
+        customKeys: {
+          OPENAI_API_KEY: "sk-test",
+          OPENAI_BASE_URL: "http://gw-123.eu-central-1.elb.amazonaws.com/v1",
+        },
+        egress: fenced(false),
+      });
+
+      expect(codeOf(result)).toBe("provider_endpoint_refused");
+      expect(result.valid ? undefined : result.domainError.meta).toMatchObject({
+        refusal: "cloud_internal_domain",
+      });
+    });
+
+    /** @scenario "A private base URL refused by the outbound policy names the setting that allows it" */
+    it("reports a private address under blockLocal as a refusal ALLOWED_PROXY_HOSTS can lift", async () => {
+      const result = await HttpModelProviderCredentialProbeService.validateProviderApiKey({
+        provider: "custom",
+        customKeys: { CUSTOM_API_KEY: "sk-test", CUSTOM_BASE_URL: "http://10.0.5.3/v1" },
+        egress: fenced(true),
+      });
+
+      expect(codeOf(result)).toBe("provider_endpoint_refused");
+      expect(result.valid ? undefined : result.domainError.meta).toMatchObject({
+        refusal: "private_address",
+      });
     });
   });
 

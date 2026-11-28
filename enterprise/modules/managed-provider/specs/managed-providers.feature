@@ -79,3 +79,70 @@ Feature: Managed model providers
       When a managed Bedrock call assumes its roles
       Then both the proxy hop and the customer hop are sent to that base
       And a value that is set but is not a URL refuses the process at start, naming the setting
+
+  # A managed organization's Bedrock rows store no AWS keys: LangWatch assumes
+  # the customer's role and calls Bedrock through the customer's private
+  # endpoint. The AI gateway (Langy, virtual keys) reads a row's keys from
+  # model-provider, so those keys must carry what the managed step mints.
+  Rule: The AI gateway runs a managed Bedrock row through the customer's private endpoint
+
+    @unit
+    Scenario: Mint the managed Bedrock credentials for an organization
+      Given an organization whose Bedrock is managed through a private endpoint
+      When its Bedrock credentials are minted
+      Then they carry the customer role's credentials, the region and the private endpoint
+
+    @unit
+    Scenario: The gateway reads a managed Bedrock row with the customer role's credentials
+      Given a Bedrock row of a managed organization that stores no keys
+      When the gateway reads the row's keys
+      Then they carry the customer role's credentials and the region
+      And they name the private endpoint as the Bedrock runtime endpoint
+
+    @unit
+    Scenario: A Bedrock row outside a managed organization reaches the gateway with its own keys
+      Given a Bedrock row of an organization that is not managed
+      When the gateway reads the row's keys
+      Then it gets the row's stored keys unchanged
+
+    @unit
+    Scenario: A failed role hop leaves the row's own keys and fails only that row
+      Given a Bedrock row of a managed organization
+      And assuming the customer's role fails
+      When the gateway reads the row's keys
+      Then it gets the row's stored keys
+      And no error reaches the gateway, so the key's other providers keep serving
+
+    @unit
+    Scenario: A runtime endpoint saved on a row never reaches the gateway
+      Given a Bedrock row that stores its own runtime endpoint
+      When the gateway reads the row's keys
+      Then the stored runtime endpoint is dropped and the row's other keys are kept
+      And only a minted managed session names a runtime endpoint
+
+    @unit
+    Scenario: The gateway re-reads a managed row's keys before its session expires
+      Given an organization whose Bedrock is managed through a private endpoint
+      When five minutes pass, well inside the one-hour session a role hop mints
+      Then the gateway's config version for its keys moves
+      And the gateway fetches a fresh bundle with a newly minted session instead of confirming the old one
+      And a mint that failed and fell back to stored keys is retried within those five minutes
+
+    # The role hop deadline lives in the credentials channel, so it bounds every
+    # caller: the gateway's bundle and the LiteLLM parameters path alike. That is
+    # deliberate: a hop that takes over 1.5s is broken for either caller. The
+    # gateway runs its background refreshes under 2s (authresolver/service.go)
+    # and its first fetch under a 10s HTTP timeout; 1.5s fits inside both.
+    @unit
+    Scenario: A stalled role hop gives up inside the gateway's config fetch
+      Given assuming the proxy role does not answer
+      When the managed Bedrock credentials are minted
+      Then the role hops give up at their shared deadline, inside the gateway's 2s background refresh
+      And the customer role is never asked
+
+    @unit
+    Scenario: The gateway bundle sends a managed Bedrock row to the private endpoint
+      Given a virtual key whose provider is a managed Bedrock row
+      When the gateway's config bundle is built
+      Then the Bedrock slot carries the customer role's credentials and region
+      And its Bedrock credential names the private endpoint, with no base URL

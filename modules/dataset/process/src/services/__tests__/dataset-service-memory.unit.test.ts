@@ -10,6 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   createDatasetTestAttachments,
+  createDatasetTestContent,
   createDatasetTestInlineAttachments,
   createDatasetTestRequestBounds,
 } from "../../app/__tests__/dataset.fixture.ts";
@@ -60,12 +61,12 @@ function seeded(overrides: Partial<Dataset> = {}) {
 }
 
 describe("DatasetService", () => {
-  it("creates records through the Dataset boundary", async () => {
+  it("creates a dataset with its records in object storage", async () => {
     const { database, repository, records } = seeded();
     const service = DatasetService.create({
       repository,
       records,
-      generateId: () => "record_1",
+      content: createDatasetTestContent({ database }),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -78,8 +79,10 @@ describe("DatasetService", () => {
       datasetRecords: [{ question: "hello" }],
     });
 
-    expect(dataset.slug).toBe("new-set");
-    expect(database.records().map((record) => record.id)).toEqual(["record_1"]);
+    expect(dataset).toMatchObject({ slug: "new-set", contentLayout: "s3_jsonl", rowCount: 1 });
+    expect(database.records()).toEqual([]);
+    const page = await service.listRecords({ projectId: "project_1", slugOrId: dataset.id });
+    expect(page.data.map((record) => record.entry)).toEqual([{ question: "hello" }]);
   });
 
   it("rejects writes to a dataset that is not ready", async () => {
@@ -87,6 +90,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -107,6 +111,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -130,6 +135,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       requestBounds: createDatasetTestRequestBounds(),
       attachments: createDatasetTestAttachments(),
       inlineAttachments: createDatasetTestInlineAttachments(),
@@ -141,7 +147,7 @@ describe("DatasetService", () => {
   });
 
   it("routes object-backed reads and mutations through the content port", async () => {
-    const { dataset, repository, records } = seeded({
+    const { database, dataset, repository, records } = seeded({
       contentLayout: "s3_jsonl",
       rowCount: 1,
       chunkCount: 1,
@@ -184,6 +190,26 @@ describe("DatasetService", () => {
         calls.push("delete");
         throw new Error("not used");
       }
+      async createDataset({
+        projectId,
+        name,
+        slug,
+      }: {
+        projectId: string;
+        name: string;
+        slug: string;
+      }) {
+        calls.push("create");
+        const born = makeDataset({
+          id: "dataset_2",
+          projectId,
+          name,
+          slug,
+          contentLayout: "s3_jsonl",
+        });
+        database.putDataset({ ...born, sourceStoredObjectId: null });
+        return born;
+      }
       async copyDataset(): Promise<void> {
         calls.push("copy");
       }
@@ -217,7 +243,7 @@ describe("DatasetService", () => {
       targetProjectId: "project_2",
     });
 
-    expect(calls).toEqual(["read:dataset_1", "copy"]);
+    expect(calls).toEqual(["read:dataset_1", "create", "copy"]);
   });
 
   /** @scenario "Upload storage remains an injected Dataset seam" */
@@ -256,6 +282,7 @@ describe("DatasetService", () => {
     const service = DatasetService.create({
       repository,
       records,
+      content: createDatasetTestContent(),
       uploads: new Uploads(),
       queue: new Queue(),
       requestBounds: createDatasetTestRequestBounds(),

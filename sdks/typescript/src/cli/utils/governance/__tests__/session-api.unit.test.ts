@@ -8,9 +8,10 @@ const saveConfig = vi.fn();
 vi.mock("../config", () => ({
   loadConfig: vi.fn(),
   saveConfig: (...args: unknown[]) => saveConfig(...args),
+  assertConfigWritable: vi.fn(),
 }));
 
-import { loadConfig } from "../config";
+import { assertConfigWritable, loadConfig } from "../config";
 import type { GovernanceConfig } from "../config";
 import {
   fetchPersonalProject,
@@ -149,6 +150,21 @@ describe("session-api request bounds", () => {
       };
       return { calls, fetchImpl };
     }
+
+    describe("when the config cannot be saved", () => {
+      /** @scenario "A project login does not fork the session when the config cannot be saved" */
+      it("refuses before the refresh token is sent to the server", async () => {
+        vi.mocked(assertConfigWritable).mockImplementationOnce(() => {
+          throw Object.assign(new Error("cannot save"), { code: "config_not_writable" });
+        });
+        const { calls, fetchImpl } = controlPlane({});
+
+        await expect(
+          mintProjectIngestionKey(liveSession(), "demo", { fetchImpl }),
+        ).rejects.toMatchObject({ code: "config_not_writable" });
+        expect(calls).toEqual([]);
+      });
+    });
 
     it("forks a child session, mints the ingestion key with it, ends the child and keeps the parent", async () => {
       const { calls, fetchImpl } = controlPlane({

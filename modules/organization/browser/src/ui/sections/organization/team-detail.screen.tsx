@@ -303,7 +303,7 @@ function EditTeam({ team }: { team: TeamWithProjectsAndMembers }) {
       <PageLayout.Header>
         <PageLayout.Heading>Team settings</PageLayout.Heading>
       </PageLayout.Header>
-      <VStack gap={8} align="start" width="full" paddingTop={4}>
+      <VStack gap={8} align="start" width="full">
         <TeamForm
           organizationId={team.organizationId}
           team={team}

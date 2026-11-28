@@ -30,16 +30,17 @@ function makeWriter() {
 function makeFakeSession() {
   let release: (() => void) | undefined;
   let rejectRun: ((error: Error) => void) | undefined;
-  const promptCalls: { prompt: string; systemPrompt: string }[] = [];
+  const promptCalls: { prompt: string; systemPrompt: string; images?: unknown[] }[] = [];
   let abortCount = 0;
   const appliedSystemPrompts: string[] = [];
   const session: SessionLike = {
     agent: { state: { messages: [] as unknown[] } },
-    prompt: (text: string) =>
+    prompt: (text: string, options?: { images?: unknown[] }) =>
       new Promise<void>((resolve, reject) => {
         promptCalls.push({
           prompt: text,
           systemPrompt: appliedSystemPrompts[appliedSystemPrompts.length - 1] ?? "",
+          ...(options?.images ? { images: options.images } : {}),
         });
         release = resolve;
         rejectRun = reject;
@@ -333,6 +334,39 @@ describe("TurnRunner", () => {
       await done;
       expect(fake.promptCalls).toHaveLength(1);
       expect(events.filter((event) => event.type === "guided_turn")).toEqual([]);
+    });
+    /** @scenario "A turn's images reach pi as image input" */
+    it("hands the turn's images to the first prompt only, never to a guided continuation", async () => {
+      const fake = makeFakeSession();
+      const { runner } = makeRunner({ session: fake.session });
+      const done = runner.submitTurn({
+        type: "turn",
+        turnId: "t1",
+        prompt: "Go ahead, keep going.",
+        resumeToken: SEED_WITH_KICKOFF,
+        images: [{ name: "pasted-7bd830.png", mediaType: "image/png", data: "iVBORw0KGgo=" }],
+      });
+      await until(() => fake.promptCalls.length === 1);
+      expect(fake.promptCalls[0]?.images).toEqual([
+        { type: "image", data: "iVBORw0KGgo=", mimeType: "image/png" },
+      ]);
+      settle(runner, { id: "s1", name: "say", input: { text: "Looking." }, output: "Said." });
+      fake.finish();
+      await until(() => fake.promptCalls.length === 2);
+      expect(fake.promptCalls[1]?.images).toBeUndefined();
+      endOnCard(runner);
+      fake.finish();
+      await done;
+    });
+
+    it("prompts with the text alone when the turn has no images", async () => {
+      const fake = makeFakeSession();
+      const { runner } = makeRunner({ session: fake.session });
+      const done = runner.submitTurn({ type: "turn", turnId: "t1", prompt: "hi" });
+      await until(() => fake.promptCalls.length === 1);
+      expect(fake.promptCalls[0]?.images).toBeUndefined();
+      fake.finish();
+      await done;
     });
   });
 

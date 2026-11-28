@@ -34,6 +34,8 @@ async function handleMessage(threadId: string, userId: string, message: string) 
 
 All traces that share the same `langwatch.thread.id` will be grouped into a single conversation thread in the LangWatch dashboard.
 
+Claude Code is the exception: its traces are grouped by the Claude Code session, or by `langwatch.session.id` when you set one, and `langwatch.thread.id` stays on its spans as an attribute you can filter by. See [Headless and CI](/coding-agents/headless-and-ci#keep-a-long-lived-agent-on-one-session).
+
 You can also use the typed attribute constants:
 
 ```typescript

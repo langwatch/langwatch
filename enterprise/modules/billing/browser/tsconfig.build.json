@@ -45,6 +45,9 @@
       "path": "../../../../packages/design-system/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/data-retention/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../packages/browser-host/tsconfig.build.json"
     },
     {

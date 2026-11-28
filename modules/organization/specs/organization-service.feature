@@ -205,6 +205,35 @@ Feature: Shared organization service
     Then each run records each organization's stored presence setting once, marked backfilled, with no changer
     And each organization's fact is keyed alike on both runs, so the second run records nothing new
 
+  # Peers kept their own member copies before organization recorded member facts. The
+  # organization:list-member-facts step lists the memberships from then as organization's facts, so
+  # a peer's copy can be rebuilt from organization's log. It runs once no old image serves.
+  @unit
+  Scenario: Existing active members are listed as organization's facts by the member listing step
+    Given organizations with an active member, a disabled member and a member whose user is deactivated
+    When the organization:list-member-facts step runs
+    Then one member listed fact is recorded for each active membership, with when the membership was created, marked backfilled
+    And none is recorded for the disabled member or the deactivated user
+
+  @unit
+  Scenario: Re-running the member listing step records nothing new
+    Given the member listing step already ran
+    When it runs again
+    Then it sends the same facts, each keyed on its organization and member alone
+    And so the rerun records nothing new
+
+  @unit
+  Scenario: A dry run of the member listing step counts what it would list and records nothing
+    When the member listing step runs as a dry run
+    Then no fact is sent
+    And the report counts the facts a real run sends, by the same rule
+
+  @integration
+  Scenario: The member listing reads only active memberships from Postgres
+    Given organizations in Postgres with an active member, a disabled member and a member whose user is deactivated
+    When a page of their active members is read
+    Then only the active member is listed, with its membership's creation time
+
   @unit
   Scenario: The signed-in person fact may carry an image organization does not read
     Given the process binds the signed-in person with a name, an email and an image
@@ -233,6 +262,19 @@ Feature: Shared organization service
     And a licence set with no validated stamp stores none
     And clearing the licence empties the licence, its expiry and its validated stamp
     And setting or clearing a licence on an unknown organization refuses with organization not found
+
+  @integration
+  Scenario: The licence mirror writes only while licensing's row still holds the key
+    Given licensing's row holds key C
+    When a late fact for key B reaches the organization's licence mirror
+    Then the organization's licence column keeps its key
+    And with licensing's row holding B, the mirror writes B
+
+  @unit
+  Scenario: The memory licence mirror writes only while licensing holds the key
+    Given a memory organization whose licensing row holds key C
+    When a late fact for key B is written to the organization's licence column
+    Then the column keeps its key
 
   @unit
   Scenario: The memory organization store sets and clears a licence the same way
@@ -361,6 +403,7 @@ Feature: Shared organization service
     Given an organization is created by sign-up, by instance provisioning or for a self-hosted customer
     When the organization and its first team are committed
     Then organization records "lw.organization.created" carrying the organization's id and name
+    And it names the founder made its admin, when a person created it
     And peers such as prompt seed their own defaults from that fact
 
   @unit
@@ -410,6 +453,12 @@ Feature: Shared organization service
     Then organization:record-presence-settings is a background data step
     And it runs only once no older image serves
 
+  @integration
+  Scenario: The organization member listing step is a background step that waits for old writers to go
+    When the worker's installed modules list their upgrade steps
+    Then organization:list-member-facts is a background data step
+    And it runs only once no older image serves
+
   @unit
   Scenario: A peer's member fact reaches organization with the fact's own moment
     Given authz records a proven offboarding, or user records an erasure naming the organisations it sat in
@@ -423,3 +472,34 @@ Feature: Shared organization service
     When organization hears the fact from its own side
     Then it records no member removal for the deleted organisation
     And it still records the removal for every live organisation the fact names
+
+  @unit
+  Scenario: Changing a member's role records the new and previous role
+    Given a member holds an organization role
+    When an administrator changes it to another role
+    Then organization records the member_role_changed fact with the new role, the previous role and who changed it
+
+  @unit
+  Scenario: A role change to the role already held records nothing
+    Given a member holds an organization role
+    When an administrator sets the role they already hold
+    Then organization records no member_role_changed fact
+
+  @unit
+  Scenario: A role change whose record fails still stands
+    Given a member's role change has committed
+    When organization cannot record the member_role_changed fact
+    Then the failure is reported and the role change is not undone or raised
+
+  @unit
+  Scenario: A membership created outside an invite records the member as admitted
+    Given a person is given a membership by the SSO domain join, a join request or a provisioning door
+    When organization creates the membership
+    Then organization records the member_admitted fact with their seat and the path
+    And a membership that already existed, or one still waiting for a seat, records nothing
+
+  @unit
+  Scenario: A waiting member given a seat is recorded as admitted
+    Given a person admission left waiting for a seat
+    When a full seat is given to them
+    Then organization records the member_admitted fact for them as a member

@@ -14,6 +14,15 @@ on:
 permissions:
   contents: read
 
+# A newer event on the same pull request cancels the older run. `opened` gets
+# a group of its own, so an edit straight after opening never cancels
+# issue-link. Each trigger type is read: edited for the title and the
+# description's deployment impact, labeled and unlabeled for the
+# acknowledgement labels.
+concurrency:
+  group: pr-conventions-run-${{ github.event.pull_request.number }}-${{ github.event.action == 'opened' && github.run_id || 'update' }}
+  cancel-in-progress: true
+
 jobs:
   # Its own job, outside the concurrency group below: it runs only when the pull
   # request opens, and an edit straight after opening would otherwise cancel it.

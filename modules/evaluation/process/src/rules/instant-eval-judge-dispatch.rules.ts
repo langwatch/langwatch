@@ -5,7 +5,11 @@
  */
 
 import { AVAILABLE_EVALUATORS } from "@langwatch/evaluator-contract";
-import { isDecisionModelId, isOwnDecisionModelId } from "@langwatch/model-provider-contract";
+import {
+  isDecisionModelId,
+  isJudgeRoutedModelId,
+  isOwnDecisionModelId,
+} from "@langwatch/model-provider-contract";
 
 import type {
   InstantEvalJudge,
@@ -15,7 +19,7 @@ import type {
 /**
  * The judge Instant Evals answers for these settings, or `runs_as_today` for any other. Any
  * decision model id means Instant Evals. Only an own pick is carried, as an override the
- * resolver weighs; the hosted id is no preference, so the project's column still decides.
+ * resolver weighs; a hosted id only says whether the judge router may answer (ADR-190).
  * @see dev/docs/adr/182-instant-evals-decision-model-is-a-default-model-column.md
  */
 export function instantEvalJudgeOf({
@@ -25,12 +29,17 @@ export function instantEvalJudgeOf({
   evaluatorType: string;
   settings: Record<string, unknown> | undefined;
 }):
-  | { kind: "instant_eval"; judge: InstantEvalJudge; decisionModel?: string | undefined }
+  | {
+      kind: "instant_eval";
+      judge: InstantEvalJudge;
+      decisionModel?: string | undefined;
+      isRoutable?: true;
+    }
   | { kind: "runs_as_today" } {
   if (!settings) return { kind: "runs_as_today" };
   const { model } = settings;
   if (typeof model !== "string" || !isDecisionModelId(model)) return { kind: "runs_as_today" };
-  const picked = isOwnDecisionModelId(model) ? { decisionModel: model } : {};
+  const picked = pickOf(model);
 
   const prompt = textOr({
     value: settings.prompt,
@@ -69,6 +78,16 @@ export function instantEvalJudgeOf({
     default:
       return { kind: "runs_as_today" };
   }
+}
+
+/**
+ * An own model is carried for the resolver; LangWatch Evals (preview) only marks the judge as
+ * routable.
+ */
+function pickOf(model: string): { decisionModel?: string; isRoutable?: true } {
+  if (isOwnDecisionModelId(model)) return { decisionModel: model };
+  if (isJudgeRoutedModelId(model)) return { isRoutable: true };
+  return {};
 }
 
 /** A setting's generated default, read loosely: the generated map types each default per field. */

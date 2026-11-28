@@ -3,7 +3,7 @@ import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
 import type { OrganizationUserRole } from "./organization.rows.ts";
-import { auditChannelSchema } from "./organization.ts";
+import { auditChannelSchema, auditStaffAccessMetadataSchema } from "./organization.ts";
 
 /** A write with nothing else to report. */
 const organizationWriteAckSchemaDefinition = z.object({ success: z.literal(true) }).strict();
@@ -45,6 +45,8 @@ const organizationInviteRowSchema = z
     subscriptionId: z.string().nullable(),
     acceptedByUserId: z.string().nullable(),
     acceptedViaIdentifierId: z.string().nullable(),
+    /** The Billing grant and no seat (ADR-205). */
+    billingOnly: z.boolean().optional(),
     createdAt: z.date(),
     updatedAt: z.date(),
   })
@@ -120,6 +122,8 @@ const organizationInviteAcceptedSchemaDefinition = z.object({
     organization: z.object({ id: z.string().min(1), name: z.string() }),
   }),
   project: z.object({ slug: z.string().min(1) }).nullable(),
+  /** Billing only (ADR-205): the browser lands them on the plan page, they open no project. */
+  billingOnly: z.boolean().optional(),
 });
 export interface OrganizationInviteAcceptedSchema extends Named<
   typeof organizationInviteAcceptedSchemaDefinition
@@ -254,6 +258,8 @@ const organizationMemberRecordSchemaDefinition = z.object({
   updatedAt: z.date(),
   departmentId: z.string().nullable(),
   disabledAt: z.date().nullable(),
+  /** Billing only (ADR-205): the Billing grant, no team and no seat. */
+  billingOnly: z.boolean().optional(),
   user: z.object({
     id: z.string().min(1),
     name: z.string().nullable(),
@@ -286,6 +292,8 @@ const organizationMemberDirectorySchemaDefinition = z.object({
       updatedAt: z.date(),
       departmentId: z.string().nullable(),
       disabledAt: z.date().nullable(),
+      /** A Billing-only member: the Billing grant, no team and no seat (ADR-205). */
+      billingOnly: z.boolean().optional(),
       /** Set while the person waits for a full seat; such a row is disabled until admitted. */
       seatPendingSince: z.date().nullable(),
       user: z.object({
@@ -361,6 +369,7 @@ const organizationAuditLogEntrySchema = z
     source: z.enum(["platform", "gateway"]),
     targetKind: z.string().nullable(),
     targetId: z.string().nullable(),
+    targetName: z.string().nullable(),
     before: z.unknown(),
     after: z.unknown(),
     actorUserId: z.string().nullable(),
@@ -370,6 +379,7 @@ const organizationAuditLogEntrySchema = z
       .nullable(),
     channel: auditChannelSchema.nullable(),
     apiKeyId: z.string().nullable(),
+    staffAccess: auditStaffAccessMetadataSchema.nullable(),
   })
   .strict();
 

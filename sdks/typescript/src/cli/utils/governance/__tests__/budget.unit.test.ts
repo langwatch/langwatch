@@ -53,7 +53,7 @@ describe("checkBudget", () => {
       limit_usd: "500.00",
       spent_usd: "500.00",
       period: "month",
-      request_increase_url: "http://app.example/me/budget/request?abc",
+      request_increase_url: "http://app.example/coding-agents/budget/request?abc",
       admin_email: "platform-team@miro.com",
     };
     const fetchImpl = vi.fn().mockResolvedValue(status(402, { error: payload }));
@@ -86,7 +86,7 @@ describe("renderBudgetExceeded", () => {
     limit_usd: "500.00",
     spent_usd: "500.00",
     period: "month",
-    request_increase_url: "http://app.example/me/budget/request",
+    request_increase_url: "http://app.example/coding-agents/budget/request",
     admin_email: "platform-team@miro.com",
   };
 
@@ -97,7 +97,7 @@ describe("renderBudgetExceeded", () => {
     expect(out).toContain("To continue, ask your team admin to raise your limit.");
     expect(out).toContain("Admin: platform-team@miro.com");
     expect(out).toContain("Need urgent access? Request an increase:");
-    expect(out).toContain("http://app.example/me/budget/request");
+    expect(out).toContain("http://app.example/coding-agents/budget/request");
   });
 
   /** @scenario "The box falls back to the static request page when the payload has no signed URL" */

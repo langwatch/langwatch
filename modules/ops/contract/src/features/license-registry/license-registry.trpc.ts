@@ -15,6 +15,7 @@ import {
 } from "../../activation-code.ts";
 import {
   changeLicenseSeatsInputSchema,
+  issuedLicenseChainSchema,
   issuedLicensePageSchema,
   issuedLicenseViewSchema,
   issueLicenseInputSchema,
@@ -37,6 +38,10 @@ export const licenseRegistryTrpc = defineTrpcContract("licenseRegistry")
   .query("getById")
   .withInput(licenseIdInputSchema)
   .withOutput(issuedLicenseViewSchema)
+
+  .query("getChain")
+  .withInput(licenseIdInputSchema)
+  .withOutput(issuedLicenseChainSchema)
 
   .mutation("issue")
   .withInput(issueLicenseInputSchema)

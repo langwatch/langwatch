@@ -544,4 +544,86 @@ describe("CodingAgentSessionEventsMapProjection", () => {
       }
     });
   });
+
+  describe("when a model call names the subscription account it ran on", () => {
+    const accountFacts = {
+      "event.name": "api_request",
+      model: "claude-opus-5-5",
+      input_tokens: 10,
+      "langwatch.account.id": "0f1e2d3c4b5a69788796a5b4c3d2e1f0",
+      "langwatch.account.name": "ACME Max 1",
+      "langwatch.account.source": "pool",
+      "langwatch.account.usage.percent": 72.5,
+      "langwatch.account.usage.window": "seven_day",
+      "langwatch.account.usage.resets_at": "2026-11-28T09:00:00.000Z",
+      "langwatch.account.usage.read_at": "2026-11-26T10:00:00.000Z",
+      "langwatch.account.limited_until": "2026-11-26T15:00:00.000Z",
+    };
+
+    /** @scenario the account attributes on a record become session facts */
+    it("stamps the account and its reading on the row", () => {
+      const row = makeProjection().mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent(accountFacts),
+      );
+
+      expect(row?.accountId).toBe("0f1e2d3c4b5a69788796a5b4c3d2e1f0");
+      expect(row?.accountName).toBe("ACME Max 1");
+      expect(row?.accountSource).toBe("pool");
+      expect(row?.accountUsagePercent).toBe(72.5);
+      expect(row?.accountUsageWindow).toBe("seven_day");
+      expect(row?.accountUsageResetsAtMs).toBe(Date.parse("2026-11-28T09:00:00.000Z"));
+      expect(row?.accountUsageReadAtMs).toBe(Date.parse("2026-11-26T10:00:00.000Z"));
+      expect(row?.accountLimitedUntilMs).toBe(Date.parse("2026-11-26T15:00:00.000Z"));
+    });
+
+    it("stamps rate-limit rows too, and leaves every other kind without an account", () => {
+      const projection = makeProjection();
+      const rateLimit = projection.mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ ...accountFacts, "event.name": "rate_limit_event" }),
+      );
+      const tool = projection.mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ ...accountFacts, "event.name": "tool_result" }),
+      );
+
+      expect(rateLimit?.accountId).toBe("0f1e2d3c4b5a69788796a5b4c3d2e1f0");
+      expect(tool?.accountId).toBe("");
+      expect(tool?.accountUsagePercent).toBeNull();
+    });
+
+    /** @scenario the account key falls back to the agent's own account id */
+    it("falls back to the agent's own account uuid, then its account id", () => {
+      const projection = makeProjection();
+      const claude = projection.mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent({
+          "event.name": "api_request",
+          "user.account_uuid": "c0ffee00-0000-4000-8000-000000000001",
+          "user.account_id": "codex-account",
+        }),
+      );
+      const codex = projection.mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ "event.name": "api_request", "user.account_id": "codex-account" }),
+      );
+
+      expect(claude?.accountId).toBe("c0ffee00-0000-4000-8000-000000000001");
+      expect(codex?.accountId).toBe("codex-account");
+    });
+
+    /** @scenario an email address never names the account */
+    it("never takes the email address as the account", () => {
+      const row = makeProjection().mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ "event.name": "api_request", "user.email": "dev@example.com" }),
+      );
+
+      expect(row?.accountId).toBe("");
+      expect(row?.accountName).toBe("");
+    });
+
+    it("reads no percent from a value that is not a number", () => {
+      const row = makeProjection().mapCodingAgentSessionLogFactsContributed(
+        logFactsEvent({ ...accountFacts, "langwatch.account.usage.percent": "lots" }),
+      );
+
+      expect(row?.accountUsagePercent).toBeNull();
+    });
+  });
 });

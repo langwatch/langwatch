@@ -18,7 +18,11 @@ import {
 } from "./coding-agent-transcript-state.ts";
 import { parseMaybeJson, pickModel, pickNumber } from "./coding-agent-transcript-value.ts";
 import type { TranscriptEntry } from "./coding-agent-transcript.ts";
-import { parseMcpToolName, deriveToolName } from "./telemetry/coding-agent-normalization.ts";
+import {
+  parseMcpToolName,
+  deriveToolName,
+  isUtilityQuerySource,
+} from "./telemetry/coding-agent-normalization.ts";
 import { pickString } from "./telemetry/coding-agent-span.ts";
 import { CODING_AGENT_REGISTRY, isModelCallSpan } from "./telemetry/index.ts";
 
@@ -97,10 +101,13 @@ function collectModelCallSpan(span: SpanDetail, accumulator: SpanEntryAccumulato
     });
   }
 
-  const replyText =
+  if (isUtilityQuerySource(span.params ?? {})) return;
+  const rawReply =
     extractOutputText(span.output) ??
     extractOutputMessagesText(pickString(span.params, "gen_ai.output.messages"));
-  if (replyText === null) return;
+  if (rawReply === null) return;
+  const replyText = withoutToolUseText(rawReply);
+  if (replyText === "") return;
 
   accumulator.spanReplies.push({
     entry: {
@@ -112,6 +119,14 @@ function collectModelCallSpan(span: SpanDetail, accumulator: SpanEntryAccumulato
     windowStartMs: span.startTimeMs,
     windowEndMs: span.endTimeMs ?? span.startTimeMs,
   });
+}
+
+/** Claude Code's own `[tool_use: Name]` lines with their JSON input: the tool rows show them. */
+const TOOL_USE_TEXT = /^\[tool_use: [^\]\n]+\][ \t]*(?:\n[ \t]*[{[].*)?$/gm;
+
+function withoutToolUseText(text: string): string {
+  if (!text.includes("[tool_use: ")) return text;
+  return text.replace(TOOL_USE_TEXT, "").trim();
 }
 
 function collectToolSpan(

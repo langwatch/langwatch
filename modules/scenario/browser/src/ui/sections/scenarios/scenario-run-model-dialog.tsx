@@ -1,6 +1,12 @@
 import { Dialog } from "@langwatch/design-system/dialog";
 import { Text, VStack } from "@langwatch/design-system/primitives";
 
+import {
+  type JudgeTraceWaitInput,
+  judgeTraceWaitErrorsOf,
+  judgeTraceWaitProblemOf,
+} from "../../../model/judge-trace-wait.ts";
+import { JudgeTraceWaitSettings } from "../../elements/judge-trace-wait-settings.tsx";
 import { SimulationModelSelect } from "./simulation-model-select.tsx";
 
 /**
@@ -15,6 +21,8 @@ export function ScenarioRunModelDialog({
   judgeModel,
   onSimulatorChange,
   onJudgeChange,
+  traceWait,
+  onTraceWaitChange,
   onConfirm,
   isRunning,
 }: {
@@ -24,6 +32,8 @@ export function ScenarioRunModelDialog({
   judgeModel: string | null;
   onSimulatorChange: (value: string | null) => void;
   onJudgeChange: (value: string | null) => void;
+  traceWait: JudgeTraceWaitInput;
+  onTraceWaitChange: (value: JudgeTraceWaitInput) => void;
   onConfirm: () => void;
   isRunning: boolean;
 }) {
@@ -33,7 +43,14 @@ export function ScenarioRunModelDialog({
       onClose={() => onOpenChange(false)}
       title="Choose models for this run"
       size="md"
-      primaryAction={{ label: "Save and run", loading: isRunning, onClick: onConfirm }}
+      primaryAction={{
+        label: "Save and run",
+        loading: isRunning,
+        // A refused input says why under itself, so the run waits for it.
+        onClick: () => {
+          if (!judgeTraceWaitProblemOf(traceWait)) onConfirm();
+        },
+      }}
     >
       <VStack gap={4} align="stretch">
         <Text fontSize="sm" color="fg.muted">
@@ -51,6 +68,11 @@ export function ScenarioRunModelDialog({
           featureKey="scenarios.judge"
           value={judgeModel}
           onChange={onJudgeChange}
+        />
+        <JudgeTraceWaitSettings
+          value={traceWait}
+          errors={judgeTraceWaitErrorsOf(traceWait)}
+          onChange={onTraceWaitChange}
         />
       </VStack>
     </Dialog>

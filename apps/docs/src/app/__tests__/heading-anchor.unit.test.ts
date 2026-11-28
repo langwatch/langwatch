@@ -19,14 +19,14 @@ function pixels({
   return Number(new RegExp(`${property}:\\s*(-?\\d+)px`).exec(rule)?.[1]);
 }
 
-describe("a heading's link icon on a touch screen", () => {
-  const touch = css.indexOf("@media (hover: none) {\n  .docs-heading:has(> .docs-anchor)");
+describe("a heading's link icon after its last word", () => {
+  const touch = css.indexOf(".docs-heading:has(> .docs-anchor) {");
   const anchor = css.indexOf(".docs-anchor {");
   const padding = Number(
     /padding:\s*(\d+)px/.exec(css.slice(anchor, css.indexOf("}", anchor)))?.[1],
   );
 
-  /** @scenario "Reserve a heading's link icon room on touch screens" */
+  /** @scenario "Reserve a heading's link icon room after its last word" */
   it("reserves room the icon's margins exactly cancel", () => {
     expect(touch).toBeGreaterThan(-1);
     const reserved = pixels({
@@ -45,5 +45,14 @@ describe("a heading's link icon on a touch screen", () => {
     expect(reserved).toBeGreaterThan(0);
     expect(start + icon + end).toBe(0);
     expect(-end).toBe(reserved);
+  });
+
+  /** @scenario "Reserve a heading's link icon room after its last word" */
+  it("keeps the icon in the text flow, shown on hover and always on touch", () => {
+    const rule = css.slice(anchor, css.indexOf("}", anchor));
+    expect(rule).not.toMatch(/position:\s*absolute|inset-inline-start/);
+    expect(rule).toMatch(/opacity:\s*0;/);
+    const touchOnly = css.indexOf("@media (hover: none) {\n  .docs-anchor {");
+    expect(css.slice(touchOnly, css.indexOf("}", touchOnly))).toMatch(/opacity:\s*1;/);
   });
 });

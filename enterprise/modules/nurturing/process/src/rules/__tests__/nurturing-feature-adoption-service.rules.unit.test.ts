@@ -61,17 +61,15 @@ describe("feature adoption signals", () => {
 
   describe("given a person creating a scenario", () => {
     describe("when the scenario is saved", () => {
-      /** @scenario "Scenario creation updates scenario count and fires event" */
-      it("decides to raise the scenario count and track the scenario and project", () => {
+      /** @scenario "Scenario creation fires its event; its count comes from the organization's usage traits" */
+      it("decides to track the scenario and project, and no scenario count", () => {
         const calls = fireScenarioCreated({
           userId: "user-1",
-          scenarioCount: 3,
           scenarioId: "scenario-1",
           projectId: "project-1",
         });
 
         expect(calls).toEqual([
-          { type: "identify", userId: "user-1", traits: { scenario_count: 3 } },
           {
             type: "track",
             userId: "user-1",

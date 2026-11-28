@@ -1,5 +1,77 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
+exports[`given the Slack notice registry > when account-payment-failed / a declined card is rendered > matches its stored rendering 1`] = `
+{
+  "blocks": [
+    {
+      "text": {
+        "emoji": true,
+        "text": "🚨 Enterprise payment failed",
+        "type": "plain_text",
+      },
+      "type": "header",
+    },
+    {
+      "fields": [
+        {
+          "text": "*Organization*
+ACME",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Organization id*
+\`organization_KAXYxPR8MU\`",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Amount*
+€4,235.00",
+          "type": "mrkdwn",
+        },
+        {
+          "text": "*Stripe invoice*
+\`in_1QxAcmeExample\`",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "section",
+    },
+    {
+      "text": {
+        "text": ">Enterprise organizations are never paused. Follow up with the account.",
+        "type": "mrkdwn",
+      },
+      "type": "section",
+    },
+    {
+      "elements": [
+        {
+          "action_id": "account-payment-failed_0",
+          "style": "primary",
+          "text": {
+            "text": "Open in Stripe",
+            "type": "plain_text",
+          },
+          "type": "button",
+          "url": "https://dashboard.stripe.com/invoices/in_1QxAcmeExample",
+        },
+      ],
+      "type": "actions",
+    },
+    {
+      "elements": [
+        {
+          "text": "app.langwatch.ai · <!date^1790000000^{date_short_pretty} at {time}|2026-09-21T14:13Z>",
+          "type": "mrkdwn",
+        },
+      ],
+      "type": "context",
+    },
+  ],
+  "text": "🚨 Enterprise payment failed · Organization: ACME · Organization id: organization_KAXYxPR8MU · Amount: €4,235.00 · Stripe invoice: in_1QxAcmeExample",
+}
+`;
+
 exports[`given the Slack notice registry > when billing-threshold-failure / a Stripe re… is rendered > matches its stored rendering 1`] = `
 {
   "blocks": [

@@ -10,6 +10,7 @@ import {
   redisBlobKey,
 } from "@langwatch/group-queue/operational";
 import type { InsightApi } from "@langwatch/insight-contract";
+import type { OrganizationApi } from "@langwatch/organization-contract";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type { ShareApi } from "@langwatch/share-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
@@ -89,7 +90,9 @@ describe.skipIf(!hasRedis)("Ops blob store delete", () => {
         anomalyState: RedisAnomalyStateRepository.create(redis),
       },
       authz: createApiFixture<AuthzApi>(),
+      operatorAddressesFixed: true,
       audit: { record: async () => undefined },
+      memberships: createApiFixture<OrganizationApi>(),
       sessions: createApiFixture<AuthApi>(),
       accounts: createApiFixture<AuthApi>(),
       auditLog: createApiFixture<AuditLogApi>(),

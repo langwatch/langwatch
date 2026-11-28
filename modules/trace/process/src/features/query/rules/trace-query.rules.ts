@@ -12,6 +12,7 @@ import {
   type TagToken,
   type UnaryOperatorToken,
   type TranslationContext,
+  unjudgeableInstantEvalTags,
 } from "@langwatch/trace-contract";
 
 import {
@@ -20,6 +21,7 @@ import {
   type EvaluationScope,
 } from "./trace-query-evaluation-scope.rules.ts";
 import { boundedSubquery, wrapMembership } from "./trace-query-subquery.rules.ts";
+import { hintForUnknownTraceFilterField } from "./trace-query-unknown-field.rules.ts";
 import {
   EVENT_ATTRIBUTE_PREFIX,
   EVENT_ATTRIBUTE_PREFIX_LEGACY,
@@ -43,8 +45,12 @@ const MAX_PARAM_COUNT = 50;
  */
 const MAX_CONTENT_TERMS = 8;
 
-/** Compiles an evaluator and the result conditions bound to it as one evaluation. */
-type EvaluationScopeTranslator = (scope: EvaluationScope, ctx: TranslationContext) => string;
+/** Compiles an evaluator and the results bound to it as one evaluation, or its complement. */
+type EvaluationScopeTranslator = (
+  scope: EvaluationScope,
+  ctx: TranslationContext,
+  negated: boolean,
+) => string;
 
 /**
  * Translates trace filters to ClickHouse SQL with value binding and free text.
@@ -141,12 +147,13 @@ function translateNode({
 
     case "LogicalExpression": {
       const logExpr = node as LogicalExpressionToken;
-      const chain =
-        translateScope && !negated && logExpr.operator.operator !== "OR"
-          ? buildAndChain(logExpr)
-          : null;
-      if (chain && translateScope) return translateAndChain({ chain, ctx, branch, translateScope });
-      const op = logExpr.operator.operator === "OR" ? "OR" : "AND";
+      const isOr = logExpr.operator.operator === "OR";
+      const chain = translateScope && !isOr ? buildAndChain(logExpr) : null;
+      if (chain && translateScope) {
+        return translateAndChain({ chain, negated, ctx, branch, translateScope });
+      }
+      // De Morgan: under a NOT, AND and OR trade places (#9806).
+      const op = isOr !== negated ? "OR" : "AND";
       return `(${branch(logExpr.left, negated)} ${op} ${branch(logExpr.right, negated)})`;
     }
 
@@ -168,16 +175,18 @@ function translateNode({
 
 /**
  * An AND chain read once from its top: the bound evaluator group, if any, as
- * one condition, ANDed with the chain's other operands walked as usual. The
- * operands are folded left, the shape the parser gave the chain.
+ * one condition, ANDed with the chain's other operands walked as usual. Under
+ * a NOT each part is negated and they are ORed, the group kept whole (#9806).
  */
 function translateAndChain({
   chain,
+  negated,
   ctx,
   branch,
   translateScope,
 }: {
   chain: AndChain;
+  negated: boolean;
   ctx: TranslationContext;
   branch: (side: LiqeQuery, sideNegated: boolean) => string;
   translateScope: EvaluationScopeTranslator;
@@ -189,12 +198,13 @@ function translateAndChain({
     throw new FilterTooComplexError({ maxNodes: MAX_FILTER_NODE_COUNT });
   }
   const parts = [
-    ...(chain.scope ? [translateScope(chain.scope, ctx)] : []),
-    ...chain.rest.map((operand) => branch(operand, false)),
+    ...(chain.scope ? [translateScope(chain.scope, ctx, negated)] : []),
+    ...chain.rest.map((operand) => branch(operand, negated)),
   ];
-  const [first = "1 = 1", ...others] = parts;
+  const op = negated ? "OR" : "AND";
+  const [first = negated ? "1 = 0" : "1 = 1", ...others] = parts;
   if (others.length === 0) return `(${first})`;
-  return others.reduce((acc, part) => `(${acc} AND ${part})`, first);
+  return others.reduce((acc, part) => `(${acc} ${op} ${part})`, first);
 }
 
 /** One tag of the `trace_summaries` dialect, its plain fields looked up in `fieldDefs`. */
@@ -234,7 +244,11 @@ export function translateTraceTag({
   const def = fieldDefs.get(fieldName);
 
   if (!def) {
-    throw new FilterFieldUnknownError(fieldName, [...fieldDefs.keys()]);
+    throw new FilterFieldUnknownError(
+      fieldName,
+      [...fieldDefs.keys()],
+      hintForUnknownTraceFilterField({ field: fieldName, knownFields: [...fieldDefs.keys()] }),
+    );
   }
 
   return def.toClickHouse(tag, negated, ctx);
@@ -466,6 +480,8 @@ export function translateFilterAst({
   }
 
   if (ast.type === "EmptyExpression") return null;
+  // Read off the tree compiled below, so each eval chip occurrence is checked on its own.
+  if (ctx.evalRuns) ctx.unjudgeableEvalTags = unjudgeableInstantEvalTags(ast);
 
   const sql = translateNode({ node: ast, negated: false, ctx, translateTag, translateScope });
 

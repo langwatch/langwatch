@@ -175,7 +175,7 @@ export async function startDeviceCode(
 }
 
 /**
- * Fingerprint stamped on the CLI session so /me/devices can render "Mac
+ * Fingerprint stamped on the CLI session so the Devices tab can render "Mac
  * (rchaves.local)" and one device can be revoked without logging out every
  * device. Contract: `auth-cli-device-flow.api.ts#clientInfoSchema`.
  */
@@ -539,17 +539,19 @@ async function mintProjectSessionKey(
 }
 
 /**
- * `POST /api/auth/cli/logout` — revokes the refresh token AND its paired
- * access token (per `e7a042c69`: a stolen access token used to survive
- * logout for up to 1h; sending both closes the gap). Idempotent.
+ * `POST /api/auth/cli/logout` — revokes whichever tokens it is given. A
+ * `login --token` session holds only an access token, so either may be absent;
+ * sending neither is a no-op. Idempotent.
  */
 export async function logout(
   opts: DeviceFlowOptions,
-  refreshToken: string,
+  refreshToken: string | undefined,
   accessToken?: string,
 ): Promise<void> {
-  const body: Record<string, string> = { refresh_token: refreshToken };
+  const body: Record<string, string> = {};
+  if (refreshToken) body.refresh_token = refreshToken;
   if (accessToken) body.access_token = accessToken;
+  if (Object.keys(body).length === 0) return;
   const res = await rawPost(opts, "/api/auth/cli/logout", body);
   // 401/404 mean "already gone" — that's success for logout.
   if (res.status === 200 || res.status === 401 || res.status === 404) return;

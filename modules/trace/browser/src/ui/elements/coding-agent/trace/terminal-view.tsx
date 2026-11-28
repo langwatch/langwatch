@@ -22,6 +22,18 @@ import {
 
 import { formatDurationSeconds } from "../../../../model/coding-agent/duration.ts";
 import {
+  type ContextHeatLabel,
+  contextHeatLabel,
+} from "../../../../model/coding-agent/trace/context-health.ts";
+import {
+  type CodeModeScriptResult,
+  isCodeModePoll,
+  isCodeModeScript,
+  isMetadataOnlySession,
+  readCodeModeScript,
+  readCodeModeScriptResults,
+} from "../../../../model/coding-agent/trace/terminal-code-mode.ts";
+import {
   TERMINAL_FONT_STACK,
   TERMINAL_TOKENS,
 } from "../../../../model/coding-agent/trace/terminal-palette.ts";
@@ -116,19 +128,10 @@ function preloadThresholdPx(el: HTMLElement): number {
   return el.clientHeight * PRELOAD_VIEWPORTS;
 }
 
-/**
- * Context-size bands for the "heatmap" note: crossing into a bigger band is worth a line,
- * but every single call isn't. Matches `TokenTimelineChart`'s own bands so the two views
- * agree on what counts as "big".
- */
-const CONTEXT_HEAT_BANDS = [
-  { minTokens: 150_000, color: TERMINAL_TOKENS.red, label: "large" },
-  { minTokens: 50_000, color: TERMINAL_TOKENS.yellow, label: "growing" },
-] as const;
-
-function contextHeatBand(contextTokens: number): (typeof CONTEXT_HEAT_BANDS)[number] | null {
-  return CONTEXT_HEAT_BANDS.find((band) => contextTokens >= band.minTokens) ?? null;
-}
+const CONTEXT_HEAT_COLORS: Record<ContextHeatLabel, string> = {
+  large: TERMINAL_TOKENS.red,
+  growing: TERMINAL_TOKENS.yellow,
+};
 
 /** A note inserted into the transcript at a model call, not a beat of its own. */
 type ContextMarker =
@@ -180,8 +183,9 @@ function markersForModelCall({
   }
 
   const contextTokens = entry.cacheReadTokens + entry.cacheCreationTokens;
-  const band = contextHeatBand(contextTokens);
-  if (!band) return { markers, band: bandState };
+  const label = contextHeatLabel({ contextTokens, model: entry.model });
+  if (!label) return { markers, band: bandState };
+  const band = { label, color: CONTEXT_HEAT_COLORS[label] };
 
   if (bandState.known && band.label !== bandState.label) {
     markers.push({
@@ -668,6 +672,7 @@ export const TerminalView = memo(function TerminalView({
     () => buildContextMarkers({ entries, visibleIndices, historyComplete }),
     [entries, visibleIndices, historyComplete],
   );
+  const metadataOnly = isMetadataOnlySession(entries);
   const dividersAtVisibleIndex = useMemo(
     () => forwardDividersToVisible({ turnDividers, entries, visibleIndices }),
     [turnDividers, entries, visibleIndices],
@@ -737,6 +742,11 @@ export const TerminalView = memo(function TerminalView({
               content to replay. The totals below are real.
             </Text>
           )}
+          {metadataOnly && (
+            <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+              This agent sends metadata only, so its prompts, scripts and output are not recorded
+            </Text>
+          )}
           {visibleIndices.map((fullIndex) => {
             const divider = dividersAtVisibleIndex?.get(fullIndex);
             return (
@@ -751,7 +761,11 @@ export const TerminalView = memo(function TerminalView({
                   data-row-key={rowKeys?.[fullIndex]}
                   ref={(node: HTMLDivElement | null) => setRowRef(fullIndex, node)}
                 >
-                  <EntryLine entry={entries[fullIndex]!} toolSpans={toolSpans} />
+                  <EntryLine
+                    entry={entries[fullIndex]!}
+                    toolSpans={toolSpans}
+                    metadataOnly={metadataOnly}
+                  />
                 </Box>
               </Fragment>
             );
@@ -1229,7 +1243,16 @@ function gradientColorAt(index: number, length: number): string {
   return stops[stopIndex] ?? stops[stops.length - 1]!;
 }
 
-function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: ToolSpanIndex }) {
+function EntryLine({
+  entry,
+  toolSpans,
+  metadataOnly,
+}: {
+  entry: TranscriptEntry;
+  toolSpans: ToolSpanIndex;
+  /** The session says once that it carries no content, so its rows don't repeat it. */
+  metadataOnly: boolean;
+}) {
   switch (entry.kind) {
     case "system_prompt":
       return <SystemContextLine text={entry.text} chars={entry.chars} />;
@@ -1238,7 +1261,13 @@ function EntryLine({ entry, toolSpans }: { entry: TranscriptEntry; toolSpans: To
     case "assistant_message":
       return <AssistantLine text={entry.text} />;
     case "tool":
-      return <ToolCall entry={entry} ran={toolSpans.get(entry.spanId) ?? null} />;
+      return (
+        <ToolEntryLine
+          entry={entry}
+          ran={toolSpans.get(entry.spanId) ?? null}
+          metadataOnly={metadataOnly}
+        />
+      );
     case "tool_rejected":
       return <RejectedLine name={entry.name} outcome={entry.outcome} byUser={entry.byUser} />;
     case "note":
@@ -1396,6 +1425,159 @@ function AssistantLine({ text }: { text: string | null }) {
   );
 }
 
+type ToolEntry = Extract<TranscriptEntry, { kind: "tool" }>;
+
+function ToolEntryLine({
+  entry,
+  ran,
+  metadataOnly,
+}: {
+  entry: ToolEntry;
+  ran: TerminalToolSpan | null;
+  metadataOnly: boolean;
+}) {
+  const name = ran?.toolName ?? entry.name;
+  if (isCodeModeScript(name)) {
+    return <CodeScriptCall entry={entry} ran={ran} metadataOnly={metadataOnly} />;
+  }
+  const failed = ran?.isError ?? entry.failed;
+  if (isCodeModePoll(name) && !failed)
+    return (
+      <ScriptWaitLine
+        durationMs={ran?.durationMs ?? entry.durationMs}
+        results={readCodeModeScriptResults(ran?.output ?? entry.output)}
+      />
+    );
+  return <ToolCall entry={entry} ran={ran} />;
+}
+
+/**
+ * A Code Mode script, drawn as the CLI draws it: `⏺ Code(description) · N lines`, the script
+ * collapsed until opened. The calls it made follow as their own rows; the span's duration is
+ * left out because the CLI logs the call as soon as the script starts.
+ */
+function CodeScriptCall({
+  entry,
+  ran,
+  metadataOnly,
+}: {
+  entry: ToolEntry;
+  ran: TerminalToolSpan | null;
+  metadataOnly: boolean;
+}) {
+  const [expanded, setExpanded] = useState(false);
+  const script = readCodeModeScript(entry.input);
+  const results = readCodeModeScriptResults(ran?.output ?? entry.output) ?? [];
+  const isError = ran?.isError ?? entry.failed;
+  const canExpand = script.code !== null || results.length > 0;
+  const linesLabel = codeScriptSizeLabel({ script, metadataOnly });
+  const toggleLabel = expanded ? "(click to hide)" : "(click to show)";
+
+  const heading = (
+    <>
+      <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
+      <Text {...CELL} color={TERMINAL_TOKENS.screenFg} flex={1} minWidth={0} textAlign="start">
+        <Text as="span" fontWeight="semibold" color={TERMINAL_TOKENS.screenFg}>
+          Code
+        </Text>
+        {script.description !== null ? `(${truncateArg(script.description)})` : ""}
+        <Text as="span" color={TERMINAL_TOKENS.faint}>
+          {linesLabel}
+          {canExpand ? ` ${toggleLabel}` : ""}
+        </Text>
+      </Text>
+    </>
+  );
+
+  return (
+    <VStack align="stretch" gap={0.5}>
+      {canExpand ? (
+        <HStack asChild align="flex-start" gap={2} cursor="pointer" width="100%">
+          {/* A real button, typed explicitly: inside a form the default `type` is submit. */}
+          <button type="button" onClick={() => setExpanded((v) => !v)} aria-expanded={expanded}>
+            {heading}
+          </button>
+        </HStack>
+      ) : (
+        <HStack align="flex-start" gap={2}>
+          {heading}
+        </HStack>
+      )}
+      {expanded && script.code !== null && (
+        <ResultLine>
+          <SyntaxHighlightedCode code={script.code} filePath="script.js" />
+        </ResultLine>
+      )}
+      {expanded && script.cutFromChars !== null && (
+        <ResultLine>
+          <Text {...CELL} color={TERMINAL_TOKENS.faint}>
+            {`Claude Code recorded only the start of this ${script.cutFromChars.toLocaleString("en-GB")}-character script`}
+          </Text>
+        </ResultLine>
+      )}
+      {expanded &&
+        results.map((result, index) => (
+          <ResultLine key={index}>
+            <TerminalOutput text={result.text} isError={isError || result.isError} />
+          </ResultLine>
+        ))}
+    </VStack>
+  );
+}
+
+/**
+ * The full script's size: its line count, or its length when only its start was recorded.
+ * Nothing in a metadata-only session, whose top line already says no script was recorded.
+ */
+function codeScriptSizeLabel({
+  script,
+  metadataOnly,
+}: {
+  script: ReturnType<typeof readCodeModeScript>;
+  metadataOnly: boolean;
+}): string {
+  if (script.cutFromChars !== null) {
+    return ` · ${script.cutFromChars.toLocaleString("en-GB")} characters`;
+  }
+  if (script.lineCount === null && metadataOnly) return "";
+  return script.lineCount === null
+    ? " · script not recorded"
+    : ` · ${lineCountLabel(script.lineCount)}`;
+}
+
+function lineCountLabel(count: number): string {
+  return count === 1 ? "1 line" : `${count} lines`;
+}
+
+/**
+ * Poll: the model waiting on a script still running. One faint line, then what the script
+ * handed back when the session recorded it; never a status body.
+ */
+function ScriptWaitLine({
+  durationMs,
+  results,
+}: {
+  durationMs: number | null;
+  results: CodeModeScriptResult[] | null;
+}) {
+  const waited = durationMs !== null && durationMs > 0 ? ` · ${formatDuration(durationMs)}` : "";
+  return (
+    <VStack align="stretch" gap={0.5}>
+      <HStack align="flex-start" gap={2}>
+        <Glyph char={GLYPH.note} color={TERMINAL_TOKENS.faint} />
+        <Text {...CELL} color={TERMINAL_TOKENS.faint} flex={1} minWidth={0}>
+          {`Waited for the script${waited}`}
+        </Text>
+      </HStack>
+      {results?.map((result, index) => (
+        <ResultLine key={index}>
+          <TerminalOutput text={result.text} isError={result.isError} />
+        </ResultLine>
+      ))}
+    </VStack>
+  );
+}
+
 /**
  * `⏺ Tool(arg)` with its result hanging underneath on the `⎿` elbow. The
  * bullet is the only status signal — muted ran, red failed — matching how
@@ -1405,7 +1587,7 @@ function ToolCall({
   entry,
   ran,
 }: {
-  entry: Extract<TranscriptEntry, { kind: "tool" }>;
+  entry: ToolEntry;
   /** The tool's real span, when we have it. */
   ran: TerminalToolSpan | null;
 }) {
@@ -1425,9 +1607,23 @@ function ToolCall({
   const transcriptOutput =
     ranOutput === null && entry.output !== null ? toolResultBodyToString(entry.output) : null;
 
+  // A call a Code Mode script made sits under the script's Code row, and its output was
+  // never recorded, so it draws no result line rather than a "(no output)" filler.
+  const inScript = entry.inScript === true;
+  const hasRecordedBody =
+    patch !== null ||
+    synthesizedDiff !== null ||
+    ranOutput !== null ||
+    (transcriptOutput !== null && transcriptOutput.trim() !== "");
+
   return (
     <VStack align="stretch" gap={0.5}>
       <HStack align="flex-start" gap={2}>
+        {inScript && (
+          <Text {...CELL} whiteSpace="pre" flexShrink={0} userSelect="none" aria-hidden>
+            {"  "}
+          </Text>
+        )}
         <Glyph char={GLYPH.bullet} color={isError ? TERMINAL_TOKENS.red : TERMINAL_TOKENS.faint} />
         {/* One flowing block, not nested spans with their own box — nesting
             `fontWeight="semibold"` on an inline child was giving a wrapped
@@ -1452,16 +1648,18 @@ function ToolCall({
         )}
       </HStack>
 
-      <ResultLine>
-        <ToolResultBody
-          patch={patch}
-          synthesizedDiff={synthesizedDiff}
-          ran={ran}
-          ranOutput={ranOutput}
-          transcriptOutput={transcriptOutput}
-          isError={isError}
-        />
-      </ResultLine>
+      {(!inScript || hasRecordedBody) && (
+        <ResultLine>
+          <ToolResultBody
+            patch={patch}
+            synthesizedDiff={synthesizedDiff}
+            ran={ran}
+            ranOutput={ranOutput}
+            transcriptOutput={transcriptOutput}
+            isError={isError}
+          />
+        </ResultLine>
+      )}
     </VStack>
   );
 }

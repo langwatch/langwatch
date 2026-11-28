@@ -159,6 +159,93 @@ function contractCases(backend: Backend): void {
     });
   });
 
+  it("replaces a licence only while the row holds the key the caller read", async () => {
+    const repository = await backend.seed({ [id("a")]: { licenseKey: null } });
+    const license = (licenseKey: string) => ({ licenseKey, expiresAt: EXPIRES, validatedAt: null });
+
+    await expect(
+      repository.replaceLicense({
+        organizationId: id("a"),
+        license: license("a"),
+        replacing: null,
+      }),
+    ).resolves.toBe(true);
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license: license("c"), replacing: "a" }),
+    ).resolves.toBe(true);
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license: license("b"), replacing: "a" }),
+    ).resolves.toBe(false);
+
+    await expect(repository.findLicense({ organizationId: id("a") })).resolves.toEqual([
+      license("c"),
+    ]);
+  });
+
+  it("compares a delivery with the organization's key while no row holds one", async () => {
+    const repository = await backend.seed({ [id("a")]: { licenseKey: "column-key" } });
+    const license = { licenseKey: "delivered", expiresAt: EXPIRES, validatedAt: null };
+
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license, replacing: null }),
+    ).resolves.toBe(false);
+    await expect(
+      repository.replaceLicense({ organizationId: id("a"), license, replacing: "column-key" }),
+    ).resolves.toBe(true);
+
+    await expect(repository.getOrganizationLicense(id("a"))).resolves.toEqual({
+      licenseKey: "delivered",
+    });
+  });
+
+  describe("given organization's column is written after licensing's own row", () => {
+    const license = (licenseKey: string) => ({ licenseKey, expiresAt: EXPIRES, validatedAt: null });
+    const columnWrittenLater = async () => {
+      const repository = await backend.seed({ [id("a")]: { licenseKey: null } });
+      await repository.saveLicense({ organizationId: id("a"), license: license("row-key") });
+      await backend.writeColumns({
+        organizationId: id("a"),
+        columns: { licenseKey: "column-key", updatedAt: LATER },
+      });
+      return repository;
+    };
+
+    /** @scenario "A delivered license is compared with the license the install reads" */
+    it("accepts a delivery that replaces the column's key", async () => {
+      const repository = await columnWrittenLater();
+
+      await expect(
+        repository.replaceLicense({
+          organizationId: id("a"),
+          license: license("delivered"),
+          replacing: "column-key",
+        }),
+      ).resolves.toBe(true);
+      await expect(repository.findLicense({ organizationId: id("a") })).resolves.toEqual([
+        license("delivered"),
+      ]);
+    });
+
+    /** @scenario "A licence column written while a sync is out keeps the delivered license out" */
+    it("refuses a delivery that read the row's key before the column changed", async () => {
+      const repository = await columnWrittenLater();
+
+      await expect(
+        repository.replaceLicense({
+          organizationId: id("a"),
+          license: license("delivered"),
+          replacing: "row-key",
+        }),
+      ).resolves.toBe(false);
+      await expect(repository.getOrganizationLicense(id("a"))).resolves.toEqual({
+        licenseKey: "column-key",
+      });
+      await expect(repository.findLicense({ organizationId: id("a") })).resolves.toEqual([
+        license("row-key"),
+      ]);
+    });
+  });
+
   it("restores the row read before a write, and deletes one that was not there", async () => {
     const repository = await backend.seed({
       [id("a")]: { licenseKey: null },
@@ -425,5 +512,82 @@ describe.skipIf(!TEST_DATABASE_URL)("given the licence Postgres repository", () 
         data: licenseData(columns),
       });
     },
+  });
+
+  /** @scenario "A licence written in the same millisecond as the one a sync read keeps the delivery out" */
+  it("refuses a delivery once a write that kept the read row's timestamp commits first", async () => {
+    const organizationId = `${prefix}same-ms`;
+    const stamp = new Date("2026-01-01T00:00:00.000Z");
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: organizationId,
+        slug: organizationId,
+        updatedAt: new Date("2020-01-01T00:00:00.000Z"),
+      },
+    });
+    await prisma.organizationLicense.create({
+      data: { organizationId, licenseKey: "key-a", updatedAt: stamp },
+    });
+    const repository = PrismaOrganizationLicenseRepository.create(prisma);
+    const deliveries: Promise<boolean>[] = [];
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.organizationLicense.update({
+        where: { organizationId },
+        data: { licenseKey: "key-b", updatedAt: stamp },
+      });
+      deliveries.push(
+        repository.replaceLicense({
+          organizationId,
+          license: { licenseKey: "delivered", expiresAt: EXPIRES, validatedAt: null },
+          replacing: "key-a",
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+
+    await expect(Promise.all(deliveries)).resolves.toEqual([false]);
+    const row = await prisma.organizationLicense.findUniqueOrThrow({ where: { organizationId } });
+    expect(row.licenseKey).toBe("key-b");
+  });
+
+  /** @scenario "A delivery that waited on organization's row is stamped after it" */
+  it("stamps a delivery that waited on organization's lock after that write", async () => {
+    const organizationId = `${prefix}waited`;
+    await prisma.organization.create({
+      data: {
+        id: organizationId,
+        name: organizationId,
+        slug: organizationId,
+        license: "key-a",
+        updatedAt: new Date("2020-01-01T00:00:00.000Z"),
+      },
+    });
+    await prisma.organizationLicense.create({
+      data: { organizationId, licenseKey: "key-a", updatedAt: new Date("2026-01-01T00:00:00Z") },
+    });
+    const repository = PrismaOrganizationLicenseRepository.create(prisma);
+    const deliveries: Promise<boolean>[] = [];
+
+    await prisma.$transaction(async (transaction) => {
+      await transaction.organization.update({
+        where: { id: organizationId },
+        data: { updatedAt: new Date(Date.now() + 3_600_000) },
+      });
+      deliveries.push(
+        repository.replaceLicense({
+          organizationId,
+          license: { licenseKey: "delivered", expiresAt: EXPIRES, validatedAt: null },
+          replacing: "key-a",
+        }),
+      );
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    });
+
+    await expect(Promise.all(deliveries)).resolves.toEqual([true]);
+    await expect(repository.getOrganizationLicense(organizationId)).resolves.toEqual({
+      licenseKey: "delivered",
+    });
   });
 });

@@ -91,6 +91,11 @@ export class ConcurrencyLimiter {
     }
   }
 
+  /** How many it lets run at once. */
+  capacity(): number {
+    return this.maxConcurrent;
+  }
+
   stats(): LimiterStats {
     return { inFlight: this.inFlight, queued: this.waiting.length };
   }

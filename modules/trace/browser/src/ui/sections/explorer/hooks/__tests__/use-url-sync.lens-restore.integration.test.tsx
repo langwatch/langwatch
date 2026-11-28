@@ -107,6 +107,20 @@ describe("useURLSync lens restore on a bare URL", () => {
     });
   });
 
+  describe("given only a tour step in the fragment and a persisted built-in lens", () => {
+    describe("when the hook mounts", () => {
+      /** @scenario "A tour step alone still restores the last-used lens" */
+      it("treats the address as bare and restores the persisted lens", () => {
+        persistedLens = "simplified";
+        window.history.replaceState(null, "", "/#sp=search-bar");
+        render(<Harness />);
+        expect(selectLensMock).toHaveBeenCalledWith("simplified", {
+          persist: true,
+        });
+      });
+    });
+  });
+
   describe("given no fragment and no persisted lens", () => {
     describe("when the hook mounts", () => {
       it("falls back to All without persisting (so an un-hydrated custom lens survives)", () => {

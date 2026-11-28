@@ -27,6 +27,12 @@ import {
   PROJECT_REVIVED_EVENT_VERSION,
   projectAggregateRuleChangedEventDataSchema,
   projectRevivedEventDataSchema,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE,
+  PROJECT_PERSONAL_OWNER_LISTED_EVENT_VERSION,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE,
+  PROJECT_FIRST_MESSAGE_LISTED_EVENT_VERSION,
+  projectPersonalOwnerListedEventDataSchema,
+  projectFirstMessageListedEventDataSchema,
 } from "@langwatch/project-contract";
 import { z } from "zod";
 
@@ -174,3 +180,37 @@ export const projectRevivedEventSchema = z.object({
   data: projectRevivedEventDataSchema,
 });
 export type ProjectRevivedEvent = z.infer<typeof projectRevivedEventSchema>;
+
+export const RECORD_PROJECT_PERSONAL_OWNER_LISTED_COMMAND_TYPE =
+  "lw.project.record_personal_owner_listed" as const;
+
+export const recordProjectPersonalOwnerListedCommandDataSchema =
+  projectPersonalOwnerListedEventDataSchema;
+export type RecordProjectPersonalOwnerListedCommandData = z.infer<
+  typeof recordProjectPersonalOwnerListedCommandDataSchema
+>;
+
+export const projectPersonalOwnerListedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_PERSONAL_OWNER_LISTED_EVENT_TYPE),
+  version: z.literal(PROJECT_PERSONAL_OWNER_LISTED_EVENT_VERSION),
+  data: projectPersonalOwnerListedEventDataSchema,
+});
+export type ProjectPersonalOwnerListedEvent = z.infer<typeof projectPersonalOwnerListedEventSchema>;
+
+export const RECORD_PROJECT_FIRST_MESSAGE_LISTED_COMMAND_TYPE =
+  "lw.project.record_first_message_listed" as const;
+
+export const recordProjectFirstMessageListedCommandDataSchema =
+  projectFirstMessageListedEventDataSchema;
+export type RecordProjectFirstMessageListedCommandData = z.infer<
+  typeof recordProjectFirstMessageListedCommandDataSchema
+>;
+
+export const projectFirstMessageListedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(PROJECT_FIRST_MESSAGE_LISTED_EVENT_TYPE),
+  version: z.literal(PROJECT_FIRST_MESSAGE_LISTED_EVENT_VERSION),
+  data: projectFirstMessageListedEventDataSchema,
+});
+export type ProjectFirstMessageListedEvent = z.infer<typeof projectFirstMessageListedEventSchema>;

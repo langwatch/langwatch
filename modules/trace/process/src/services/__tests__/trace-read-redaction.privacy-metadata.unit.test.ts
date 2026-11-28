@@ -1,7 +1,7 @@
 import type { Trace } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
-import { applyTraceProtections } from "../../rules/trace-read-redaction.rules.ts";
+import { applyTraceProtections } from "../../features/read/rules/trace-read-redaction.rules.ts";
 
 function traceWithIO(): Trace {
   return {

@@ -9,7 +9,7 @@ import {
   outputsSchema,
   promptingTechniqueSchema,
   responseFormatSchema,
-  runtimeParametersSchema,
+  runtimeParametersUpdateSchema,
 } from "./prompt.field-schemas.ts";
 import { promptScopeSchema } from "./prompt.ts";
 import type { PromptTagAssignment, VersionedPrompt } from "./prompt.ts";
@@ -80,7 +80,7 @@ export function createPromptCreateTrpcInputSchema<TDemonstrations extends z.ZodT
     responseFormat: z.ZodOptional<typeof responseFormatSchema>;
     demonstrations: z.ZodOptional<TDemonstrations>;
     handle: typeof handleSchema;
-    parameters: z.ZodOptional<typeof runtimeParametersSchema>;
+    parameters: z.ZodOptional<typeof runtimeParametersUpdateSchema>;
   }>;
 }> {
   return z.object({
@@ -112,7 +112,7 @@ export function createPromptCreateTrpcInputSchema<TDemonstrations extends z.ZodT
       responseFormat: responseFormatSchema.optional(),
       demonstrations: demonstrationsSchema.optional(),
       handle: handleSchema,
-      parameters: runtimeParametersSchema.optional(),
+      parameters: runtimeParametersUpdateSchema.optional(),
     }),
   });
 }
@@ -144,7 +144,7 @@ export function createPromptUpdateTrpcInputSchema<TDemonstrations extends z.ZodT
     promptingTechnique: z.ZodOptional<typeof promptingTechniqueSchema>;
     responseFormat: z.ZodOptional<typeof responseFormatSchema>;
     demonstrations: z.ZodOptional<TDemonstrations>;
-    parameters: z.ZodOptional<typeof runtimeParametersSchema>;
+    parameters: z.ZodOptional<typeof runtimeParametersUpdateSchema>;
   }>;
 }> {
   return z.object({
@@ -175,7 +175,7 @@ export function createPromptUpdateTrpcInputSchema<TDemonstrations extends z.ZodT
       promptingTechnique: promptingTechniqueSchema.optional(),
       responseFormat: responseFormatSchema.optional(),
       demonstrations: demonstrationsSchema.optional(),
-      parameters: runtimeParametersSchema.optional(),
+      parameters: runtimeParametersUpdateSchema.optional(),
     }),
   });
 }

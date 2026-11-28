@@ -70,6 +70,50 @@ Feature: Model resolver and feature registry
     # projectId } so the frontend interceptor (utils/trpcError.ts) can
     # render the missing-model popup.
 
+  # A model named outright skips the cascade, so a missing or disabled
+  # provider is not `model_provider_disabled` (which carries the scope its
+  # swap toast reads) but its own code, and background callers stop on it.
+
+  @unit
+  Scenario: A named model whose provider is not set up is refused with a typed code
+    Given the project has no provider row for "openai"
+    When an execution handle is asked for "openai/gpt-5-mini" by name
+    Then it is refused with the code "model_provider_unavailable" and reason "not_configured"
+
+  @unit
+  Scenario: A named model whose provider is turned off is refused with a typed code
+    Given the project's "openai" provider is disabled
+    When an execution handle is asked for "openai/gpt-5-mini" by name
+    Then it is refused with the code "model_provider_unavailable" and reason "disabled"
+    And the refusal is not reworded as a generic AI call failure
+
+  @unit
+  Scenario: A provider that refuses the request itself is marked as not worth retrying
+    Given the provider answers a model call with a client error such as 400 or 401
+    When the AI call wrapper rethrows it
+    Then it is "ai_call_failed" and not retryable
+    And background callers treat it as a permanent failure
+
+  @unit @regression
+  Scenario: A provider content filter refusal is told apart from a model configuration failure
+    Given the provider answers a model call with 400 and the error code "content_filter"
+    When the AI call wrapper rethrows it
+    Then it is "ai_content_filtered" and not retryable
+    And a 400 with any other error code stays "ai_call_failed"
+
+  @unit
+  Scenario: A provider failure a retry could fix stays retryable
+    Given a model call fails with a 5xx, a 429, a timeout or a dropped connection
+    When the AI call wrapper rethrows it
+    Then it is "ai_call_failed" and retryable
+    And background callers do not treat it as permanent
+
+  @unit
+  Scenario: A wrapped AI call failure keeps the code of the failure it wraps
+    Given a model call fails with a handled error the wrapper does not pass through
+    When the AI call wrapper rethrows it as "ai_call_failed"
+    Then the wrapped error's code is still on the reason chain
+
   # ────────────────────────────────────────────────────────────────────────────
   # Dev-facing registry semantics
   # ────────────────────────────────────────────────────────────────────────────

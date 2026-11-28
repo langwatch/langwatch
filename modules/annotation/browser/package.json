@@ -32,6 +32,7 @@
     "@langwatch/time": "workspace:*",
     "@langwatch/trace-client": "workspace:*",
     "@langwatch/trace-contract": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "diff": "catalog:",
     "lucide-react": "catalog:",
     "motion": "catalog:",

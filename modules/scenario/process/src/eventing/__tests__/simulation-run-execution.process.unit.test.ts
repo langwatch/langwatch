@@ -66,6 +66,9 @@ class UnusedScenarioExecutionService extends ScenarioExecutionService {
   recordHooks(): Promise<void> {
     throw new Error("recordHooks unexpectedly called in evolve tests");
   }
+  recordRedTeamReport(): Promise<void> {
+    throw new Error("recordRedTeamReport unexpectedly called in evolve tests");
+  }
 }
 
 /**
@@ -481,6 +484,14 @@ describe("simulationRunExecution process (runtime-built definition)", () => {
           langwatch: { actorId: "user_1", actorLabel: "api", actorApiKeyId: "pat_1" },
         }),
       ).toMatchObject({ startedByUserId: "user_1", startedByApiKeyId: "pat_1" });
+    });
+
+    /** @scenario "A scenario run started with a service key is minted under that key" */
+    it("names the starting key alone when no person started the run", () => {
+      const payload = executeIntentFor({ langwatch: { actorApiKeyId: "service_key_1" } });
+
+      expect(payload).toMatchObject({ startedByApiKeyId: "service_key_1" });
+      expect(payload).not.toHaveProperty("startedByUserId");
     });
 
     it("names nobody when the queued event records no actor", () => {

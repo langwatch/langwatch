@@ -6,11 +6,11 @@ import { fileURLToPath } from "node:url";
 import { mergeDiagnostics } from "../../packages/oxlint-rules/src/unused-directives.mjs";
 import { memberRoots } from "./workspace-members.mjs";
 
-// `pnpm lint`: oxlint's native rules and the langwatch plugin as two parallel
-// processes over the tree; `--types` adds the type-aware rules as a third, over the
-// TypeScript projects. One unused-directive check spans the processes. `--changed`
-// and `--base <sha>` narrow a plain run to the changed files, a `--types` run to the
-// projects a change reached. ADR-150, TOOLING.md.
+// `pnpm lint`: oxlint's native rules and the langwatch plugin as two parallel processes;
+// `--types` adds the type-aware rules as a third. One unused-directive check spans them.
+// `--changed` lints the working tree's changes itself. Otherwise a plain run lints its
+// scope (`--base <sha>`: the changed files) through the cached `workspace:lint:tree`
+// target, and `--types` runs every project's cached `lint:types`. ADR-150, TOOLING.md.
 const root = join(dirname(fileURLToPath(import.meta.url)), "../..");
 const OXLINT = join(root, "node_modules/.bin/oxlint");
 const LINTABLE = /\.(?:[cm]?[jt]sx?)$/;
@@ -86,7 +86,15 @@ function affectedRoots({ roots, files, base }) {
   const nameOf = (member) =>
     JSON.parse(readFileSync(join(root, member, "package.json"), "utf8")).name;
 
-  return roots.filter((member) => names.has(nameOf(member)));
+  return widenedScope({ roots, reached: roots.filter((member) => names.has(nameOf(member))) });
+}
+
+/**
+ * Past half the projects a scoped type-aware run costs about a full one, and the full
+ * scope is the one main runs, so main replays the pull request's result from the cache.
+ */
+export function widenedScope({ roots, reached }) {
+  return reached.length * 2 > roots.length ? roots : reached;
 }
 
 /** nx.json's `lintGlobals` as root-relative globs: editing one re-lints everything. */
@@ -157,17 +165,89 @@ function print(diagnostic) {
   return `${diagnostic.filename}:${line}:${column}: ${diagnostic.message}${rule}${help}`;
 }
 
-async function main() {
-  const flags = process.argv.slice(2);
+/** Runs one Nx command; resolves its exit status. */
+function nxStatus(args) {
+  const env = { ...process.env, FORCE_COLOR: "0", NX_LOAD_DOT_ENV_FILES: "false" };
+  const run = spawnSync("pnpm", ["exec", "nx", ...args, "--outputStyle=static"], {
+    cwd: root,
+    stdio: "inherit",
+    env,
+  });
+
+  return run.status ?? 1;
+}
+
+const nx = (args) => process.exit(nxStatus(args));
+
+/**
+ * Every project's `lint:types`, after every `typecheck` wrote the declarations it reads.
+ * Two runs, not a dependsOn: with no task dependencies Nx batches every miss into one
+ * oxlint run (dev/nx/executors/lint-types.mjs) instead of one per dependency level.
+ */
+function lintProjects() {
+  const typecheck = nxStatus(["run-many", "-t", "typecheck"]);
+  const lint = nxStatus(lintTypesArgs({ typecheck }));
+
+  process.exit(typecheck || lint);
+}
+
+/** After a failed typecheck some declarations are missing: lint still reports, never caches. */
+export const lintTypesArgs = ({ typecheck }) => [
+  "run-many",
+  "-t",
+  "lint:types",
+  ...(typecheck === 0 ? [] : ["--skip-nx-cache"]),
+];
+
+/** Lints the resolved paths through Nx, which replays a run whose inputs and paths it saw. */
+function lintThroughNx({ paths }) {
+  nx(["run", "workspace:lint:tree", "--", "--resolved", ...paths]);
+}
+
+/**
+ * Lint the paths Nx handed back (`resolved`), the working tree's changes (`direct`), every
+ * project's cached `lint:types` (`projects`, `--base` ignored), or a resolved plain scope
+ * through Nx (`nx`).
+ */
+export function routeFlags(flags) {
   const baseFlag = flags.indexOf("--base");
   const types = flags.includes("--types");
   const base = baseFlag === -1 ? undefined : flags[baseFlag + 1];
-  const files = flags.includes("--changed") ? changedFiles(mergeBase()) : undefined;
-  if (files?.length === 0) process.exit(0);
+  if (flags.includes("--resolved")) {
+    const paths = flags.filter((flag, i) => !flag.startsWith("--") && flags[i - 1] !== "--base");
+    return { route: "resolved", types, paths };
+  }
+  if (flags.includes("--changed")) return { route: "direct", types };
+  if (types) return { route: "projects", types };
+
+  return { route: "nx", types, base };
+}
+
+/** The scopes this process lints itself; a run Nx should cache is handed to it instead. */
+function ownScopes(flags) {
+  const decision = routeFlags(flags);
+  const { types } = decision;
+  if (decision.route === "resolved") return [{ paths: decision.paths, ignores: [] }];
+  if (decision.route === "direct") {
+    const files = changedFiles(mergeBase());
+    if (files.length === 0) process.exit(0);
+    return scopes({ types, files, base: undefined });
+  }
+  if (decision.route === "projects") return lintProjects();
+  const paths = scopes({ types, files: undefined, base: decision.base }).flatMap((s) => s.paths);
+  if (paths.length === 0) process.exit(0);
+
+  return lintThroughNx({ paths });
+}
+
+async function main() {
+  const flags = process.argv.slice(2);
+  const types = flags.includes("--types");
+  const resolvedScopes = ownScopes(flags);
 
   const ignored = ignoreArgs();
   const configs = types ? TYPES : PLAIN;
-  const runs = scopes({ types, files, base })
+  const runs = resolvedScopes
     .filter((scope) => scope.paths.length > 0)
     .map(async ({ paths, ignores }) => {
       const args = [...ignored, ...ignores, ...paths];
@@ -197,7 +277,8 @@ async function main() {
   );
   process.stdout.write(`\n${diagnostics.length} problem(s)\n`);
 
-  process.exit(diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1);
+  // exitCode, not exit(): a piped stdout flushes before the process ends.
+  process.exitCode = diagnostics.length === 0 && !results.includes(undefined) ? 0 : 1;
 }
 
 const runDirectly = process.argv[1] === fileURLToPath(import.meta.url);

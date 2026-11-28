@@ -23,7 +23,8 @@ Feature: Stored Objects service and API
     And the row contains tenant, object, status, owner, provider-relative identity, byte facts and expiry timestamps
     And StoredObjectRecordRepository is one interface with a Prisma and a memory backend
     And StoredObjectService is a concrete class
-    And no Stored Object event projection, process manager or parallel lifecycle store exists
+    And no Stored Object event, projection, lifecycle process manager or parallel lifecycle store exists
+    And the only pipeline is the scheduled upload reaper, which records no events
 
   @unit @persistence
   Scenario: The memory and Postgres stored-object repositories answer alike
@@ -99,6 +100,28 @@ Feature: Stored Objects service and API
     And failed physical cleanup remains retryable from that same row
     And repeating deletion is safe
 
+  @unit @delete
+  Scenario: A delete that keeps losing its row write reports a write conflict
+    Given an available stored object whose row another writer moves on before every delete write
+    When its project calls storedObjects.delete
+    Then the delete is refused with code "stored_object_write_conflict", which may be retried
+    And no storage failure is reported, since no storage call failed
+    And the row and its bytes stay as the other writer left them
+
+  @unit @regression
+  Scenario: Probing an object or minting its read URL opens none of its bytes
+    Given an available stored object
+    When a viewer probes it, or a peer asks for its read URL for a purpose
+    Then storage is asked at most whether the bytes exist
+    And no byte stream is opened, so no storage connection is held
+
+  @unit @regression
+  Scenario: A byte read hands over storage's own stream
+    Given an available stored object whose bytes storage streams
+    When a reader reads it by id
+    Then the reader gets storage's own stream, not a wrapper around it
+    And stopping that stream early frees the storage connection behind it
+
   @unit
   Scenario: The storage checkup probe writes and removes one canary object
     Given a project whose storage destination accepts writes
@@ -153,6 +176,37 @@ Feature: Stored Objects service and API
     Then it reports every row unchanged and writes nothing
 
   @unit @migration
+  Scenario: A Stored Objects import copies again a legacy row that changed
+    Given the import already copied a project's row
+    And that row's legacy version changed since
+    When it runs for that project again
+    Then the row store holds the changed version under a new generation
+
+  @unit @migration
+  Scenario: A Stored Objects import leaves a row another writer moved
+    Given a delete moves a project's row after the import read it
+    When the import writes that row
+    Then it reports the row unchanged
+    And the row stays as the delete left it
+
+  @unit @migration @regression
+  Scenario: A Stored Objects import never brings a deleted row back
+    Given the import copied a project's row and a delete then marked the row as deleted
+    And that row's legacy version changed since
+    When the import runs for that project again
+    Then it reports the row unchanged
+    And the row stays deleted, so its object is not delivered again
+
+  @unit @migration @regression
+  Scenario: A Stored Objects import never writes over a row another run created
+    Given an import run read a project's row as absent
+    And another run of the import, one a stalled run outlived the lease of, created it before the first run wrote
+    And a delete then marked the row as deleted
+    When the first run writes the row
+    Then it reports the row unchanged
+    And the row stays deleted
+
+  @unit @migration
   Scenario: A legacy row stored outside its project fails the Stored Objects import
     Given a legacy row's storage location does not sit under its project
     When the import runs for that project
@@ -182,3 +236,10 @@ Feature: Stored Objects service and API
     Then it observes the durable completion state
     And it may pass readiness only after its startup migration checks succeed
     And it does not run a second migration or serve from a partial import
+
+  @regression @unit
+  Scenario: A project id that starts with a dash or an underscore is a valid stored-object scope
+    Given a project whose generated id starts with "-" or "_"
+    When its trace media is stored or linked to its trace
+    Then the project id passes the stored-object identity check
+    And an id that starts with "." or contains "/" is still refused

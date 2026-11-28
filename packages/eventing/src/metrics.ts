@@ -130,6 +130,11 @@ const foldRefoldOnMissTotal = counter("es_fold_refold_on_miss_total", "Store-mis
   "projection_name",
   "outcome",
 ]);
+const foldStoreMissProbeTotal = counter(
+  "es_fold_store_miss_probe_total",
+  "Event-log probes after a fold store miss, by what the fold did next",
+  ["projection_name", "outcome"],
+);
 const foldReadWindowFallbackTotal = counter(
   "es_fold_read_window_fallback_total",
   "Unwindowed retries after a fold read miss",
@@ -411,6 +416,14 @@ export const incrementEsFoldRefoldOnMissTotal = (
   projectionName: string,
   outcome: "performed" | "absent",
 ) => foldRefoldOnMissTotal.labels(projectionName, outcome).inc();
+export const incrementEsFoldStoreMissProbeTotal = (
+  projectionName: string,
+  outcome:
+    | "new_aggregate"
+    | "retried_state_not_visible"
+    | "retried_log_not_visible"
+    | "refold_after_retries",
+) => foldStoreMissProbeTotal.labels(projectionName, outcome).inc();
 export const incrementEsFoldReadWindowFallbackTotal = (
   projectionName: string,
   outcome: "recovered" | "absent",

@@ -127,6 +127,17 @@ func TestAccessAgainstRealClickHouse(t *testing.T) {
 		if _, err := h.query("monitor", monitorPassword, "SELECT 1 SETTINGS log_queries = 0"); err == nil {
 			t.Error("monitor changed an audited setting through its own profile")
 		}
+		// @scenario "A user's own cap renders as a constraint in its own profile"
+		if out, err := h.query("monitor", monitorPassword, "SELECT getSetting('max_rows_to_read')"); err != nil || out != "1000000" {
+			t.Errorf("monitor max_rows_to_read: %q, %v; want its own cap of 1000000", out, err)
+		}
+		// @scenario "A user cannot raise its own cap"
+		for _, raise := range []string{"max_rows_to_read = 1000001", "max_rows_to_read = 0"} {
+			_, err := h.query("monitor", monitorPassword, "SELECT getSetting('max_rows_to_read') SETTINGS "+raise)
+			if err == nil || !strings.Contains(err.Error(), "SETTING_CONSTRAINT_VIOLATION") {
+				t.Errorf("monitor lifted its own cap with %s: %v", raise, err)
+			}
+		}
 		// @scenario "A user whose own settings break a rendered cap or pin is left out"
 		if _, err := h.query("greedy", monitorPassword, "SELECT 1"); err == nil {
 			t.Error("a user whose own setting is past its tier's cap logged in")
@@ -223,6 +234,7 @@ users:
     databases: [analytics]
     login: {rolling: {dir: /access/secrets/monitor}}
     settings: {max_execution_time: 10}
+    caps: {max_rows_to_read: 1000000}
     quota: {duration_seconds: 3600, limits: {queries: 6}}
     grants: ["SELECT ON system.query_log"]
   - name: greedy

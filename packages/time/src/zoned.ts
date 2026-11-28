@@ -56,6 +56,11 @@ export function nowInstant(): Instant {
   return Temporal.Now.instant();
 }
 
+/** Epoch milliseconds now, without building an Instant (the polyfill is costly on hot paths). */
+export function nowEpochMs(): number {
+  return Date.now();
+}
+
 /** A `Date` from a boundary that only speaks `Date`, as an instant. */
 export function fromDate(value: Date): Instant {
   return Temporal.Instant.fromEpochMilliseconds(value.getTime());

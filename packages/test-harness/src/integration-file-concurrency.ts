@@ -34,7 +34,7 @@ export function assertSerialWorkerSlot(env: NodeJS.ProcessEnv): void {
   );
 }
 
-/** What the vitest launcher exports when nobody set a count (patches/vitest@5.0.1.patch). */
+/** What the vitest launcher exports when nobody set a count (patches/vitest@5.0.5.patch). */
 const LAUNCHER_DEFAULT_WORKERS = "2";
 
 /**

@@ -7,9 +7,10 @@ import { Link } from "@langwatch/browser-host/link";
 import { Banner } from "@langwatch/design-system/banner";
 import { Card } from "@langwatch/design-system/card";
 import { MeterBar } from "@langwatch/design-system/meter-bar";
-import { Box, Button, HStack, SimpleGrid, Text, VStack } from "@langwatch/design-system/primitives";
+import { Box, Button, HStack, Text, VStack } from "@langwatch/design-system/primitives";
 import { SettingList, SettingRow, StatusChip } from "@langwatch/design-system/settings-card";
-import { Check, Info } from "lucide-react";
+import { Info } from "lucide-react";
+import type { ReactNode } from "react";
 
 import {
   type FixedSeats,
@@ -17,6 +18,7 @@ import {
   type PlanEventUsage,
   type PlanPrice,
 } from "../../model/subscription-page-state.ts";
+import { PlanFeatureList } from "../elements/plan-feature-list.tsx";
 
 const METER_FILL: Record<PlanEventUsage["status"], string> = {
   ok: "blue.solid",
@@ -54,12 +56,14 @@ function EventUsageRow({ usage }: { usage: PlanEventUsage }) {
 }
 
 function PlanActions({
+  paymentAction,
   onUpgrade,
   isUpgradeLoading,
   onManageSubscription,
   isManageLoading,
   contactSalesUrl,
 }: {
+  paymentAction?: ReactNode;
   onUpgrade?: () => void;
   isUpgradeLoading?: boolean;
   onManageSubscription?: () => void;
@@ -68,6 +72,7 @@ function PlanActions({
 }) {
   return (
     <HStack gap={2} width="full" justify="flex-end" data-testid="current-plan-actions">
+      {paymentAction}
       {onUpgrade && (
         <Button
           data-testid="current-plan-upgrade-button"
@@ -143,6 +148,7 @@ export function CurrentPlanBlock({
   upgradeRequired,
   isOverPlanSeats,
   onUserCountClick,
+  paymentAction,
   onUpgrade,
   isUpgradeLoading,
   onManageSubscription,
@@ -162,6 +168,8 @@ export function CurrentPlanBlock({
   /** Above the plan's seats: the upgrade-required chip turns to the danger tone. */
   isOverPlanSeats?: boolean;
   onUserCountClick?: () => void;
+  /** While an invoice is unpaid: the way to pay it, which takes the upgrade's place. */
+  paymentAction?: ReactNode;
   onUpgrade?: () => void;
   isUpgradeLoading?: boolean;
   onManageSubscription?: () => void;
@@ -175,7 +183,7 @@ export function CurrentPlanBlock({
   // Fixed seats carry their own "Contact us" link, so the card has no second one.
   const salesUrl = fixedSeats ? undefined : contactSalesUrl;
   const isOverSeats = maxSeats != null && userCount > maxSeats;
-  const hasActions = Boolean(onUpgrade || onManageSubscription || salesUrl);
+  const hasActions = Boolean(paymentAction || onUpgrade || onManageSubscription || salesUrl);
   return (
     <Card
       data-testid="current-plan-block"
@@ -202,6 +210,7 @@ export function CurrentPlanBlock({
       footer={
         hasActions ? (
           <PlanActions
+            paymentAction={paymentAction}
             onUpgrade={onUpgrade}
             isUpgradeLoading={isUpgradeLoading}
             onManageSubscription={onManageSubscription}
@@ -258,23 +267,11 @@ export function CurrentPlanBlock({
           <FixedSeatsLine fixedSeats={fixedSeats} contactUrl={fixedSeatsContactUrl} />
         )}
         {features && (
-          <SimpleGrid
+          <PlanFeatureList
+            features={features}
             data-testid="current-plan-features-grid"
-            templateColumns={{ base: "1fr", md: "1fr 1.4fr 1fr" }}
-            rowGap={2}
-            columnGap={3}
-          >
-            {features.map((feature) => (
-              <HStack key={feature} gap={2} alignItems="start" data-testid="current-plan-feature">
-                <Box color="green.solid" flexShrink={0} paddingTop={1}>
-                  <Check size={12} />
-                </Box>
-                <Text textStyle="bodySm" color="fg.muted">
-                  {feature}
-                </Text>
-              </HStack>
-            ))}
-          </SimpleGrid>
+            itemTestId="current-plan-feature"
+          />
         )}
         {deprecatedNotice && (
           <Banner status="info" data-testid="tiered-deprecated-notice">

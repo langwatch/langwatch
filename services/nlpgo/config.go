@@ -41,6 +41,9 @@ type Config struct {
 
 	// LangWatchEndpoint is where customer studio traces route (see configureNLPGoOTel).
 	LangWatchEndpoint string `env:"LANGWATCH_ENDPOINT"`
+	// ModelCatalogDir is where the image copies LangWatch's model catalog. Empty
+	// reads the checkout's (a development run).
+	ModelCatalogDir string `env:"LANGWATCH_MODEL_CATALOG_DIR"`
 	// SpanSync swaps the per-tenant batch processor for a synchronous one so
 	// integration tests can assert on persisted spans (nlpgo-eval-trace-id-roundtrip).
 	// Production leaves it off: batching keeps the hot path off collector RTT.
@@ -98,9 +101,6 @@ type EngineConfig struct {
 	// set the unprefixed SANDBOX_PYTHON instead, which resolveSandboxPython
 	// accepts as a fallback.
 	SandboxPython string `env:"SANDBOX_PYTHON"`
-	// CodeBlockAllowVisibleProcess — run code blocks where the platform refuses
-	// to hide the engine's /proc files. Honored only on AWS Lambda (cmd/root.go).
-	CodeBlockAllowVisibleProcess bool `env:"CODE_BLOCK_ALLOW_VISIBLE_PROCESS"`
 	// LangWatchBaseURL — base URL for evaluator + agent-workflow callbacks.
 	// In production this is the public LangWatch app URL (eg.
 	// https://app.langwatch.ai); in dev it's typically http://host.docker.internal:5560

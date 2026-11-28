@@ -2,6 +2,7 @@ package app_test
 
 import (
 	"context"
+	"errors"
 	"net"
 	"os"
 	"os/exec"
@@ -128,8 +129,11 @@ func TestHandOverGivesTheStackToARealKeeper(t *testing.T) {
 		_, ok := stackNamed(store, keeperTestSlug)
 		return !ok
 	}, 10*time.Second, 50*time.Millisecond)
-	_, err = os.Stat(app.KeeperPlanPath(wt, keeperTestSlug))
-	assert.ErrorIs(t, err, os.ErrNotExist)
+	// The record goes before the plan file, so wait for the file too.
+	require.Eventually(t, func() bool {
+		_, err := os.Stat(app.KeeperPlanPath(wt, keeperTestSlug))
+		return errors.Is(err, os.ErrNotExist)
+	}, 10*time.Second, 50*time.Millisecond)
 }
 
 // A keeper SIGKILLed under a live owner is respawned by the daemon tick from

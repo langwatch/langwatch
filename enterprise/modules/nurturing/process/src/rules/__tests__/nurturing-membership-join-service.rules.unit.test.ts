@@ -8,7 +8,10 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import {
   fireInviteAccepted,
   fireJoinedOrganization,
+  fireMemberAdmitted,
+  fireMemberRoleChanged,
   fireSsoAutoAdded,
+  seatTraitOf,
 } from "../nurturing-membership-join-service.rules.ts";
 
 afterEach(() => vi.useRealTimers());
@@ -84,6 +87,145 @@ describe("joined_via_invite", () => {
       expect(inviteTrack()).not.toHaveProperty("properties.seat");
       expect(inviteTrack("OWNER")).not.toHaveProperty("properties.seat");
     });
+  });
+});
+
+describe("a person who joins", () => {
+  const identifies = (calls: ReturnType<typeof inviteCalls>) =>
+    calls.filter((call) => call.type === "identify");
+  const ssoCalls = (role?: string) =>
+    fireSsoAutoAdded({
+      signal: { kind: "sso_auto_added", ...joinSource, role },
+      traces: noTraces,
+    });
+
+  /** @scenario "A person who joins is identified with the seat they joined with" */
+  it("is identified once with the seat, by invite or by SSO", () => {
+    expect(identifies(inviteCalls("EXTERNAL"))).toEqual([
+      { type: "identify", userId: "user-1", traits: { seat: "lite_member" } },
+    ]);
+    expect(identifies(ssoCalls("ADMIN"))).toEqual([
+      { type: "identify", userId: "user-1", traits: expect.objectContaining({ seat: "admin" }) },
+    ]);
+  });
+
+  /** @scenario "A person who joins is identified with the seat they joined with" */
+  it("carries the seat on the one identify that also carries known traces", () => {
+    const calls = fireInviteAccepted({
+      signal: { kind: "invite_accepted", ...joinSource, role: "DEVELOPER" },
+      traces: { hasTraces: true, lastTraceAt: null },
+    });
+
+    expect(identifies(calls)).toEqual([
+      { type: "identify", userId: "user-1", traits: { has_traces: true, seat: "developer" } },
+    ]);
+  });
+
+  /** @scenario "A person who joins with no known role is identified with no seat" */
+  it("is identified with no seat, and an invite with no traces identifies no one", () => {
+    expect(identifies(inviteCalls())).toEqual([]);
+    expect(identifies(inviteCalls("OWNER"))).toEqual([]);
+    expect(identifies(ssoCalls())[0]).not.toHaveProperty("traits.seat");
+  });
+});
+
+describe("a person who joins, linked to the organization", () => {
+  const groupOf = (calls: ReturnType<typeof inviteCalls>) =>
+    calls.find((call) => call.type === "group");
+
+  /** @scenario "A person who joins is linked to the organization with the seat they joined with" */
+  it("carries the seat on the group call, by invite or by SSO", () => {
+    const sso = fireSsoAutoAdded({
+      signal: { kind: "sso_auto_added", ...joinSource, role: "ADMIN" },
+      traces: noTraces,
+    });
+
+    expect(groupOf(inviteCalls("EXTERNAL"))).toMatchObject({
+      groupId: "org-1",
+      traits: { name: "Acme Corp", relationshipAttributes: { seat: "lite_member" } },
+    });
+    expect(groupOf(sso)).toMatchObject({
+      traits: { name: "Acme Corp", relationshipAttributes: { seat: "admin" } },
+    });
+  });
+
+  /** @scenario "A person who joins is linked to the organization with the seat they joined with" */
+  it("sends no relationship seat for a role we cannot name", () => {
+    expect(groupOf(inviteCalls())).not.toHaveProperty("traits.relationshipAttributes");
+    expect(groupOf(inviteCalls("OWNER"))).not.toHaveProperty("traits.relationshipAttributes");
+  });
+});
+
+describe("a member whose role changed", () => {
+  const changed = (role: string) =>
+    fireMemberRoleChanged({
+      kind: "member_role_changed",
+      ...joinSource,
+      role,
+      previousRole: "MEMBER",
+    });
+
+  /** @scenario "A role change tells Customer.io the person's new seat" */
+  it.each([
+    ["ADMIN", "admin"],
+    ["MEMBER", "member"],
+    ["EXTERNAL", "lite_member"],
+    ["DEVELOPER", "developer"],
+  ])("is identified once with the seat of %s", (role, seat) => {
+    expect(changed(role).filter((call) => call.type === "identify")).toEqual([
+      { type: "identify", userId: "user-1", traits: { seat } },
+    ]);
+  });
+
+  /** @scenario "A role change groups the person into the organization" */
+  it("is grouped into the organization", () => {
+    expect(changed("ADMIN")).toContainEqual({
+      type: "group",
+      userId: "user-1",
+      groupId: "org-1",
+      traits: { relationshipAttributes: { seat: "admin" } },
+    });
+  });
+
+  /** @scenario "A role change or admission links the person to the organization with their new seat" */
+  it("is linked to the organization with the new seat", () => {
+    expect(changed("EXTERNAL")).toContainEqual({
+      type: "group",
+      userId: "user-1",
+      groupId: "org-1",
+      traits: { relationshipAttributes: { seat: "lite_member" } },
+    });
+  });
+
+  /** @scenario "A role change to a role with no seat sends no seat" */
+  it("is not identified for a role we cannot name, and is still grouped", () => {
+    expect(changed("OWNER")).toEqual([{ type: "group", userId: "user-1", groupId: "org-1" }]);
+  });
+});
+
+describe("a member admitted without a join event", () => {
+  const admitted = (role: string) =>
+    fireMemberAdmitted({ kind: "member_admitted", ...joinSource, role });
+
+  /** @scenario "An admitted member is sent their seat and linked to the organization" */
+  it("is identified with their seat and grouped into the organization", () => {
+    expect(admitted("EXTERNAL")).toEqual([
+      { type: "identify", userId: "user-1", traits: { seat: "lite_member" } },
+      {
+        type: "group",
+        userId: "user-1",
+        groupId: "org-1",
+        traits: { relationshipAttributes: { seat: "lite_member" } },
+      },
+    ]);
+  });
+});
+
+describe("seatTraitOf", () => {
+  it("names the seat of a known role and nothing for any other", () => {
+    expect(seatTraitOf("MEMBER")).toEqual({ seat: "member" });
+    expect(seatTraitOf("OWNER")).toEqual({});
+    expect(seatTraitOf()).toEqual({});
   });
 });
 

@@ -254,7 +254,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When a view whose source sorts by a column its write path moves is inspected
     Then it declares that one row is one record rather than one sort key
     And a view that declares a grain narrower than its engine's key declares a strategy that can deliver it
-    And the views whose sort keys hold still keep the shipped default
+    And the views whose sort keys hold still keep the shipped default, read their latest version in order without FINAL, read rows written once as written, or settle retraction pairs without FINAL
 
   @integration
   Scenario: A pre-aggregated view returns one merged row per bucket
@@ -304,6 +304,12 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     When the restricted identity selects that record through the LangWatchQL view
     Then one row is returned
     And it carries the newer version's values
+
+  @integration
+  Scenario: A plain span_metrics read counts a residual duplicate span
+    Given span_analytics holds two copies of one span, a residual duplicate ADR-034 accepts
+    When the restricted identity selects that span through the span_metrics view
+    Then both copies are returned, because a plain read does not deduplicate
 
   @integration
   Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
@@ -525,6 +531,20 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Then the query answers 200
     And the query reaches the database with the key's own reach
 
+  @regression @unit
+  Scenario: A project-bound access token runs a LangWatchQL query as its person
+    Given a person's project-bound access token, the hosted MCP's OAuth sign-in
+    When the key door hands it to the query surface
+    Then it is accepted as that person, not refused as an invalid credential
+    And its run, schema and reference are judged by that person's analytics:view on the bound project
+
+  @regression @unit
+  Scenario: A project-bound access token reads only the project it is bound to
+    Given a person's access token bound to one project of an organization with several
+    When it runs over every project it can read, or names another project
+    Then its scope is the bound project alone
+    And a run naming another project is refused as not found
+
   @integration
   Scenario: Results carry typed columns, rows, execution statistics, and diagnostics
     Given an authenticated API client
@@ -563,9 +583,22 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   @unit
   Scenario: A parameter value that does not fit its declared type is refused with the parameter named
     Given a query declaring {start:DateTime64(3)}
-    When the request binds start to a value the server cannot read as that type, such as an ISO string ending in Z
+    When the request binds start to a value the server cannot read as that type, such as "last tuesday"
     Then the query is refused with error code lwql_parameter_invalid at HTTP 400, a customer fault
     And the refusal names the parameter and nothing else from the server's message
+
+  @unit
+  Scenario: An ISO instant bound to a date-time parameter is sent as the same moment the server can read
+    Given a query declaring {start:DateTime64(3, 'UTC')} and {day:DateTime}
+    When the request binds start to "2026-11-01T00:00:00Z" and day to "2026-11-01T02:00:00+02:00"
+    Then the server receives each as Unix seconds for that moment, start with its fraction and day whole
+    And a value that is not an ISO instant with an offset is sent exactly as the caller bound it
+
+  @unit
+  Scenario: Placeholder text inside a string literal or comment does not change a bound value
+    Given a query declaring {s:String} that also holds the text {s:DateTime} in a string literal and in a comment
+    When the request binds s to "2026-11-01T00:00:00Z"
+    Then the server receives s exactly as the caller bound it
 
   @unit
   Scenario: A missing column passed to a function is named in the refusal
@@ -742,6 +775,409 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given the parser, the restricted identity, or the row-policy setup is unavailable
     When a client submits a LangWatchQL query
     Then the query is rejected rather than executed with weaker guarantees
+
+  # ---------------------------------------------------------------------------
+  # Organizations with a private ClickHouse (issue #9248). The placement gate
+  # (specs/lwql/isolation.feature) admits a routed organization only where its
+  # own server is provisioned, probed as that organization's derived reader. The
+  # upgrade creates the database, app functions, views and engine tables on
+  # each server, signing in as the route URL's admin; the reader, its profile,
+  # grants and row policies come from a users.d file the render task writes
+  # (rendered mode, the default) or from statements (sql mode), the same mode
+  # as the shared run. Queries use only the reader.
+  # ---------------------------------------------------------------------------
+
+  @unit
+  Scenario: A LangWatchQL query for an organization with a private ClickHouse runs on that ClickHouse as the organization's derived reader
+    Given an organization whose projects are routed to its own ClickHouse by a URL carrying that server's admin user and password
+    When a LangWatchQL query reads that organization's projects
+    Then it runs on the route's server and database
+    And it connects as the reader derived from the key pepper and the organization id
+    And it never connects with the user or password in the route URL, nor with the shared LangWatchQL user or password
+    And a query for an organization without a private ClickHouse still runs on the shared ClickHouse as the LangWatchQL identity
+
+  @unit
+  Scenario: A private route with no key pepper to derive a reader from is refused
+    Given an organization routed to its own ClickHouse
+    And this deployment has no key pepper and no reader password of that organization's own
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code lwql_unavailable before any client is built for that route
+    And neither the route URL's login nor the shared LangWatchQL user and password is sent to the route's server
+
+  @unit
+  Scenario: Two organizations never share a derived reader
+    Given two organizations with private ClickHouses
+    When their readers are derived
+    Then each reader has a different lower-case login name and a different password
+    And the same organization always derives the same reader
+
+  # A private instance's own reader password (ADR-200): the platform keeps it, the instance's
+  # server gets only its sha256, so no platform secret, nor anything derived from one, reaches it.
+  @unit
+  Scenario: A private ClickHouse's reader signs in with the instance's own password where one is set
+    Given LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> holds a password for an organization routed to its own ClickHouse
+    When a LangWatchQL query reads that organization's projects, or the upgrade provisions its server
+    Then the reader signs in and is provisioned with that password, whether or not a key pepper is set
+    And its login name is still the one derived from the organization id
+    And no password derived from the key pepper is used for that organization
+
+  @unit
+  Scenario: Without its own password a private reader falls back to the key pepper and warns
+    Given an organization routed to its own ClickHouse with no LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id>
+    And a key pepper is set
+    When the upgrade provisions its server, or the render task renders its reader
+    Then the reader's password is derived from the key pepper and the organization id, as before
+    And a warning names the organization and the variable to set, never a password
+
+  @unit
+  Scenario: A blank or doubled private reader password is refused, never derived
+    Given an organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is empty or holds only whitespace, or two such variables name it
+    And the empty value may come from the environment or the .env file the secrets chain reads
+    When a LangWatchQL query reads its projects, the upgrade provisions its server, or the render task renders its reader
+    Then the organization gets no reader: its queries are refused, its server is not converged and the render fails naming the variable
+    And no password derived from the key pepper stands in for it
+
+  @unit
+  Scenario: A short or shared private reader password is refused, never derived
+    Given an organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> holds fewer than 32 characters once trimmed, or the same value as another organization's
+    When its reader password is read
+    Then each such organization is refused as a blank one is, naming its variable
+    And no password derived from the key pepper stands in for it
+
+  @unit
+  Scenario: A private reader password variable naming no organization is ignored
+    Given a LWQL_PRIVATE_READER_PASSWORD__ variable with no organization id after its last "__", or one starting with "_"
+    When the reader passwords are read
+    Then it gives no organization a password and refuses none
+
+  @unit
+  Scenario: The upgrade and render tasks read private reader passwords through the secrets chain
+    Given LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is held by a source the secrets chain reads, such as the workspace .env file, and not by the task's environment
+    When the upgrade provisions that organization's server, or the render task renders its reader
+    Then the reader uses that password, as the api's does
+    And a blank value the task's environment carries is still refused
+
+  @unit
+  Scenario: Each private ClickHouse is provisioned with its own derived reader
+    Given a deployment with a private ClickHouse route for an organization
+    When the upgrade provisions LangWatchQL
+    Then the LangWatchQL views are created on that server, in the route's database, and in sql mode the reader's profile, grants and row policies too
+    And the reader is the organization's derived reader, with the tenant setting the router sends
+    And the PostgreSQL statements run once, not once per private server
+
+  @unit
+  Scenario: Provisioning never creates, replaces or alters the route URL's own user
+    Given a private ClickHouse route whose URL carries an admin user
+    When the upgrade provisions LangWatchQL on it
+    Then no statement creates, replaces, alters or grants for the route URL's user
+    And that user's password is never written into a statement
+
+  @unit
+  Scenario: A second organization on a private database claimed in the same run is refused and warned
+    Given two organizations whose routes in one run name the same server and database
+    When the upgrade provisions LangWatchQL
+    Then that database is converged once, for the first organization in code-point id order
+    And the other is refused with a warning naming it, and its queries stay refused
+
+  @unit
+  Scenario: A private route naming a shared server's origin is refused and warned
+    Given an organization whose route names the origin of the shared ClickHouse or of its LangWatchQL connection, whatever the database
+    When the upgrade provisions LangWatchQL
+    Then nothing is converged for it and a warning names the organization
+
+  @unit
+  Scenario: A private ClickHouse that cannot be provisioned warns and leaves the rest running
+    Given a private ClickHouse whose admin lacks a grant the setup needs
+    When the upgrade provisions LangWatchQL
+    Then a warning names the organization and the reason, with the route URL and passwords redacted
+    And the shared ClickHouse and every other private ClickHouse are still provisioned
+    And the upgrade does not fail on that target, so its queries stay refused
+
+  @unit
+  Scenario: Private provisioning is skipped without a key pepper
+    Given a deployment with a private ClickHouse route and no key pepper
+    When the upgrade provisions LangWatchQL
+    Then no private server is touched and a warning says why
+    And the organization's queries stay refused
+
+  @unit
+  Scenario: A private ClickHouse binds its views to its own lwql_postgres and never carries the shared Postgres password
+    Given a private ClickHouse whose config mounts a lwql_postgres named collection holding that customer's own PostgreSQL login
+    When the upgrade provisions LangWatchQL on it
+    Then every PostgreSQL-backed engine table binds to that lwql_postgres collection
+    And no statement creates or alters a named collection
+    And no statement contains the shared PostgreSQL reader password
+
+  @unit
+  Scenario: In rendered mode a private ClickHouse gets its views and engine tables but no access entity
+    Given the shared run's access model is rendered, as it is with LWQL_ACCESS_MODEL_MODE unset
+    And a private ClickHouse of two replicas on local access storage, whose admin cannot manage access, that mounts lwql_postgres
+    And its source database uses the Replicated engine, so a plain CREATE reaches every replica
+    When the upgrade provisions LangWatchQL on it
+    Then no statement creates a user, settings profile, row policy or grant
+    And the sql-mode cluster guard is not asked, so the replicas do not refuse it
+    And the key map and every PostgreSQL-backed engine table bind to lwql_postgres, and the views are created
+
+  @unit
+  Scenario: In rendered mode a private ClickHouse of several hosts whose database is not Replicated is not converged
+    Given the shared run's access model is rendered
+    And a private ClickHouse of more than one host whose source database does not use the Replicated engine
+    When the upgrade provisions LangWatchQL on it
+    Then no statement runs, since a plain CREATE would reach one host only
+    And a warning names the organization, the database and its engine, and the organization's queries stay refused
+
+  @unit
+  Scenario: In rendered mode a private ClickHouse holding a SQL-created reader is not converged
+    Given the shared run's access model is rendered
+    And a private ClickHouse whose access storage already holds the organization's reader created by an earlier sql-mode upgrade
+    When the upgrade provisions LangWatchQL on it
+    Then no statement runs, since rendered mode never updates that reader
+    And any access store other than users_xml counts, whatever its name and wherever it is listed among the reader's entries
+    And a warning names the reader and its storage, never a password, and says to drop it so the users.d file takes over
+
+  @unit
+  Scenario: A rendered private ClickHouse whose reader is not loaded yet says so, not that it is not isolated
+    Given the shared run's access model is rendered
+    And a private ClickHouse provisioned without error that does not hold the organization's reader yet
+    When the post-provisioning check reads the server
+    Then a warning says the reader is not loaded yet and the organization's queries stay refused until the users.d file is mounted
+    And no warning says its queries are not isolated
+
+  @unit
+  Scenario: In sql mode a private ClickHouse keeps the SQL access entities and the cluster guard
+    Given the shared run's access model is sql
+    When the upgrade provisions LangWatchQL on a private ClickHouse
+    Then a server of several replicas without replicated access storage is refused before any statement runs
+    And a single-host server gets the reader, its profile, row policies and grants by statement
+
+  @unit
+  Scenario: The render task renders a private ClickHouse's reader as a users.d file, offline
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID names an organization and a key pepper is set
+    And LWQL_RENDER_PRIVATE_DATABASE names the private database, or is unset for langwatch
+    When lwql-render-access-config runs with no ClickHouse or PostgreSQL connection
+    Then it writes users.d/lwql-access.yaml under LWQL_RENDER_OUT_DIR and no named-collection file
+    And the file is readable by its owner only, even where an earlier file had a broader mode
+    And it is written to an owner-only file beside it and renamed into place, so it is never readable at a looser mode
+    And the file holds the organization's derived reader, its settings profile and the sha256 of its password, never the password or the pepper
+    And its profile, row policies and grants are exactly those the private sql path would create, over the private database, the key map being the project-keys engine table
+    And every grant is a SELECT, with no POSTGRES or NAMED COLLECTION grant
+
+  @unit
+  Scenario: The private render target fails by name without a key pepper
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set
+    And none of API_KEY_PEPPER, CREDENTIALS_SECRET or NEXTAUTH_SECRET is set, nor a password hash or the organization's own password
+    When lwql-render-access-config runs
+    Then it fails naming those inputs and writes no file
+    And with a later pepper in that chain set it derives the same reader the upgrade does
+
+  @unit
+  Scenario: A blank private organization id fails rather than render the shared target
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set but holds only whitespace
+    When lwql-render-access-config runs
+    Then it fails naming LWQL_RENDER_PRIVATE_ORGANIZATION_ID
+    And it writes no file, so the shared PostgreSQL reader's password never reaches a private server's config
+
+  @unit
+  Scenario: The private render reads the key pepper through the upgrade's secrets chain
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set
+    And the runner's secrets chain answers a key pepper
+    When lwql-render-access-config runs
+    Then the reader is derived from the chain's pepper, as the upgrade derives it, over any environment value
+    And with no chain the environment's pepper is used
+
+  @unit
+  Scenario: The private render logs the reader and database it rendered, never a secret
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID is set with surrounding whitespace
+    When lwql-render-access-config runs
+    Then the reader is derived from the trimmed organization id
+    And it logs the reader's login name and the database, never the password, its hash or the pepper
+
+  @unit
+  Scenario: The private render writes a given password hash and needs no key pepper
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID names an organization
+    And LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 holds the sha256 of its reader password as 64 lower-case hex characters
+    And no key pepper is set
+    When lwql-render-access-config runs
+    Then users.d/lwql-access.yaml holds that hash as the organization's reader password_sha256_hex
+    And with a key pepper or the organization's own password also set, the given hash still wins
+    And the render with the organization's own password and no hash writes that password's sha256
+
+  @unit
+  Scenario: The private render refuses a malformed password hash
+    Given LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 is blank, is not 64 lower-case hex characters, or is set without LWQL_RENDER_PRIVATE_ORGANIZATION_ID
+    When lwql-render-access-config runs
+    Then it fails naming LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 and writes no file
+    And it never falls back to the key pepper or to the shared target
+
+  @unit
+  Scenario: A given password hash never stands in for a refused private reader password
+    Given LWQL_RENDER_PRIVATE_ORGANIZATION_ID names an organization and LWQL_RENDER_PRIVATE_READER_PASSWORD_SHA256 holds a well-formed hash
+    And that organization's LWQL_PRIVATE_READER_PASSWORD__<label>__<organization id> is refused: empty, blank, short or shared, or two such variables name it
+    When lwql-render-access-config runs
+    Then it fails naming the refused variable and writes no file
+    And the given hash does not stand in for it, as the api and the upgrade refuse that organization too
+
+  @unit
+  Scenario: A private ClickHouse whose rendered reader is not loaded yet stays refused as not provisioned
+    Given a private ClickHouse whose views were provisioned but whose users.d does not hold the organization's reader yet
+    When the placement gate probes it as that reader
+    Then the server's refusal of the login is read as LangWatchQL not set up there
+    And the probe answers not provisioned, so the organization's queries are refused with error code lwql_not_provisioned
+
+  @unit
+  Scenario: A private ClickHouse without lwql_postgres is left unprovisioned and warns
+    Given a private ClickHouse that holds no lwql_postgres named collection
+    When the upgrade provisions LangWatchQL on it
+    Then no statement runs on that server and a warning says the collection is absent
+    And the organization's queries stay refused
+
+  @unit
+  Scenario: The Postgres scoped schema carries a row-scoped copy of each project's key capability
+    Given the scoped-reader group exists
+    When the upgrade writes the scoped copies
+    Then lwql_scoped holds a security_barrier view of the project ids and the lower-hex sha256 of each lwqlKey
+    And it shows a row only to a login in the owning organization's lwql_org role, like the other copies
+    And the scoped reader group is granted SELECT on it only after the scoped-view check
+
+  @unit
+  Scenario: A private ClickHouse reads its key map from Postgres through lwql_postgres
+    Given a private ClickHouse that mounts lwql_postgres
+    When the upgrade provisions LangWatchQL on it
+    Then its key map is a PostgreSQL-engine table over the scoped project keys, bound to lwql_postgres
+    And no local key-map table is created and every row policy reads that engine table
+    And no statement gives the server a key row, so the engine table is its only source
+
+  @unit
+  Scenario: No provisioning statement sent to a private ClickHouse carries a capability
+    Given the plan for a private ClickHouse
+    When its statements are rendered
+    Then none inserts a row and none carries a key hash or a tenant capability value, only the reader's own password hash
+
+  @unit
+  Scenario: The shared ClickHouse keeps its local key-map table
+    Given the plan for the shared ClickHouse
+    When its statements are rendered
+    Then it still creates the local key-map table and the row policies read it
+
+  @unit
+  Scenario: A private ClickHouse is provisioned after the shared one, and PostgreSQL runs once
+    Given routes for two organizations on their own ClickHouse servers
+    When the provisioning task runs
+    Then the shared server converges first, and the private step runs once with both routes
+    And no private server's converge runs a PostgreSQL statement
+
+  @unit
+  Scenario: Private provisioning waits for the shared converge and is skipped when it fails
+    Given the shared server's converge did not complete
+    When the provisioning task runs
+    Then no private server is touched and one warning says why
+
+  @unit
+  Scenario: A malformed private route variable warns and never fails the upgrade
+    Given the ClickHouse route variables cannot be read
+    When the provisioning task runs
+    Then it warns without the route text, skips the private servers and the upgrade completes
+
+  @unit
+  Scenario: The project-keys copy is written and granted on every scoped converge
+    Given the scoped-reader group exists
+    When a full converge or a drift repair writes the scoped copies
+    Then a full converge writes the project-keys copy after the group's grants
+    And a repair writes it only when that copy is a gap
+
+  @unit
+  Scenario: A private ClickHouse with a source table not policed for the reader after provisioning warns
+    Given a private ClickHouse provisioned without error
+    And the server holds the organization's reader
+    And a source table or the key map has no row policy for the organization's reader, or one applying to all or all but some
+    When the post-provisioning check reads the server
+    Then a warning names the tables and says its queries are not isolated
+
+  @unit
+  Scenario: A LangWatchQL query for an organization whose private route is missing is refused, never answered from the shared ClickHouse
+    Given an organization recorded as keeping its data on its own ClickHouse
+    And this deployment has no route to that ClickHouse
+    When a LangWatchQL query reads that organization's projects
+    Then a plain route error is refused with error code lwql_unavailable
+    And the router's handled private_dataplane_unavailable passes through as the same error, its code, its 503 status and the variable it names (never its value) unchanged
+    And no statement runs on the shared ClickHouse
+
+  @unit
+  Scenario: A LangWatchQL query spanning organizations is refused
+    Given projects that belong to two organizations
+    When one LangWatchQL query reads them together
+    Then the query layer refuses it with error code lwql_unavailable before any statement runs
+    And from REST with a project key the request gets 404 project_not_found earlier, so this refusal is not reached there
+
+  @unit
+  Scenario: A LangWatchQL query on a private ClickHouse without LangWatchQL set up is refused
+    Given an organization whose private ClickHouse refuses the route's login or has no LangWatchQL views
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code lwql_unavailable, saying LangWatchQL is not set up on this organization's ClickHouse yet
+    And the refusal names no URL, user or password
+
+  @unit
+  Scenario: A statement on a private route names the route's database, never the shared one
+    Given an organization routed to its own ClickHouse, whose route names the database acme_db
+    When a LangWatchQL query or pass reads that organization's projects
+    Then unqualified table names resolve to acme_db
+    And a statement naming acme_db runs, and it runs only on the route's server
+    And a statement naming the shared database is refused with error code lwql_not_permitted before any statement runs
+    And on an organization without a private ClickHouse a statement naming acme_db is refused the same way
+    And the generated member-window and completeness statements name acme_db too
+
+  @unit
+  Scenario: A pass on a private route validates against the route's database and asks the route once
+    Given an organization routed to its own ClickHouse
+    When a pass runs a statement over that organization's project
+    Then the statement is validated against the route's database
+    And the route is asked once for the pass
+
+  @unit
+  Scenario: A private route's statement may not use FINAL or SAMPLE on a PostgreSQL-resident view
+    Given an organization routed to its own ClickHouse
+    When a query or a pass names a PostgreSQL-resident view qualified with the route's database and uses FINAL
+    Then it is refused with error code lwql_table_modifier_unsupported before any statement runs
+
+  @unit
+  Scenario: A bad statement for an organization with no usable route gets the route refusal first
+    Given an organization whose route is missing or broken
+    When a LangWatchQL query reads that organization's projects with a statement the policy would refuse
+    Then the query layer refuses it with the route's refusal, lwql_unavailable or private_dataplane_unavailable
+    And no statement runs
+
+  @unit
+  Scenario: A deployment with no LangWatchQL identity judges the statement first
+    Given this deployment has no LangWatchQL restricted identity
+    When a LangWatchQL query is run with a statement the caller may not read
+    Then the query layer refuses it with the policy's refusal, lwql_not_permitted
+    And a statement the caller may read is refused with error code lwql_unavailable
+
+  @unit
+  Scenario: A save needs no route
+    Given a statement is saved without being run
+    When it is validated
+    Then no route is asked
+    And a statement naming the shared database saves, and is refused at run on a private organization
+    And a statement naming a private route's database is refused at save
+
+  @unit
+  Scenario: A run validates against its route's database before anything is judged
+    Given an organization routed to its own ClickHouse, whose route names the database acme_db
+    When a run is validated at its start
+    Then the route is asked once, and the statement is judged against acme_db
+    And a statement naming the shared database is refused with error code lwql_not_permitted
+    And a statement naming acme_db is accepted
+    And an organization whose route is missing gets the route's refusal, not a statement refusal
+    And an organization without a private ClickHouse is judged against the shared database as before
+
+  @unit
+  Scenario: A private route whose database is not a plain ClickHouse name is refused
+    Given an organization routed to a URL whose path is not a plain lower-case identifier, carries SQL once decoded, names no database, names a reserved database such as system, or cannot be parsed at all
+    When a LangWatchQL query reads that organization's projects
+    Then the query layer refuses it with error code lwql_unavailable before any statement runs
+    And the refusal names no part of the route URL
+    And the reasons kept for operators carry no part of the route URL
 
   # ---------------------------------------------------------------------------
   # Resource safety (later PR of this issue — #6480)
@@ -1117,7 +1553,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
   # counts a view as drift only when it lacks a column this worker's catalog
   # declares, never for an extra one, so a newer deploy that added a column looks
   # healthy to an older worker, which leaves the newer view alone. Its grants are
-  # additive and never revoke, so a view only the newer catalog has keeps its
+  # additive and never revoke the shared reader, so a view only the newer catalog has keeps its
   # SELECT. A newer deploy that only removed a column is put back to the older
   # view by an older worker, and the newer worker accepts the extra column: the
   # view settles on the union of the columns both catalogs need, so it stops
@@ -1136,8 +1572,130 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
     Given a newer deploy has converged views and approved views that added columns this worker's catalog does not declare
     When this worker's reconvergence check runs
     Then it finds no drift and runs no DDL
-    And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes
-    And a deploy's converge still revokes and grants the reader role's whole set
+    And repairing a missing or ungranted approved view grants SELECT on that view alone and never revokes the shared reader
+    And the scoped-reader group's SELECT is revoked on every shared view and on any scoped copy that fails the scoped-view check
+    And a deploy's converge still revokes and grants the shared reader's whole set
+    And a deploy's converge or a repair warns, naming any scoped copy the scoped-reader group still cannot select
+
+  @integration
+  Scenario: A scoped view a deploy converge restores regains the scoped-reader group's SELECT
+    Given the scoped-reader group has SELECT on a row-scoped copy in lwql_scoped
+    And that copy is replaced by an unscoped look-alike and the group loses its SELECT
+    When a deploy's converge runs and restores the row-scoped copy
+    Then the scoped-reader group has SELECT on it again, with no manual step
+
+  # Scoped readers read copies of the approved views in schema lwql_scoped, under
+  # the same names. Each copy reads the base tables directly and carries a
+  # per-reader row scope: a login sees only the projects of the organizations
+  # whose lwql_org_<md5(organizationId)> role it is a member of, and no login is
+  # exempt. The shared lwql_* views keep main's definition; the shared reader
+  # reads those and keeps every row.
+  @integration
+  Scenario: Each Postgres reader login sees only its own organizations' projects
+    Given two logins in the scoped-reader group, each holding one organization's role
+    And the shared reader login
+    When the shared reader reads every shared view and each organization login every scoped copy
+    Then the shared reader sees exactly the TenantIds the base tables hold for each view
+    And each organization login sees only its organization's projects
+    And its rows equal the shared reader's rows filtered to that organization
+
+  @integration
+  Scenario: A Postgres reader's row scope follows a project moved to another organization
+    Given a project belongs to org_a and an org_b login reads every scoped copy
+    When the project moves to a team of org_b
+    Then the org_a login no longer sees the moved project
+    And the org_b login keeps every row it saw before and sees the moved project's rows through a project-path view
+
+  @integration
+  Scenario: A Postgres reader login with no organization role sees no rows
+    Given a login in the scoped-reader group that holds no organization role
+    When it reads every scoped copy
+    Then every copy returns no rows
+
+  # A copy without the barrier lets a caller's leaky function see rows the
+  # scope predicate would remove; the barrier must not cost the tenant filter
+  # its pushdown onto the scan of the relation carrying the project id.
+  @integration
+  Scenario: Every scoped copy is a security barrier and keeps the tenant filter pushed down
+    Given the scoped copies are provisioned
+    Then every one is created with security_barrier=true
+    And on the deepest join paths an organization login's TenantId filter is applied on the tenant relation's scan
+    And no subquery scan above the barrier carries that filter
+
+  # The scoped-reader group's grant reads the live copy's stored definition
+  # (pg_get_viewdef): it must be a security barrier and carry the org-role
+  # lookup, the pg_auth_members join and the rolname = current_user tie.
+  @integration
+  Scenario: The scoped-reader group is granted only a live view that is provably row-scoped
+    Given a live copy in lwql_scoped that is unscoped, or carries the org-role lookup without the membership join or the current-user tie
+    And the scoped-reader group holds a stale SELECT on it
+    When the app grants the scoped copies
+    Then the group's SELECT on that copy is revoked
+    And the group keeps SELECT on every row-scoped copy
+
+  @integration
+  Scenario: Provisioning without the scoped-reader group is unchanged
+    Given a deployment where the scoped-reader group does not exist
+    When the app provisions the approved views
+    Then provisioning succeeds without creating the group
+    And no lwql_scoped schema exists, and the shared views keep main's definition
+    And the shared reader still reads every view
+
+  @integration
+  Scenario: The scoped-reader state read reports nothing and raises nothing without the group
+    Given live copies, and a group name that may or may not exist
+    When the converge reads the scoped-reader group's reach
+    Then a group that does not exist yields no copy, no shared grant and no error
+    And a copy passes only when it is a security barrier carrying the row scope tied to the current user
+    And a copy is granted only when the group holds USAGE on lwql_scoped and SELECT on the copy
+    And the scoped schema is this installation's only when its comment names this app schema
+
+  # Scoped readers read copies in schema lwql_scoped that read base tables
+  # directly; no older version writes that schema, so its converge (a rollback's
+  # included) cannot unscope them. Shared lwql_* views keep main's definition.
+  @integration
+  Scenario: An older version's converge cannot weaken a scoped copy
+    Given the scoped-reader group has SELECT on every scoped copy
+    When an older version's converge rewrites the shared views, its drop-and-create fallback included
+    Then every scoped copy's stored definition and options are unchanged
+    And the group can select no relation outside the scoped copies that pass the scoped-view check
+    And each organization login sees only its organizations' rows through every scoped copy
+
+  @integration
+  Scenario: Without CREATE on the database, the scoped part fails closed
+    Given the scoped-reader group exists, lwql_scoped is absent and the app role lacks CREATE on the database
+    When a deploy's converge runs
+    Then the shared views and the shared reader's grants converge as without the group
+    And a warning says the scoped schema is absent
+    And the group can select no relation
+
+  # lwql_scoped is one per database, the app schema one per installation: the
+  # schema's comment names the app schema that created it, so two installations
+  # sharing a database never write each other's copies.
+  @integration
+  Scenario: A scoped schema marked as another installation's is left alone
+    Given the scoped-reader group exists and lwql_scoped exists with a comment naming another app schema
+    When a deploy's converge runs
+    Then no copy is written into it and the group is granted nothing in it
+    And the group can select no relation
+    And a warning says lwql_scoped is not marked as this installation's
+
+  @unit
+  Scenario: The reconvergence check guards every scoped copy
+    Given the scoped-reader group exists
+    And it holds SELECT on a shared view, one copy is absent, one is replaced by an unscoped look-alike, and one lacks its grant
+    When the reconvergence check runs
+    Then it revokes the group on the shared view and the look-alike before any DDL
+    And it rebuilds only the absent and unscoped copies, and no shared view
+    And it grants the group each copy only once it passes the scoped-view check
+
+  @integration
+  Scenario: Scoped copies exist only where the scoped-reader group does
+    Given no scoped-reader group
+    When a deploy's converge runs
+    Then no lwql_scoped schema exists and the check reports no scoped gap
+    When the group is created and the next reconvergence check runs
+    Then every scoped copy exists and the group has USAGE on lwql_scoped only
 
   # A deploy converges views after the engine tables and stops at the first
   # failing statement, so a deploy whose PostgreSQL bridge fails never replaces
@@ -1437,6 +1995,7 @@ Feature: LangWatchQL analytics SQL API — read-only native ClickHouse SQL over 
 #  views are usable at scale)
 #   → Scenario: A LangWatchQL view returns only the calling tenant's rows
 #   → Scenario: A LangWatchQL view returns one row per logical record, the latest version
+#   → Scenario: A plain span_metrics read counts a residual duplicate span
 #   → Scenario: A column no LangWatchQL view exposes is unreachable, not merely unselected
 #   → Scenario: Reading the physical fact table directly is policed the same way
 #   → Scenario: Row policies leave the application's own reads untouched

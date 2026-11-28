@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
 import type { Named } from "@langwatch/module";
+import { CODING_AGENTS_PATH } from "@langwatch/user-contract";
 import { z } from "zod";
 
 export const governanceOrganizationIntentSchema = z.enum(["AGENT_GOVERNANCE", "LLM_OPS"]);
@@ -25,6 +26,8 @@ const personaResolverInputSchemaDefinition = z
     isEnterprise: z.boolean(),
     hasGovernanceUi: z.boolean(),
     firstProjectSlug: z.string().nullable(),
+    /** The plan page for a Billing-only member (ADR-205); null for everyone else. */
+    planHome: z.enum(["/settings/subscription", "/settings/license"]).nullable(),
   })
   .strict();
 export interface PersonaResolverInputSchema extends Named<
@@ -62,13 +65,26 @@ export class PersonaHomeResolverService {
   resolve(input: PersonaResolverInput): PersonaResolution {
     const persona = this.detectPersona(input);
 
+    // A Billing-only member reaches nothing else (ADR-205): the plan page beats every other rule,
+    // and the browser's remembered product, which is why it answers as an override.
+    if (input.planHome) {
+      return {
+        persona,
+        destination: input.planHome,
+        isOverride: true,
+        governanceUiEnabled: input.hasGovernanceUi,
+        intentPinned: false,
+        firstProjectSlug: input.firstProjectSlug,
+      };
+    }
+
     if (input.organizationIntent) {
       const projectHome = input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/settings";
       return {
         persona,
         destination:
           input.organizationIntent === "AGENT_GOVERNANCE" && input.hasGovernanceUi
-            ? "/me"
+            ? CODING_AGENTS_PATH
             : projectHome,
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi,
@@ -116,11 +132,12 @@ export class PersonaHomeResolverService {
         isEnterprise: input.isEnterprise ?? false,
         hasGovernanceUi: input.hasGovernanceUi ?? false,
         firstProjectSlug: input.firstProjectSlug,
+        planHome: input.planHome ?? null,
       });
     } catch {
       return {
         persona: "project_only",
-        destination: input.firstProjectSlug ? `/${input.firstProjectSlug}` : "/me",
+        destination: input.firstProjectSlug ? `/${input.firstProjectSlug}` : CODING_AGENTS_PATH,
         isOverride: false,
         governanceUiEnabled: input.hasGovernanceUi ?? false,
         intentPinned: false,
@@ -145,7 +162,7 @@ export class PersonaHomeResolverService {
   }
 
   private mapPersonaToDestination(persona: Persona, input: PersonaResolverInput): string {
-    const noProjectHome = input.hasGovernanceUi ? "/me" : "/onboarding/welcome";
+    const noProjectHome = input.hasGovernanceUi ? CODING_AGENTS_PATH : "/onboarding/welcome";
     const projectHome = input.firstProjectSlug ? `/${input.firstProjectSlug}` : noProjectHome;
 
     if (!input.hasGovernanceUi) return projectHome;
@@ -154,7 +171,7 @@ export class PersonaHomeResolverService {
         return "/governance";
       case "personal_only":
       case "mixed":
-        return "/me";
+        return CODING_AGENTS_PATH;
       case "project_only":
         return projectHome;
     }

@@ -1,13 +1,18 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-import type { GovernanceIngestionSource } from "@langwatch/enterprise-governance-contract";
-import { Temporal, toDate } from "@langwatch/time";
+import {
+  ingestionSourceAwaitsFirstEvent,
+  ingestionSourceStatusIsOff,
+  type GovernanceIngestionSource,
+} from "@langwatch/enterprise-governance-contract";
+import { Temporal, toDate, type Instant } from "@langwatch/time";
 
 import {
   IngestionSourceRepository,
   type CreateIngestionSourceRecord,
   type CursorPinnedUpdate,
   type IngestionSourceClaim,
+  type ReceivingIngestionSource,
   type UnpricedUsageSourceWindow,
   type UnpricedUsageWindow,
   type UpdateIngestionSourceRecord,
@@ -118,6 +123,20 @@ export class MemoryIngestionSourceRepository extends IngestionSourceRepository {
     };
     this.rows[index] = next;
     return toSource(next);
+  }
+
+  async recordEventReceived(
+    source: ReceivingIngestionSource,
+    at: Instant,
+  ): Promise<{ wentLive: boolean }> {
+    const row = this.rows.find((candidate) => candidate.id === source.id);
+    if (row === undefined || ingestionSourceStatusIsOff(row.status)) return { wentLive: false };
+
+    // As Prisma's: a source read as live never tries the first-event write; the row decides it.
+    const wentLive =
+      ingestionSourceAwaitsFirstEvent(source.status) && ingestionSourceAwaitsFirstEvent(row.status);
+    await this.update(source.id, { lastEventAt: at, status: "active" });
+    return { wentLive };
   }
 
   async getUnpricedUsageWindow(id: string): Promise<UnpricedUsageWindow> {

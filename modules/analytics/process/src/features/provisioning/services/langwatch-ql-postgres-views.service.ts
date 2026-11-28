@@ -6,9 +6,16 @@ import { LWQL_VIEW_CATALOG } from "../../../rules/lwql-view-catalog.rules.ts";
 import type { LangWatchQLNames } from "../../../services/langwatch-ql-access-model.service.ts";
 import {
   LangWatchQLCatalogShapesService,
+  type LangWatchQLPostgresMapping,
   type LangWatchQLViewDefinition,
 } from "../../../services/langwatch-ql-catalog-shapes.service.ts";
+import { LangWatchQLSqlTextService } from "../../../services/langwatch-ql-sql-text.service.ts";
 import { postgresEngineColumnType } from "../rules/lwql-postgres-engine-type.rules.ts";
+import {
+  LWQL_SCOPED_SCHEMA,
+  LWQL_PROJECT_KEYS_VIEW,
+  scopedCopiesWritableCondition,
+} from "../rules/lwql-scoped-view.rules.ts";
 import {
   DEFAULT_POSTGRES_ENGINE_POOL_SIZE,
   LangWatchQLPostgresMappingService,
@@ -16,6 +23,7 @@ import {
 } from "./langwatch-ql-postgres-mapping.service.ts";
 
 const postgresMapping = LangWatchQLPostgresMappingService.create();
+const sqlText = LangWatchQLSqlTextService.create();
 
 const catalogShapes = LangWatchQLCatalogShapesService.create();
 
@@ -36,6 +44,41 @@ function singleSourceColumn(view: LangWatchQLViewDefinition, columnName: string)
   }
 
   return only;
+}
+
+/** One dataset's view body: the relations it reads in `schema`, and the tenant's alias. */
+function approvedViewShape({
+  schema,
+  view,
+}: {
+  schema: string;
+  view: LangWatchQLViewDefinition & { postgres: LangWatchQLPostgresMapping };
+}) {
+  const joins = view.postgres.tenantPath ?? [];
+  // The project column lives on the last hop's relation (the base itself
+  // when the path is empty), so the tenant column is read on that alias
+  // while every other column reads off the base.
+  const tenantAlias = joins[joins.length - 1]?.alias ?? POSTGRES_BASE_ALIAS;
+  const tenant = { alias: tenantAlias, column: view.postgres.tenantSourceColumn };
+
+  return {
+    tenant,
+    statement: {
+      schema,
+      view: view.postgres.approvedView,
+      baseRelation: view.postgres.baseRelation,
+      joins,
+      ...(view.postgres.rowFilter !== undefined ? { rowFilter: view.postgres.rowFilter } : {}),
+      columns: view.columns.map((column) => ({
+        exposed: column.name,
+        // The tenant column is the one rename every mapping performs; the rest
+        // are the base relation's own names, taken from the catalog.
+        source:
+          column.name === TENANT_COLUMN ? tenant.column : singleSourceColumn(view, column.name),
+        ...(column.name === TENANT_COLUMN ? { alias: tenant.alias } : {}),
+      })),
+    },
+  };
 }
 
 /** The PostgreSQL side of the catalog: approved views and the tables mapping them in. */
@@ -66,31 +109,89 @@ export class LangWatchQLPostgresViewsService {
      */
     readerRole?: string;
   }): string[] {
+    return catalogShapes.postgresViews(views).map((view) =>
+      postgresMapping.approvedViewStatement({
+        ...approvedViewShape({ schema, view }).statement,
+        ...(readerRole !== undefined ? { readerRole } : {}),
+      }),
+    );
+  }
+
+  /**
+   * The scoped copies: each approved view, same name, in {@link LWQL_SCOPED_SCHEMA}, reading the
+   * base tables in `schema` with the row scope. Each runs only when the group exists and the
+   * scoped schema is this installation's.
+   */
+  scopedViewStatements({
+    schema,
+    views = LWQL_VIEW_CATALOG,
+  }: {
+    /** PostgreSQL schema the application's tables live in. */
+    schema: string;
+    views?: readonly LangWatchQLViewDefinition[];
+  }): string[] {
+    const onlyWhen = scopedCopiesWritableCondition({ appSchema: schema });
+
     return catalogShapes.postgresViews(views).map((view) => {
-      const joins = view.postgres.tenantPath ?? [];
-      // The project column lives on the last hop's relation (the base itself
-      // when the path is empty), so the tenant column is read on that alias
-      // while every other column reads off the base.
-      const tenantAlias = joins[joins.length - 1]?.alias ?? POSTGRES_BASE_ALIAS;
+      const shape = approvedViewShape({ schema, view });
 
       return postgresMapping.approvedViewStatement({
-        schema,
-        view: view.postgres.approvedView,
-        baseRelation: view.postgres.baseRelation,
-        joins,
-        ...(view.postgres.rowFilter !== undefined ? { rowFilter: view.postgres.rowFilter } : {}),
-        ...(readerRole !== undefined ? { readerRole } : {}),
-        columns: view.columns.map((column) => ({
-          exposed: column.name,
-          // The tenant column is the one rename every mapping performs; the rest
-          // are the base relation's own names, taken from the catalog.
-          source:
-            column.name === TENANT_COLUMN
-              ? view.postgres.tenantSourceColumn
-              : singleSourceColumn(view, column.name),
-          ...(column.name === TENANT_COLUMN ? { alias: tenantAlias } : {}),
-        })),
+        ...shape.statement,
+        rowScope: { tenant: shape.tenant },
+        viewSchema: LWQL_SCOPED_SCHEMA,
+        onlyWhen,
       });
+    });
+  }
+
+  /**
+   * The scoped copy of project keys: each project's `lower-hex sha256(lwqlKey)` and id, row-scoped
+   * like the other copies. The hash is the exact token the app's key map stores
+   * (`createHash("sha256").update(key).digest("hex")`), so the ClickHouse side compares equal.
+   */
+  projectKeysScopedViewStatement({ schema }: { schema: string }): string {
+    const base = sqlText.postgresQuoted(POSTGRES_BASE_ALIAS);
+    return postgresMapping.approvedViewStatement({
+      schema,
+      view: LWQL_PROJECT_KEYS_VIEW,
+      baseRelation: "Project",
+      columns: [
+        {
+          exposed: "KeyHash",
+          expression: `encode(sha256(convert_to(${base}."lwqlKey", 'UTF8')), 'hex')`,
+        },
+        { exposed: "TenantId", source: "id" },
+      ],
+      rowFilter: `coalesce(${base}."lwqlKey", '') <> ''`,
+      rowScope: { tenant: { alias: POSTGRES_BASE_ALIAS, column: "id" } },
+      viewSchema: LWQL_SCOPED_SCHEMA,
+      onlyWhen: scopedCopiesWritableCondition({ appSchema: schema }),
+    });
+  }
+
+  /**
+   * The ClickHouse key map of a private server: a PostgreSQL-engine table over the scoped
+   * project-key copy, bound to the collection the server's config mounts. It carries no rows.
+   */
+  keyMapEngineTableStatement({
+    names,
+    collection,
+    schema,
+  }: {
+    names: LangWatchQLNames;
+    collection: string;
+    schema: string;
+  }): string {
+    return postgresMapping.engineTableStatement({
+      names,
+      table: names.keyMapTable,
+      columns: [
+        { name: "KeyHash", type: "String" },
+        { name: "TenantId", type: "String" },
+      ],
+      collection,
+      postgresRelation: LWQL_PROJECT_KEYS_VIEW,
+      schema,
     });
   }
 

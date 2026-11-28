@@ -52,7 +52,7 @@ Feature: Role-based default models with per-scope overrides
     Then below the providers list I see a "Default Models" section
     And the section renders a table with one row per ModelDefaultConfig the caller can see
     And the table header reads "Scopes / Default / Fast / Embeddings" plus a per-row Edit affordance
-    And above the table I see a scope filter ("All you can see" / "This Team" / "This Project" / "More Scopes ▸")
+    And above the table I see a scope filter ("All you can see" / "Team [team name]" / "Project [project name]" / "More Scopes ▸", names in a badge)
     # The "three effective lines at the top" of the pre-redesign UI is
     # gone; the table itself tells the cascade story. A specific-scope
     # filter pick swaps to the resolved-cascade view (one row per role

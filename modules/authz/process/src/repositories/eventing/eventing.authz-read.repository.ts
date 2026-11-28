@@ -13,7 +13,7 @@ import {
   type ShareLinkRow,
 } from "../authz-read.repository.ts";
 import { RESOURCE_KIND_TO_DB } from "../prisma/prisma.authz-grant.mapper.ts";
-import { liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
+import { findReplacedGrantIds, liveGrants, liveRoles } from "./eventing.authz-live-rows.mapper.ts";
 import {
   BINDING_SCOPE_TYPES,
   type BindingGrantRow,
@@ -75,6 +75,22 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     return rows.map((row) => row.userId);
   };
 
+  findActiveMemberIds = async ({
+    organizationId,
+    limit,
+  }: {
+    organizationId: string;
+    limit: number;
+  }): Promise<string[]> => {
+    const rows = (await this.database.organizationUser.findMany({
+      where: { organizationId, disabledAt: null },
+      select: { userId: true },
+      orderBy: { userId: "asc" },
+      take: limit,
+    })) as { userId: string }[];
+    return rows.map((row) => row.userId);
+  };
+
   findUserBindings = async ({
     userId,
     organizationId,
@@ -94,7 +110,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         principalId: userId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
+      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true, condition: true },
     })) as StoredBindingGrantRow[];
     return collectBindings({ rows: rows.map(withStoredEnd), viaGroupId: () => null });
   };
@@ -131,6 +147,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         scopeId: true,
         principalId: true,
         expiresAt: true,
+        condition: true,
       },
     })) as (StoredBindingGrantRow & { principalId: string })[];
     return collectBindings({
@@ -156,7 +173,7 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
         principalId: apiKeyId,
         scopeType: { in: [...BINDING_SCOPE_TYPES] },
       },
-      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true },
+      select: { roleKey: true, scopeType: true, scopeId: true, expiresAt: true, condition: true },
     })) as StoredBindingGrantRow[];
     return collectBindings({ rows: rows.map(withStoredEnd), viaGroupId: () => null });
   };
@@ -313,6 +330,23 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
     };
   };
 
+  findProjectLineages = async ({
+    projectIds,
+  }: {
+    projectIds: readonly string[];
+  }): Promise<Map<string, { teamId: string; organizationId: string; kind: string }>> => {
+    if (projectIds.length === 0) return new Map();
+    const projects = (await this.database.project.findMany({
+      where: { id: { in: [...new Set(projectIds)] }, archivedAt: null },
+      select: { id: true, kind: true, team: { select: { id: true, organizationId: true } } },
+    })) as { id: string; kind: string; team: { id: string; organizationId: string } | null }[];
+    return new Map(
+      projects.flatMap(({ id, kind, team }) =>
+        team ? [[id, { teamId: team.id, organizationId: team.organizationId, kind }] as const] : [],
+      ),
+    );
+  };
+
   findLiveSharedReads = async ({
     organizationId,
     readerProjectId,
@@ -322,17 +356,36 @@ export class EventingAuthzReadRepository extends AuthzReadRepository {
   }): Promise<SharedReadRow[]> => {
     const rows = (await liveGrants(this.database).findMany({
       where: sharedProjectReadsOf({ organizationId, readerProjectId }),
-      select: { id: true, scopeId: true, condition: true, expiresAt: true },
-    })) as { id: string; scopeId: string; condition: unknown; expiresAt: unknown }[];
+      select: {
+        id: true,
+        scopeId: true,
+        condition: true,
+        expiresAt: true,
+        replacesGrantId: true,
+      },
+    })) as {
+      id: string;
+      scopeId: string;
+      condition: unknown;
+      expiresAt: unknown;
+      replacesGrantId: string | null;
+    }[];
+    const replaced = await findReplacedGrantIds({
+      database: this.database,
+      organizationId,
+      grantIds: rows.map((row) => row.id),
+    });
     return rows.flatMap((row) => {
+      if (replaced.has(row.id)) return [];
       const condition = grantConditionSchema.safeParse(row.condition);
-      if (!condition.success) return [];
+      if (!condition.success && row.replacesGrantId === null) return [];
       return [
         {
           grantId: row.id,
           memberProjectId: row.scopeId,
-          condition: condition.data,
+          condition: condition.success ? condition.data : ("unreadable" as const),
           expiresAt: row.expiresAt instanceof Date ? fromDate(row.expiresAt) : null,
+          ...(row.replacesGrantId === null ? {} : { replacesGrantId: row.replacesGrantId }),
         },
       ];
     });

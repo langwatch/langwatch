@@ -2,7 +2,7 @@ import type { Named } from "@langwatch/module";
 import type { SpanDetail } from "@langwatch/trace-contract";
 import { z } from "zod";
 
-import { collectLogEntries } from "./coding-agent-transcript-log.ts";
+import { collectDeliveredPolls, collectLogEntries } from "./coding-agent-transcript-log.ts";
 import { collectSpanEntries } from "./coding-agent-transcript-span.ts";
 import {
   type SpanReply,
@@ -61,6 +61,9 @@ const transcriptEntrySchemaDefinition = z.discriminatedUnion("kind", [
     failed: z.boolean(),
     agentId: z.string().nullable(),
     spanId: z.string(),
+    // True for a call Claude Code's Code Mode made from inside a REPL script: it left only a
+    // decision log, so it has no span and no recorded output.
+    inScript: z.boolean().optional(),
   }),
   z.object({
     kind: z.literal("tool_rejected"),
@@ -125,7 +128,12 @@ export function buildCodingAgentTranscript({
   // A log event is the richer record of a prompt; the span's copy fills in when none arrived.
   const logsReportPrompts = fromLogs.entries.some(isUserPromptEntry);
   const spanPrompts = logsReportPrompts ? [] : fromSpans.spanPrompts;
-  const entries = [...fromSpans.entries, ...spanPrompts, ...logEntries];
+  const entries = [
+    ...fromSpans.entries,
+    ...spanPrompts,
+    ...logEntries,
+    ...collectDeliveredPolls(logs),
+  ];
 
   addUnduplicatedSpanReplies(entries, fromSpans.spanReplies, fromLogs.entries);
   entries.sort((left, right) => left.atMs - right.atMs);

@@ -477,3 +477,30 @@ export interface ScimCostCenterChangedEventDataSchema extends Named<
 export const scimCostCenterChangedEventDataSchema: ScimCostCenterChangedEventDataSchema =
   scimCostCenterChangedEventDataSchemaDefinition;
 export type ScimCostCenterChangedEventData = z.infer<typeof scimCostCenterChangedEventDataSchema>;
+
+/**
+ * SCIM's member-created fact: committed with the membership a directory create writes, so
+ * organization counts the seat from its own side (ADR-002). A held create takes no seat yet.
+ */
+export const SCIM_MEMBERSHIP_PIPELINE_NAME = "scim_membership" as const;
+export const SCIM_MEMBERSHIP_AGGREGATE_TYPE = "scim_membership" as const;
+export const SCIM_MEMBER_CREATED_EVENT_TYPE = "lw.scim.member_created" as const;
+export const SCIM_MEMBER_CREATED_EVENT_VERSION = "2026-11-02" as const;
+
+/**
+ * `createId` is minted with the membership row, so a redelivered fact records nothing new. It
+ * names no seat: organization classifies the member's seat by its own rule (its ADR-002 §6).
+ */
+const scimMemberCreatedEventDataSchemaDefinition = z.object({
+  tenantId: z.string().min(1),
+  organizationId: z.string().min(1),
+  userId: z.string().min(1),
+  occurredAt: z.number().int().nonnegative(),
+  createId: z.string().min(1),
+});
+export interface ScimMemberCreatedEventDataSchema extends Named<
+  typeof scimMemberCreatedEventDataSchemaDefinition
+> {}
+export const scimMemberCreatedEventDataSchema: ScimMemberCreatedEventDataSchema =
+  scimMemberCreatedEventDataSchemaDefinition;
+export type ScimMemberCreatedEventData = z.infer<typeof scimMemberCreatedEventDataSchema>;

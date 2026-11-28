@@ -4,7 +4,7 @@
  * (cache key); no read below carries key material — see ADR-001.
  */
 
-import type { apiKeyTrpc } from "@langwatch/api-key-contract";
+import type { apiKeyTrpc, signingKeyTrpc } from "@langwatch/api-key-contract";
 import { createModuleApi, type ContractApiMap } from "@langwatch/api/web";
 import type { AuthzOwnStanding, AuthzOwnStandingInput } from "@langwatch/authz-contract";
 import type { projectTrpc } from "@langwatch/project-contract";
@@ -34,6 +34,7 @@ type BorrowedProcedures = {
 /** Everything this family calls: its own namespace, the project contract, and the borrowed ones. */
 export type ApiKeyApiMap = ContractApiMap<typeof apiKeyTrpc> &
   ContractApiMap<typeof projectTrpc> &
+  ContractApiMap<typeof signingKeyTrpc> &
   BorrowedProcedures;
 
 /**

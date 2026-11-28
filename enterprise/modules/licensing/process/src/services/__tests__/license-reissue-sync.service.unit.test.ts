@@ -5,6 +5,7 @@
  */
 import { NodeLicenseCryptographyService } from "@langwatch/enterprise-license-signing";
 import { registryHashForToken } from "@langwatch/gateway-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal, type Instant } from "@langwatch/time";
 import { describe, expect, it } from "vitest";
 
@@ -23,6 +24,7 @@ import { ConnectCredentialService } from "../connect-credential.service.ts";
 import { ConnectInstallService } from "../connect-install.service.ts";
 import { InstanceIdentityService } from "../instance-identity.service.ts";
 import { LicenseRefreshService } from "../license-refresh.service.ts";
+import type { ConnectManagedKeys } from "../license-registry.service.ts";
 import { LicenseSyncService } from "../license-sync.service.ts";
 import { appliedConnectFacts } from "./support/applied-connect-facts.ts";
 
@@ -72,6 +74,7 @@ async function registryRow(
     maxMembers: 50,
     maxMembersLite: 0,
     liteSeatsUnlimited: false,
+    maxMembersDeveloper: null,
     issuedAt: Temporal.Instant.from("2025-12-01T00:00:00.000Z"),
     expiresAt: Temporal.Instant.from("2027-01-01T00:00:00.000Z"),
     source: "BACKOFFICE",
@@ -205,7 +208,10 @@ describe("a reissued license over a sync", () => {
       facts: appliedConnectFacts(rows),
       seats: { getMemberCount: async () => 53, getMembersLiteCount: async () => 7 },
       licenses: {
-        validateAndStoreLicense: async ({ licenseKey }) => {
+        storeDeliveredLicense: async ({ licenseKey, replacing }) => {
+          if ((rows.get(ORGANIZATION)?.license ?? null) !== replacing) {
+            return { success: false, superseded: true };
+          }
           const result = cryptography.validateLicense({ licenseKey, publicKey: TEST_PUBLIC_KEY });
           if (!result.valid) return { success: false, error: result.error };
           stored.push(licenseKey);
@@ -231,5 +237,180 @@ describe("a reissued license over a sync", () => {
     const page = cryptography.validateLicense({ licenseKey: held, publicKey: TEST_PUBLIC_KEY });
     expect(page.valid && page.licenseData.plan.maxMembers).toBe(80);
     expect((await registry.findById("license-2"))?.pendingDeliveryLicense).toBeNull();
+  });
+});
+
+/** A host whose answer lands after another sync stored `applied`: it hands back `stale`. */
+class LateAnswerHost extends RegistryHost {
+  constructor(
+    private readonly rows: Map<string, ConnectOrganizationRecord>,
+    private readonly answer: { stale: string; applied: string },
+  ) {
+    super(undefined as never);
+  }
+
+  async syncLicense() {
+    this.rows.set(ORGANIZATION, {
+      ...(this.rows.get(ORGANIZATION) as ConnectOrganizationRecord),
+      license: this.answer.applied,
+    });
+    return { services: [], license: this.answer.stale };
+  }
+}
+
+describe("an answer that arrives after a newer license was applied", () => {
+  /** @scenario An answer that arrives after a newer license was applied is not stored */
+  it("keeps the newer license and stores nothing", async () => {
+    const first = licenseOf({ licenseId: "lic-1", maxMembers: 50 });
+    const second = licenseOf({ licenseId: "lic-2", maxMembers: 50 });
+    const third = licenseOf({ licenseId: "lic-3", maxMembers: 50 });
+    const rows = new Map<string, ConnectOrganizationRecord>([
+      [
+        ORGANIZATION,
+        {
+          organizationId: ORGANIZATION,
+          license: first,
+          servicesDisabled: [],
+          lastSyncAt: null,
+          lastSyncError: null,
+        },
+      ],
+    ]);
+    const stored: string[] = [];
+    const replaced: (string | null)[] = [];
+    const refresher = LicenseRefreshService.create({
+      install: ConnectInstallService.create({
+        organizations: MemoryConnectOrganizationRepository.create({ rows }),
+        facts: appliedConnectFacts(rows),
+        identity: InstanceIdentityService.create({
+          repository: MemoryInstanceIdentityRepository.create({ now: () => NOW }),
+          newInstanceId: () => INSTANCE,
+        }),
+        cryptography,
+        deployment: {
+          permitted: true,
+          gatewayEndpoint: "https://gateway.langwatch.ai",
+          licenseEndpoint: "https://connect.langwatch.ai",
+        },
+        gateway: MemoryConnectGatewayChannel.create(),
+        instanceLicenseKey: () => void 0,
+        publicKey: TEST_PUBLIC_KEY,
+      }),
+      instanceId: async () => INSTANCE,
+      facts: appliedConnectFacts(rows),
+      seats: { getMemberCount: async () => 8, getMembersLiteCount: async () => 0 },
+      licenses: {
+        storeDeliveredLicense: async ({ licenseKey, replacing }) => {
+          replaced.push(replacing);
+          if (rows.get(ORGANIZATION)?.license !== replacing) {
+            return { success: false, superseded: true };
+          }
+          stored.push(licenseKey);
+          return { success: true, planInfo: { maxMembers: 50 } };
+        },
+      },
+      cryptography,
+      host: new LateAnswerHost(rows, { stale: second, applied: third }),
+      version: () => "1.42.0",
+      now: () => NOW,
+    });
+
+    const outcome = await refresher.refresh(ORGANIZATION);
+
+    expect(outcome).toEqual({ outcome: "unchanged" });
+    expect(replaced).toEqual([first]);
+    expect(stored).toEqual([]);
+    expect(rows.get(ORGANIZATION)?.license).toBe(third);
+  });
+});
+
+/** A registry holding license-1, then two extensions that both wait for delivery. */
+async function chainOfThree() {
+  const first = licenseOf({ licenseId: "lic-1", maxMembers: 50 });
+  const second = licenseOf({ licenseId: "lic-2", maxMembers: 50 });
+  const third = licenseOf({ licenseId: "lic-3", maxMembers: 50 });
+  const registry = MemoryIssuedLicenseRepository.create([
+    await registryRow({ licenseKey: first }),
+    await registryRow({
+      licenseKey: second,
+      id: "license-2",
+      licenseId: "lic-2",
+      replacesId: "license-1",
+      pendingDeliveryLicense: second,
+      virtualKeyId: "vk-2",
+    }),
+    await registryRow({
+      licenseKey: third,
+      id: "license-3",
+      licenseId: "lic-3",
+      replacesId: "license-2",
+      pendingDeliveryLicense: third,
+      virtualKeyId: "vk-3",
+    }),
+  ]);
+  const retired: string[] = [];
+  const managedKeys = createApiFixture<ConnectManagedKeys>({
+    retire: async ({ virtualKeyId }) => void retired.push(virtualKeyId),
+    setConnectServices: async () => undefined,
+    setLicense: async () => undefined,
+  });
+  const sync = LicenseSyncService.create({
+    credentials: ConnectCredentialService.create({
+      repository: registry,
+      managedKeys,
+      cryptography,
+      systemActorId: "system",
+      now: () => NOW,
+    }),
+    repository: registry,
+    managedKeys,
+    rateLimit: { allow: () => Promise.resolve(true) },
+    systemActorId: "system",
+    now: () => NOW,
+  });
+  const syncWith = async (licenseKey: string) =>
+    sync.answer({
+      caller: await sync.verify({
+        bearer: cryptography.getLicenseToken(licenseKey),
+        instanceId: INSTANCE,
+      }),
+      body: { version: "1.42.0", seats: { members: 8, liteMembers: 0 } },
+    });
+  return { first, third, registry, retired, syncWith };
+}
+
+describe("an extension signed while another waited", () => {
+  /** @scenario An extension signed while another waited arrives in one sync */
+  it("is the one the sync carries, and presenting it retires both licenses before it", async () => {
+    const { first, third, registry, retired, syncWith } = await chainOfThree();
+
+    expect(await syncWith(first)).toMatchObject({ license: third });
+
+    await syncWith(third);
+
+    expect((await registry.findById("license-1"))?.supersededAt).toEqual(NOW);
+    expect((await registry.findById("license-2"))?.supersededAt).toEqual(NOW);
+    expect((await registry.findById("license-2"))?.pendingDeliveryLicense).toBeNull();
+    expect((await registry.findById("license-3"))?.pendingDeliveryLicense).toBeNull();
+    expect(retired).toEqual(["vk-2", "vk-1"]);
+  });
+
+  /** @scenario A sync never carries a license that a delivery retired while it looked */
+  it("carries nothing when the newest extension's delivery completes during the walk", async () => {
+    const { first, third, registry, syncWith } = await chainOfThree();
+    const lookUp = registry.findByReplacesId.bind(registry);
+    let interleaved = false;
+    registry.findByReplacesId = async (replacesId) => {
+      if (replacesId === "license-2" && !interleaved) {
+        interleaved = true;
+        await syncWith(third);
+      }
+      return lookUp(replacesId);
+    };
+
+    const answer = await syncWith(first);
+
+    expect(interleaved).toBe(true);
+    expect(answer).not.toHaveProperty("license");
   });
 });

@@ -8,6 +8,7 @@ export {
   type ObjectDigest,
   type ObjectStorage,
   type ObjectStorageDestination,
+  type ObjectUploadRoute,
   type RateLimitDecision,
   type RateLimiter,
   type StoresMemberSource,
@@ -43,5 +44,7 @@ export {
 } from "./pipeline-selection.ts";
 export { openStores } from "./open-stores.ts";
 export { clickhouseRoutesOf } from "./clickhouse-routes.ts";
+/** The private families' one name split, for a module family named as the routes are. */
+export { privateRouteNameOf } from "@langwatch/clickhouse-client";
 export { OverloadedRefusal, StatementBoundTelemetry } from "./clickhouse-member.ts";
 export { memoryObjectStorage } from "./object-storage-memory.ts";

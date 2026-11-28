@@ -137,9 +137,11 @@ console.log('Wrote ' + out + ' (' + map.features.length + ' top-level features)'
 # Skills bundle — embed the published agent skills (the curated FEATURE_SKILLS
 # + auto-discovered recipes) so `langwatch skills list/get/install/…` needs no
 # runtime files and works identically in the tsup dist and the bun single
-# binary. Bodies are the COMMITTED skills/_compiled/native/<slug>/SKILL.md
-# renders (same inlineMdx output the public publisher ships — no
-# re-implementation to drift); metadata comes from the canonical sources.
+# binary. Bodies are the COMMITTED skills/_compiled/<render>/<slug>/SKILL.md
+# renders, where <render> is LANGWATCH_SKILLS_RENDER: `cli` by default (login
+# steps kept), `native` in Dockerfile.langyagent and the host-tier Langy build.
+# Same inlineMdx output the public publisher ships, so nothing re-implemented
+# can drift; metadata comes from the canonical sources.
 # Pure node, no workspace deps — see scripts/generate-skills-bundle.mjs.
 node scripts/generate-skills-bundle.mjs
 

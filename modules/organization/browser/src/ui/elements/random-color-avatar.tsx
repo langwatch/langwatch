@@ -1,29 +1,13 @@
-/**
- * A FAMILY-LOCAL COPY of `platform/app/src/components/RandomColorAvatar.tsx`
- * (sixteen platform callers keep the original alive); these rows carry a
- * `userImage` an initials-only avatar would drop. Colour: Design System's own `rotating-colors`.
- */
-
 import { type AvatarRootProps, UserAvatar } from "@langwatch/design-system/avatar";
-import { getAvatarFillForString } from "@langwatch/design-system/rotating-colors";
 
 /**
- * Person avatar with a deterministic name-hashed background behind the initials
- * fallback. Delegates the image/initials/silhouette fallback chain to
- * {@link UserAvatar}; pass `image`, an already resolved URL, to show a photo when available.
+ * Person avatar: the photo when `image` (an already resolved URL) loads, else initials on the
+ * hue hashed from the name, through the design system's {@link UserAvatar}.
  */
 export function RandomColorAvatar({
   name,
   image,
   ...props
 }: AvatarRootProps & { name: string; image?: string | null }) {
-  return (
-    <UserAvatar
-      name={name}
-      src={image}
-      color="fg.onColor"
-      background={getAvatarFillForString(name)}
-      {...props}
-    />
-  );
+  return <UserAvatar name={name} src={image} colorFromName {...props} />;
 }

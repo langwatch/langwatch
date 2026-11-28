@@ -132,6 +132,17 @@ Neither is bundled with the anchor, because the anchor is correct and shippable 
 - `trace_analytics` and `trace_summaries` now share one implementation of the anchor rule. `evaluation_analytics` and `coding_agent_sessions` step 3 remain recorded-only in ADR-071's inventory and are the next adopters of `services/storage-anchor.ts`.
 - The span-seeded-zero defect is now closed everywhere it existed. Reviewing #6430, `langwatch-agent` traced the same question across the folds and found that `evaluation_analytics` has a mutable-anchor concern of its own but does **not** share this span-seeded-zero path, and `trace_analytics` already carries its own `EarliestSpanStartMs` from 00061. So `trace_summaries` was the last table where a contribution that is not a span could file a row at the epoch; what remains on ADR-071's list is the milder mutable-anchor class, not this one.
 
+## Amendment 2026-11-26: the read window covers the trace's own time
+
+`trustAbsentMiss` is only safe while the read window covers the row, and the row lives at its storage anchor. Two events were centred on an arrival time instead, so a trace backfilled more than seven days after it happened lost state on a cold Redis tier:
+
+- A `span_received` event's `occurredAt` is when the span arrived. A second batch for a backfilled trace read around that, missed the row its first batch filed at the span's start time, trusted the miss and folded from `init()`.
+- The deferred origin check stamped its `origin_resolved` event with the time it ran, five minutes after the spans, when the cache had expired. `trace_analytics` then wrote an empty row (no spans, origin only) with a newer `UpdatedAt` over the real one, and the slim dashboards, which read the newest version, dropped the trace. `trace_summaries` refused the empty row, so the origin was lost there.
+
+**Decision.** A fold may declare `readWindow.anchorOf(event)`, a business time the read window must also cover: the window runs from the earlier of `occurredAt` and the anchor, minus `widthMs`, to the later of the two, plus `widthMs`. Both trace folds declare `traceFoldReadAnchorMs`: a span's own start time (validated like the anchor itself), every other event's `occurredAt`. Covering both, not moving the window, matters: a row can sit near a span's arrival (a live trace, or one a log record opened, later joined by a span that started long before) or near its start time (a backfill). The deferred origin check stamps its event with the found summary's storage anchor, as topic assignment already stamps the trace's time. A brand-new trace still pays one read; a live span's start and arrival coincide, so its window is unchanged.
+
+**Not repaired.** Rows already shadowed by an empty version stay until the trace's next event or a replay. The replay step refolds a whole lane over a time range for every tenant, which is far more work than the few backfilled installs need; a targeted repair needs a replay source keyed on the affected trace ids. Spec: `specs/trace-processing/backfilled-trace-read-anchor.feature`.
+
 ## References
 
 - [ADR-071](./071-coding-agent-session-immutable-storage-anchor.md) - the storage-anchor rule, and the inventory this closes an entry in

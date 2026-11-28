@@ -108,6 +108,39 @@ describe("the scenarios tRPC transport", () => {
     });
   });
 
+  describe("given a create", () => {
+    const createInput = { projectId: PROJECT_ID, name: "Prompt leak", situation: "Probes" };
+
+    /** @scenario "Create over REST or tRPC stores a red team scenario with its attack" */
+    it("hands the kind and the attack config to the app", async () => {
+      const create = vi.fn(async () => ({}) as never);
+      const { caller } = harness({ create });
+      const redTeam = {
+        attackGoal: "Reveal the system prompt",
+        owaspIds: ["LLM07"],
+        strategy: "goat" as const,
+        maxTurns: 10,
+      };
+
+      await caller.create({ ...createInput, kind: "red_team", redTeam });
+      expect(create).toHaveBeenCalledWith(
+        expect.objectContaining({ kind: "red_team", redTeam }),
+        expect.anything(),
+      );
+    });
+
+    /** @scenario "Create over REST or tRPC refuses the template marker" */
+    it("refuses a create naming the template marker", async () => {
+      const create = vi.fn();
+      const { caller } = harness({ create });
+
+      await expect(
+        caller.create({ ...createInput, sourceTemplateId: "owasp" } as never),
+      ).rejects.toMatchObject({ code: "BAD_REQUEST" });
+      expect(create).not.toHaveBeenCalled();
+    });
+  });
+
   describe("given a person with read-only access", () => {
     /** @scenario "A person with read-only access cannot move a scenario" */
     it("refuses to move a scenario", async () => {

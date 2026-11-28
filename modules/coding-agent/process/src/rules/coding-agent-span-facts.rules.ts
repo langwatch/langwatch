@@ -6,6 +6,7 @@ import {
   declaredSpanSessionFacts,
   detectCodingAgent,
   deriveSpanConversationKey,
+  resourceAccountFacts,
   SPANS_REQUIRE_SESSION_KEY_AGENT_IDS,
 } from "@langwatch/coding-agent-contract";
 
@@ -35,6 +36,7 @@ export function liftSpanContribution({
     agent,
     name: span.name,
     attrs: span.spanAttributes,
+    resourceAttrs: span.resourceAttributes,
   });
   if (sessionKey === null && SPANS_REQUIRE_SESSION_KEY_AGENT_IDS.has(agent)) {
     return { outcome: "ignored" };
@@ -55,6 +57,10 @@ export function liftSpanContribution({
     }),
     ...toolCallFileFacts({ name: span.name, attributes: span.spanAttributes }),
   };
+  Object.assign(
+    facts,
+    resourceAccountFacts({ facts, resourceAttributes: span.resourceAttributes }),
+  );
   const serviceVersion = span.resourceAttributes["service.version"];
   if (typeof serviceVersion === "string" && serviceVersion.length > 0) {
     facts["service.version"] = serviceVersion;

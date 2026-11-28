@@ -72,6 +72,41 @@ const CODEX_AUTH_FAILURE_COPY: Partial<Record<string, { title: string; descripti
   },
 };
 
+/**
+ * Whether a server remediation tip is for a person. A tip that points at a `meta` field is written
+ * for an API caller, who can read that field; a person never sees `meta` (ADR-045).
+ */
+export function isTipForPeople(tip: string): boolean {
+  return !/\bmeta\./.test(tip);
+}
+
+/** The tips for people that add something the description didn't already say. */
+export function supplementalTips({
+  tips,
+  description,
+}: {
+  tips: readonly string[];
+  description: string;
+}): string[] {
+  const forPeople = tips.filter(isTipForPeople);
+  const target = normaliseProse(description);
+  if (!target) return forPeople;
+
+  return forPeople.filter((tip) => {
+    const candidate = normaliseProse(tip);
+    if (!candidate) return false;
+    return !target.includes(candidate);
+  });
+}
+
+/** Words only: two sentences that say the same thing must compare equal. */
+function normaliseProse(text: string): string {
+  return text
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, " ")
+    .trim();
+}
+
 /** Reads a string out of `meta` without trusting it. */
 const str = (error: HandledErrorShape, key: string, fallback: string): string => {
   const value = error.meta[key];
@@ -200,6 +235,41 @@ const reachableSentence = (error: HandledErrorShape): string => {
 const strEq = (error: HandledErrorShape, key: string, expected: string): boolean =>
   str(error, key, "") === expected;
 
+/** Why the outbound policy refused a base URL, and what lifts it, keyed by `meta.refusal`. */
+const ENDPOINT_REFUSAL_COPY: Readonly<Record<string, { title: string; remedy: string }>> = {
+  cloud_internal_domain: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses cloud provider internal domains such as amazonaws.com, and no setting allows them. Point a DNS name of your own at the endpoint, such as a CNAME to the load balancer, and use that as the base URL.",
+  },
+  on_premise_domain: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses .local and .localhost names unless each is allowed by name. On a self-hosted instance, an administrator can add this exact host to ALLOWED_PROXY_HOSTS.",
+  },
+  private_address: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "Its outbound policy refuses private and local addresses. On a self-hosted instance, an administrator can add this exact host to ALLOWED_PROXY_HOSTS.",
+  },
+  metadata_endpoint: {
+    title: "This instance doesn't send requests to that base URL",
+    remedy:
+      "It points at a cloud metadata endpoint, which is always refused. Use the address the provider serves.",
+  },
+  unresolvable_host: {
+    title: "That base URL's host wasn't found",
+    remedy: "Its hostname doesn't resolve. Check the base URL is spelled correctly.",
+  },
+  invalid_url: {
+    title: "That base URL can't be used",
+    remedy: "Use a full http or https address, such as https://inference.acme.internal/v1.",
+  },
+};
+
+const endpointRefusal = (error: HandledErrorShape) =>
+  ENDPOINT_REFUSAL_COPY[str(error, "refusal", "")];
+
 const describeMissingModel = (error: HandledErrorShape): string =>
   (missingModelDescriptions as Record<string, string>)[str(error, "request_type", "")] ??
   "Set the model where this endpoint expects it, then try again.";
@@ -227,8 +297,9 @@ const SEAT_LIMIT_LABELS: Record<string, string> = {
 /** Creation caps the cloud Free plan sets, named as the pricing page does. */
 const CREATION_LIMIT_LABELS: Record<string, string> = {
   scenarios: "scenarios",
-  scenarioSets: "simulations",
+  scenarioRuns: "scenario runs a month",
   evaluators: "custom evaluators",
+  testSuites: "suites",
 };
 
 /**
@@ -426,12 +497,21 @@ const presentations = {
   trace_not_found: {
     title: "Trace not found",
     describe: () =>
-      "It may have been deleted, or it may still be arriving. Traces take a few seconds to appear.",
+      "No project you can read holds this id yet. If it was just sent, it may still be arriving: try again in a few seconds. Otherwise it may have passed the retention window.",
   },
   trace_attribute_values_withheld: {
     title: "Attribute values withheld",
     describe: () =>
       "This project hides captured input or output from you, or an attribute policy restricts this key to an audience you are not in. Facet a named field instead, such as model, status or evaluator, or call the facets endpoint with no field to see what this project has.",
+  },
+  scenario_run_has_many_traces: {
+    title: "That is a scenario run id",
+    describe: () => "The run produced several traces. Pick one of the listed trace ids to open it.",
+  },
+  trace_withheld_over_plan: {
+    title: "Trace held until your plan is sorted",
+    describe: () =>
+      "This trace was recorded while your organization has more members than its plan covers. It is saved and will show once you upgrade your plan or remove members.",
   },
   trace_id_ambiguous: {
     title: "Trace ID is ambiguous",
@@ -493,7 +573,8 @@ const presentations = {
     title: "Unknown filter field",
     describe: (error) => {
       const field = str(error, "field", "");
-      return field ? `There's no field called "${field}".` : "";
+      const hint = str(error, "hint", "");
+      return field ? [`There's no field called "${field}".`, hint].filter(Boolean).join(" ") : "";
     },
   },
   filter_value_refused: {
@@ -662,9 +743,9 @@ const presentations = {
       "This project doesn't have the SQL workbench enabled yet. Ask your administrator to switch it on.",
   },
   lwql_not_provisioned: {
-    title: "Custom SQL isn't set up where this data lives",
+    title: "Dashboards aren't available for this data yet",
     describe: () =>
-      "Custom SQL isn't set up yet on the server that holds this organisation's data. Ask your workspace administrator, or contact support.",
+      "Dashboards and custom SQL aren't available yet for the data this organisation keeps on its own server. Nothing is wrong with your account, and trying again won't help. Your workspace administrator or LangWatch support can tell you when it will be switched on.",
   },
   saved_workbench_chart_already_exists: {
     title: "That chart id is already taken",
@@ -719,6 +800,10 @@ const presentations = {
   dashboard_not_found: {
     title: "Dashboard not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
+  },
+  dashboard_home_needs_org_scope: {
+    title: "Only an LLM Ops dashboard can be shared with a project",
+    describe: () => "Share it with everyone in the organization, or keep it to yourself.",
   },
   dashboard_read_only_here: {
     title: "This dashboard is read-only here",
@@ -823,6 +908,70 @@ const presentations = {
     title: "This page is out of date: reload to continue",
     describe: () => "LangWatch was updated while this page was open. Reload to pick up the update.",
   },
+  braid_across_organizations: {
+    title: "These projects are in different organisations",
+    describe: () =>
+      "A braid joins two projects of the same organisation. Pick a project from this one.",
+  },
+  braid_aggregate_project: {
+    title: "Aggregate projects cannot be braided",
+    describe: () =>
+      "An aggregate project already reads its member projects. Braid the member projects instead.",
+  },
+  braid_already_exists: {
+    title: "This braid already exists",
+    describe: () =>
+      "A live braid between these projects already has this condition, data window and end date.",
+  },
+  braid_changed: {
+    title: "This braid changed in the meantime",
+    describe: () =>
+      "Someone changed or removed this braid since you opened it. Reload the list and try again.",
+  },
+  braid_condition_limit_reached: {
+    title: "This project receives too many braid conditions",
+    describe: (error) =>
+      `A project can receive braids with at most ${num(error, "limit", 50)} different conditions. Reuse a condition an existing braid already has, or remove a braid first.`,
+  },
+  braid_condition_syntax: {
+    title: "The condition is not complete",
+    describe: (error) =>
+      str(error, "fix", "") || "Check the condition for an unclosed quote, bracket or parenthesis.",
+  },
+  braid_condition_too_large: {
+    title: "The condition is too large",
+    describe: (error) =>
+      str(error, "fix", "") || "Shorten the condition, or use fewer comparisons or less nesting.",
+  },
+  braid_condition_unsupported: {
+    title: "The condition uses something braids do not support",
+    describe: (error) =>
+      str(error, "fix", "") ||
+      "Braid conditions support equality on attributes and the span name, joined with and.",
+  },
+  braid_governance_project: {
+    title: "The governance project cannot be braided",
+    describe: () => "The organisation's governance project never shares its spans with a braid.",
+  },
+  braid_into_itself: {
+    title: "A project cannot be braided into itself",
+    describe: () => "Pick a different project to braid into.",
+  },
+  braid_not_on_project: {
+    title: "This braid is not on this project",
+    describe: () =>
+      "A braid can only be removed from the project its spans come from or the project that shows them.",
+  },
+  braids_not_enabled: {
+    title: "Braids aren't switched on here",
+    describe: () =>
+      "This organisation can't manage braids yet. Removing a braid and revoking a signing key still work.",
+  },
+  braids_turned_off: {
+    title: "Braids is turned off",
+    describe: () =>
+      "An organisation admin can turn Braids on in organisation settings. Until then, existing braids are paused and kept.",
+  },
   broadcaster_not_active: {
     title: "Live updates disconnected",
     describe: () => "Refresh the page to reconnect.",
@@ -891,6 +1040,13 @@ const presentations = {
     // configured wrong. The engine's statusText stays in the server log.
     title: "The workflow couldn't run",
     describe: () => "We've been notified. Try running it again in a moment.",
+  },
+  workflow_result_too_large: {
+    // fault: customer. The run finished but returned more than one synchronous
+    // answer can carry (6 MB), so the workflow's own output is what to shrink.
+    title: "The workflow's result is too large",
+    describe: () =>
+      "Make the workflow return less data, for example fewer rows or shorter text, and run it again.",
   },
 
   // ---- agent dev tunnel ----
@@ -1301,6 +1457,11 @@ const presentations = {
     title: "That email already has an account",
     describe: () => "Sign in with it, or reset the password if you don't have it.",
   },
+  passkey_assertion_refused: {
+    title: "That passkey didn't confirm it was you",
+    describe: () =>
+      "Use a passkey registered to your own account, unlock it with your fingerprint, face or PIN, then try again.",
+  },
   password_auth_not_available: {
     title: "Passwords aren't used here",
     describe: () =>
@@ -1456,6 +1617,11 @@ const presentations = {
     describe: () =>
       "The documentation site that opened this page is not registered with this LangWatch installation. Paste an API key into the playground instead.",
   },
+  docs_playground_sessions_disabled: {
+    title: "Your organisation turned this off",
+    describe: () =>
+      "Your organisation does not let the documentation playground use your account. Paste an API key into the playground instead.",
+  },
   api_key_scope_violation: {
     title: "You don't have access for this",
     describe: () =>
@@ -1591,11 +1757,16 @@ const presentations = {
       "Saving this would remove the credentials already stored for this provider. Leave the credential fields as they are to keep them, or empty them yourself if removing them is what you want.",
   },
   model_provider_invalid: {
+    // `meta.refusal` names why the outbound policy refused the base URL, the same reason the
+    // credential probe reports as `provider_endpoint_refused`, so both say the same thing.
     title: "That provider can't be saved",
-    describe: (error) =>
-      strEq(error, "reason", "endpoint_not_allowed")
+    describe: (error) => {
+      const refusal = endpointRefusal(error);
+      if (refusal) return `${refusal.title}, so nothing was saved. ${refusal.remedy}`;
+      return strEq(error, "reason", "endpoint_not_allowed")
         ? "The base URL can't be used. Check it is a full address such as https://inference.acme.internal/v1 that resolves to a public host, then save again."
-        : "Check the provider's fields, then save again.",
+        : "Check the provider's fields, then save again.";
+    },
   },
   model_provider_custom_keys_missing: {
     title: "This provider has no credentials saved",
@@ -1642,6 +1813,13 @@ const presentations = {
     describe: () =>
       "No default model is set yet. Open Settings, then Default Models, and pick one for your organization.",
   },
+  model_execution_unavailable: {
+    // A codex model reached a process with no gateway road to run it; no retry
+    // changes that, so the copy points at picking a model from another provider.
+    title: "This model can't run this feature yet",
+    describe: () =>
+      "Codex models can't run this feature on this deployment yet. Pick a model from another provider for it in Default Models.",
+  },
   model_restricted_for_execution: {
     // The same licence as `model_restricted_for_feature`, hit at the other
     // end: a codex model arriving at a surface it cannot run on, which is
@@ -1665,6 +1843,15 @@ const presentations = {
     title: "This model provider is turned off",
     describe: () =>
       "Turn it back on in your project's model settings, or pick a different provider.",
+  },
+  model_provider_unavailable: {
+    // A model named outright (not picked by the cascade) whose provider row is
+    // missing or switched off; `meta.reason` says which, so the copy names the fix.
+    title: "This model's provider isn't available",
+    describe: (error) =>
+      strEq(error, "reason", "disabled")
+        ? "Its provider is turned off. Turn it back on in Settings, then Model Providers, or pick a different model."
+        : "Its provider isn't set up for this project. Add it in Settings, then Model Providers, or pick a different model.",
   },
   model_provider_scope_forbidden: {
     // Deliberate refusal, not a mistake to correct: the provider is managed
@@ -1724,6 +1911,19 @@ const presentations = {
     title: "That endpoint redirects somewhere else",
     describe: () =>
       "We don't follow redirects when sending a credential. Point the base URL at the address the provider actually serves — an http:// URL redirecting to https:// is the usual cause.",
+  },
+  provider_endpoint_refused: {
+    // Not "we couldn't reach it": nothing was sent. The instance's outbound policy refused the
+    // base URL, and `meta.refusal` says which part of the policy, so the copy names what lifts
+    // it instead of sending an operator to debug a network that works.
+    title: "This instance doesn't send requests to that base URL",
+    titleFor: (error) => endpointRefusal(error)?.title,
+    describe: (error) => {
+      const refusal = endpointRefusal(error);
+      return refusal
+        ? `Nothing was sent, so this API key was not checked. ${refusal.remedy}`
+        : "Its outbound policy refused the base URL, so nothing was sent and this API key was not checked.";
+    },
   },
   provider_key_missing: {
     title: "No API key to check",
@@ -1933,6 +2133,11 @@ const presentations = {
   license_expiry_in_past: {
     title: "That end date has already passed",
     describe: () => "A license can only end on a future date. Pick a later one and try again.",
+  },
+  license_in_use: {
+    title: "An install is using this license",
+    describe: () =>
+      "An install started using this license, so its key keeps working. The new license reaches that install on its next sync.",
   },
   license_signing_key_not_pem: {
     title: "That doesn't look like a private key",
@@ -2155,6 +2360,18 @@ const presentations = {
     title: "All member seats are in use",
     describe: () => "Free a seat by disabling a membership, or upgrade the plan to add more.",
   },
+  member_additions_held_for_payment: {
+    // fault: customer. A renewal charge failed and is unpaid; members already in keep working.
+    title: "A payment failed, so new members can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add them. Ask an admin if you can't.",
+  },
+  seats_held_for_payment: {
+    // fault: customer. Buying seats while an invoice is unpaid would charge the same failing card.
+    title: "A payment failed, so seats can't be added",
+    describe: () =>
+      "Update the card on the billing page to pay the open invoice, then add seats. Nothing was charged.",
+  },
   membership_disabled: {
     // The person IS a member, so nothing here may suggest they are not, and
     // nothing may suggest a role they could ask for instead — the seat is the
@@ -2308,6 +2525,25 @@ const presentations = {
   join_request_not_pending: {
     title: "That request was already answered",
     describe: () => "Somebody approved, rejected or withdrew it. Refresh to see where it ended up.",
+  },
+  judge_preview_budget_exhausted: {
+    title: "Your free LangWatch Judge budget is used up",
+    describe: () =>
+      "This run was not judged. Upgrade your plan under Settings, Plan & billing, or pick another judge model.",
+  },
+  judge_preview_not_available: {
+    title: "LangWatch Judge (preview) isn't available for this project",
+    describe: () =>
+      "It is off for this organization, or this project cannot use it yet. Pick another judge model.",
+  },
+  judge_preview_request_invalid: {
+    title: "LangWatch Judge (preview) can't judge this run",
+    describe: () =>
+      "The run asked for a judgement this judge doesn't support. Pick another judge model for it.",
+  },
+  judge_preview_unavailable: {
+    title: "LangWatch Judge (preview) couldn't answer right now",
+    describe: () => "This run was not judged. Run it again, or pick another judge model.",
   },
   join_request_already_pending: {
     title: "You have already asked",
@@ -2484,6 +2720,11 @@ const presentations = {
     title: "LangWatch is set up for a different web address than the one you are using",
     describe: () => "Check the address and try again.",
   },
+  authz_epoch_bump_failed: {
+    title: "Saved, but not yet applied everywhere",
+    describe: () =>
+      "The access change was saved, but not every server has picked it up yet. Try again to finish it; otherwise it applies on its own within a few minutes.",
+  },
   authz_ledger_unavailable: {
     title: "Access changes are paused",
     describe: () =>
@@ -2639,6 +2880,9 @@ const presentations = {
     // is a message they can forward as-is.
     title: "You don't have access to this",
     describe: (error) => {
+      if (str(error, "denialReason", "") === "braids-kept-to-organisation-admins") {
+        return "Your organisation keeps braids to its admins, so only they can create, change or remove them. Ask an organisation admin.";
+      }
       const permission = str(error, "permission", "");
       return permission
         ? `Ask an organization admin to grant you "${permission}" on this project.`
@@ -2756,6 +3000,11 @@ const presentations = {
     title: "This account is deactivated",
     describe: () => "Its sessions were revoked on purpose. Reactivate the account first.",
   },
+  user_platform_operator_email_locked: {
+    title: "An operator's email address can't change",
+    describe: () =>
+      "Revoke their platform operator role on the Operators page first, then change the address.",
+  },
   user_to_impersonate_not_found: {
     title: "User not found",
     describe: () => "They may have been removed since this page loaded.",
@@ -2787,6 +3036,153 @@ const presentations = {
     describe: () =>
       "The development secrets source could not be read. Sign in to it and try again.",
   },
+  staff_copy_source_invalid: {
+    title: "The copy's source session is not valid",
+    describe: () =>
+      "An organization copy names its source session by that session's own ops token, and this one was not recognised.",
+  },
+  staff_copy_scope_missing: {
+    title: "This approval does not cover a copy",
+    describe: () =>
+      "A copy needs one approval for copy:source on the source organization and one for copy:target on the target, each naming the other organization.",
+  },
+  staff_copy_same_organization: {
+    title: "The source and target are the same organization",
+    describe: () => "A copy goes from one organization into a different one.",
+  },
+  staff_copy_approvals_mismatch: {
+    title: "The two approvals do not belong together",
+    describe: () => "Both approvals of a copy must come from the same agent and the same operator.",
+  },
+  staff_copy_direction_mismatch: {
+    title: "The two approvals name different copies",
+    describe: () =>
+      "Each approval of a copy names the other organization, and these two do not name each other.",
+  },
+  staff_copy_window_closed: {
+    title: "The source approval is no longer live",
+    describe: () =>
+      "Both approvals of a copy must be live at the same time, and the source one expired, ended or was revoked.",
+  },
+  staff_access_unavailable: {
+    title: "Staff access is not available here",
+    describe: () =>
+      "This request came from a LangWatch staff key, and this server cannot record it, so it was refused.",
+  },
+  staff_access_revoked: {
+    title: "This staff access was revoked",
+    describe: () => "An operator ended this staff access, so its key no longer works.",
+  },
+  staff_access_expired: {
+    title: "This staff access has ended",
+    describe: () => "Staff access lasts one hour and this one has run out.",
+  },
+  staff_access_ip_mismatch: {
+    title: "This key is used from another address",
+    describe: () => "Staff access is pinned to the address that redeemed it.",
+  },
+  staff_access_operator_lost: {
+    title: "The approver is no longer an operator",
+    describe: () =>
+      "The operator who approved this access no longer holds the platform operator grant, so it stopped.",
+  },
+  staff_spend_not_approved: {
+    title: "This access cannot start or change runs",
+    describe: () =>
+      "Runs, evaluators, monitors, scenarios and dashboards spend the organization's money, and this access was approved without that. It may change datasets only.",
+  },
+  staff_content_not_approved: {
+    title: "This access cannot read content",
+    describe: () =>
+      "Run results and stored files hold what the organization's users wrote, and this access was approved without content.",
+  },
+  staff_function_unknown: {
+    title: "No such ops function",
+    describe: () =>
+      "The function name is not in the registry. List the functions to see every name.",
+  },
+  staff_function_not_approved: {
+    title: "This function was not approved",
+    describe: () =>
+      "A staff session calls only the functions its approval named. Ask for a new approval that names it.",
+  },
+  staff_function_scope_mismatch: {
+    title: "This function needs another scope",
+    describe: () =>
+      "Lookup and platform functions need ops:read; organization functions need an organization scope.",
+  },
+  staff_function_bad_input: {
+    title: "The function input is not valid",
+    describe: () =>
+      "The input does not match the function's schema, or its time range is longer than 31 days.",
+  },
+  staff_function_bad_cursor: {
+    title: "The page cursor is not valid",
+    describe: () => "Pass the nextCursor of the previous page of this same function, unchanged.",
+  },
+  staff_function_not_found: {
+    title: "Not found in this organization",
+    describe: () =>
+      "The project or record the function asked for is not in the approved organization.",
+  },
+  staff_write_not_allowed: {
+    title: "Staff access cannot make this change",
+    describe: () =>
+      "Staff access never removes or switches off a record, and only changes what it was approved for.",
+  },
+  staff_access_audit_unavailable: {
+    title: "Staff access could not be recorded",
+    describe: () =>
+      "Every staff request is recorded before it runs, and the record could not be written, so the request was refused.",
+  },
+  already_redeemed: {
+    title: "This request was already used",
+    describe: () =>
+      "An approved request gives out its key once, and this one was already redeemed.",
+  },
+  staff_access_not_configured: {
+    title: "Staff access is not set up on this server",
+    describe: () =>
+      "The server has no public base URL, so it cannot build the approval link an operator opens.",
+  },
+  staff_access_already_ended: {
+    title: "This session already ended",
+    describe: () =>
+      "The session was revoked, expired or ended by its agent, so there is nothing to revoke.",
+  },
+  staff_access_confirmation_mismatch: {
+    title: "Confirmation did not match",
+    describe: () => "Type the words exactly as shown to revoke every staff session.",
+  },
+  invalid_code_verifier: {
+    title: "The code verifier does not match",
+    describe: () =>
+      "The agent that redeems a request must present the verifier behind the challenge it sent.",
+  },
+  organization_name_mismatch: {
+    title: "The organization name does not match",
+    describe: () => "This approval needs the organization's name typed exactly as shown.",
+  },
+  passkey_required: {
+    title: "Add a passkey first",
+    describe: () => "Staff access is approved with a passkey, and this account has none.",
+  },
+  staff_access_rate_limited: {
+    title: "Too many access requests",
+    describe: () => "An agent may make five access requests an hour.",
+  },
+  request_not_pending: {
+    title: "This request was already decided",
+    describe: () => "Someone approved or denied this access request already.",
+  },
+  request_expired: {
+    title: "This request expired",
+    describe: () => "An access request waits ten minutes for an approval.",
+  },
+  request_not_approved: {
+    title: "This request is not approved",
+    describe: () => "Only an approved access request can be redeemed.",
+  },
   ops_confirmation_required: {
     title: "Confirm before running this",
     describe: () => "This action can't be undone, so it has to be confirmed first.",
@@ -2810,7 +3206,12 @@ const presentations = {
     // and it says the same thing.
     describe: (error) => {
       const limitType = str(error, "limitType", "");
-      const creationLabel = CREATION_LIMIT_LABELS[limitType];
+      const creationLabel = CREATION_LIMIT_LABELS[str(error, "countedAs", "") || limitType];
+      if (limitType === "scenarioRuns") {
+        const max = num(error, "max", 0);
+        const included = max > 0 ? `${max} ${creationLabel}` : "a monthly number of scenario runs";
+        return `Your plan includes ${included} and this month's are used. Upgrade your plan to keep running scenarios, or wait for the count to start again next month.`;
+      }
       if (creationLabel) {
         const max = num(error, "max", 0);
         const included = max > 0 ? `${max} ${creationLabel}` : creationLabel;
@@ -3006,6 +3407,11 @@ const presentations = {
     describe: (error) =>
       `${scenarioFieldLabel(error)} references a parameter in a way we can't read. Check it is written as params.name, then try again.`,
   },
+  scenario_red_team_config_mismatch: {
+    title: "This scenario's red team settings don't match its kind",
+    describe: () =>
+      "A red team scenario needs an attack goal and OWASP ids, and a standard scenario takes none. Set the kind and the attack together, then try again.",
+  },
   scenario_reserved_set_id: {
     title: "This run can't be saved to that set",
     describe: () =>
@@ -3116,6 +3522,18 @@ const presentations = {
     title: "Add a billing email first",
     describe: () => "Billing needs an email address on the account before this can go through.",
   },
+  billing_only_keeps_billing: {
+    // Billing is the whole of a Billing-only membership (ADR-205); without it nothing is taken away.
+    title: "A Billing-only member always pays",
+    describe: () =>
+      "Billing only is the whole of their membership. To stop them paying, remove them from the organization, or move them to a seat role first.",
+  },
+  billing_only_no_team_access: {
+    // The Billing-only person reaches the plan and invoices, never a project (ADR-205).
+    title: "A Billing-only member joins no team",
+    describe: () =>
+      "Billing only covers the plan, the card and the invoices. To give them a team, invite them with a seat role, or change a current member's role to a seat role first.",
+  },
   billing_plan_price_missing: {
     // fault: platform. The plan the customer picked has no price set up on our
     // side, so there is nothing for them to correct — and telling them to
@@ -3158,14 +3576,15 @@ const presentations = {
     describe: () => "Nothing was charged. Try again in a moment.",
   },
   seat_quantity_below_in_use: {
-    // fault: customer. The seat count asked for is below the minimum (the full
-    // seats in use, and never below one), so nothing changed or was charged.
+    // fault: customer. The seat count asked for is below the seats of that kind
+    // in use (full seats never below one), so nothing changed or was charged.
     title: "That's too few seats",
     describe: (error) => {
       const minimum = num(error, "minimum", 0);
+      const kind = strEq(error, "seat", "developer") ? "developer " : "";
       return minimum > 0
-        ? `Nothing changed. Choose at least ${minimum} ${minimum === 1 ? "seat" : "seats"}.`
-        : "Nothing changed. Choose at least as many seats as are in use.";
+        ? `Nothing changed. Choose at least ${minimum} ${kind}${minimum === 1 ? "seat" : "seats"}.`
+        : `Nothing changed. Choose at least as many ${kind}seats as are in use.`;
     },
   },
   subscription_already_active: {
@@ -3272,6 +3691,19 @@ const presentations = {
     title: "Reports and alerts aren't available on a group project yet",
     describe: () =>
       "Open the chart on the group project to see it, or set the report or alert up on a member project.",
+  },
+  analytics_filter_key_required: {
+    title: "This filter needs a key",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" filters by a key, ` +
+      "such as a metadata key or a metric, so a plain list can't be applied. " +
+      "Pick the key, then the values.",
+  },
+  analytics_filter_value_unsupported: {
+    title: "This filter value isn't one of its options",
+    describe: (error) =>
+      `"${safeProse(str(error, "filterField", "This filter"))}" accepts only its option values, ` +
+      "such as true or false. Pick one of the options listed for it.",
   },
   analytics_series_percentage_unsupported: {
     // A percentage is the series divided by the same measurement without the
@@ -3688,6 +4120,67 @@ const presentations = {
   },
 
   // ---- governance ----
+  agent_registry_entry_not_found: {
+    title: "Agent not found in the registry",
+    describe: () => "No agent in this organisation's registry has that id.",
+  },
+  agent_stop_already_open: {
+    title: "This agent already has an open stop",
+    describe: () =>
+      "Approve, deny or restore the stop that is open before you request another one.",
+  },
+  agent_stop_not_found: {
+    title: "Stop not found",
+    describe: () => "No kill switch stop in this organisation has that id.",
+  },
+  agent_stop_not_pending: {
+    title: "This stop is no longer waiting for an approval",
+    describe: () => "Someone already approved or denied it. Reload to see its status.",
+  },
+  agent_stop_not_restorable: {
+    title: "This stop cannot be restored",
+    describe: () => "Only a quarantined stop, or one that failed, can be restored.",
+  },
+  agent_stop_not_retryable: {
+    title: "This stop cannot be retried",
+    describe: () => "Only a stop that is quarantined, or one that failed, can be stopped again.",
+  },
+  agent_stop_plan_changed: {
+    title: "The stop plan changed",
+    describe: () => "Someone edited this agent's stop plan. Check the targets again, then confirm.",
+  },
+  agent_stop_plan_conflict: {
+    title: "Someone else saved this stop plan",
+    describe: () => "Your changes were not saved. Reload the plan, then make your changes again.",
+  },
+  agent_stop_plan_empty: {
+    title: "This agent has no stop plan",
+    describe: () =>
+      "Add a serving endpoint, a Bedrock agent alias or a virtual key to its stop plan first.",
+  },
+  agent_stop_self_approval: {
+    title: "The credential that requested a stop cannot approve it",
+    describe: () => "Ask another person or API key with governance:manage to approve it.",
+  },
+  agent_stop_target_invalid: {
+    title: "A stop plan target is not valid",
+    describe: () =>
+      "Each target must name a Databricks source, an AWS connection or a virtual key of this organisation.",
+  },
+  agent_stop_target_not_found: {
+    title: "A stop plan target does not exist",
+    describe: () =>
+      "The Bedrock agent alias or serving endpoint was not found. Check its region, ids or name.",
+  },
+  governance_aws_connection_in_use: {
+    title: "This AWS connection is still in use",
+    describe: () =>
+      "A stop plan target or a stop that is not restored yet signs with it. Remove those targets or restore the stop first.",
+  },
+  governance_aws_connection_not_found: {
+    title: "AWS connection not found",
+    describe: () => "No AWS connection in this organisation has that id.",
+  },
   anomaly_rule_not_found: {
     title: "Anomaly rule not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -3709,6 +4202,11 @@ const presentations = {
     title: "The judgements couldn't be made right now",
     describe: () => "The query ran, but nothing could be judged. Try again in a moment.",
   },
+  instant_eval_decision_model_key_invalid: {
+    title: "The Instant Evals model's key couldn't be used",
+    describe: () =>
+      "Your model provider refused the key for this project's Instant Evals model, or it has none. Check it in Settings > Model Providers.",
+  },
   instant_eval_estimate_unavailable: {
     title: "We couldn't work out the size of this run",
     describe: () => "The estimate failed on our side. Try again, or start the run without one.",
@@ -3723,6 +4221,17 @@ const presentations = {
       const allowance = typeof budget === "number" ? `$${budget.toFixed(2)}` : "the free";
       return `Organizations without a paid plan can judge up to ${allowance} of text in total. Upgrade your plan under Settings, Plan & billing to keep running Instant Evals.`;
     },
+  },
+  instant_eval_gateway_budget_exceeded: {
+    title: "A gateway budget stopped Instant Evals",
+    // The budget is one the customer set to block, so the way out is theirs:
+    // raise or remove it. The scope says whose budget it is.
+    titleFor: (error) => {
+      const owner = budgetMetaWord(error, "scope", BUDGET_SCOPE_OWNERS);
+      return owner ? `${owner} gateway budget stopped Instant Evals` : undefined;
+    },
+    describe: () =>
+      "The budget is set to block once it is reached, and Instant Evals count against it. Raise or remove it under AI Gateway, Budgets to keep judging.",
   },
   instant_eval_memory_judge_in_production: {
     title: "This installation's Instant Evals judge is for development only",
@@ -3805,6 +4314,12 @@ const presentations = {
     describe: () =>
       "Leave impersonation first. How this account signs in can only be changed by its owner.",
   },
+  impersonation_cannot_mint_credential: {
+    // No permission unlocks this, so the copy must not name one to ask for.
+    title: "Not available while impersonating",
+    describe: () =>
+      "Leave impersonation first. Only the member can create or rotate their own keys.",
+  },
   ingestion_key_not_found: {
     title: "Ingestion key not found",
     describe: () =>
@@ -3842,6 +4357,11 @@ const presentations = {
   ingestion_source_cap_reached: {
     title: "You've hit the limit for ingestion sources",
     describe: () => "Archive one you no longer use, or upgrade your plan to raise the limit.",
+  },
+  ingestion_source_disabled: {
+    title: "This ingestion source is disabled",
+    describe: () =>
+      "An admin turned this source off, so it takes no new events. Set it back to active to resume.",
   },
   ingestion_source_unauthorized: {
     title: "That ingestion source secret wasn't recognized",
@@ -3978,6 +4498,12 @@ const presentations = {
       return `${need} Ask an administrator, or set the rule on a scope you manage.`.trim();
     },
   },
+  data_privacy_api_key_add_forbidden: {
+    // ADR-208: the caller may edit this rule and keep its keys; only adding one is refused.
+    title: "Only an organization admin can add an API key",
+    describe: () =>
+      "You can still change this rule and keep the keys it names. Ask an organization admin to add the key.",
+  },
   data_privacy_config_invalid: {
     // `meta.reason` is the service's own line naming the offending pattern.
     // It is the only part the reader can act on, so it is what they read.
@@ -4022,6 +4548,16 @@ const presentations = {
       const need = permission ? `You need ${permission} here.` : "";
       return `${need} Ask an administrator, or set the length on a scope you manage.`.trim();
     },
+  },
+  data_retention_billed_through_billing: {
+    title: "This retention length is billed",
+    describe: () =>
+      "Keeping data longer than 90 days adds storage to the organization's bill, so it needs subscription:manage. Ask a billing administrator, or pick 90 days or less.",
+  },
+  data_retention_not_billed: {
+    title: "This retention length isn't billed",
+    describe: () =>
+      "Only a length that adds storage to the bill is set through billing. Save this length from the data retention settings instead.",
   },
   data_retention_disable_forbidden: {
     title: "Keeping data forever isn't available",
@@ -4173,6 +4709,11 @@ const presentations = {
     title: "Too many files opened at once",
     describe: () => "Wait a moment, then open the file again.",
   },
+  stored_object_write_conflict: {
+    // Every row write lost to another writer; nothing failed, so a retry settles it.
+    title: "The file changed while we were updating it",
+    describe: () => "Try again in a moment.",
+  },
   dataset_not_ready: {
     // A state, not a breakage — the rows are still being prepared. Waiting is
     // a real action, so this is not the "we've been notified" shape.
@@ -4274,6 +4815,20 @@ const presentations = {
     describe: () =>
       "Nothing was saved. An administrator has to set up storage before rows can be added.",
   },
+  storage_credentials_refused: {
+    // fault: platform. The deployment's own storage key or identity was turned
+    // away; only an administrator can change it, and the tips say where.
+    title: "Storage turned this workspace's credentials away",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to check the storage credentials this deployment uses.",
+  },
+  storage_permission_denied: {
+    // fault: platform. The identity signs in but holds no data access; the
+    // role to grant is in the tips, for the administrator.
+    title: "Storage won't let this workspace read or save files",
+    describe: () =>
+      "Nothing was read or saved. An administrator has to give this deployment's storage identity access to its files.",
+  },
   export_failed: {
     // fault: platform. The export ran on our side and did not finish, so the
     // copy has to say nothing was changed — an export that half-worked is the
@@ -4327,6 +4882,10 @@ const presentations = {
   },
 
   // ---- suites (run plans) ----
+  suite_template_not_found: {
+    title: "That suite template doesn't exist",
+    describe: () => "Pick a template from the list of templates, then try again.",
+  },
   suite_not_found: {
     title: "Run plan not found",
     describe: () => "It may have been deleted. Reload to see the current list.",
@@ -4435,6 +4994,61 @@ const presentations = {
     title: "That name is taken",
     describe: () =>
       "Another annotation queue in this project already uses it. Pick a different name.",
+  },
+
+  // ---- weekly digest emails ----
+  digest_member_address_missing: {
+    title: "Member has no email address",
+    describe: () =>
+      "This member has no email address, so a test can't be sent to them. Send it to yourself instead.",
+  },
+  digest_member_deactivated: {
+    title: "Member is deactivated",
+    describe: () =>
+      "This member's account is deactivated, so no test is sent to them. Send it to yourself instead.",
+  },
+  digest_member_not_found: {
+    title: "Member not found",
+    describe: () =>
+      "Only active members of this organization can get a test digest. Pick someone else.",
+  },
+  digest_impersonation_refused: {
+    title: "Can't change this while impersonating",
+    describe: () => "Email preferences belong to the person. Stop impersonating to change them.",
+  },
+  digest_link_invalid: {
+    title: "This link isn't valid",
+    describe: () => "It may have expired or been changed. Use the link from the latest email.",
+  },
+  digest_nothing_to_send: {
+    title: "Nothing to send this week",
+    describe: () =>
+      "This member's weekly email has no new items to show this week, so nothing was sent.",
+  },
+  digest_links_unavailable: {
+    title: "Unsubscribe links are unavailable",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_operator_address_missing: {
+    title: "Your account has no email address",
+    describe: () => "Add an email address to your account, then send the test again.",
+  },
+  digest_person_not_found: {
+    title: "No account with that email",
+    describe: () => "No LangWatch account uses that email address. Check it and try again.",
+  },
+  digest_member_unsubscribed: {
+    title: "Member opted out",
+    describe: () => "This member opted out of the digest, so no test is sent. Pick someone else.",
+  },
+  digest_public_base_url_missing: {
+    title: "Public address not configured",
+    describe: () => "This is on our side. Try again later.",
+  },
+  digest_unsubscribe_rate_limited: {
+    // Read on the digest's unsubscribe page, by someone with no session and nothing to fix.
+    title: "Too many attempts just now",
+    describe: () => "Wait a minute, then open the link again.",
   },
 
   // ---- automations & notifications ----
@@ -4822,6 +5436,16 @@ const presentations = {
     title: "This conversation belongs to someone else",
     describe: () => "You can view shared conversations but only the owner can continue them.",
   },
+  langy_attachment_refused: {
+    title: "Langy can't take that file",
+    describe: (error) => {
+      const reason = str(error, "reason", "");
+      if (reason === "not_an_image") return "Attach a PNG, JPEG, GIF or WebP image.";
+      if (reason === "too_large") return "Attach an image of 5 MB or less.";
+      if (reason === "too_many") return "Send at most four images in one message.";
+      return "Attach the image again, then send.";
+    },
+  },
   langy_empty_message: {
     title: "Nothing to send",
     describe: () => "Type a message first.",
@@ -5189,6 +5813,14 @@ const presentations = {
     // notified" would be both wrong and useless here.
     title: "That model call didn't go through",
     describe: () => "Try again in a moment, or pick a different model.",
+  },
+  ai_content_filtered: {
+    // fault: provider. The model settings work; the provider's content filter
+    // refused this text, so pointing at the model configuration would send the
+    // reader to fix something that is not broken.
+    title: "The provider's content filter blocked this text",
+    describe: () =>
+      "Your model provider refused this text under its content policy. Other text still works. To allow it, relax the content filter on your provider's deployment.",
   },
   ai_query_provider_error: {
     // fault: provider. Same shape as above, but the reader is mid-search, so
@@ -5606,7 +6238,7 @@ const presentations = {
   checkup_lwql_not_provisionable: {
     title: "LWQL functions cannot be provisioned",
     describe: () =>
-      "Give the ClickHouse user permission to create functions, or set a user defined path.",
+      "Set user_defined_zookeeper_path on every ClickHouse replica so functions live in Keeper.",
   },
   checkup_model_provider_refused: {
     title: "A model provider refused the test call",
@@ -5834,6 +6466,19 @@ const presentations = {
   voice_session_invalid: {
     title: "The session is invalid or has expired",
     describe: () => "Start the call again.",
+  },
+  gateway_a2a_target_headers_need_replacing: {
+    title: "Upstream headers need replacing",
+    describe: () =>
+      "The upstream URL now points at a different origin, so its saved headers were not kept. Enter the headers for the new upstream, or save it with none.",
+  },
+  gateway_a2a_target_name_taken: {
+    title: "Agent target name taken",
+    describe: () => "Another agent target in this scope uses that name. Pick a different name.",
+  },
+  gateway_a2a_target_not_found: {
+    title: "Agent target not found",
+    describe: () => "It may have been deleted. Reload to see the current list.",
   },
   gateway_cache_rule_not_found: {
     title: "Cache rule not found",
@@ -6202,6 +6847,10 @@ const presentations = {
   invalid_conversation_id: {
     title: "Conversation not found",
     describe: () => "This conversation link isn't one we can open. Start a new chat to keep going.",
+  },
+  invalid_images: {
+    title: "These images can't be sent",
+    describe: () => "Attach fewer or smaller images in a supported format and try again.",
   },
   agent_session_not_found: {
     title: "The session was lost",

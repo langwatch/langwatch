@@ -8,7 +8,7 @@ Feature: Automation reacts to trace's and evaluation's existing events from its 
   Scenario: Automation carries main's settle windows on its own peer lanes
     When automation's pipeline registers its peer subscribers
     Then trace trigger matching settles 30 seconds per trace
-    And evaluation trigger matching waits 10 seconds per evaluation with a 30 second dedup
+    And evaluation trigger matching waits 10 seconds per settled trace with a 30 second dedup
     And graph sweeps debounce 5 seconds per tenant in one lane per tenant
 
   @unit
@@ -47,3 +47,34 @@ Feature: Automation reacts to trace's and evaluation's existing events from its 
     Given trace or evaluation recorded activity for a project
     When automation's peer subscriber receives it twice
     Then the project's graph triggers are swept with the same inputs both times
+
+  @unit
+  Scenario: A burst of span events for one trace stages one match per trigger
+    Given trace recorded many spans for one trace inside its settle window
+    When automation's trace trigger matching settles them
+    Then one trigger match is staged per trigger, not one per span
+
+  @unit
+  Scenario: Settled evaluations of one trace stage one match per trigger
+    Given several evaluations of one trace settle inside the settle window
+    When automation's evaluation trigger matching settles them
+    Then one trigger match is staged per trigger, not one per evaluation
+
+  @unit
+  Scenario: A non-terminal evaluation event never hides a settled one
+    Given a settled evaluation of a trace is waiting in the evaluation lane
+    When a non-terminal evaluation event for the same trace arrives
+    Then the settled evaluation still matches its triggers
+
+  @unit
+  Scenario: A stale evaluation event never hides a fresh settled one
+    Given a fresh settled evaluation of a trace is waiting in the evaluation lane
+    When a settled evaluation event older than an hour for the same trace is redelivered
+    Then the stale event waits on its own
+    And the fresh evaluation still matches its triggers
+
+  @unit
+  Scenario: The trigger match queue drops only what the match identity drops
+    Given two trigger matches for one trigger and trace
+    When both are staged
+    Then the queue keeps one exactly when the event log would keep one

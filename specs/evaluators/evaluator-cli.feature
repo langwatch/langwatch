@@ -72,9 +72,11 @@ Feature: Evaluator CLI Commands
   # Rejecting unknown types before the network, and listing the valid ones,
   # is specified in evaluator-create-validation.feature.
 
-  Scenario: Create an evaluator without required type
-    When I run "langwatch evaluator create 'My Evaluator'"
-    Then I see an error that the --type option is required
+  @unit
+  Scenario: Create an evaluator naming neither a type nor a code file
+    When I run "langwatch evaluator create 'My Evaluator'" without --type or --code
+    Then the command fails with a validation error asking for exactly one of --type or --code
+    And no evaluator is created
 
   Scenario: Update an evaluator name
     Given my project has an evaluator with slug "my-evaluator"

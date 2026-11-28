@@ -10,6 +10,8 @@ const voiceSessionMintInputSchemaDefinition = z.object({
   /** The vendor agent id from the form; a saved row's own id always wins. */
   agentId: z.string().trim().min(1).max(128),
   agentRowId: z.string().min(1).optional(),
+  /** Set for a scenario call, which asks the run cap before it opens; a drawer call has none. */
+  scenarioId: z.string().min(1).optional(),
 });
 export interface VoiceSessionMintInputSchema extends Named<
   typeof voiceSessionMintInputSchemaDefinition

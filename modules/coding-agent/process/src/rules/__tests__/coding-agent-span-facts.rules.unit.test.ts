@@ -2,6 +2,8 @@ import { admitsCodingAgentSpan } from "@langwatch/coding-agent-contract";
 import { NormalizedSpanKind, type NormalizedSpan } from "@langwatch/trace-contract";
 import { describe, expect, it } from "vitest";
 
+import { CodingAgentSessionStateProjection } from "../../eventing/coding-agent-session-state.projection.ts";
+import { accountColumnsOf } from "../coding-agent-account.rules.ts";
 import { liftSpanContribution, type SpanContribution } from "../coding-agent-span-facts.rules.ts";
 
 const TRACE_ID = "trace-1";
@@ -82,5 +84,62 @@ describe("liftSpanContribution", () => {
 
     expect(lifted.agent).toBe("claude_cowork");
     expect(lifted.sessionId).toBe("cw-sess-1");
+  });
+
+  /** @scenario a launcher's declared session groups every harness session it runs */
+  it("keys the span on the launcher's declared session over Claude Code's own", () => {
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({
+          name: "claude_code.llm_request",
+          spanAttributes: { "session.id": "cc-run-2", "gen_ai.conversation.id": "channel_a" },
+          resourceAttributes: { "langwatch.session.id": "agent_scout" },
+        }),
+      }),
+    );
+
+    expect(lifted.sessionId).toBe("agent_scout");
+    expect(lifted.sessionKeySource).toBe("provider");
+  });
+
+  /** @scenario a session with no declared session is keyed by the agent's own session id */
+  it("keys a plain Claude Code span on its session id over a declared thread", () => {
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({
+          name: "claude_code.llm_request",
+          spanAttributes: { "session.id": "cc-run-1", "gen_ai.conversation.id": "channel_a" },
+        }),
+      }),
+    );
+
+    expect(lifted.sessionId).toBe("cc-run-1");
+  });
+
+  /** @scenario a resource account id never names the session's user */
+  it("keys the account on the resource's agent account id without setting the session's user", () => {
+    const stateProjection = CodingAgentSessionStateProjection.create();
+    const lifted = contributionOf(
+      liftSpanContribution({
+        tenantId: "project-1",
+        occurredAt: 3_000,
+        span: span({
+          name: "claude_code.llm_request",
+          spanAttributes: { "session.id": "cc-run-3" },
+          resourceAttributes: { "user.account_uuid": "5a6b7c8d-0000-4000-8000-000000000002" },
+        }),
+      }),
+    );
+
+    expect(accountColumnsOf(lifted.facts).accountId).toBe("5a6b7c8d-0000-4000-8000-000000000002");
+    const session = stateProjection.withIdentity(
+      stateProjection.createInitCodingAgentSession(),
+      lifted.facts,
+    );
+    expect(session.userId).toBeNull();
   });
 });

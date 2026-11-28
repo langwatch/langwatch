@@ -1,6 +1,9 @@
 import type { SubscriptionNotificationPayload } from "@langwatch/enterprise-billing-contract";
 
-import { BillingWebhookHost } from "../billing-webhook-host.channel.ts";
+import {
+  BillingWebhookHost,
+  type AccountPaymentFailedAlert,
+} from "../billing-webhook-host.channel.ts";
 
 /** The Slack alerts a subscription change posts, as the notice service sends them. */
 type BillingWebhookSlackNotices = {
@@ -9,6 +12,7 @@ type BillingWebhookSlackNotices = {
     stripeSubscriptionId: string;
     reason: string;
   }): Promise<void>;
+  sendSlackAccountPaymentFailed(input: AccountPaymentFailedAlert): Promise<void>;
 };
 
 /** What a Stripe delivery posts to Slack, through the configured notice channels. */
@@ -30,5 +34,9 @@ export class SlackBillingWebhookHostChannel extends BillingWebhookHost {
     reason: string;
   }): Promise<void> {
     return this.notices.sendSlackBillingThresholdFailureAlert(input);
+  }
+
+  sendSlackAccountPaymentFailed(input: AccountPaymentFailedAlert): Promise<void> {
+    return this.notices.sendSlackAccountPaymentFailed(input);
   }
 }

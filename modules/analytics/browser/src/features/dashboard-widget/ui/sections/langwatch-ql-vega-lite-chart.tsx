@@ -1,7 +1,7 @@
 /**
  * A specification is validated against the bundled Vega-Lite schema and
  * the LangWatchQL policy *before* Vega loads it, so no path through this
- * component renders an empty chart.
+ * component renders an empty chart. A render crash is reported as an exception.
  * @see modules/analytics/specs/analytics-lwql-workbench.feature
  */
 
@@ -9,6 +9,8 @@ import type {
   LangWatchQLVegaLiteChartProps,
   VegaValidationWarning,
 } from "@langwatch/analytics-contract/visualization";
+import { useUiAnalytics } from "@langwatch/browser-host/analytics";
+import { toError } from "@langwatch/browser-host/errors";
 import { Box, Stack, Text, VisuallyHidden, VStack } from "@langwatch/design-system/primitives";
 import { type RefObject, useId } from "react";
 import { ErrorBoundary } from "react-error-boundary";
@@ -31,8 +33,10 @@ export function LangWatchQLVegaLiteChart({
   pinnedConfig,
   colorMode,
   isResultNoteHidden = false,
+  crashContext,
 }: LangWatchQLVegaLiteChartProps) {
   const descriptionId = useId();
+  const analytics = useUiAnalytics();
   const { containerRef, state, failures, warnings, isRefused } = useLangWatchQLChartModel({
     spec,
     datasets,
@@ -40,6 +44,7 @@ export function LangWatchQLVegaLiteChart({
     themeConfig,
     pinnedConfig,
     colorMode,
+    crashContext,
   });
 
   return (
@@ -47,6 +52,12 @@ export function LangWatchQLVegaLiteChart({
       {isRefused && <LangWatchQLChartFailure errors={failures} />}
       <LangWatchQLChartWarnings warnings={warnings} />
       <ErrorBoundary
+        onError={(error) =>
+          analytics.captureException({
+            error: toError(error),
+            properties: { surface: "lwql_chart", ...crashContext },
+          })
+        }
         fallbackRender={() => (
           <LangWatchQLChartFailure
             errors={[

@@ -171,7 +171,19 @@ export class GatewayInternalKeyResolutionService {
       return refuse(statusRejection.status, { ...statusRejection });
     }
 
-    return answer(await this.keyResolution({ vk, notAfter: vk.expiresAt }));
+    // A token minted for the old secret inside a rotation grace carries the grace
+    // end as its own claim; `vk_expires_at` stays the key's date, so an ended old
+    // secret reads as an invalid key, never as an expired one.
+    const now = nowInstant().epochMilliseconds;
+    const graceEnd =
+      vk.presentedPreviousSecret &&
+      vk.previousSecretValidUntil &&
+      vk.previousSecretValidUntil.epochMilliseconds > now
+        ? vk.previousSecretValidUntil
+        : null;
+    return answer(
+      await this.keyResolution({ vk, notAfter: vk.expiresAt, secretNotAfter: graceEnd }),
+    );
   }
 
   /**
@@ -182,10 +194,12 @@ export class GatewayInternalKeyResolutionService {
   private async keyResolution({
     vk,
     notAfter,
+    secretNotAfter,
     connectServices,
   }: {
     vk: GatewayVirtualKeyRecord;
     notAfter: Instant | null;
+    secretNotAfter?: Instant | null;
     connectServices?: string[];
   }) {
     // Null for a key written before the destination was stored, in an organization
@@ -201,6 +215,7 @@ export class GatewayInternalKeyResolutionService {
       principal_id: vk.principalUserId,
       revision: vk.revision.toString(),
       notAfter,
+      ...(secretNotAfter ? { secretNotAfter } : {}),
       ...(connectServices ? { connect_services: connectServices } : {}),
     });
     // Fire-and-forget last-used bump. Failures here must not deny the request.

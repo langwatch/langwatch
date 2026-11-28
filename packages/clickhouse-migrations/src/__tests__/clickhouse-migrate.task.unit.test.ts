@@ -1,3 +1,8 @@
+import { mkdtempSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+
+import { ClickHouseSchemaLock } from "@langwatch/clickhouse-client";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const stubs = vi.hoisted(() => ({
@@ -21,6 +26,13 @@ import {
   resolveClickHouseMigrationTaskConfig,
 } from "../clickhouse-migrate.task.ts";
 
+/** A lock of the test's own, so a migration elsewhere on the machine never holds it up. */
+function privateLock(): ClickHouseSchemaLock {
+  return ClickHouseSchemaLock.create({
+    lockPath: join(mkdtempSync(join(tmpdir(), "migrate-task-lock-")), "schema.lock"),
+  });
+}
+
 describe("clickhouse-migrate task", () => {
   beforeEach(() => {
     stubs.runMigrations.mockClear();
@@ -30,6 +42,7 @@ describe("clickhouse-migrate task", () => {
 
   it("waits for the shared endpoint before it queues on the schema lock", async () => {
     await ClickHouseMigrateTask.create({
+      lock: privateLock(),
       source: { CLICKHOUSE_URL: "http://shared:8123", CLICKHOUSE_MIGRATE_WAIT_SECONDS: "30" },
     }).execute();
 
@@ -44,6 +57,7 @@ describe("clickhouse-migrate task", () => {
 
   it("runs schema work once for each physical private endpoint", async () => {
     await ClickHouseMigrateTask.createFromConfig({
+      lock: privateLock(),
       config: {
         buildTime: false,
         sharedUrl: "http://shared:8123",
@@ -86,6 +100,7 @@ describe("clickhouse-migrate task", () => {
 
   it("does nothing during BUILD_TIME even when endpoints are configured", async () => {
     await ClickHouseMigrateTask.createFromConfig({
+      lock: privateLock(),
       config: {
         buildTime: true,
         sharedUrl: "http://shared:8123",
@@ -118,6 +133,7 @@ describe("clickhouse-migrate task", () => {
 
   it("migrates every endpoint with the cluster, cold-storage and hot-days settings the input named", async () => {
     await ClickHouseMigrateTask.create({
+      lock: privateLock(),
       source: {
         CLICKHOUSE_URL: "http://shared:8123",
         CLICKHOUSE_CLUSTER: "main",
@@ -149,6 +165,7 @@ describe("clickhouse-migrate task", () => {
     /** @scenario "The migrate task passes the list it was created with to every endpoint" */
     it("hands that list to the reconciler for the shared and a private endpoint", async () => {
       await ClickHouseMigrateTask.create({
+        lock: privateLock(),
         source: {
           CLICKHOUSE_URL: "http://shared:8123",
           CLICKHOUSE_URL__primary__org_1: "http://private:8123",
@@ -177,6 +194,7 @@ describe("clickhouse-migrate task", () => {
   describe("when the whole environment is the input", () => {
     it("migrates the shared endpoint the environment named", async () => {
       await ClickHouseMigrateTask.create({
+        lock: privateLock(),
         source: { CLICKHOUSE_URL: "http://shared:8123" },
       }).execute();
 
@@ -189,7 +207,10 @@ describe("clickhouse-migrate task", () => {
     });
 
     it("runs nothing when no endpoint is configured at all", async () => {
-      await ClickHouseMigrateTask.create({ source: {} }).execute();
+      await ClickHouseMigrateTask.create({
+        lock: privateLock(),
+        source: {},
+      }).execute();
 
       expect(stubs.runMigrations).not.toHaveBeenCalled();
       expect(stubs.reconcileTTL).not.toHaveBeenCalled();

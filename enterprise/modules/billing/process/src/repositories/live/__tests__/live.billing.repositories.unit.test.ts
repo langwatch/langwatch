@@ -29,7 +29,7 @@ describe("LiveBillingRepositories", () => {
               pricingModel: "SEAT_EVENT",
               stripeCustomerId: "cus_1",
               selfHostedCustomer: false,
-              subscriptions: [{ id: "sub_1" }],
+              subscriptions: [{ id: "sub_1", status: "ACTIVE", startDate: null, endDate: null }],
             };
           },
         },
@@ -70,6 +70,9 @@ describe("LiveBillingRepositories", () => {
           }),
         queryInstantEvalSpendTotal: async () => ({ outcome: "unavailable" }),
         isInstantEvalMeterProvisioned: () => true,
+        queryPiiRedactionSpendTotal: async () => ({ outcome: "unavailable" }),
+        isPiiRedactionMeterProvisioned: () => true,
+        subscriptionPriceLine: async () => ({ carried: true, addedAtMs: null }),
         selfDispatch: async () => {},
         errorReporter: BillingErrorReporterService.create(),
         connectedUsageCeiling: async () => null,
@@ -101,7 +104,7 @@ describe("LiveBillingRepositories", () => {
       expect(organizationReads).toEqual([{ id: "org_1" }]);
       expect(checkpointReads).toContainEqual(checkpointKey);
       expect(checkpointWrites).toContainEqual(checkpointKey);
-      expect([...store.strings.keys()]).toEqual(["ttlcache:billing:orgData:org_1"]);
+      expect([...store.strings.keys()]).toEqual(["ttlcache:billing:orgData:v2:org_1"]);
       expect(cacheLifetimes).toEqual([60]);
     });
   });

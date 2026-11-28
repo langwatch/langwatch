@@ -163,15 +163,12 @@ async function seedLangyHistory({
     return;
   }
   const http = new DemoHttp({ endpoint: run.endpoint, apiKey, signal: run.signal });
-  const { team } = await run.prisma.project.findUniqueOrThrow({
-    where: { id: projectId },
-    select: { team: { select: { organizationId: true } } },
-  });
   const turns = daysOf(run)
     .flatMap((day) =>
       langyMirrorTurnsOn({
         projectId,
-        organizationId: team.organizationId,
+        organizationId: DASHBOARDS_DEMO_ORGANIZATION.id,
+        sourceProjectIds: DASHBOARDS_DEMO_PROJECTS.map((project) => project.id),
         day,
         scale: run.scale,
         now: run.now,

@@ -6,6 +6,7 @@ import {
   NativeSelect,
   Skeleton,
   Text,
+  useMediaQuery,
 } from "@chakra-ui/react";
 import { ChevronLeft, ChevronRight } from "lucide-react";
 
@@ -41,19 +42,18 @@ interface PaginationCommon {
   summaryTone?: "muted" | "subtle";
 }
 
-const NARROW = "@media (max-width: 30rem)";
-
+/** Below `md` the bar stacks: the summary on top, the pager on one line under it, start-aligned
+ * so it stays clear of the floating assistant button in the bottom-right corner. */
 function barLook({
   layout = "end",
   ground = "transparent",
 }: Pick<PaginationCommon, "layout" | "ground">) {
-  const center = layout === "center";
   return {
-    templateColumns: center
-      ? "minmax(max-content, 1fr) auto minmax(0, 1fr)"
-      : { base: "minmax(0, 1fr)", md: "1fr auto" },
+    templateColumns: {
+      base: "minmax(0, 1fr)",
+      md: layout === "center" ? "minmax(max-content, 1fr) auto minmax(0, 1fr)" : "1fr auto",
+    },
     ...(ground === "card" ? { background: "bg.card" } : {}),
-    ...(center ? { [NARROW]: { templateColumns: "minmax(0, 1fr)", justifyItems: "center" } } : {}),
   } as const;
 }
 
@@ -222,15 +222,22 @@ function PageNavigator({
   isPageReachable: (page: number) => boolean;
   onPageChange: (page: number) => void;
 }) {
+  // Below `md` the pager keeps to one line by dropping the current page's neighbours.
+  const [narrow] = useMediaQuery(["(max-width: 47.98rem)"], { ssr: false });
+  const siblingCount = narrow ? 0 : 2;
   return (
     <ChakraPagination.Root
       count={totalCount}
       pageSize={pageSize}
       page={page}
-      siblingCount={2}
+      siblingCount={siblingCount}
       onPageChange={(details) => onPageChange(details.page)}
     >
-      <HStack gap={0.5} flexWrap="wrap" justifyContent={{ base: "start", md: "end" }}>
+      <HStack
+        gap={0.5}
+        flexWrap={{ base: "nowrap", md: "wrap" }}
+        justifyContent={{ base: "start", md: "end" }}
+      >
         <ChakraPagination.PrevTrigger asChild>
           <Button
             variant="ghost"

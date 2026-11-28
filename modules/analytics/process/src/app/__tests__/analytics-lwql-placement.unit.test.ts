@@ -87,11 +87,24 @@ const keyFor = (projectId: string): LangWatchQLKeyReach => ({
   resolvedProject: { id: projectId, teamId: `team-${projectId}` },
 });
 
+/** The origin the memory placement gives `project-routed`, its own server. */
+const ROUTED_ORIGIN = `http://${ROUTED}.memory.invalid:8123`;
+
 /**
  * The app with a provisioned identity and admin seam: `project-routed` on its own ClickHouse,
- * `project-shared` on the LangWatchQL server, whose access model is answered provisioned.
+ * `project-shared` on the LangWatchQL server, whose access model is answered provisioned. A
+ * private server's answer is held only when `routedAnswer` names it; otherwise it is probed.
  */
-async function appOver() {
+async function appOver({
+  routedAnswer,
+  routedPrivately = false,
+  environment = {},
+}: {
+  routedAnswer?: "provisioned";
+  /** Sends `project-routed` to its own ClickHouse through the router, signing in as its reader. */
+  routedPrivately?: boolean;
+  environment?: Readonly<Record<string, string>>;
+} = {}) {
   const inserts: Parameters<ClickHouseAdminStatements["insert"]>[0][] = [];
   const admin: ClickHouseAdminStatements = {
     command: () => Promise.resolve(),
@@ -106,6 +119,12 @@ async function appOver() {
   );
   const memory = MemoryAnalyticsRepositories.create();
   await memory.lwqlAccessModelAnswer.recordAnswer({ origin: TARGET_ORIGIN, answer: "provisioned" });
+  if (routedAnswer) {
+    await memory.lwqlAccessModelAnswer.recordAnswer({
+      origin: `private:${ROUTED_ORIGIN}:${ROUTED}`,
+      answer: routedAnswer,
+    });
+  }
   const app = await AnalyticsModule.create({
     dependencies: {
       featureFlags: createApiFixture<FeatureFlagApi>({ isEnabled: () => Promise.resolve(false) }),
@@ -156,6 +175,20 @@ async function appOver() {
       }),
       langWatchQl: {
         ...memory.langWatchQl,
+        ...(routedPrivately
+          ? {
+              routeTenantSet: ({ tenantIds }: { tenantIds: readonly string[] }) =>
+                Promise.resolve(
+                  tenantIds.includes(ROUTED)
+                    ? {
+                        kind: "private" as const,
+                        organizationId: ORGANIZATION_ID,
+                        url: `${ROUTED_ORIGIN}/langwatch`,
+                      }
+                    : { kind: "shared" as const },
+                ),
+            }
+          : {}),
         admin: {
           configured: true,
           target: { url: "http://clickhouse.test:8123/", database: "langwatch" },
@@ -173,6 +206,7 @@ async function appOver() {
         accessModelMode: void 0,
         sqlSingleNode: void 0,
         clickhouseCluster: void 0,
+        installMethod: void 0,
         aggregateMaxMembers: void 0,
       },
       tenantAnalyticsConcurrency: 4,
@@ -182,6 +216,7 @@ async function appOver() {
     secrets: analyticsTestSecrets({
       NEXTAUTH_SECRET: TEST_SESSION_SECRET,
       LWQL_CLICKHOUSE_PASSWORD: "lwql-test-password",
+      ...environment,
     }),
   });
   return { app, inserts, resolveSession };
@@ -199,8 +234,14 @@ const SQL = "SELECT 1";
 const PROTECTIONS = { catalogue: EVERY_CATALOGUE_PERMISSION };
 
 /** What each door answers for one project: a refusal's code, or `answered`. */
-async function everyDoorFor({ projectId }: { projectId: string }) {
-  const { app } = await appOver();
+async function everyDoorFor({
+  projectId,
+  routedAnswer,
+}: {
+  projectId: string;
+  routedAnswer?: "provisioned";
+}) {
+  const { app } = await appOver({ routedAnswer });
   const reach = keyFor(projectId);
   const project = { id: projectId, lwqlKey: `lwql-${projectId}` };
   const run = (caller: "workbench" | "saved_chart") =>
@@ -232,8 +273,11 @@ async function everyDoorFor({ projectId }: { projectId: string }) {
 describe("AnalyticsModule LangWatchQL doors", () => {
   describe("when each door runs a query for an organisation routed to its own ClickHouse", () => {
     /** @scenario "Every LangWatchQL entry point passes the gate" */
-    it("refuses lwql_not_provisioned at the API, the CLI verbs, the workbench, saved charts and passes", async () => {
+    it("refuses lwql_not_provisioned at every door where its server shows a row to the reader, sending only the probe", async () => {
       queryMock.mockReset();
+      queryMock.mockResolvedValue({
+        json: async () => ({ data: [{ visible: 1 }], meta: [], statistics: {} }),
+      });
 
       expect(await everyDoorFor({ projectId: ROUTED })).toEqual({
         api: "lwql_not_provisioned",
@@ -242,7 +286,29 @@ describe("AnalyticsModule LangWatchQL doors", () => {
         savedChart: "lwql_not_provisioned",
         pass: "lwql_not_provisioned",
       });
-      expect(queryMock).not.toHaveBeenCalled();
+      const sent = queryMock.mock.calls.map(([request]) => String(request.query));
+      expect(sent.length).toBeGreaterThan(0);
+      expect(sent.every((query) => query.startsWith("SELECT 1 AS visible FROM traces"))).toBe(true);
+    });
+
+    /** @scenario "A routed organisation whose server is provisioned is answered on its own server" */
+    it("answers at every door once its server is held provisioned", async () => {
+      queryMock.mockReset();
+      queryMock.mockResolvedValue({
+        json: async () => ({
+          data: [{ one: 1 }],
+          meta: [{ name: "one", type: "UInt8" }],
+          statistics: { elapsed: 0, rows_read: 1, bytes_read: 1 },
+        }),
+      });
+
+      expect(await everyDoorFor({ projectId: ROUTED, routedAnswer: "provisioned" })).toEqual({
+        api: "answered",
+        cli: "answered",
+        workbench: "answered",
+        savedChart: "answered",
+        pass: "answered",
+      });
     });
   });
 
@@ -267,6 +333,38 @@ describe("AnalyticsModule LangWatchQL doors", () => {
       });
       expect(queryMock).toHaveBeenCalledTimes(5);
     });
+  });
+});
+
+describe("AnalyticsModule LangWatchQL on an organisation's own ClickHouse", () => {
+  const PASSWORD_VARIABLE = `LWQL_PRIVATE_READER_PASSWORD__label__${ORGANIZATION_ID}`;
+
+  async function apiDoorWith(environment: Readonly<Record<string, string>>) {
+    queryMock.mockReset();
+    queryMock.mockResolvedValue({
+      json: async () => ({
+        data: [{ one: 1 }],
+        meta: [{ name: "one", type: "UInt8" }],
+        statistics: { elapsed: 0, rows_read: 1, bytes_read: 1 },
+      }),
+    });
+    const { app } = await appOver({
+      routedAnswer: "provisioned",
+      routedPrivately: true,
+      environment,
+    });
+    return codeOf(app.runLangWatchQLForKey({ reach: keyFor(ROUTED), door: "rest_api", sql: SQL }));
+  }
+
+  /** @scenario "Without its own password a private reader falls back to the key pepper and warns" */
+  it("answers with the reader derived from the key pepper where no password variable is set", async () => {
+    expect(await apiDoorWith({})).toBe("answered");
+  });
+
+  /** @scenario "A blank or doubled private reader password is refused, never derived" */
+  it("refuses the organisation's runs when its password variable is set but empty", async () => {
+    expect(await apiDoorWith({ [PASSWORD_VARIABLE]: "" })).toBe("lwql_unavailable");
+    expect(queryMock).not.toHaveBeenCalled();
   });
 });
 

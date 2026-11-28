@@ -1,5 +1,7 @@
 import type {
   AuditLogEntry,
+  AuditLogExportEntry,
+  FindAuditLogForOrganizationInput,
   AuditLogHistoryEntry,
   AuditLogTargetEntry,
   FindAuditLogByTargetKindInput,
@@ -20,4 +22,6 @@ export interface AuditLogRepository {
   hasRecordedSince(input: RecordedSinceInput): Promise<boolean>;
   /** Newest first, at most `limit`. */
   findByTargetKind(input: FindAuditLogByTargetKindInput): Promise<AuditLogTargetEntry[]>;
+  /** Oldest first after the `(createdAt, id)` watermark, at most `limit`. */
+  findForOrganization(input: FindAuditLogForOrganizationInput): Promise<AuditLogExportEntry[]>;
 }

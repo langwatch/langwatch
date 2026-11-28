@@ -13,7 +13,12 @@ export type BillingReportOrganization = {
   subscriptions: { id: string }[];
   /** Which of the two contracts invoices this organization's hosted usage. */
   contract: UsageBillingContract;
+  /** Growth-seat subscriptions live or ended, newest start first (no start first); empty when connected. */
+  growthSeatPeriods: GrowthSeatPeriod[];
 };
+
+/** When one growth-seat subscription ran, in epoch ms; a null end is still running. */
+export type GrowthSeatPeriod = { startMs: number | null; endMs: number | null };
 
 /**
  * Why the lookup did or did not yield an organization: "no such organization"
@@ -33,4 +38,13 @@ export abstract class BillingReportOrganizationRepository {
   abstract getOrganizationForBilling(
     organizationId: string,
   ): Promise<BillingReportOrganizationLookup>;
+
+  /**
+   * When an organization admin accepted the PII Redaction Model's price, in epoch milliseconds:
+   * the PII redaction meter counts spend from then on only (ADR-201 decision 15). Null when no
+   * admin accepted it, and for an unknown organization.
+   */
+  abstract findPiiRedactionModelAcceptedAtMs(input: {
+    organizationId: string;
+  }): Promise<number | null>;
 }

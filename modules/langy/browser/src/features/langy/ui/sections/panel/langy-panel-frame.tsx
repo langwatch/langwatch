@@ -1,8 +1,13 @@
 import { Box, chakra } from "@langwatch/design-system/primitives";
+import { clampWidth, ResizeHandle } from "@langwatch/design-system/resize-handle";
 import { motion } from "motion/react";
-import { type ComponentProps, type ReactNode, type RefObject } from "react";
+import { type ComponentProps, type ReactNode, type RefObject, useEffect, useState } from "react";
 
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
+import {
+  type LangyResizablePlacement,
+  resolvePanelWidthBounds,
+} from "../../../../../model/langy-panel-resize.ts";
 import {
   FLOATING_PEEK_NEAR_PX,
   SIDEBAR_PEEK_NEAR_PX,
@@ -21,7 +26,6 @@ import {
   panelSizeCss,
   panelTransition,
   panelVariants,
-  panelWidth,
 } from "./langy-panel-chrome.ts";
 
 // The panel stays MOUNTED when closed (unmounting would tear down useChat's
@@ -46,6 +50,57 @@ function peekDataAttributes({
     "data-langy-peek": peek.phase,
     "data-langy-peek-mode": mode,
     ...(turnActive ? { "data-langy-peek-working": "" } : {}),
+  };
+}
+
+/**
+ * The free-edge drag: it follows the pointer in local state and is saved once, when it ends, to
+ * the layout it started in; a layout change mid-drag abandons it.
+ */
+function useLangyPanelDrag({
+  resizable,
+  sizing,
+  bounds,
+  panelWidthPx,
+}: {
+  resizable: boolean;
+  sizing: LangyResizablePlacement;
+  bounds: { min: number; max: number };
+  panelWidthPx: number;
+}) {
+  const setPanelWidth = useLangyStore((s) => s.setPanelWidth);
+  const resetPanelWidth = useLangyStore((s) => s.resetPanelWidth);
+  const [resizing, setResizing] = useState(false);
+  const [drag, setDrag] = useState<{ placement: LangyResizablePlacement; width: number } | null>(
+    null,
+  );
+  useEffect(() => {
+    if (resizable) return;
+    setResizing(false);
+    setDrag(null);
+  }, [resizable]);
+  // A drag is live only on the layout it started in; after a layout change it is inert.
+  const live = resizable && drag?.placement === sizing ? drag : null;
+  const widthPx = live
+    ? clampWidth({ width: live.width, min: bounds.min, max: bounds.max })
+    : panelWidthPx;
+  return {
+    resizing,
+    widthPx,
+    handleProps: {
+      onChange: (width: number) => {
+        if (!resizing) return setPanelWidth({ placement: sizing, width });
+        if (drag?.placement === sizing) setDrag({ ...drag, width });
+      },
+      onDraggingChange: (dragging: boolean) => {
+        setResizing(dragging);
+        setDrag(dragging ? { placement: sizing, width: panelWidthPx } : null);
+      },
+      onDragEnd: (width: number) => {
+        if (drag?.placement === sizing) setPanelWidth({ placement: sizing, width });
+      },
+      onReset: () => resetPanelWidth(sizing),
+    },
   };
 }
 
@@ -84,15 +139,30 @@ export function LangyPanelFrame({
   const { floating, reduceMotion, isDrawerCompanion } = placement;
   const touchable = (isOpen || peek.peeking) && !peek.dismissed;
   const markPanelShown = useLangyStore((s) => s.markPanelShown);
+  // The free edge is the one facing the page: left, unless the card dodged to the left corner.
+  const edge = placement.floatingDodgesDrawer ? "right" : "left";
+  const sizing = floating ? "floating" : "sidebar";
+  const resizable = isOpen && !peek.peeking && !isDrawerCompanion;
+  const bounds = resolvePanelWidthBounds({
+    placement: sizing,
+    viewportWidth: placement.viewportWidth,
+  });
+  const { resizing, widthPx, handleProps } = useLangyPanelDrag({
+    resizable,
+    sizing,
+    bounds,
+    panelWidthPx: placement.panelWidthPx,
+  });
   return (
     <MotionBox
       ref={panelRef}
       {...dropProps}
       {...guardProps}
       className="langy-root"
-      layout="position"
+      // A drag moves the panel's own edge; the spring would trail the pointer.
+      layout={resizing ? false : "position"}
       position="fixed"
-      width={panelWidth({ floating, isDrawerCompanion })}
+      width={`${widthPx}px`}
       zIndex={isDrawerCompanion ? 1600 : 1200}
       background={isDrawerCompanion ? "bg.card/80" : "bg.card"}
       borderStyle="solid"
@@ -123,7 +193,7 @@ export function LangyPanelFrame({
       onAnimationComplete={() => {
         if (isOpen) markPanelShown();
       }}
-      css={panelSizeCss({ floating, reduceMotion })}
+      css={panelSizeCss({ floating, reduceMotion, resizing })}
       {...panelPlacementChrome({
         floating,
         isDrawerCompanion,
@@ -132,6 +202,16 @@ export function LangyPanelFrame({
         minHeightPx: floorPx,
       })}
     >
+      {resizable ? (
+        <ResizeHandle
+          label="Resize Langy panel"
+          edge={edge}
+          value={widthPx}
+          min={bounds.min}
+          max={bounds.max}
+          {...handleProps}
+        />
+      ) : null}
       {children}
     </MotionBox>
   );

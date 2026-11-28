@@ -130,6 +130,7 @@ describe("DatasetService object-backed reads", () => {
       });
       batchCreateRecords = vi.fn(async () => []);
       deleteRecords = vi.fn(async () => ({ count: 0 }));
+      createDataset = vi.fn(async () => dataset());
       copyDataset = vi.fn(async () => undefined);
       updateColumns = vi.fn(async () => dataset());
     })();

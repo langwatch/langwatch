@@ -10,11 +10,11 @@ import { CURATED_BOARDS, curatedBoardById } from "../model/curated-boards.ts";
 
 describe("CURATED_BOARDS", () => {
   /** @scenario "AC161 The sidebar lists Your dashboards, Pinned and From LangWatch in order" */
-  it("is Release check, Can I trust my numbers? and Where my agent breaks, in that order", () => {
+  it("is Ready to ship?, Fix missing data and Errors and failures, in that order", () => {
     expect(CURATED_BOARDS.map(({ name }) => name)).toEqual([
-      "Release check",
-      "Can I trust my numbers?",
-      "Where my agent breaks",
+      "Ready to ship?",
+      "Fix missing data",
+      "Errors and failures",
     ]);
   });
 

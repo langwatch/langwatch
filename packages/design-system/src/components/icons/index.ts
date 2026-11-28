@@ -14,6 +14,7 @@ export {
   WorkatoIcon,
 } from "./vendor-icons.tsx";
 export { Azure } from "./azure.tsx";
+export { GoogleCloud } from "./provider/google-cloud.tsx";
 export { Python } from "./python.tsx";
 export { DSPy } from "./ds-py.tsx";
 export { TypeScript } from "./type-script.tsx";

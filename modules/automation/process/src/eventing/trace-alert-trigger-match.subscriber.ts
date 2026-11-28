@@ -38,5 +38,5 @@ export async function handleTraceAlertTriggerMatch(
     });
     recorded++;
   }
-  deps.metrics.countRecorded(recorded);
+  deps.metrics.countRecorded({ path: "trace", count: recorded });
 }

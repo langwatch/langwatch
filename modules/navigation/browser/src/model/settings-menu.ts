@@ -1,9 +1,11 @@
 /** Settings navigation as data; model not hook, gates belong to host; shell menu, not page menu */
 
 import type { Hosting } from "@langwatch/browser-host/deployment";
+import type { FeatureName } from "@langwatch/design-system/feature-mark";
 import {
   Activity,
   Anvil,
+  BotMessageSquare,
   Archive,
   BadgeCheck,
   Cloud,
@@ -33,6 +35,7 @@ import {
   UserRound,
   Workflow,
   Vault,
+  Waypoints,
   UserStar,
   UsersRound,
   ShieldUser,
@@ -60,27 +63,64 @@ export interface SettingsMenuItem {
    */
   alsoActiveAt?: string[];
   icon: LucideIcon;
+  /** A branded feature: the sidebar draws its mark in place of `icon`, as its pages do. */
+  feature?: FeatureName;
   /**
    * An Enterprise entry offered to a plan that lacks it: the sidebar shows a lock and "Included
    * in Enterprise", and the page opens on its upsell.
    */
   isLocked?: boolean;
-  /** An Enterprise entry on a plan that includes it: the sidebar marks it with the "ENT" chip. */
-  isEnterprise?: boolean;
 }
 
 /** Settings entry active check by path prefix; uses pathname, not router pattern */
 export function isSettingsMenuItemActive({
   item,
   pathname,
+  search = "",
 }: {
   item: SettingsMenuItem;
   pathname: string;
+  search?: string;
 }): boolean {
   // By prefix, so a detail page (/settings/teams/:team) keeps its owner lit.
   if (item.alsoActiveAt?.some((base) => isPathUnder({ pathname, base }))) return true;
-  if (item.isExactMatch) return pathname === item.href;
-  return isPathUnder({ pathname, base: item.includePath ?? item.href });
+  const [hrefPath = item.href, hrefQuery] = item.href.split("?");
+  // An entry whose href opens a tab (?tab=teams) is lit only while the address shows that tab.
+  if (hrefQuery) {
+    const current = new URLSearchParams(search);
+    for (const [key, value] of new URLSearchParams(hrefQuery)) {
+      if (current.get(key) !== value) return false;
+    }
+  }
+  if (item.isExactMatch) return pathname === hrefPath;
+  return isPathUnder({ pathname, base: item.includePath ?? hrefPath });
+}
+
+/** An entry whose href opens one tab of a shared page. */
+function opensTab(item: SettingsMenuItem): boolean {
+  return item.href.includes("?");
+}
+
+/** As above, but an entry for a whole page yields to a lit sibling that opens one of its tabs. */
+export function isSettingsMenuItemActiveAmong({
+  item,
+  siblings,
+  pathname,
+  search = "",
+}: {
+  item: SettingsMenuItem;
+  siblings: readonly SettingsMenuItem[];
+  pathname: string;
+  search?: string;
+}): boolean {
+  if (!isSettingsMenuItemActive({ item, pathname, search })) return false;
+  if (opensTab(item)) return true;
+  return !siblings.some(
+    (sibling) =>
+      sibling !== item &&
+      opensTab(sibling) &&
+      isSettingsMenuItemActive({ item: sibling, pathname, search }),
+  );
 }
 
 export interface SettingsMenuGroup {
@@ -101,6 +141,11 @@ export interface SettingsMenuGroup {
  */
 export interface SettingsMenuGates {
   hasPermission: (permission: string) => boolean;
+  /**
+   * The same check across the whole organization, not just the open project: what an
+   * organization page asks, so an entry onto one is offered exactly when the page is.
+   */
+  hasOrganizationPermission: (permission: string) => boolean;
   isSaaS: boolean;
   hasCloudOps: boolean;
   hosting: Hosting;
@@ -109,6 +154,10 @@ export interface SettingsMenuGates {
   isLiteMember: boolean;
   hasOpsAccess: boolean;
   isPlatformAdmin: boolean;
+  /** `release_braids` answered on; false while it is still loading, so no entry flickers. */
+  braidsEnabled: boolean;
+  /** The organisation already has braids: shown with the flag off so an admin can end them. */
+  braidsPresent?: boolean;
 }
 
 export type EnterprisePlanGate = "included" | "locked" | "pending";
@@ -135,9 +184,7 @@ function enterpriseEntry({
   enterprisePlan: EnterprisePlanGate;
 }): SettingsMenuItem[] {
   if (enterprisePlan === "pending") return [];
-  return [
-    enterprisePlan === "locked" ? { ...item, isLocked: true } : { ...item, isEnterprise: true },
-  ];
+  return [enterprisePlan === "locked" ? { ...item, isLocked: true } : item];
 }
 
 /**
@@ -172,6 +219,8 @@ function organizationGroup({
         href: "/settings",
         isExactMatch: true,
         icon: Settings2,
+        // The organisation's Braids page is organisation-wide, so it lights no Project entry.
+        alsoActiveAt: ["/settings/organization-braids"],
       },
       // Keys sit here rather than in Access, where four enterprise entries
       // came first and left a page most readers use at the bottom of a group
@@ -214,7 +263,10 @@ function organizationGroup({
   };
 }
 
-function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
+function accessGroup({
+  enterprisePlan,
+  hasOrganizationPermission,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-access",
     label: "People & access",
@@ -234,6 +286,21 @@ function accessGroup({ enterprisePlan }: SettingsMenuGates): SettingsMenuGroup {
           "/settings/access",
         ],
       },
+      // A shortcut to the Users page's Teams tab, which readers could not find; the tab is
+      // offered to an organization manager only, so the entry is too, asked the way the tab
+      // asks it. Where both are offered, Users yields team pages to it; a reader without it
+      // still sees Users lit there.
+      ...(hasOrganizationPermission("organization:manage")
+        ? [
+            {
+              label: "Teams & projects",
+              href: "/settings/directory?tab=teams",
+              includePath: "/settings/directory",
+              icon: UsersRound,
+              alsoActiveAt: ["/settings/teams"],
+            },
+          ]
+        : []),
       // Every organization role reads it through `members:view`, Lite included; the page
       // offers its edits to a manager only. Definitions and assignments are two tabs.
       ...enterpriseEntry({
@@ -289,7 +356,12 @@ function dataControlsGroup({ hasPermission }: SettingsMenuGates): SettingsMenuGr
   };
 }
 
-function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
+function projectGroup({
+  isLiteMember,
+  enterprisePlan,
+  braidsEnabled,
+  braidsPresent = false,
+}: SettingsMenuGates): SettingsMenuGroup {
   return {
     id: "settings-project",
     label: "Project",
@@ -310,6 +382,17 @@ function projectGroup({ isLiteMember }: SettingsMenuGates): SettingsMenuGroup {
           ]
         : []),
       { label: "Integrations", href: "/settings/integrations", icon: Blocks },
+      ...(!isLiteMember && (braidsEnabled || braidsPresent)
+        ? enterpriseEntry({
+            item: {
+              label: "Braids",
+              href: "/settings/braids",
+              icon: Waypoints,
+              feature: "braids",
+            },
+            enterprisePlan,
+          })
+        : []),
     ],
   };
 }
@@ -355,7 +438,9 @@ function healthGroup(): SettingsMenuGroup {
 function toolsGroup({
   hasCloudOps,
   hosting,
-}: Pick<SettingsMenuGates, "hasCloudOps" | "hosting">): SettingsMenuGroup {
+  isPlatformAdmin,
+  hasAgentAccess,
+}: AdminMenuGates): SettingsMenuGroup {
   return {
     id: "admin-tools",
     label: "Tools",
@@ -364,6 +449,11 @@ function toolsGroup({
       // The cloud's gradual-rollout switch, also on a developer's machine; never self-hosted.
       ...(hasCloudOps || hosting === "local"
         ? [{ label: "Feature flags", href: "/ops/feature-flags", icon: Flag }]
+        : []),
+      // Operators approving their coding agents' access to customers: cloud only, behind the
+      // ops_agent_access_enabled flag, which the page itself answers not found without (ADR-202).
+      ...(hasCloudOps && isPlatformAdmin && hasAgentAccess
+        ? [{ label: "Agent access", href: "/ops/agents", icon: BotMessageSquare }]
         : []),
     ],
   };
@@ -405,11 +495,12 @@ export function cloudAdminGroup(): SettingsMenuGroup {
 export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
   const groups: SettingsMenuGroup[] = [
     youGroup(),
+    // Right under You: from a project, Settings lands on its General page (ADR-098 amendment).
+    projectGroup(gates),
     organizationGroup(gates),
     accessGroup(gates),
     aiInfrastructureGroup(gates),
     dataControlsGroup(gates),
-    projectGroup(gates),
   ];
 
   return groups.filter((group) => group.items.length > 0);
@@ -418,7 +509,10 @@ export function settingsMenu(gates: SettingsMenuGates): SettingsMenuGroup[] {
 export type AdminMenuGates = Pick<
   SettingsMenuGates,
   "hasCloudOps" | "hosting" | "hasOpsAccess" | "isPlatformAdmin"
->;
+> & {
+  /** The `ops_agent_access_enabled` system flag. */
+  hasAgentAccess: boolean;
+};
 
 /** The operator console's menu (/ops): its own sidebar, never appended to Settings. */
 export function adminMenu(gates: AdminMenuGates): SettingsMenuGroup[] {

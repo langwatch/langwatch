@@ -6,6 +6,7 @@ import {
   type ApiKeyBindingNames,
   type ApiKeyCredentialCheck,
   type ApiKeyDetail,
+  type ApiKeyFacts,
   type ApiKeyListEnrichment,
   type ApiKeyName,
   type ApiKeyProject,
@@ -131,6 +132,13 @@ export class ApiKeyService {
     return this.lifecycle.revokeSystemManaged(input);
   }
 
+  /** Retires the live keys minted under one key; the docs playground revocation's cascade. */
+  async revokeChildren(
+    input: Parameters<ApiKeyLifecycleService["revokeChildren"]>[0],
+  ): Promise<number> {
+    return this.lifecycle.revokeChildren(input);
+  }
+
   async updateAsCaller(input: UpdateApiKeyInput): Promise<ApiKey> {
     try {
       return await this.lifecycle.update(input);
@@ -174,6 +182,10 @@ export class ApiKeyService {
 
   async listAll(input: { organizationId: string }): Promise<ApiKey[]> {
     return this.catalog.listAll(input);
+  }
+
+  findKeyFactsForOrganization(input: { organizationId: string }): Promise<ApiKeyFacts[]> {
+    return this.catalog.findKeyFactsForOrganization(input);
   }
 
   async listForCaller(input: ApiKeyCredentialCheck): Promise<ApiKey[]> {

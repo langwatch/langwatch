@@ -65,6 +65,132 @@ describe("ensureClaudeProjectTelemetryPin", () => {
     });
   });
 
+  describe("when the directory is a git repository", () => {
+    const pinPath = () => path.join(temp.cwd, ".claude", "settings.local.json");
+    const excludePath = () => path.join(temp.cwd, ".git", "info", "exclude");
+    const git = (...args: string[]) => execFileSync("git", args, { cwd: temp.cwd });
+
+    describe("and the pin file already existed, unignored", () => {
+      /** @scenario "a pin in a file that already existed is still kept out of git" */
+      it("adds the exclude entry anyway", () => {
+        git("init", "-q");
+        fs.mkdirSync(path.dirname(pinPath()), { recursive: true });
+        fs.writeFileSync(pinPath(), "{}\n");
+
+        const result = ensureClaudeProjectTelemetryPin({
+          vars: currentClaudeVars(),
+          cwd: temp.cwd,
+        });
+
+        expect(result.action).toBe("updated");
+        expect(fs.readFileSync(excludePath(), "utf8")).toContain("**/.claude/settings.local.json");
+        expect(git("status", "--porcelain").toString()).toBe("");
+      });
+    });
+
+    describe("and .gitignore already covers the pin file", () => {
+      /** @scenario "a pin file git already ignores is not excluded twice" */
+      it("leaves the exclude file as it was", () => {
+        git("init", "-q");
+        fs.writeFileSync(path.join(temp.cwd, ".gitignore"), ".claude/settings.local.json\n");
+        const before = fs.readFileSync(excludePath(), "utf8");
+
+        ensureClaudeProjectTelemetryPin({ vars: currentClaudeVars(), cwd: temp.cwd });
+
+        expect(fs.readFileSync(excludePath(), "utf8")).toBe(before);
+      });
+    });
+
+    describe("and git tracks a pin file an older run wrote a key into", () => {
+      /** @scenario "a key an older run left in a tracked pin file is taken out" */
+      it("removes the langwatch env and keeps the user's own settings", () => {
+        git("init", "-q");
+        installAppEnv(
+          claudeProjectSettingsTarget(temp.cwd),
+          buildOtelEnvBlock("claude", STALE_ENDPOINT, STALE_TOKEN),
+        );
+        const withUserKey = JSON.parse(fs.readFileSync(pinPath(), "utf8"));
+        fs.writeFileSync(pinPath(), JSON.stringify({ ...withUserKey, model: "opus" }));
+        git("add", "-f", ".claude/settings.local.json");
+
+        const result = ensureClaudeProjectTelemetryPin({
+          vars: currentClaudeVars(),
+          cwd: temp.cwd,
+        });
+
+        const after = fs.readFileSync(pinPath(), "utf8");
+        expect(result.action).toBe("tracked");
+        expect(after).not.toContain(STALE_TOKEN);
+        expect(after).not.toContain(CURRENT_TOKEN);
+        expect(JSON.parse(after).model).toBe("opus");
+      });
+    });
+
+    describe("and git does not answer in time", () => {
+      /** @scenario "no key is written when git cannot say whether it tracks the pin file" */
+      it("writes nothing and reports the pin as unverified", () => {
+        const bin = fs.mkdtempSync(path.join(temp.cwd, "slow-git-"));
+        fs.writeFileSync(path.join(bin, "git"), "#!/bin/sh\nsleep 5\n", { mode: 0o755 });
+        const prevPath = process.env.PATH;
+        process.env.PATH = `${bin}${path.delimiter}${prevPath}`;
+        try {
+          const result = ensureClaudeProjectTelemetryPin({
+            vars: currentClaudeVars(),
+            cwd: temp.cwd,
+          });
+
+          expect(result.action).toBe("unverified");
+          expect(fs.existsSync(pinPath())).toBe(false);
+        } finally {
+          process.env.PATH = prevPath;
+        }
+      });
+    });
+
+    describe("and git fails reading its index", () => {
+      /** @scenario "a git error is not taken as an untracked pin file" */
+      it("writes no key and takes out the previous login's env", () => {
+        git("init", "-q");
+        installAppEnv(
+          claudeProjectSettingsTarget(temp.cwd),
+          buildOtelEnvBlock("claude", STALE_ENDPOINT, STALE_TOKEN),
+        );
+        git("add", "-f", ".claude/settings.local.json");
+        fs.writeFileSync(path.join(temp.cwd, ".git", "index"), "not an index");
+
+        const result = ensureClaudeProjectTelemetryPin({
+          vars: currentClaudeVars(),
+          cwd: temp.cwd,
+        });
+
+        const after = fs.readFileSync(pinPath(), "utf8");
+        expect(result.action).toBe("unverified");
+        expect(after).not.toContain(CURRENT_TOKEN);
+        expect(after).not.toContain(STALE_TOKEN);
+      });
+    });
+
+    describe("and git tracks the pin file", () => {
+      /** @scenario "no key is written into a pin file git tracks" */
+      it("writes no key into it and reports it as tracked", () => {
+        git("init", "-q");
+        fs.mkdirSync(path.dirname(pinPath()), { recursive: true });
+        fs.writeFileSync(pinPath(), '{ "permissions": {} }\n');
+        git("add", "-f", ".claude/settings.local.json");
+        const before = fs.readFileSync(pinPath(), "utf8");
+
+        const result = ensureClaudeProjectTelemetryPin({
+          vars: currentClaudeVars(),
+          cwd: temp.cwd,
+        });
+
+        expect(result.action).toBe("tracked");
+        expect(fs.readFileSync(pinPath(), "utf8")).toBe(before);
+        expect(fs.readFileSync(pinPath(), "utf8")).not.toContain(CURRENT_TOKEN);
+      });
+    });
+  });
+
   describe("when a pin from a previous login exists", () => {
     it("refreshes it to the current login's values", () => {
       installAppEnv(

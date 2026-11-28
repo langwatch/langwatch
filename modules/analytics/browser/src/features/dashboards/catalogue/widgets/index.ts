@@ -148,7 +148,7 @@ const BUILDS: Readonly<Record<string, CatalogueWidgetBuild>> = {
     queries: {
       models: sql.TOP_MODELS_SQL,
       modelCosts: sql.MODEL_COSTS_SQL,
-      traffic: sql.TRACE_COUNT_SQL,
+      modelRequests: sql.MODEL_REQUEST_COUNT_SQL,
     },
     width: "half",
     rows: TABLE_ROWS,

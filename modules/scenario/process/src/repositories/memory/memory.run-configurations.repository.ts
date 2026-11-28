@@ -25,6 +25,8 @@ interface PairFold {
   runs: number;
   simulatorModel: string;
   judgeModel: string;
+  traceQuietPeriodMs: string;
+  traceWaitTimeoutMs: string;
   parameters: string;
   hasNote: boolean;
   firstRunId: string;
@@ -38,6 +40,8 @@ interface BatchFold {
   repeatCount: number;
   simulatorModel: string;
   judgeModel: string;
+  traceQuietPeriodMs: string;
+  traceWaitTimeoutMs: string;
   parameters: string;
   firstTargetParameters: string;
   hasNote: boolean;
@@ -88,6 +92,8 @@ function foldPair(atoms: NonEmpty<ScopedAtom>): PairFold {
   );
   const langwatch = (key: string): string[] =>
     atoms.map((atom) => jsonString({ value: atom.metadata, path: ["langwatch", key] }));
+  const langwatchRaw = (key: string): string[] =>
+    atoms.map((atom) => jsonRaw({ value: atom.metadata, path: ["langwatch", key] }));
   return {
     setId: lead.state.ScenarioSetId,
     batchRunId: lead.state.BatchRunId,
@@ -96,6 +102,8 @@ function foldPair(atoms: NonEmpty<ScopedAtom>): PairFold {
     runs: atoms.length,
     simulatorModel: maxText(langwatch("simulatorModel")),
     judgeModel: maxText(langwatch("judgeModel")),
+    traceQuietPeriodMs: maxText(langwatchRaw("traceQuietPeriodMs")),
+    traceWaitTimeoutMs: maxText(langwatchRaw("traceWaitTimeoutMs")),
     parameters: jsonRaw({ value: lead.metadata, path: ["parameters"] }),
     hasNote: atoms.some((atom) => jsonString({ value: atom.metadata, path: ["note"] }) !== ""),
     firstRunId: lead.scenarioRunId,
@@ -122,6 +130,8 @@ function foldBatch(pairs: NonEmpty<PairFold>): BatchFold {
     repeatCount: Math.max(...pairs.map((pair) => pair.runs)),
     simulatorModel: maxText(pairs.map((pair) => pair.simulatorModel)),
     judgeModel: maxText(pairs.map((pair) => pair.judgeModel)),
+    traceQuietPeriodMs: maxText(pairs.map((pair) => pair.traceQuietPeriodMs)),
+    traceWaitTimeoutMs: maxText(pairs.map((pair) => pair.traceWaitTimeoutMs)),
     parameters: source.parameters,
     firstTargetParameters: isNonEmpty(plain) ? "" : source.targetParameters,
     hasNote: pairs.some((pair) => pair.hasNote),
@@ -181,6 +191,8 @@ export class MemoryRunConfigurationsRepository extends RunConfigurationsReposito
           batch.repeatCount,
           batch.simulatorModel,
           batch.judgeModel,
+          batch.traceQuietPeriodMs,
+          batch.traceWaitTimeoutMs,
           batch.parameters,
           batch.firstTargetParameters,
         ]),
@@ -194,6 +206,8 @@ export class MemoryRunConfigurationsRepository extends RunConfigurationsReposito
         RepeatCount: String(first.repeatCount),
         SimulatorModel: first.simulatorModel,
         JudgeModel: first.judgeModel,
+        TraceQuietPeriodMs: first.traceQuietPeriodMs,
+        TraceWaitTimeoutMs: first.traceWaitTimeoutMs,
         Parameters: first.parameters,
         FirstTargetParameters: first.firstTargetParameters,
         UsesNote: runsOfOne.some((batch) => batch.hasNote) ? "1" : "0",

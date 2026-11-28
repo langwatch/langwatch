@@ -42,11 +42,14 @@ describe("moduleVitestTestOptions", () => {
       ]);
     });
 
-    it("omits include, testTimeout and dir when unasked, and sets up only the logger", () => {
+    it("omits include, testTimeout and dir when unasked, and sets up only the logger and the timer guard", () => {
       const test = moduleVitestTestOptions({ kind: "node" }) ?? {};
 
       expect("include" in test).toBe(false);
-      expect(test.setupFiles).toEqual([expect.stringMatching(/logger-setup\.ts$/)]);
+      expect(test.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
+      ]);
       expect("testTimeout" in test).toBe(false);
       expect("dir" in test).toBe(false);
     });
@@ -96,6 +99,7 @@ describe("moduleVitestTestOptions", () => {
       expect(test?.exclude).toEqual(["**/fixtures/**", BROWSER_TEST_GLOB]);
       expect(test?.setupFiles).toEqual([
         expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
         "./vitest.setup.ts",
       ]);
       expect(test?.testTimeout).toBe(30_000);
@@ -111,6 +115,31 @@ describe("moduleVitestTestOptions", () => {
       expect(test?.pool).toBe("threads");
       expect(test?.globals).toBe(true);
       expect(test?.fsModuleCache).toBe(true);
+    });
+
+    it("adds a test block's setupFiles after the guards instead of replacing them", () => {
+      const listed = moduleVitestTestOptions({
+        kind: "unit",
+        setupFiles: ["./vitest.setup.ts"],
+        test: { setupFiles: ["./src/__tests__/setup.ts"] },
+      });
+      const single = moduleVitestTestOptions({
+        kind: "jsdom",
+        test: { setupFiles: "./src/__tests__/setup.ts" },
+      });
+
+      expect(listed?.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
+        expect.stringMatching(/console-guard\.ts$/),
+        "./vitest.setup.ts",
+        "./src/__tests__/setup.ts",
+      ]);
+      expect(single?.setupFiles).toEqual([
+        expect.stringMatching(/logger-setup\.ts$/),
+        expect.stringMatching(/timer-guard\.ts$/),
+        "./src/__tests__/setup.ts",
+      ]);
     });
   });
 });

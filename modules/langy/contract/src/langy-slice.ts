@@ -6,6 +6,7 @@
 
 import type { z } from "zod";
 
+import { LANGY_DOCK_WIDTH_PX } from "./langy-ask.ts";
 import type { LangyResourceKind } from "./langy-turn-context.ts";
 
 export const LANGY_STORE_SLICE = "langy:store";
@@ -30,6 +31,12 @@ export interface LangyContextChip {
 }
 
 /**
+ * The label start of a dashboard chip that stands for one widget on the board rather than the
+ * whole board, so the composer says what Langy reads of it.
+ */
+export const LANGY_WIDGET_CHIP_LABEL_PREFIX = "widget: ";
+
+/**
  * A piece of context a SURFACE explicitly hands to Langy — the home briefing's "look at
  * this receipt", a card's "work from this", anything off the current route.
  */
@@ -43,6 +50,8 @@ export interface LangyAttachedContext {
   label: string;
   /** Optional display/agent extras, e.g. `{ value: "8.2s", severity: "error" }`. */
   meta?: Record<string, unknown>;
+  /** What it is apart from its text: attaching the same key again replaces it in place. */
+  key?: string;
 }
 
 /**
@@ -169,8 +178,11 @@ export interface LangySliceSurface {
   isOpen: boolean;
   openPanel: () => void;
   pendingPrompt: string | null;
-  /** Open Langy on a fresh conversation and queue `prompt` to auto-send. */
-  askLangy: (prompt: string) => void;
+  /**
+   * Open Langy and queue `prompt` to auto-send: in a fresh conversation, or in the one an ask from
+   * the same `askedFrom` started while it is recent and still open.
+   */
+  askLangy: (prompt: string, askedFrom?: string) => void;
   /** Prefill the composer with `draft`, never sent; pair with `openPanel` to show it. */
   setDraft: (draft: string) => void;
   panelMode: LangyPanelMode;
@@ -191,16 +203,20 @@ export interface LangySliceSurface {
   detachContext: (id: string) => void;
   /** The docked panel is open and wants its room beside the app shell's content card. */
   dockShifted: boolean;
+  /** The docked panel's width right now; the user can drag it, so the shell cannot assume 392. */
+  dockWidthPx: number;
   /** An app shell is mounted: the dock starts below its header as a second content card. */
   claimDockShell: () => void;
   releaseDockShell: () => void;
 }
 
-/**
- * The room a claiming app shell keeps right of its content card while the dock is open:
- * the docked panel's width plus the strip of page ground between the two cards.
- */
-export const LANGY_SHELL_DOCK_INSET = 392 + 12;
+/** The strip of page ground between the shell's content card and the docked panel. */
+export const LANGY_SHELL_DOCK_GUTTER_PX = 12;
+
+/** The room a claiming app shell keeps right of its content card for a dock of this width. */
+export function langyShellDockInset(dockWidthPx: number): number {
+  return dockWidthPx + LANGY_SHELL_DOCK_GUTTER_PX;
+}
 
 /**
  * The precise context the current page declares for Langy (a dataset with its name), which the
@@ -233,6 +249,7 @@ export const LANGY_ABSENT_SURFACE: LangySliceSurface = {
   attachContext: nothing,
   detachContext: nothing,
   dockShifted: false,
+  dockWidthPx: LANGY_DOCK_WIDTH_PX,
   claimDockShell: nothing,
   releaseDockShell: nothing,
 };

@@ -195,13 +195,22 @@ export function createDatasetRest(): Readonly<{
       .withMiddlewareContext(projectRequestContext)
       .withStatus(201)
       .withOutput(datasetRestSummarySchema)
-      .withDocs({ description: "Create a new dataset" })
-      .handle(async ({ app, input, scope }, project) => {
-        const dataset = await app.upsertDataset({
-          projectId: scope.id,
-          name: input.name,
-          columnTypes: input.columnTypes,
-        });
+      .withDocs({
+        description:
+          "Create a new dataset, optionally with its first rows in `entries`, written in the same call.",
+      })
+      .handle(async ({ app, input, scope, actor }, project) => {
+        const dataset = await app
+          .upsertDataset({
+            projectId: scope.id,
+            name: input.name,
+            columnTypes: input.columnTypes,
+            ...(input.entries && input.entries.length > 0
+              ? { datasetRecords: input.entries, enforceBatchBound: true }
+              : {}),
+            editedBy: datasetAuthorOf({ actor }),
+          })
+          .catch(rethrowColumnRefusal);
 
         return {
           id: dataset.id,

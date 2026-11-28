@@ -1,4 +1,18 @@
+import type { MemberType } from "@langwatch/entitlement-contract";
 import type { OrganizationMemberSeats } from "@langwatch/organization-contract";
+
+import type { SeatHolder, SeatKind } from "../rules/seat-holder.rules.ts";
+
+/** One holder and the seat it takes, classified as the counts above classify it. */
+export type OrganizationSeatHolding = Readonly<{
+  holder: SeatHolder;
+  seat: SeatKind;
+  /** A hold holding no seat because a live full invitation to its address took it: that one. */
+  suppressedBy?: string;
+}>;
+
+/** A seat hold that counts as a full seat, and when it ends (epoch milliseconds). */
+export type CountedSeatHold = Readonly<{ userId: string; heldUntil: number }>;
 
 /**
  * The seat lease as the work under it holds it: `assertHeld` right before each seat-holding
@@ -40,4 +54,30 @@ export abstract class OrganizationSeatRepository {
   /** False when the lease is no longer this holder's. */
   abstract renewSeatLease(input: { organizationId: string; holder: string }): Promise<boolean>;
   abstract releaseSeatLease(input: { organizationId: string; holder: string }): Promise<void>;
+  /** Every seat holder and its seat, live invitations included: the seat peak's opening count. */
+  abstract findSeatHolders(organizationId: string): Promise<OrganizationSeatHolding[]>;
+  /** One member's seat by the rule the counts use; null when they hold none. */
+  abstract findMemberSeat(input: {
+    organizationId: string;
+    userId: string;
+  }): Promise<MemberType | null>;
+  /**
+   * The person's seat hold when it counts as a full seat by the rule the counts use, with its end;
+   * `ignoringInviteId` reads it as if that invitation were not there. Empty when none counts.
+   */
+  abstract findCountedHold(input: {
+    organizationId: string;
+    userId: string;
+    ignoringInviteId?: string;
+  }): Promise<CountedSeatHold[]>;
+  /** The people whose live seat hold names this address, counted or not. */
+  abstract findHoldUserIdsByEmail(input: {
+    organizationId: string;
+    email: string;
+  }): Promise<string[]>;
+  /** One live invitation's seat by the rule the counts use; null when it holds none. */
+  abstract findInvitationSeat(input: {
+    organizationId: string;
+    inviteId: string;
+  }): Promise<MemberType | null>;
 }

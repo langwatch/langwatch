@@ -20,9 +20,9 @@ type LwqlKeyMapTarget = Readonly<{
 }>;
 
 /**
- * Writes a new project's LangWatchQL key-map row, analytics' reaction to project's created event
- * (ARCHITECTURE §9). A duplicate (KeyHash, TenantId) pair is harmless to the row policy, so a
- * redelivery writes again; a failed insert throws so the queue retries it.
+ * A project's LangWatchQL key-map row. `syncProject` writes it as the reaction to project's
+ * created event (ARCHITECTURE §9); a duplicate pair is harmless, and a failed insert throws so
+ * the queue retries. `ensureProject` checks for the row before a read and heals a missing one.
  */
 export class LwqlKeyMapService {
   private constructor(
@@ -60,5 +60,39 @@ export class LwqlKeyMapService {
       TenantId: project.id,
     };
     await target.repository.insertRow({ row, sourceDatabase: target.sourceDatabase });
+  }
+
+  /**
+   * Whether the project's key-map row is there to read through, writing it first when missing.
+   * False, never a throw, when it cannot be: a read without the row sees zero rows, not an error.
+   */
+  async ensureProject(input: { projectId: string }): Promise<boolean> {
+    const { target, projects } = this.deps;
+    if (!target) return false;
+
+    try {
+      const project = await projects.findById(input.projectId);
+      if (!project?.lwqlKey) return false;
+
+      const row: LwqlKeyMapRow = {
+        KeyHash: lwqlCapability.tenantCapability({ secret: project.lwqlKey }),
+        TenantId: project.id,
+      };
+      const hashes = await target.repository.findKeyHashes({
+        tenantId: project.id,
+        sourceDatabase: target.sourceDatabase,
+      });
+      if (hashes.includes(row.KeyHash)) return true;
+
+      await target.repository.insertRow({ row, sourceDatabase: target.sourceDatabase });
+      logger.warn({ projectId: project.id }, "wrote a missing LangWatchQL key-map row");
+      return true;
+    } catch (error) {
+      logger.error(
+        { projectId: input.projectId, error },
+        "could not ensure the project's LangWatchQL key-map row",
+      );
+      return false;
+    }
   }
 }

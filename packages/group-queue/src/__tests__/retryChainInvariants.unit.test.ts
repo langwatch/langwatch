@@ -19,9 +19,10 @@ describe("retry chain invariants", () => {
     });
 
     it("outlives the longest backoff the schedule can actually produce", () => {
+      // The top of every rung's jitter.
       const longestScheduled = Math.max(
         ...Array.from({ length: JOB_RETRY_CONFIG.maxOverloadedAttempts }, (_, index) =>
-          getBackoffMs(index + 1),
+          getBackoffMs(index + 1, () => 1),
         ),
       );
 

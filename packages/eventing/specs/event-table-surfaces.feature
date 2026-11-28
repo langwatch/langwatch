@@ -26,6 +26,13 @@ Feature: Eventing's own surfaces over its tables
       And it touches only rows of that category's aggregate types that may expire
       And it carries the category's marker
 
+    @unit
+    Scenario: A category's raise only lengthens its rows
+      Given a classification naming each aggregate type's retention class
+      When a category's retention is raised for a tenant
+      Then the rewrite touches only that category's finite rows kept for less than the new retention
+      And a row kept forever is never touched
+
     # Only customer telemetry expires (Alex, 2026-10-09): an unlisted aggregate type is kept forever.
     @unit
     Scenario: An aggregate type mapped to no category is never rewritten
@@ -104,6 +111,16 @@ Feature: Eventing's own surfaces over its tables
       When its history is read whole, up to an event, or a page at a time
       Then each read is declared a full scan, keyed by the aggregate
       And a read given a lower bound declares nothing, so the bound prunes
+
+    # A server sending 64-bit integers unquoted made the ops contract refuse event times as numbers.
+    @integration @regression
+    Scenario: Event times come back as text, newest first, whatever the server's integer quoting
+      Given a ClickHouse server that sends 64-bit integers as JSON numbers
+      And a tenant with an event at a twelve-digit time and one at a thirteen-digit time
+      When the event explorer searches that tenant's aggregates
+      Then each aggregate's last event time comes back as text
+      And the newer aggregate comes first, ordered by time as a number
+      And opening one aggregate's history answers each event's time as text
 
   Rule: Eventing publishes its table list with categories
 

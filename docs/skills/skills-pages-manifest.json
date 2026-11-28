@@ -138,6 +138,12 @@
         "promptFile": "recipes-test-compliance.docs.txt"
       },
       {
+        "title": "Red team my agent against the OWASP Top 10",
+        "skill": "langwatch/skills/recipes/owasp-red-team",
+        "slashCommand": "/owasp-red-team",
+        "promptFile": "recipes-owasp-red-team.docs.txt"
+      },
+      {
         "title": "Test my CLI is well usable by AI agents",
         "skill": "langwatch/skills/recipes/test-cli-usability",
         "slashCommand": "/test-cli-usability",

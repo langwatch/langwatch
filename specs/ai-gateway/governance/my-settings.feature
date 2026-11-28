@@ -1,6 +1,6 @@
 Feature: AI Gateway Governance — My Settings (personal API keys + budget readonly)
   As an enterprise developer using LangWatch-governed AI tools
-  I want a personal settings page at "/me/settings" where I can see my profile,
+  I want a personal settings page at "/coding-agents/configure" where I can see my profile,
   manage my own personal API keys (one per device), tweak notifications, and
   see — but not change — my budget that the admin set
   So that I can clean up old keys, add new ones for new laptops, and understand
@@ -27,7 +27,7 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
 
   @bdd @ui @settings @profile
   Scenario: Profile section is read-only with explicit IT-managed labels
-    When I navigate to "/me/settings"
+    When I navigate to "/coding-agents/configure"
     Then I see a "Profile" section showing:
       | field   | value                                  | editable |
       | Name    | "Jane Doe"                             | no       |
@@ -42,7 +42,7 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
 
   @bdd @ui @settings @personal-keys @list
   Scenario: Personal API Keys list shows my own keys with metadata and revoke action
-    When I navigate to "/me/settings"
+    When I navigate to "/coding-agents/configure"
     Then I see a "Personal API Keys" section
     And the section shows 2 rows: "jane-laptop" and "jane-desktop"
     And each row contains: an icon (laptop/desktop/server), the label, the OS hint, last-used relative time, created date, and a [Revoke] button
@@ -70,7 +70,7 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
 
   @bdd @ui @settings @notifications
   Scenario: Notifications section exposes 3 toggles
-    When I navigate to "/me/settings"
+    When I navigate to "/coding-agents/configure"
     Then I see a "Notifications" section with three checkboxes:
       | label                                      | default |
       | Alert me when I hit 80% of monthly budget  | on      |
@@ -85,18 +85,18 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
   @bdd @ui @settings @budget @readonly
   Scenario: Budget section shows the admin-set cap with a clear "managed by company" label
     Given admin "carol@acme.com" set jane's user-scope budget to USD 500/month
-    When I navigate to "/me/settings"
+    When I navigate to "/coding-agents/configure"
     Then I see a "Budget" section showing:
       | field            | value                                          |
       | Monthly limit    | "$500 / month"                                 |
       | Managed by       | "Your Acme admin · cannot edit"                |
-      | Current spend    | from the same source as /me's "Spent this mo." |
+      | Current spend    | from the same source as /coding-agents's "Spent this mo." |
     And there is no edit affordance
 
   @bdd @ui @settings @budget @no-budget
   Scenario: Budget section renders an empty state when no admin budget is configured
     Given jane has no user-scope budget
-    When I navigate to "/me/settings"
+    When I navigate to "/coding-agents/configure"
     Then the Budget section shows "No personal budget set by your admin."
     And a quiet hint mentions "If you'd like one, ask your admin."
     And there is no edit affordance
@@ -106,8 +106,8 @@ Feature: AI Gateway Governance — My Settings (personal API keys + budget reado
   # ---------------------------------------------------------------------------
 
   @bdd @ui @settings @authz
-  Scenario: /me/settings is only accessible to a signed-in user, scoped to their own data
+  Scenario: /coding-agents/configure is only accessible to a signed-in user, scoped to their own data
     Given jane is signed in
-    When she navigates to "/me/settings"
+    When she navigates to "/coding-agents/configure"
     Then she sees her own settings (no URL param leaks another user's data)
     And one user cannot revoke another user's personal VK from this page

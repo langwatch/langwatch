@@ -38,6 +38,7 @@ const commandBarOpenMock = vi.fn();
 
 function renderSettingsSidebar({
   pathname = "/settings",
+  search = "",
   isLiteMember = false,
   isEnterprise = true,
   hasOpsAccess = false,
@@ -45,10 +46,13 @@ function renderSettingsSidebar({
   isSaaS = false,
   hasCloudOps = false,
   permissions = ["organization:view", "auditLog:view", "triggers:view", "sso:view"],
+  organizationPermissions = [],
   surface = "settings",
 }: {
   surface?: "settings" | "admin";
+  organizationPermissions?: string[];
   pathname?: string;
+  search?: string;
   isLiteMember?: boolean;
   isEnterprise?: boolean;
   hasOpsAccess?: boolean;
@@ -63,10 +67,14 @@ function renderSettingsSidebar({
         organization: ORGANIZATION,
         organizations: [ORGANIZATION],
         pathname,
+        search,
         permissions,
+        organizationPermissions,
         plan: { isEnterprise, isLoading: false, isLiteMember },
         opsAccess: { hasAccess: hasOpsAccess, isAdmin: isOpsAdmin },
         deployment: { isSaaS, hasCloudOps },
+        // Braids released, so the menu's Braids entry renders as the organisation would see it.
+        flags: { release_braids: { enabled: true, isLoading: false } },
         commandBar: { shortcut: "⌘K", open: commandBarOpenMock, trigger: null },
       }}
     >
@@ -84,6 +92,7 @@ function readySettingsShellState(): NavigationShellReadyState {
     activeProductId: null,
     isSettingsRoute: true,
     seatRefusal: null,
+    openBoard: null,
     showDevelopmentIndicator: false,
     isCompactSidebar: false,
     isMobile: false,
@@ -115,6 +124,14 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
 });
+
+/** The sidebar entries marked as the page on screen. */
+function markedEntries() {
+  return within(screen.getByTestId("sidebar-scroll-region"))
+    .getAllByRole("link")
+    .filter((link) => link.getAttribute("aria-current") === "page")
+    .map((link) => link.textContent?.trim());
+}
 
 /** Organization and Project each have a General entry, so the href picks the one meant. */
 function generalLink(href: string) {
@@ -264,12 +281,13 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.getByRole("link", { name: /^Roles/ })).toHaveAttribute("aria-current", "page");
     });
 
-    /** @scenario "A plan with Enterprise sees its entries marked ENT, not locked" */
-    it("marks the enterprise entries ENT on a plan that includes them", () => {
+    /** @scenario "A plan with Enterprise sees its entries as plain entries" */
+    it("draws the enterprise entries plainly on a plan that includes them", () => {
       renderSettingsSidebar();
 
       const roles = screen.getByRole("link", { name: /^Roles/ });
-      expect(within(roles).getByText("ENT")).toBeInTheDocument();
+      expect(within(roles).queryByLabelText("Enterprise")).not.toBeInTheDocument();
+      expect(roles.querySelector(".lucide-lock")).toBeNull();
       expect(screen.queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
     });
 
@@ -282,7 +300,7 @@ describe("the settings shell in a new navigation mode", () => {
         const link = screen.getByRole("link", { name });
         expect(within(link).getByLabelText("Included in Enterprise")).toBeInTheDocument();
       }
-      expect(screen.queryByText("ENT")).not.toBeInTheDocument();
+      expect(screen.queryByLabelText("Enterprise")).not.toBeInTheDocument();
       for (const name of [/^Users/, /^Authentication/]) {
         const link = screen.getByRole("link", { name });
         expect(within(link).queryByLabelText("Included in Enterprise")).not.toBeInTheDocument();
@@ -297,6 +315,15 @@ describe("the settings shell in a new navigation mode", () => {
       expect(screen.queryByRole("link", { name: /^Authentication/ })).not.toBeInTheDocument();
     });
 
+    /** @scenario "A branded feature's entries wear its mark" */
+    it("draws the Braids entry with the braids mark, not a stock icon", () => {
+      renderSettingsSidebar();
+
+      const braids = screen.getByRole("link", { name: /^Braids/ });
+      expect(braids.querySelector('[data-feature="braids"]')).not.toBeNull();
+      expect(braids.querySelector(".lucide")).toBeNull();
+    });
+
     /** @scenario "Settings groups read in sentence case" */
     it("labels its groups in sentence case", () => {
       renderSettingsSidebar();
@@ -306,9 +333,69 @@ describe("the settings shell in a new navigation mode", () => {
     });
 
     /** @scenario "A detail page keeps its owning entry lit" */
-    it("lights Users on a team's own page", () => {
-      renderSettingsSidebar({ pathname: "/settings/teams/platform" });
-      expect(screen.getByRole("link", { name: "Users" })).toHaveAttribute("aria-current", "page");
+    it("lights Teams & projects on a team's own page", () => {
+      renderSettingsSidebar({
+        pathname: "/settings/teams/platform",
+        permissions: ["organization:manage"],
+      });
+      expect(markedEntries()).toEqual(["Teams & projects"]);
+    });
+
+    /** @scenario "A team page lights Users for whoever may not manage the organization" */
+    it("lights Users on a team's own page when Teams & projects is not offered", () => {
+      renderSettingsSidebar({
+        pathname: "/settings/teams/platform",
+        permissions: ["team:view", "members:view"],
+      });
+      expect(markedEntries()).toEqual(["Users"]);
+    });
+
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("offers Teams & projects right after Users, opening the Users page on its tab", () => {
+      renderSettingsSidebar({ permissions: ["organization:manage"] });
+
+      const peopleGroup = screen.getByRole("button", {
+        name: "Collapse People & access",
+      }).parentElement;
+      const entries = within(peopleGroup!)
+        .getAllByRole("link")
+        .map((link) => link.textContent?.trim());
+      expect(entries.indexOf("Teams & projects")).toBe(entries.indexOf("Users") + 1);
+      expect(screen.getByRole("link", { name: "Teams & projects" })).toHaveAttribute(
+        "href",
+        "/settings/directory?tab=teams",
+      );
+    });
+
+    /** @scenario "Teams & projects asks who may manage the organization the way its tab does" */
+    it("offers Teams & projects to a manager whose open project does not grant it", () => {
+      renderSettingsSidebar({
+        permissions: ["members:view"],
+        organizationPermissions: ["organization:manage"],
+      });
+      expect(screen.getByRole("link", { name: "Teams & projects" })).toHaveAttribute(
+        "href",
+        "/settings/directory?tab=teams",
+      );
+    });
+
+    /** @scenario "Teams & projects has its own entry under Users" */
+    it("marks only Teams & projects on its tab, and only Users on the other tabs", () => {
+      const permissions = ["organization:manage"];
+      renderSettingsSidebar({ pathname: "/settings/directory", search: "?tab=teams", permissions });
+      expect(markedEntries()).toEqual(["Teams & projects"]);
+      cleanup();
+
+      renderSettingsSidebar({
+        pathname: "/settings/directory",
+        search: "?tab=groups",
+        permissions,
+      });
+      expect(markedEntries()).toEqual(["Users"]);
+      cleanup();
+
+      renderSettingsSidebar({ pathname: "/settings/directory", permissions });
+      expect(markedEntries()).toEqual(["Users"]);
     });
 
     /** @scenario "The settings groups fold, and start open" */
@@ -362,25 +449,21 @@ describe("the settings shell in a new navigation mode", () => {
     it("puts API keys under General, above the access group", () => {
       renderSettingsSidebar();
 
-      const entries = within(screen.getByTestId("sidebar-scroll-region"))
-        .getAllByRole("link")
-        .map((link) => link.textContent?.trim());
+      const links = within(screen.getByTestId("sidebar-scroll-region")).getAllByRole("link");
+      const entries = links.map((link) => link.textContent?.trim());
+      const organizationGeneral = links.findIndex(
+        (link) => link.getAttribute("href") === "/settings",
+      );
 
       expect(entries.filter((entry) => entry === "API keys")).toHaveLength(1);
-      expect(entries.indexOf("API keys")).toBe(entries.indexOf("General") + 1);
+      expect(entries.indexOf("API keys")).toBe(organizationGeneral + 1);
       expect(entries.indexOf("API keys")).toBeLessThan(entries.indexOf("Users"));
     });
 
     /** @scenario The menu marks the page that is open */
     it("marks the entry of the page on screen, and only that one", () => {
       renderSettingsSidebar({ pathname: "/settings/email-suppressions" });
-
-      const marked = within(screen.getByTestId("sidebar-scroll-region"))
-        .getAllByRole("link")
-        .filter((link) => link.getAttribute("aria-current") === "page")
-        .map((link) => link.textContent?.trim());
-
-      expect(marked).toEqual(["Email suppressions"]);
+      expect(markedEntries()).toEqual(["Email suppressions"]);
     });
 
     /** @scenario A lite member sees no restricted settings entries */
@@ -480,6 +563,98 @@ describe("the settings shell in a new navigation mode", () => {
         "aria-current",
         "page",
       );
+    });
+  });
+});
+
+describe("the settings menu's group order", () => {
+  describe("when the settings sidebar renders", () => {
+    /** @scenario The Project group sits between You and Organization */
+    it("reads You, Project, Organization, then the remaining groups", () => {
+      renderSettingsSidebar();
+
+      const groupButtons = screen
+        .getAllByRole("button", { name: /^Collapse / })
+        .map((button) => button.textContent?.trim());
+
+      expect(groupButtons.slice(0, 4)).toEqual([
+        "You",
+        "Project",
+        "Organization",
+        "People & access",
+      ]);
+    });
+  });
+});
+
+const SHARED_TEAM = {
+  id: "team_1",
+  name: "Core",
+  isPersonal: false,
+  ownerUserId: null,
+  members: [{ userId: "user_1" }],
+  projects: [{ id: "project_1", slug: "checkout-bot", name: "Checkout bot", isPersonal: false }],
+};
+
+/** The LLM Ops sidebar on a page of `checkout-bot`, holding the Settings entry at its foot. */
+function renderProjectPageSidebar({ permissions }: { permissions: string[] }) {
+  const organization = { ...ORGANIZATION, teams: [SHARED_TEAM] };
+  return renderWithDesignSystem(
+    <WithStubNavigationHost
+      readings={{
+        organization,
+        organizations: [organization],
+        project: SHARED_TEAM.projects[0],
+        team: SHARED_TEAM,
+        openableTeams: [SHARED_TEAM],
+        projectParam: "checkout-bot",
+        pathname: "/checkout-bot/traces",
+        permissions,
+        plan: { isEnterprise: true, isLoading: false, isLiteMember: false },
+      }}
+    >
+      <SidebarContent surface="llm-ops" showExpanded />
+    </WithStubNavigationHost>,
+  );
+}
+
+describe("the Settings entry on a project's page", () => {
+  describe("when the reader may update the project", () => {
+    /** @scenario "Settings opened from a project lands on that project's settings" */
+    it("opens the project's General page", () => {
+      renderProjectPageSidebar({ permissions: ["organization:view", "project:update"] });
+
+      expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute(
+        "href",
+        "/settings/project",
+      );
+    });
+  });
+
+  describe("when the project's General page opened from a project page", () => {
+    /** @scenario "Settings opened from a project lands on that project's settings" */
+    it("keeps the back entry on the page the reader left", () => {
+      captureSettingsReturnPath({
+        organizationId: ORGANIZATION.id,
+        pathname: "/checkout-bot/traces",
+      });
+      renderSettingsSidebar({ pathname: "/settings/project" });
+
+      expect(screen.getByRole("link", { name: /^Back to / })).toHaveAttribute(
+        "href",
+        "/checkout-bot/traces",
+      );
+      expect(markedEntries()).toEqual(["General"]);
+      expect(generalLink("/settings/project")).toHaveAttribute("aria-current", "page");
+    });
+  });
+
+  describe("when the reader may only view the project", () => {
+    /** @scenario "A reader who may not update the project lands on the organization's settings" */
+    it("opens the organization's General page", () => {
+      renderProjectPageSidebar({ permissions: ["organization:view", "project:view"] });
+
+      expect(screen.getByRole("link", { name: "Settings" })).toHaveAttribute("href", "/settings");
     });
   });
 });

@@ -165,6 +165,10 @@ export const githubInstallRest = defineRestRouter(GithubInstallApi)
 // and the popup document a `mode=popup` flow closes itself from.
 // ─────────────────────────────────────────────────────────────────────────────
 
+const GITHUB_NOT_SET_UP =
+  "GitHub is not set up on this instance. An administrator can configure the GitHub App, " +
+  "or you can share a local folder with Langy instead.";
+
 function jsonAnswer(body: unknown, status: GithubAnswer["status"]): GithubAnswer {
   return { status, mediaType: "application/json", body: JSON.stringify(body) };
 }
@@ -210,8 +214,9 @@ async function startInstallation({
 }): Promise<GithubAnswer> {
   const service = app.github();
 
+  // A browser opened this, as a popup or a page, so the refusal is a page it can read.
   if (!service.getAppConfig().configured) {
-    return jsonAnswer({ error: "The GitHub integration is not available on this instance." }, 503);
+    return popupAnswer(service.popupErrorHtml(GITHUB_NOT_SET_UP), 503);
   }
 
   const query = queryOf(request);

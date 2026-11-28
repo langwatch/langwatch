@@ -34,7 +34,8 @@ export class LangyTurnHandoffRedisRepository extends LangyTurnHandoffRepository 
     const raw = await this.redis.get(`langy:handoff:{${input.conversationId}}:${input.turnId}`);
     if (raw == null) return { kind: "miss" };
     try {
-      return { kind: "hit", handoff: langyTurnHandoffSchema.parse(JSON.parse(raw)) };
+      // Another release may have stashed it with fields this one no longer reads.
+      return { kind: "hit", handoff: langyTurnHandoffSchema.strip().parse(JSON.parse(raw)) };
     } catch {
       return { kind: "miss" };
     }

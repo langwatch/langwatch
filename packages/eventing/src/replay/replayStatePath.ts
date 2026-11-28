@@ -1,4 +1,4 @@
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 
 import { isAtOrBeforeCutoff } from "./replayConstants.ts";
 import { discoverProjectionAggregates, filterDiscoveredByAggregateIds } from "./replayDiscovery.ts";
@@ -81,7 +81,7 @@ async function replayTenantForState({
     for (let i = 0; i < tenantAggregates.length; i += aggregateBatchSize) {
       const batch = tenantAggregates.slice(i, i + aggregateBatchSize);
       const batchNum = Math.floor(i / aggregateBatchSize) + 1;
-      const batchStartTime = nowInstant().epochMilliseconds;
+      const batchStartTime = nowEpochMs();
 
       const emitBatchProgress = (
         batchPhase: ReplayProgress["batchPhase"],
@@ -102,7 +102,7 @@ async function replayTenantForState({
           batchEventsProcessed,
           aggregatesCompleted,
           totalEventsReplayed,
-          elapsedSec: (nowInstant().epochMilliseconds - startTime) / 1000,
+          elapsedSec: (nowEpochMs() - startTime) / 1000,
           skippedCount: 0,
           batchErrors: batchErrorsSoFar,
           firstError: firstErrorSoFar,
@@ -129,7 +129,7 @@ async function replayTenantForState({
         totalBatches,
         aggregatesInBatch: batch.length,
         eventsInBatch,
-        durationSec: (nowInstant().epochMilliseconds - batchStartTime) / 1000,
+        durationSec: (nowEpochMs() - batchStartTime) / 1000,
       });
     }
 
@@ -183,7 +183,7 @@ export async function replayStateProjection({
   onProgress?: (progress: ReplayProgress) => void;
   onBatchComplete?: (info: BatchCompleteInfo) => void;
 }): Promise<ReplayResult & { touchedTenants: string[] }> {
-  const startTime = nowInstant().epochMilliseconds;
+  const startTime = nowEpochMs();
   const eventTypes = projection.definition.eventTypes;
 
   // Discover aggregates — when tenantIds is empty, discover across ALL tenants.
@@ -225,6 +225,7 @@ export async function replayStateProjection({
   try {
     await waitForActiveJobs({
       redis: ctx.redis,
+      claims: ctx.claims,
       aggregates: allAggregates,
       projectionName: projection.projectionName,
       kind: "state",

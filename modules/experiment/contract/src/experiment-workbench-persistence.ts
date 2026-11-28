@@ -139,7 +139,7 @@ export const extractPersistedState = (state: EvaluationsV3State): PersistedEvalu
     results: persistedResults,
     // Convert Set to array for JSON serialization
     hiddenColumns: Array.from(ui.hiddenColumns),
-    // Persist concurrency setting
-    concurrency: ui.concurrency,
+    // Only a picked concurrency is kept; Auto saves none, so the server picks the default.
+    ...(ui.concurrency !== undefined ? { concurrency: ui.concurrency } : {}),
   });
 };

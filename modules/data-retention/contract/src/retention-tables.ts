@@ -8,6 +8,7 @@ const EVENT_LOG = EVENT_TABLES[0].table;
 export const RETENTION_TABLE_CATEGORY_MAP = {
   [EVENT_LOG]: "traces",
   stored_spans: "traces",
+  span_analytics: "traces",
   stored_log_records: "traces",
   log_records: "traces",
   metric_data_points: "traces",
@@ -16,6 +17,7 @@ export const RETENTION_TABLE_CATEGORY_MAP = {
   trace_summaries: "traces",
   trace_analytics: "traces",
   trace_analytics_rollup: "traces",
+  trace_evaluation_analytics: "traces",
   evaluation_runs: "traces",
   evaluation_analytics: "traces",
   evaluation_analytics_rollup: "traces",
@@ -105,8 +107,10 @@ const SHADOW_METER_TABLES = new Set<RetentionManagedTable>([
 ]);
 
 const TABLES_WITHOUT_SIZE_COLUMN = new Set<RetentionManagedTable>([
+  "span_analytics",
   "trace_analytics",
   "trace_analytics_rollup",
+  "trace_evaluation_analytics",
   "evaluation_analytics",
   "evaluation_analytics_rollup",
 ]);

@@ -1,26 +1,15 @@
 name: docs-site-lighthouse-all
 
 # Lighthouse (desktop and mobile) and the static search checks on every
-# published docs page, merged into one sticky PR comment, the run summary and an
-# artifact. Informational: never a gate, no aggregator, not required.
+# published docs page, merged into the run summary and an artifact, nightly and
+# on demand. Informational: never a gate, no aggregator, not required, so it
+# does not run on pull requests (20 jobs a push).
 # The budgets gate only the representative pages in docs-site.yml's audit job.
 # Each page runs once; a page under 0.9 runs twice more and reports the median:
 # one run on a shared runner swings a page's TBT from 0 to over a second.
 # Same scripts: run.ts --all-pages --shard, then all-pages.ts merges the shards.
-#
-# To move to daily only, delete the pull_request trigger: schedule and
-# workflow_dispatch keep producing the run summary and artifact.
 
 on:
-  pull_request:
-    types: [opened, synchronize, reopened, ready_for_review]
-    paths:
-      - "apps/docs/**"
-      - "docs/**"
-      - "packages/design-system/**"
-      - "packages/time/**"
-      - ".github/workflows/docs-site-lighthouse-all.yml"
-      - ".github/actions/docs-media-encoders/**"
   schedule:
     - cron: "17 5 * * *"
   workflow_dispatch:
@@ -28,10 +17,8 @@ on:
 permissions:
   contents: read
 
-# One run per PR: a newer push cancels the older one, so two never race to
-# create the comment.
 concurrency:
-  group: docs-site-lighthouse-all-${{ github.event.pull_request.number || github.ref }}
+  group: docs-site-lighthouse-all-${{ github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -57,19 +44,7 @@ jobs:
       - uses: ./.github/actions/docs-media-encoders
         with:
           save: "false"
-      - name: Read the Playwright version
-        id: playwright
-        run: |
-          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-      - name: Install build browser
-        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-chromium
       - name: Build the documentation under /docs
         env:
           # Signs the star count read, which GitHub refuses from shared runner addresses.
@@ -89,7 +64,7 @@ jobs:
   lighthouse:
     needs: build
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 35
     strategy:
       fail-fast: false
       matrix:
@@ -107,19 +82,7 @@ jobs:
         with:
           name: docs-site-lighthouse-all-build
           path: apps/docs/dist
-      - name: Read the Playwright version
-        id: playwright
-        run: |
-          version=$(grep -m1 -oE '^  playwright@[0-9][^:]*' pnpm-lock.yaml | cut -d@ -f2)
-          test -n "$version"
-          echo "version=$version" >> "$GITHUB_OUTPUT"
-      - name: Cache the Playwright browser
-        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: ~/.cache/ms-playwright
-          key: ${{ runner.os }}-playwright-${{ steps.playwright.outputs.version }}
-      - name: Install the audit browser
-        run: pnpm --filter @langwatch/docs-site exec playwright install --with-deps chromium
+      - uses: ./.github/actions/playwright-chromium
       - name: Lighthouse on this shard's pages
         run: >-
           pnpm --filter @langwatch/docs-site audit:site
@@ -143,9 +106,6 @@ jobs:
     if: always() && needs.build.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
-      pull-requests: write
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -164,7 +124,7 @@ jobs:
       - name: Merge the shards and check search on every page
         working-directory: apps/docs
         env:
-          COMMIT: ${{ github.event.pull_request.head.sha || github.sha }}
+          COMMIT: ${{ github.sha }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: >-
           node src/site/audit/all-pages.ts
@@ -179,32 +139,3 @@ jobs:
           path: ${{ runner.temp }}/docs-lighthouse-all
           if-no-files-found: error
           retention-days: 14
-      # Fork PRs get a read-only token, so the comment would 403: skip quietly.
-      - name: Update the sticky PR comment
-        if: >-
-          github.event_name == 'pull_request' &&
-          github.event.pull_request.head.repo.full_name == github.repository
-        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
-        with:
-          script: |
-            const MARKER = "<!-- docs-lighthouse-all -->";
-            const { readFileSync } = require("node:fs");
-            const body = readFileSync(`${process.env.RUNNER_TEMP}/docs-lighthouse-all/comment.md`, "utf8");
-            const { owner, repo } = context.repo;
-            const issue_number = context.payload.pull_request.number;
-            const comments = await github.paginate(github.rest.issues.listComments, {
-              owner,
-              repo,
-              issue_number,
-              per_page: 100,
-            });
-            const existing = comments.find(
-              (c) => c.user?.login === "github-actions[bot]" && c.body?.includes(MARKER)
-            );
-            if (existing) {
-              await github.rest.issues.updateComment({ owner, repo, comment_id: existing.id, body });
-              core.info(`Updated comment ${existing.id} on PR #${issue_number}.`);
-            } else {
-              await github.rest.issues.createComment({ owner, repo, issue_number, body });
-              core.info(`Created the every-page Lighthouse comment on PR #${issue_number}.`);
-            }

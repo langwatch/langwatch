@@ -25,7 +25,7 @@ import {
   SessionReader,
   type TransportSelection,
 } from "@langwatch/api/hosting";
-import { ClientAddress, SecurityHeaders } from "@langwatch/api/policy";
+import { ClientAddress, SecurityHeaders, servesPlainHttp } from "@langwatch/api/policy";
 import {
   BrowserSessionIdentity,
   canonicalErrorAnswer,
@@ -33,10 +33,12 @@ import {
   type IdempotentRunner,
   loggerMiddleware,
   openConfirmationGate,
+  openStaffAccessGate,
   recordAnsweredCause,
   recordRequestPrincipal,
   RestHost,
   type RestConfirmationGate,
+  type RestStaffAccessGate,
 } from "@langwatch/api/rest";
 import {
   bindTrpcMiddlewareContext,
@@ -46,10 +48,12 @@ import {
   type TrpcRequestContext,
 } from "@langwatch/api/trpc";
 import type { Logger } from "@langwatch/observability";
+import { noteRouteTemplate } from "@langwatch/observability/metrics";
 import type { ProcessMemberSource } from "@langwatch/process-stores";
 import { TRPCError } from "@trpc/server";
 import { fetchRequestHandler } from "@trpc/server/adapters/fetch";
 import { type Context, Hono } from "hono";
+import { matchedRoutes } from "hono/route";
 import { z } from "zod";
 
 import type { ExposedSurface } from "../process-supply.ts";
@@ -106,6 +110,8 @@ class ApiSurface {
 
     // The module that shows confirmation cards binds the gate; none bound refuses Langy deletes.
     const confirmations = openConfirmationGate(peers);
+    // The staff-access module binds the gate; none bound refuses every staff key.
+    const staffAccess = openStaffAccessGate(peers);
 
     return new ApiSurface({
       composition,
@@ -114,6 +120,7 @@ class ApiSurface {
       idempotency,
       rateLimiter,
       confirmations,
+      staffAccess,
     });
   }
 
@@ -131,6 +138,7 @@ class ApiSurface {
     idempotency,
     rateLimiter,
     confirmations,
+    staffAccess,
   }: {
     composition: ApiSurfaceComposition;
     door: ApiDoor;
@@ -138,12 +146,13 @@ class ApiSurface {
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
     confirmations: RestConfirmationGate | undefined;
+    staffAccess: RestStaffAccessGate | undefined;
   }) {
     this.composition = composition;
     this.door = door;
     this.sessions = sessions;
     if (composition.selection.selected.rest) {
-      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations });
+      this.#rest = this.#restHost({ idempotency, rateLimiter, confirmations, staffAccess });
     }
     if (composition.selection.selected.trpc) this.#trpc = this.#trpcHost(rateLimiter);
   }
@@ -152,10 +161,12 @@ class ApiSurface {
     idempotency,
     rateLimiter,
     confirmations,
+    staffAccess,
   }: {
     idempotency: IdempotentRunner | undefined;
     rateLimiter: RateLimiter | undefined;
     confirmations: RestConfirmationGate | undefined;
+    staffAccess: RestStaffAccessGate | undefined;
   }): RestHost {
     return RestHost.create({
       identities: {
@@ -169,6 +180,7 @@ class ApiSurface {
       entitlements: this.door.entitlements,
       authz: this.door.authz,
       confirmations,
+      staffAccess,
     });
   }
 
@@ -212,7 +224,12 @@ class ApiSurface {
     });
     this.#rest?.assertEveryRouteDeclared();
     const api = composeApiApplication(
-      { rest: this.#rest, trpc: this.#trpc, docsOrigins: composition.docsOrigins },
+      {
+        rest: this.#rest,
+        trpc: this.#trpc,
+        docsOrigins: composition.docsOrigins,
+        plainHttp: servesPlainHttp(composition.publicBaseUrl),
+      },
       selected,
     );
     const clientAddress = ClientAddress.fromTrustedProxies({
@@ -221,7 +238,12 @@ class ApiSurface {
     });
     const mux = HttpMux.create({ reporter: composition.logger })
       .use(clientAddress)
-      .use(SecurityHeaders.strict({ production: composition.production }))
+      .use(
+        SecurityHeaders.strict({
+          production: composition.production,
+          publicBaseUrl: composition.publicBaseUrl,
+        }),
+      )
       .route("/api", api, { onFailure: answerApiFailure });
     for (const path of apiRootPaths(api))
       mux.route(path, api, { onFailure: answerApiFailure, exact: true });
@@ -363,6 +385,18 @@ const shareViewerContext = defineMiddlewareContext(
 );
 
 /**
+ * The most specific non-wildcard route that matched is the request's template;
+ * the mux labels its HTTP metric with it rather than the raw path.
+ */
+export function noteMatchedRouteTemplate(context: Context): void {
+  const template = matchedRoutes(context)
+    .map((route) => route.path)
+    .reverse()
+    .find((path) => path !== "*" && path !== "/*");
+  if (template) noteRouteTemplate(context.req.raw, template);
+}
+
+/**
  * The API's whole surface: the tRPC lanes, every REST family, then the 404 — mount order is
  * match order, and only here is every declaration known to have mounted (ARCHITECTURE.md §4).
  */
@@ -371,6 +405,8 @@ export function composeApiApplication(
     rest?: RestHost | undefined;
     trpc?: TrpcHost | undefined;
     docsOrigins?: readonly string[] | undefined;
+    /** The deployment is served without TLS, so live streams arrive without `Sec-Fetch-Site`. */
+    plainHttp?: boolean | undefined;
   },
   policies: { trpc?: SecurityHeaders; rest?: SecurityHeaders } = {},
 ): Hono {
@@ -380,6 +416,8 @@ export function composeApiApplication(
   root.use("*", async (context, next) => {
     await next();
 
+    noteMatchedRouteTemplate(context);
+
     const policy =
       context.req.path === TrpcHost.path || context.req.path.startsWith(`${TrpcHost.path}/`)
         ? policies.trpc
@@ -388,7 +426,7 @@ export function composeApiApplication(
     for (const [name, value] of Object.entries(policy?.headers ?? {})) context.header(name, value);
   });
 
-  if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc));
+  if (hosts.trpc) root.route("/", trpcLanes(hosts.trpc, { plainHttp: hosts.plainHttp === true }));
 
   if (hosts.rest) {
     mountApiDiscovery({ root, restApp: hosts.rest.app });
@@ -427,7 +465,7 @@ const answerApiFailure: HttpFailureAnswer = (failure) => canonicalErrorAnswer(fa
  * and the subscription lane at `/api/sse`, so a procedure is reachable live
  * exactly when it is reachable at all.
  */
-function trpcLanes(trpc: TrpcHost): Hono {
+function trpcLanes(trpc: TrpcHost, { plainHttp }: { plainHttp: boolean }): Hono {
   const app = new Hono();
   app.onError((failure) => answerApiFailure(failure));
   // The same access record every REST family writes, so a dashboard 5xx is seen and alerted
@@ -479,6 +517,7 @@ function trpcLanes(trpc: TrpcHost): Hono {
   // The context each subscription's caller was built over, so its access record names the user.
   const sseContexts = new WeakMap<Request, TrpcRequestContext>();
   const sse = SseLane.create({
+    plainHttp,
     members: {
       procedureTypeAt: (path) => trpc.procedureTypeAt(path),
       createCaller: async ({ request, signal }) => {

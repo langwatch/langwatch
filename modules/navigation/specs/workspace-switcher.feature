@@ -41,10 +41,10 @@ Feature: Workspace switcher
     Then no "My Workspace" row shows under that organization
 
   @integration
-  Scenario: With a single governance organization, My Workspace links to /me
+  Scenario: With a single governance organization, My Workspace links to /coding-agents
     Given exactly one organization I belong to enables governance
     When I click "My Workspace"
-    Then the browser opens "/me"
+    Then the browser opens "/coding-agents"
 
   @integration
   Scenario: A single governance organization still shows its name with My Workspace nested under it

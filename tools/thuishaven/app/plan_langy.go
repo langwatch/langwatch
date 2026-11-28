@@ -157,7 +157,29 @@ func (o *Orchestrator) langyChild(st domain.Stack, opts PlanOptions, base []stri
 	}
 }
 
-const langyCLIBuildCommand = nxCacheEnv + "pnpm --filter langwatch build"
+// The build's prebuild re-runs generate; the native render keeps the login
+// steps out of the skills bundled into the CLI that Langy runs.
+const langyCLIBuildCommand = nxCacheEnv + "LANGWATCH_SKILLS_RENDER=native pnpm --filter langwatch build"
+
+// The native build leaves the checkout's generated skills bundle in Langy's
+// render; regenerating the default keeps the SDK's tests, which pin the cli
+// render, green in this checkout.
+const langyCLIRestoreBundleCommand = "LANGWATCH_SKILLS_RENDER=cli node sdks/typescript/scripts/generate-skills-bundle.mjs"
+
+// langyCLIRender is what a successful native build stamps beside the CLI.
+const langyCLIRender = "render=native\n"
+
+// langyCLIManualBuildCommand is what the failed-build hint tells a developer to
+// run by hand. It ends with the bundle restore, so following it leaves no native
+// bundle in the checkout.
+const langyCLIManualBuildCommand = langyCLIBuildCommand + "; " + langyCLIRestoreBundleCommand
+
+// langyCLIBuildShell restores the default bundle even when the build fails
+// (its prebuild may already have written the native one) and keeps the
+// build's exit status.
+func langyCLIBuildShell(logPath string) string {
+	return "(" + langyCLIBuildCommand + "; rc=$?; " + langyCLIRestoreBundleCommand + "; exit $rc) >" + shQuote(logPath) + " 2>&1"
+}
 
 // langyCLIEntry is the checkout's built CLI; langyCLIBinDir holds the
 // `langwatch` and `lw` shims that run it, first on the host tier's PATH.
@@ -165,28 +187,47 @@ func langyCLIEntry(repoRoot string) string {
 	return filepath.Join(repoRoot, "sdks", "typescript", "dist", "cli", "index.js")
 }
 
+// langyCLIRenderStamp sits inside dist, so any other build of the CLI (whose
+// `rm -rf dist` drops it) makes haven rebuild with the native render.
+func langyCLIRenderStamp(repoRoot string) string {
+	return filepath.Join(repoRoot, "sdks", "typescript", "dist", "cli", ".skills-render")
+}
+
+// langyCLIIsNative reports a built CLI that carries haven's native stamp.
+func langyCLIIsNative(repoRoot string) bool {
+	if _, err := os.Stat(langyCLIEntry(repoRoot)); err != nil {
+		return false
+	}
+	stamp, err := os.ReadFile(langyCLIRenderStamp(repoRoot)) //nolint:gosec // G304: haven's own stamp in the checkout
+	return err == nil && string(stamp) == langyCLIRender
+}
+
 func langyCLIBinDir(repoRoot string) string {
 	return filepath.Join(repoRoot, ".bin", "langwatch-cli")
 }
 
-// ensureLangyCLI builds the checkout's CLI when it is missing and writes the
-// shims Langy's PATH names. A failed build keeps Langy and says the CLI on
-// PATH is used instead, with the command and the log.
+// ensureLangyCLI builds the checkout's CLI when it is missing or was not built
+// with the native render, and writes the shims Langy's PATH names. A failed
+// build keeps Langy and says the CLI on PATH is used instead, with the command
+// and the log.
 func (o *Orchestrator) ensureLangyCLI(ctx context.Context, st domain.Stack, opts *PlanOptions) {
 	if !opts.Selection.Langy || st.LangyTier.RunsInContainer() {
 		return
 	}
 	entry := langyCLIEntry(opts.RepoRoot)
-	if _, err := os.Stat(entry); err != nil {
+	if !langyCLIIsNative(opts.RepoRoot) {
 		dir, _ := domain.StackLogPaths(st.WorktreeDir, st.Slug)
 		_ = os.MkdirAll(dir, 0o700)
 		logPath := filepath.Join(dir, "langwatch-cli-build.log")
 		fmt.Printf("  langyagent: building this checkout's langwatch CLI (output in %s)…\n", logPath)
-		job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langwatch-cli-build", Dir: opts.RepoRoot, Shell: langyCLIBuildCommand + " >" + shQuote(logPath) + " 2>&1"}
+		job := onceJob{Slug: st.Slug, WorktreeDir: st.WorktreeDir, Name: "langwatch-cli-build", Dir: opts.RepoRoot, Shell: langyCLIBuildShell(logPath)}
 		if err := o.runOnceJob(ctx, job); err != nil {
-			fmt.Printf("  langyagent: the CLI build failed, so Langy uses the langwatch on PATH.\n  Build it with `%s`; log: %s\n", langyCLIBuildCommand, logPath)
+			fmt.Printf("  langyagent: the CLI build failed, so Langy uses the langwatch on PATH.\n  Build it with `%s`; log: %s\n", langyCLIManualBuildCommand, logPath)
 			o.log.Warn("langwatch CLI build failed — Langy uses the CLI on PATH", zap.String("log", logPath), zap.Error(err))
 			return
+		}
+		if err := os.WriteFile(langyCLIRenderStamp(opts.RepoRoot), []byte(langyCLIRender), 0o600); err != nil {
+			o.log.Warn("langwatch CLI render stamp", zap.Error(err))
 		}
 	}
 	binDir := langyCLIBinDir(opts.RepoRoot)

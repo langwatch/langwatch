@@ -1,6 +1,11 @@
 import type { Authorization } from "@langwatch/authorization";
 import { AuthorizedClickHouse, type ClickHouseClientResolver } from "@langwatch/clickhouse-client";
-import type { EvaluationRunData, TraceEvaluationData } from "@langwatch/evaluation-contract";
+import type {
+  EvaluationOutcome,
+  EvaluationOutcomeCursor,
+  EvaluationRunData,
+  TraceEvaluationData,
+} from "@langwatch/evaluation-contract";
 
 import {
   EvaluationRunRepository,
@@ -74,6 +79,15 @@ export class ClickHouseEvaluationRepository extends EvaluationRunRepository {
     traceIds: readonly string[];
   }): Promise<TraceEvaluationData[]> {
     return this.reader.findTraceEvaluations(input);
+  }
+
+  findOutcomesSince(input: {
+    authorization: Authorization;
+    sinceMs: number;
+    after: EvaluationOutcomeCursor | null;
+    limit: number;
+  }): Promise<EvaluationOutcome[]> {
+    return this.reader.findOutcomesSince(input);
   }
 
   findInputs(input: {

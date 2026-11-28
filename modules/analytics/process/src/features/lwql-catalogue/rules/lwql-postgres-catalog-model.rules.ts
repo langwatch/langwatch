@@ -513,17 +513,30 @@ function defaultDescription(model: PrismaModel, grain: string): string {
   return `Rows of the ${model.name} table, ${grain}.`;
 }
 
-/** The grain sentence: a fan-out row appears once per project, a plain one not. */
+/**
+ * The grain sentence: a collapsed fan-out row counts once under the lowest project (tasks#1212),
+ * a kept fan-out row once per project, a plain row neither.
+ */
 function defaultGrain({
   isFannedOut,
+  collapsesFanOut,
   scope,
   keyColumns,
+  entityKeyColumns,
 }: {
   isFannedOut: boolean;
+  collapsesFanOut: boolean;
   scope: TenantScope;
   keyColumns: readonly string[];
+  entityKeyColumns: readonly string[];
 }): string {
   if (!isFannedOut) return `one row per ${keyColumns.join(", ")}`;
+  if (collapsesFanOut) {
+    return (
+      `one row per (${entityKeyColumns.join(", ")}), ` +
+      "counted once across the projects read, under the lowest project id"
+    );
+  }
   return (
     `one row per (${keyColumns.join(", ")}); ` +
     `${fanOutRowSentence(scope.kind)} appears once per project`
@@ -657,8 +670,16 @@ function deriveModel({
     ...(isFannedOut ? [TENANT_COLUMN] : []),
     ...model.primaryKey.map((keyField) => exposedKeyName({ name, table, scope, keyField })),
   ].filter((key, index, all) => all.indexOf(key) === index);
+  // A key holding the consumed scope field names a row only together with its team or
+  // organization, which TenantId no longer carries: collapsing on the rest would merge
+  // rows of different scopes, so such a view keeps its fan-out.
+  const collapsesFanOut =
+    isFannedOut && !model.primaryKey.some((keyField) => keyField === scope.consumedField);
+  const entityKeyColumns = keyColumns.filter((key) => key !== TENANT_COLUMN);
 
-  const grain = override.grain ?? defaultGrain({ isFannedOut, scope, keyColumns });
+  const grain =
+    override.grain ??
+    defaultGrain({ isFannedOut, collapsesFanOut, scope, keyColumns, entityKeyColumns });
   const exposedNames = new Set(columns.map((column) => column.name));
   const timeColumn = override.timeColumn ?? pickDefaultTimeColumn({ columns });
   const joinKeys = override.joinKeys ?? defaultJoinKeys(columns);
@@ -675,6 +696,7 @@ function deriveModel({
       tenantSourceColumn: scope.column,
       ...(scope.tenantPath.length > 0 ? { tenantPath: scope.tenantPath } : {}),
       ...(override.rowFilter !== undefined ? { rowFilter: override.rowFilter } : {}),
+      ...(collapsesFanOut ? { entityKeyColumns } : {}),
     },
     description: viewDescription(model, override, grain),
     gates: [],

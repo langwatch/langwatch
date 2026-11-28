@@ -2,6 +2,7 @@
 import {
   IngestionRateLimitedError,
   IngestionReceiverUnavailableError,
+  IngestionSourceDisabledError,
   IngestionSourceUnauthorizedError,
   IngestionWrongEndpointError,
   type GovernanceIngestHeaders,
@@ -165,8 +166,13 @@ function accepted(body: GovernanceIngestReceipt): GovernanceIngestResponse {
 
 function refusalOf(
   gate: Exclude<GovernanceIngestAuthorization, { outcome: "authorized" }>,
-): IngestionRateLimitedError | IngestionSourceUnauthorizedError {
-  return gate.outcome === "rate-limited"
-    ? new IngestionRateLimitedError({ retryAfterSec: gate.retryAfterSec })
-    : new IngestionSourceUnauthorizedError();
+): IngestionRateLimitedError | IngestionSourceDisabledError | IngestionSourceUnauthorizedError {
+  switch (gate.outcome) {
+    case "rate-limited":
+      return new IngestionRateLimitedError({ retryAfterSec: gate.retryAfterSec });
+    case "disabled":
+      return new IngestionSourceDisabledError();
+    case "unauthorized":
+      return new IngestionSourceUnauthorizedError();
+  }
 }

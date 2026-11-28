@@ -4,7 +4,8 @@
  * widget on it (AC120, AC140, AC142), and the editor's starting prompt. Pure.
  */
 
-import type { LangyContextChip } from "@langwatch/langy-contract";
+import type { ChartAskSubject } from "@langwatch/analytics-contract/chart-frame-protocol";
+import { type LangyContextChip, LANGY_WIDGET_CHIP_LABEL_PREFIX } from "@langwatch/langy-contract";
 import { Temporal } from "@langwatch/time";
 
 import type {
@@ -12,7 +13,13 @@ import type {
   AnalyticsLangyContext,
   AnalyticsLangyDraftAbout,
 } from "../../../../model/analytics-host.ts";
-import type { BoardPeriod, BoardPeriodRange } from "../../model/board-period.ts";
+import {
+  type BoardPeriod,
+  type BoardPeriodRange,
+  boardCustomInShort,
+  boardPeriodInWords,
+  bucketInWords,
+} from "../../model/board-period.ts";
 import type { WidgetShape } from "../../model/widget-shape.ts";
 
 /** The rollout flag that gives a project Langy at all. */
@@ -90,12 +97,26 @@ function shortGrainText(granularitySeconds: number): string {
   return `${granularitySeconds / found.seconds}${found.short}`;
 }
 
-function context({ ref, label }: { ref: string; label: string }): AnalyticsLangyContext {
+function context({
+  ref,
+  label,
+  key,
+}: {
+  ref: string;
+  label: string;
+  key: string;
+}): AnalyticsLangyContext {
   return {
     kind: "dashboard",
     ref: ref.slice(0, MAX_REF_LENGTH),
     label: label.slice(0, MAX_LABEL_LENGTH),
+    key: key.slice(0, MAX_REF_LENGTH),
   };
+}
+
+/** The board's key: the open board's chip id, so an ask about the board is that chip. */
+function boardKey(board: Pick<BoardSubject, "id">): string {
+  return `dashboard:${board.id}`;
 }
 
 /** The board as the agent reads it: which one, what is on it, over when. */
@@ -109,7 +130,7 @@ export function boardAskContext({
   const widgets = board.widgetNames.length > 0 ? board.widgetNames.join(", ") : "none yet";
   const which =
     board.templateId === void 0
-      ? `dashboard "${board.name}" (id ${board.id})`
+      ? `dashboard ${JSON.stringify(board.name)} (id ${board.id})`
       : `From LangWatch dashboard "${board.name}" (template ${board.templateId}, read-only, not stored)`;
   return context({
     ref: [
@@ -118,6 +139,7 @@ export function boardAskContext({
       `period: ${periodText(period)}, one bucket per ${grainText(period.granularitySeconds)}`,
     ].join("; "),
     label: board.name,
+    key: boardKey(board),
   });
 }
 
@@ -134,16 +156,31 @@ export function boardContextChip({
   range: BoardPeriodRange;
   period: BoardPeriod;
 }): LangyContextChip {
-  const shown = `${range === "live" ? "Live" : range} · ${shortGrainText(period.granularitySeconds)}`;
+  const shown = `${rangeInShort({ range, period })} · ${shortGrainText(period.granularitySeconds)}`;
   return {
-    id: `dashboard:${board.id}`,
+    id: boardKey(board),
     kind: "dashboard",
     label: `dashboard: ${board.name} · ${shown}`.slice(0, MAX_LABEL_LENGTH),
     ref: boardAskContext({ board, period }).ref,
   };
 }
 
-/** A typed question, asked with the board attached. */
+/** The range as the chip names it: "Live", "7d", or a custom window's dates. */
+function rangeInShort({ range, period }: { range: BoardPeriodRange; period: BoardPeriod }) {
+  if (range === "live") return "Live";
+  if (range !== "custom") return range;
+  return boardCustomInShort({ from: period.periodStart, to: period.periodEnd });
+}
+
+/** What a question from a stored board's ask bar asks for: the answer as a widget on it. */
+export const BOARD_QUESTION_ANSWER =
+  "asked from this dashboard's ask bar: answer by adding a widget that shows the answer to " +
+  "this dashboard, then say the answer in a sentence";
+
+/**
+ * A typed question, asked with the board attached. On a stored board the answer is a widget
+ * on it (AC264); a From LangWatch board is read-only, so there it is a reply.
+ */
 export function boardQuestion({
   question,
   board,
@@ -153,7 +190,16 @@ export function boardQuestion({
   board: BoardSubject;
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
-  return { question: question.trim(), context: [boardAskContext({ board, period })] };
+  const attached = boardAskContext({ board, period });
+  const asked =
+    board.templateId === void 0
+      ? context({
+          ref: `${BOARD_QUESTION_ANSWER}; ${attached.ref}`,
+          label: attached.label,
+          key: boardKey(board),
+        })
+      : attached;
+  return { question: question.trim(), context: [asked], askedFrom: boardKey(board) };
 }
 
 /** Opens Langy with the board attached and nothing asked, for the reader to write in. */
@@ -165,14 +211,6 @@ export function boardOpen({
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
   return { context: [boardAskContext({ board, period })] };
-}
-
-/** A prompt with the board's concrete window and grain appended. */
-function promptWithWindow({ prompt, period }: { prompt: string; period: BoardPeriod }): string {
-  const window =
-    `Dashboard period: ${periodText(period)} (UTC). ` +
-    `Dashboard grain: one bucket per ${grainText(period.granularitySeconds)}.`;
-  return `${prompt}\n\n${window}`;
 }
 
 /**
@@ -189,20 +227,16 @@ export function boardPromptDraft({
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
   return {
-    draft: promptWithWindow({ prompt, period }),
+    draft: prompt,
     about: boardDraftAbout(board),
     context: [boardAskContext({ board, period })],
   };
 }
 
-/**
- * Langy's composer declares no length, so a widget draft keeps itself readable: long
- * LangWatchQL is cut to share what room is left under this bound between the queries.
- */
-export const MAX_WIDGET_DRAFT_LENGTH = 6_000;
-
 /** A widget as a draft reads it: its name and the stored parts that explain it. */
 export interface WidgetSubject {
+  /** The stored widget's id; a widget not stored yet goes by its name. */
+  readonly id?: string;
   readonly name: string;
   readonly definition: {
     readonly prompt?: string;
@@ -211,19 +245,9 @@ export interface WidgetSubject {
   };
 }
 
-/** Older and Langy-made widgets store no prompt, so ask the widget's own question. */
-function fallbackPrompt(name: string): string {
-  return (
-    `Answer "${name}" for this dashboard widget, using its queries below over the ` +
-    "dashboard period at the dashboard grain. Quote the real numbers from the query " +
-    "results. If a query returns no rows, say plainly that there is no data for the " +
-    "dashboard period rather than guessing."
-  );
-}
-
 function truncated({ sql, room }: { sql: string; room: number }): string {
   if (sql.length <= room) return sql;
-  const marker = (cut: number) => `\n-- [truncated: ${cut} more characters]`;
+  const marker = (cut: number) => ` -- [truncated: ${cut} more characters]`;
   const kept = Math.max(room - marker(sql.length).length, 0);
   return `${sql.slice(0, kept)}${marker(sql.length - kept)}`;
 }
@@ -243,21 +267,71 @@ function fittedSql({ sqls, room }: { sqls: readonly string[]; room: number }): s
   return fitted;
 }
 
-function widgetBlock({ widget, sqls }: { widget: WidgetSubject; sqls: readonly string[] }) {
-  const { description, queries } = widget.definition;
-  return [
-    "This widget:",
-    `Name: ${widget.name}`,
-    ...(description ? [`Description: ${description}`] : []),
-    ...(queries.length > 0 ? ["Queries (LangWatchQL):"] : []),
-    ...queries.map(({ name }, index) => `- ${name}:\n${sqls[index] ?? ""}`),
-  ].join("\n");
+/**
+ * The widget as Langy reads it, beside the visible draft: its description, how to answer it,
+ * what was clicked, the period as instants and each query's LangWatchQL, cut to fit the
+ * context's bound. The reader sees only its label; the draft stays in their words.
+ */
+export function widgetContext({
+  widget,
+  board,
+  period,
+  focus,
+}: {
+  widget: WidgetSubject;
+  board: Pick<BoardSubject, "id">;
+  period: BoardPeriod;
+  /** What the draft is about within the widget, such as the clicked value. */
+  focus?: string;
+}): AnalyticsLangyContext {
+  const { description, prompt, queries } = widget.definition;
+  const ref = (sqls: readonly string[]) =>
+    [
+      `widget "${widget.name}"`,
+      ...(description ? [`description: ${description}`] : []),
+      ...(prompt ? [`how to answer it: ${prompt}`] : []),
+      ...(focus ? [`clicked: ${focus}`] : []),
+      `period: ${periodText(period)}, one bucket per ${grainText(period.granularitySeconds)}`,
+      ...(queries.length > 0
+        ? [
+            `queries (LangWatchQL): ${queries
+              .map(({ name }, index) => `${name}: ${sqls[index] ?? ""}`)
+              .join(" | ")}`,
+          ]
+        : []),
+    ].join("; ");
+  // Whole, as the widget runs it: a literal's spaces and the line a comment ends on both count.
+  const sqls = queries.map(({ sql }) => sql.trim());
+  const room = MAX_REF_LENGTH - ref(queries.map(() => "")).length;
+  return context({
+    ref: ref(fittedSql({ sqls, room })),
+    label: `${LANGY_WIDGET_CHIP_LABEL_PREFIX}${widget.name}`,
+    // Clicks on different values of one widget are still that widget, listed once; another
+    // widget of the same name, here or on another board, is listed beside it.
+    key: `${boardKey(board)}:widget:${widget.id ?? widget.name}`,
+  });
 }
 
+/** What every widget draft fills in: the card's title and the board's period in words. */
+function widgetValues({ widget, period }: { widget: WidgetSubject; period: BoardPeriod }) {
+  return { question: widget.name, period: boardPeriodInWords(period) };
+}
+
+/** A prompt with its `{placeholders}` filled; one with no value is left as it was. */
+function filled({ prompt, values }: { prompt: string; values: Readonly<Record<string, string>> }) {
+  const byKey = new Map(Object.entries(values).map(([key, value]) => [key.toLowerCase(), value]));
+  return prompt.replace(
+    /\{([^{}]+)\}/g,
+    (match, key: string) => byKey.get(key.toLowerCase()) ?? match,
+  );
+}
+
+const PLACEHOLDER = /\{[^{}]+\}/;
+
 /**
- * One widget's prompt as a composer draft, as picking a widget gives (AC121): its prompt
- * or a fallback, its name, description and queries, then the board's window. Langy has
- * no widget context kind, so the widget rides in the text beside the board context.
+ * One widget's ask as a composer draft (AC121): what the card answers over the board's period,
+ * in the reader's words. The stored prompt, the description and the queries ride in the
+ * widget's context (AC247).
  */
 export function widgetPromptDraft({
   widget,
@@ -268,12 +342,11 @@ export function widgetPromptDraft({
   board: BoardSubject;
   period: BoardPeriod;
 }): AnalyticsLangyAskRequest {
-  return widgetDraft({
-    prompt: widget.definition.prompt ?? fallbackPrompt(widget.name),
-    widget,
-    board,
-    period,
-  });
+  const prompt =
+    `What does "${widget.name}" show over ${boardPeriodInWords(period)}? Quote the real ` +
+    "numbers and tell me what stands out. If there is no data for the period, say so plainly " +
+    "rather than guessing.";
+  return widgetDraft({ prompt, widget, board, period });
 }
 
 /** What a widget's menu asks Langy to set up on it, beside asking about it. */
@@ -287,11 +360,11 @@ const SETUP_PROMPTS: Readonly<Record<WidgetSetup, (name: string) => string>> = {
   alert: (name) =>
     `Set up an alert on my "${name}" dashboard widget. Ask me which number to watch, the ` +
     "threshold and where to send the alert (Slack, email or webhook), then create it in " +
-    "LangWatch. Base it on the widget's queries below.",
+    "LangWatch. Base it on the widget's queries.",
   report: (name) =>
     `Send my "${name}" dashboard widget as a scheduled report. Ask me how often and where ` +
     "to send it (Slack, email or webhook), then set the report up in LangWatch. Base it on " +
-    "the widget's queries below.",
+    "the widget's queries.",
 };
 
 /** A widget menu action as a composer draft (AC142, AC143): what to set up, then the widget. */
@@ -328,6 +401,163 @@ export function widgetMissingDataDraft({
     `Help me send ${missing.label} on my traces. "${widget.name}" needs it (the ` +
     `${missing.field} field), and my traces do not have it yet. Explain in plain words what ` +
     "it is, how I start sending it from my agent, and what the widget will show once it arrives.";
+  return widgetDraft({ prompt, widget, board, period });
+}
+
+/** A button under a widget's chart (AC243), drafting its own prompt about the widget. */
+export interface WidgetButtonAction {
+  readonly kind: "investigate" | "propose-fix";
+  /** The button's words where "Investigate" or "Propose a fix" would read wrong. */
+  readonly label?: string;
+  /** "problem": only while the widget's code signals its problem (AC244); "always" otherwise. */
+  readonly shown: "problem" | "always";
+  /** With `{question}` and `{period}` to fill. */
+  readonly prompt: string;
+}
+
+/** What a click on one of a widget's values drafts (AC245): a prompt per kind of value. */
+export interface WidgetClickAction {
+  readonly kind: "click";
+  /** The kind of value the click names, as the widget's code sends it: "day", "model". */
+  readonly on: string;
+  /** Set when one kind has a prompt per raw value, as a field per field: the value it is for. */
+  readonly value?: string;
+  /** The placeholder the series under the pointer fills, as "outcome" in "{outcome} on {day}". */
+  readonly series?: string;
+  /** With `{question}`, `{period}`, `{<on>}` and `{<series>}` to fill. */
+  readonly prompt: string;
+}
+
+/** What a catalogue widget declares about asking Langy from its card. */
+export type WidgetAction = WidgetButtonAction | WidgetClickAction;
+
+const BUTTON_LABELS: Readonly<Record<WidgetButtonAction["kind"], string>> = {
+  investigate: "Investigate",
+  "propose-fix": "Propose a fix",
+};
+
+/** An action's button label. */
+export function widgetActionLabel(action: WidgetButtonAction): string {
+  return action.label ?? BUTTON_LABELS[action.kind];
+}
+
+/** The buttons a card shows now: the problem ones only while its widget reports the problem. */
+export function shownWidgetButtons({
+  actions,
+  problem,
+}: {
+  actions: readonly WidgetAction[];
+  problem: boolean;
+}): readonly WidgetButtonAction[] {
+  return actions.filter(
+    (action): action is WidgetButtonAction =>
+      action.kind !== "click" && (action.shown === "always" || problem),
+  );
+}
+
+/** The click prompt a widget declares for the kind of value clicked (and its value), if any. */
+export function widgetClickFor({
+  actions,
+  subject,
+}: {
+  actions: readonly WidgetAction[];
+  subject: ChartAskSubject;
+}): WidgetClickAction | undefined {
+  const kind = subject.kind?.toLowerCase();
+  if (kind === void 0) return void 0;
+  const value = subject.value ?? subject.label;
+  return actions.find(
+    (action): action is WidgetClickAction =>
+      action.kind === "click" &&
+      action.on.toLowerCase() === kind &&
+      (action.value === void 0 || action.value === value),
+  );
+}
+
+/** The clicked value as Langy reads it beside the draft: its kind, raw value, bucket and series. */
+function clickedText(subject: ChartAskSubject): string {
+  return [
+    `${subject.kind ?? "value"} "${subject.label}"`,
+    ...(subject.value ? [`raw value ${subject.value}`] : []),
+    ...(subject.at ? [`bucket starting ${subject.at}`] : []),
+    ...(subject.series ? [`series ${subject.series}`] : []),
+  ].join(", ");
+}
+
+/**
+ * A bar, row, point or legend entry clicked on a widget (AC124, AC245), as a composer draft:
+ * the widget's own prompt for that kind of value when it declares one, else a general one.
+ * The visible text names the value as the card shows it; its raw value and bucket ride along.
+ */
+export function widgetChartDraft({
+  subject,
+  click,
+  widget,
+  board,
+  period,
+}: {
+  subject: ChartAskSubject;
+  click?: WidgetClickAction | undefined;
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const at = subject.at
+    ? bucketInWords({ at: subject.at, granularitySeconds: period.granularitySeconds })
+    : void 0;
+  const values: Record<string, string> = {
+    ...widgetValues({ widget, period }),
+    day: at ?? subject.label,
+  };
+  if (click) {
+    values[click.on] = click.on.toLowerCase() === "day" ? (at ?? subject.label) : subject.label;
+    if (click.series && subject.series) values[click.series] = subject.series;
+  }
+  const declared = click ? filled({ prompt: click.prompt, values }) : void 0;
+  const prompt =
+    declared !== void 0 && !PLACEHOLDER.test(declared)
+      ? declared
+      : generalClickPrompt({ subject, at, values });
+  return widgetDraft({ prompt, widget, board, period, focus: clickedText(subject) });
+}
+
+function generalClickPrompt({
+  subject,
+  at,
+  values,
+}: {
+  subject: ChartAskSubject;
+  at: string | undefined;
+  values: Readonly<Record<string, string>>;
+}): string {
+  const named = subject.kind && subject.kind !== "series" ? `the ${subject.kind} ` : "";
+  // A day's label is the bucket itself; any other value clicked at a bucket is named with it.
+  const value =
+    subject.kind && !["day", "series"].includes(subject.kind) ? [`${named}"${subject.label}"`] : [];
+  const on = [...value, ...(subject.series ? [subject.series] : [])].join(", ");
+  const what = at
+    ? `${on ? `${on} on ` : ""}${at}`
+    : `${named}"${subject.label}" over ${values.period}`;
+  return (
+    `On "${values.question}", what stands out about ${what}? Find the requests behind it, ` +
+    "show me 3 examples and tell me the most likely cause. If there is no data for it, say so " +
+    "plainly rather than guessing."
+  );
+}
+
+/** A widget action button as a composer draft (AC125b, AC243): the widget's own prompt for it. */
+export function widgetActionDraft({
+  action,
+  widget,
+  board,
+  period,
+}: {
+  action: WidgetButtonAction;
+  widget: WidgetSubject;
+  board: BoardSubject;
+  period: BoardPeriod;
+}): AnalyticsLangyAskRequest {
+  const prompt = filled({ prompt: action.prompt, values: widgetValues({ widget, period }) });
   return widgetDraft({ prompt, widget, board, period });
 }
 
@@ -390,11 +620,12 @@ export function widgetEditorContext({
 }): AnalyticsLangyContext {
   const which =
     widget.id === void 0
-      ? `new widget "${widget.name}", not saved yet`
-      : `widget "${widget.name}" (id ${widget.id})`;
+      ? `new widget ${JSON.stringify(widget.name)}, not saved yet`
+      : `widget ${JSON.stringify(widget.name)} (id ${widget.id})`;
   return context({
     ref: `${which}, open in the editor on ${boardAskContext({ board, period }).ref}`,
     label: widget.name,
+    key: `${boardKey(board)}:editing:${widget.id ?? NEW_WIDGET_REF}`,
   });
 }
 
@@ -434,12 +665,13 @@ export function widgetBuildQuestion({
       : `Edit my "${widget.name}" widget on my "${board.name}" dashboard with me. Ask me what ` +
         "I want the widget to show, propose the change to its code and queries, and save it " +
         "only when I agree.";
-  // A new widget's starter queries mean nothing in the chat; a saved one's are the subject.
-  const question =
-    widget.id === void 0
-      ? promptWithWindow({ prompt, period })
-      : widgetText({ prompt, widget, period });
-  return { question, context: [widgetEditorContext({ widget, board, period })] };
+  // A new widget's starter queries mean nothing to Langy; a saved one's are the subject.
+  const attached = widgetEditorContext({ widget, board, period });
+  return {
+    question: prompt,
+    context:
+      widget.id === void 0 ? [attached] : [attached, widgetContext({ widget, board, period })],
+  };
 }
 
 /** One change Langy suggests beside the editor, and why it helps. */
@@ -523,6 +755,7 @@ function widgetDraft({
   widget,
   board,
   period,
+  focus,
   about = boardDraftAbout(board),
   attached = boardAskContext({ board, period }),
 }: {
@@ -530,26 +763,61 @@ function widgetDraft({
   widget: WidgetSubject;
   board: BoardSubject;
   period: BoardPeriod;
+  focus?: string;
   about?: AnalyticsLangyDraftAbout;
-  /** What rides with the draft: the board, or the widget open in the editor. */
+  /** What rides with the draft beside the widget: the board, or the widget open in the editor. */
   attached?: AnalyticsLangyContext;
 }): AnalyticsLangyAskRequest {
-  return { draft: widgetText({ prompt, widget, period }), about, context: [attached] };
+  return {
+    draft: prompt,
+    about,
+    context: [attached, widgetContext({ widget, board, period, ...(focus ? { focus } : {}) })],
+  };
 }
 
-/** The prompt, the widget's name, description and queries cut to fit, then the window. */
-function widgetText({
-  prompt,
-  widget,
-  period,
+/** The board's reference in a context: first, its quoted name holding no bare quote. */
+const escapedRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+const boardReference = (id: string) =>
+  new RegExp(`(dashboard "(?:[^"\\\\]|\\\\.)*" )\\(id ${escapedRegExp(id)}\\)`);
+
+/**
+ * An ask built on a new board, retold about the board it was stored as: the board's id in each
+ * context and in what the draft is about. Nothing else in the ask names the board by id.
+ */
+export function askAboutStoredBoard({
+  request,
+  draftId,
+  dashboardId,
 }: {
-  prompt: string;
-  widget: WidgetSubject;
-  period: BoardPeriod;
-}): string {
-  const textWith = (sqls: readonly string[]) =>
-    promptWithWindow({ prompt: `${prompt}\n\n${widgetBlock({ widget, sqls })}`, period });
-  const sqls = widget.definition.queries.map(({ sql }) => sql);
-  const room = MAX_WIDGET_DRAFT_LENGTH - textWith([]).length;
-  return textWith(fittedSql({ sqls, room }));
+  request: AnalyticsLangyAskRequest;
+  draftId: string;
+  dashboardId: string;
+}): AnalyticsLangyAskRequest {
+  const { about } = request;
+  const draftKey = boardKey({ id: draftId });
+  const storedKey = boardKey({ id: dashboardId });
+  // Only the board's own context and the editor's name the board in their reference.
+  const namesBoard = (key: string) => key === draftKey || key.startsWith(`${draftKey}:editing:`);
+  return {
+    ...request,
+    context: request.context.map((each) => ({
+      ...each,
+      ref: namesBoard(each.key)
+        ? each.ref.replace(
+            boardReference(draftId),
+            (_, named: string) => `${named}(id ${dashboardId})`,
+          )
+        : each.ref,
+      key:
+        each.key === draftKey || each.key.startsWith(`${draftKey}:`)
+          ? `${storedKey}${each.key.slice(draftKey.length)}`
+          : each.key,
+    })),
+    ...(about === void 0
+      ? {}
+      : { about: about.ref === draftId ? { ...about, ref: dashboardId } : about }),
+    ...(request.askedFrom === void 0
+      ? {}
+      : { askedFrom: request.askedFrom === draftKey ? storedKey : request.askedFrom }),
+  };
 }

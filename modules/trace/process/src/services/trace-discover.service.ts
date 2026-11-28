@@ -13,6 +13,7 @@ import type {
   DiscoverResult,
   DiscreteFacetResult,
   FacetDescriptor,
+  SpanAnalyticsFloor,
   TraceListRead,
 } from "@langwatch/trace-contract";
 
@@ -182,12 +183,14 @@ export class TraceDiscoverService {
     descriptors: TraceFacetDescriptorService;
     facets: FacetCatalog;
     updates: Pick<PresenceApi, "publishProjectEvent">;
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }) {
     this.descriptors = deps.descriptors;
     this.tasks = TraceDiscoverTaskService.create({
       repository: deps.repository,
       descriptors: deps.descriptors,
       facets: deps.facets,
+      ...(deps.lightFloor ? { lightFloor: deps.lightFloor } : {}),
     });
     this.facets = deps.facets;
     this.updates = deps.updates;
@@ -198,18 +201,22 @@ export class TraceDiscoverService {
     topicNaming,
     facets,
     updates,
+    lightFloor,
   }: {
     repository: TraceListRead;
     topicNaming: TraceTopicNamingService;
     facets: FacetCatalog;
     /** Where a finished background refresh tells the tenant's tabs to refetch. */
     updates: Pick<PresenceApi, "publishProjectEvent">;
+    /** Where span_analytics starts; batched span facets read it inside that window. */
+    lightFloor?: () => Promise<SpanAnalyticsFloor>;
   }): TraceDiscoverService {
     return new TraceDiscoverService({
       repository,
       descriptors: TraceFacetDescriptorService.create({ repository, topicNaming, facets }),
       facets,
       updates,
+      ...(lightFloor ? { lightFloor } : {}),
     });
   }
 

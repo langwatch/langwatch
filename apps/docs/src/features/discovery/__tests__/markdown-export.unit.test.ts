@@ -143,7 +143,7 @@ describe("when a guide declares its title and description", () => {
 
 describe("when docs.json gives agents Markdown instructions", () => {
   /** @scenario "Give agents the site's instructions in every Markdown export" */
-  it("opens the export with them, before the title, as Mintlify does", () => {
+  it("closes the export with them, after the page, so the page opens with its title", () => {
     const fixture = docsFixture({
       config: {
         markdown: { instructions: "Report problems with `npx langwatch report`.\nThanks." },
@@ -152,17 +152,16 @@ describe("when docs.json gives agents Markdown instructions", () => {
     });
     try {
       const markdown = pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide" });
+      expect(markdown.startsWith("# Agent setup\n")).toBe(true);
       expect(
-        markdown.startsWith(
-          "> ## Agent Instructions\n> Report problems with `npx langwatch report`.\n> Thanks.\n\n# Agent setup\n",
+        markdown.endsWith(
+          "Body\n\n> ## Agent Instructions\n> Report problems with `npx langwatch report`.\n> Thanks.\n",
         ),
       ).toBe(true);
       expect(agentInstructions({ docsRoot: fixture.docsRoot })).toContain("## Agent Instructions");
       expect(
-        pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide", instructions: "" }).startsWith(
-          "# Agent setup",
-        ),
-      ).toBe(true);
+        pageMarkdown({ docsRoot: fixture.docsRoot, slug: "guide", instructions: "" }),
+      ).not.toContain("Agent Instructions");
     } finally {
       fixture.dispose();
     }

@@ -31,6 +31,7 @@ import type { AuthzApi } from "@langwatch/authz-contract";
 import { ValidationError } from "@langwatch/handled-error";
 import type { TenantStatementLimiter } from "@langwatch/limiter";
 import { nowInstant } from "@langwatch/time";
+import { filtersReadSpanType, type SpanAnalyticsFloor } from "@langwatch/trace-contract";
 import { context, SpanStatusCode, trace } from "@opentelemetry/api";
 import { z } from "zod";
 
@@ -39,10 +40,12 @@ import type {
   AnalyticsRepository,
   AnalyticsTimeseriesQuery,
 } from "../repositories/analytics.repository.ts";
+import { timeseriesReadsSpanType } from "../rules/span-type-reads.rules.ts";
 import { AnalyticsTenantQueueService } from "./analytics-tenant-queue.service.ts";
 import { AnalyticsTimeseriesRequestService } from "./analytics-timeseries-request.service.ts";
 import type { LoggingAnalyticsTripwireService } from "./analytics-tripwire.service.ts";
 import { LWQL_TENANT_CAPABILITY_MAX_PROJECTS } from "./langwatch-ql-capability.service.ts";
+import type { SpanAnalyticsFloorReadService } from "./span-analytics-floor-read.service.ts";
 
 const TIMESERIES_CACHE_TTL_MS = 30_000;
 const TIMESERIES_READ_CODE_PATH = "analytics.AnalyticsService.getTimeseries";
@@ -88,6 +91,8 @@ type AnalyticsServiceDeps = {
   tripwire?: LoggingAnalyticsTripwireService;
   /** The most members one aggregate read may span; LangWatchQL's cap when unset. */
   maxMembers?: number | undefined;
+  /** Where span_analytics is complete; absent, span types are read from stored_spans. */
+  spanAnalyticsFloor?: SpanAnalyticsFloorReadService | undefined;
 };
 
 /** A cost-gated read's proof, refused when forged or expired before any read. */
@@ -106,6 +111,7 @@ export class AnalyticsService {
   private readonly timeseriesRequest = AnalyticsTimeseriesRequestService.create();
   private readonly authz: Pick<AuthzApi, "authorizeInternal">;
   private readonly tripwire?: LoggingAnalyticsTripwireService;
+  private readonly spanAnalyticsFloor: SpanAnalyticsFloorReadService | undefined;
   private readonly cache = new Map<string, CacheEntry>();
 
   private constructor(deps: AnalyticsServiceDeps) {
@@ -117,6 +123,14 @@ export class AnalyticsService {
     });
     this.authz = deps.authz;
     this.tripwire = deps.tripwire;
+    this.spanAnalyticsFloor = deps.spanAnalyticsFloor;
+  }
+
+  /** The span_analytics floor field a read naming a span type carries; none for any other read. */
+  private async floorFieldFor(
+    needed: boolean,
+  ): Promise<{ spanAnalyticsFloor?: SpanAnalyticsFloor }> {
+    return this.spanAnalyticsFloor ? this.spanAnalyticsFloor.floorFieldFor(needed) : {};
   }
 
   private readonly tracer = trace.getTracer("langwatch.analytics.service");
@@ -134,6 +148,7 @@ export class AnalyticsService {
       try {
         const parsed = analyticsTimeseriesInputSchema.parse(input);
         this.timeseriesRequest.refuseDisallowedAggregations(parsed);
+        this.timeseriesRequest.refuseUnapplicableFilters(parsed);
         // Checked before the cache, so an expired or forged proof is refused even on a repeat.
         const authorization = usableAuthorization({
           authorization:
@@ -198,6 +213,7 @@ export class AnalyticsService {
       input: routedInput,
       ...window,
       maxResultRows: options.maxResultRows,
+      ...(await this.floorFieldFor(timeseriesReadsSpanType(routedInput))),
     };
     if (
       table === "trace_summaries" ||
@@ -244,6 +260,7 @@ export class AnalyticsService {
       startDate: input.startDate,
       endDate: input.endDate,
       filters: input.filters,
+      ...(await this.floorFieldFor(filtersReadSpanType(input.filters))),
     };
     const span = this.tracer.startSpan("AnalyticsService.getFeedbacks", {
       attributes: { "tenant.id": parsed.projectId },
@@ -296,6 +313,7 @@ export class AnalyticsService {
           filters: input.filters,
           after: page.data.cursor?.after,
           limit,
+          ...(await this.floorFieldFor(filtersReadSpanType(input.filters))),
         });
         span.setAttribute("event.count", read.rows.length);
         const events = read.rows.map((row) => row.event);
@@ -324,6 +342,7 @@ export class AnalyticsService {
       startDate: input.startDate,
       endDate: input.endDate,
       filters: input.filters,
+      ...(await this.floorFieldFor(filtersReadSpanType(input.filters))),
     };
     const span = this.tracer.startSpan("AnalyticsService.getTopUsedDocuments", {
       attributes: { "tenant.id": parsed.projectId },

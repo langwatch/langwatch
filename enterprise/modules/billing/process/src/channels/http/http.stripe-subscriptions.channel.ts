@@ -31,6 +31,22 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     return subscriptionOf(await this.stripe.subscriptions.retrieve(subscriptionId));
   }
 
+  async listCustomerSubscriptions({
+    customerId,
+  }: {
+    customerId: string;
+  }): Promise<BillingSubscription[]> {
+    const subscriptions: BillingSubscription[] = [];
+    for await (const subscription of this.stripe.subscriptions.list({
+      customer: customerId,
+      status: "all",
+      limit: 100,
+    })) {
+      subscriptions.push(subscriptionOf(subscription));
+    }
+    return subscriptions;
+  }
+
   async updateSubscription({
     subscriptionId,
     change,
@@ -163,22 +179,35 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
     id: subscription.id,
     status: subscription.status,
     canceledAt: subscription.canceled_at ?? null,
+    ...(typeof subscription.ended_at === "number" ? { endedAt: subscription.ended_at } : {}),
     billingThreshold: threshold
       ? {
           amountGte: threshold.amount_gte,
           resetBillingCycleAnchor: threshold.reset_billing_cycle_anchor,
         }
       : null,
+    // The first page of lines only, ten at most; a Growth subscription holds about six today.
     items: (subscription.items?.data ?? []).map((item) => ({
       id: item.id,
       priceId: item.price.id,
       unitAmount: item.price.unit_amount ?? null,
       interval: item.price.recurring?.interval ?? null,
       quantity: item.quantity ?? null,
+      ...(item.price.lookup_key ? { lookupKey: item.price.lookup_key } : {}),
+      ...langwatchKeyOf(item.price.metadata),
+      createdAt: item.created,
     })),
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,
+    ...customerOf(subscription),
   };
+}
+
+/** The billed customer, when the provider's answer names one. */
+function customerOf(subscription: Stripe.Subscription): { customerId?: string } {
+  const customer: Stripe.Subscription["customer"] | undefined = subscription.customer;
+  if (!customer) return {};
+  return { customerId: typeof customer === "string" ? customer : customer.id };
 }
 
 function previewDetailsOf(
@@ -209,4 +238,10 @@ function updateParamsOf(change: BillingSubscriptionChange): Stripe.SubscriptionU
     };
   }
   return params;
+}
+
+/** Both metadata spellings the price sync accepts (stripe-prices-sync.task.ts). */
+function langwatchKeyOf(metadata: Stripe.Metadata | null | undefined): { langwatchKey?: string } {
+  const key = metadata?.langwatch_key ?? metadata?.langwatchKey;
+  return key ? { langwatchKey: key } : {};
 }

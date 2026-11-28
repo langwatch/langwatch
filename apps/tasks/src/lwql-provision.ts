@@ -6,6 +6,7 @@ import type { TaskInput } from "./config.ts";
 export async function lwqlProvision({
   config,
   connections,
+  chain,
   environment,
   signal,
   failOnError = false,
@@ -23,6 +24,8 @@ export async function lwqlProvision({
   await LwqlProvisionTask.create({
     database: () => database.client,
     source: environment,
+    lookup: (id) => chain.fetch(id),
+    lookupFamily: (prefix) => chain.fetchFamily(prefix),
     failOnError,
   }).run({
     args: [],

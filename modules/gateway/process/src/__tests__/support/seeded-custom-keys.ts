@@ -8,7 +8,7 @@ import type { GatewayCustomKeys } from "../../services/gateway-config-materialis
  */
 export function seededCustomKeys(prisma: PrismaClient): GatewayCustomKeys {
   return {
-    getCustomKeys: async ({ modelProviderId }) => {
+    getGatewayCustomKeys: async ({ modelProviderId }) => {
       const row = await prisma.modelProvider.findUniqueOrThrow({
         where: { id: modelProviderId },
         select: { id: true, provider: true, organizationId: true, customKeys: true },
@@ -18,5 +18,6 @@ export function seededCustomKeys(prisma: PrismaClient): GatewayCustomKeys {
         typeof stored === "object" && stored !== null && !Array.isArray(stored) ? stored : {};
       return { id: row.id, provider: row.provider, organizationId: row.organizationId, customKeys };
     },
+    getGatewayKeysEpoch: () => "",
   };
 }

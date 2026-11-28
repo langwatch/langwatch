@@ -152,6 +152,9 @@ func (p *parser) object(depth int) (any, error) {
 	}
 }
 
+// Set sets key like a JS assignment: an existing key keeps its position.
+func (o Object) Set(key string, v any) Object { return o.set(key, v) }
+
 // set mirrors JSON.parse: a repeated key keeps its first position and takes
 // the last value.
 func (o Object) set(key string, v any) Object {

@@ -100,11 +100,15 @@ export abstract class AuthzManagedGrantRepository {
     userId: string;
   }): Promise<OrganizationRole | null>;
 
+  /** Whether the membership carries the Billing-only flag (ADR-205); no membership reads false. */
+  abstract isBillingOnlyMember(input: { organizationId: string; userId: string }): Promise<boolean>;
+
   abstract isGroupInOrganization(input: {
     organizationId: string;
     groupId: string;
   }): Promise<boolean>;
 
+  /** Whether a key a grant may name lives in the organization: never a system-managed key. */
   abstract isApiKeyInOrganization(input: {
     organizationId: string;
     apiKeyId: string;

@@ -61,7 +61,8 @@ def sync_detailed(
     client: AuthenticatedClient,
     body: PostApiEvaluatorsBody,
 ) -> Response[PostApiEvaluatorsResponse200]:
-    """Create a new evaluator
+    r"""Create a new evaluator: a built-in one, a custom code evaluator (`type: \"code\"`) or one that wraps
+    a workflow (`type: \"workflow\"`)
 
     Args:
         body (PostApiEvaluatorsBody):
@@ -90,7 +91,8 @@ def sync(
     client: AuthenticatedClient,
     body: PostApiEvaluatorsBody,
 ) -> PostApiEvaluatorsResponse200 | None:
-    """Create a new evaluator
+    r"""Create a new evaluator: a built-in one, a custom code evaluator (`type: \"code\"`) or one that wraps
+    a workflow (`type: \"workflow\"`)
 
     Args:
         body (PostApiEvaluatorsBody):
@@ -114,7 +116,8 @@ async def asyncio_detailed(
     client: AuthenticatedClient,
     body: PostApiEvaluatorsBody,
 ) -> Response[PostApiEvaluatorsResponse200]:
-    """Create a new evaluator
+    r"""Create a new evaluator: a built-in one, a custom code evaluator (`type: \"code\"`) or one that wraps
+    a workflow (`type: \"workflow\"`)
 
     Args:
         body (PostApiEvaluatorsBody):
@@ -141,7 +144,8 @@ async def asyncio(
     client: AuthenticatedClient,
     body: PostApiEvaluatorsBody,
 ) -> PostApiEvaluatorsResponse200 | None:
-    """Create a new evaluator
+    r"""Create a new evaluator: a built-in one, a custom code evaluator (`type: \"code\"`) or one that wraps
+    a workflow (`type: \"workflow\"`)
 
     Args:
         body (PostApiEvaluatorsBody):

@@ -64,9 +64,9 @@ Feature: Landing
   Scenario: A remembered product I lost access to falls through
     Given the device remembers "governance" for my organization
     And Governance is not reachable for me anymore
-    And the organization intent points at "/me"
+    And the organization intent points at "/coding-agents"
     When "/" resolves
-    Then I land on "/me"
+    Then I land on "/coding-agents"
 
   @unit
   Scenario: A remembered LLM Ops without any project falls through
@@ -109,6 +109,22 @@ Feature: Landing
     Given the device remembers "gateway" for my organization
     When I open "/"
     Then I am sent to the Gateway home
+
+  # The organization's Dashboards library (ADR-002 in modules/dashboard) is where Dashboards opens.
+  @unit
+  Scenario: A remembered Dashboards lands on the organization's library
+    Given the device remembers "dashboards" for my organization
+    And the organization's Dashboards library is on
+    When "/" resolves
+    Then I land on "/dashboards", not on my project's Dashboards area
+
+  @integration
+  Scenario: The root address waits for the library's flags before landing on Dashboards
+    Given the device remembers "dashboards" for my organization
+    And the organization's Dashboards flags have not answered yet
+    When I open "/"
+    Then I am sent nowhere while they load
+    And once both answer on, I am sent to "/dashboards", once
 
   @integration
   Scenario: The landing redirect navigates once per destination

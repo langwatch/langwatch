@@ -20,6 +20,10 @@ import {
   GithubRateLimitedError,
 } from "../../channels/github-api.channel.ts";
 import { MemoryGithubApiAdapter } from "../../channels/memory/memory.github-api.channel.ts";
+import {
+  GITHUB_TURN_OPTIONAL_PERMISSIONS,
+  GITHUB_WRITE_PERMISSIONS,
+} from "../../rules/github-app-permissions.rules.ts";
 import { TestOrganizationService } from "../../services/__tests__/fixtures/github-services.fixture.ts";
 import { GithubAppTokenService } from "../../services/github-app-token.service.ts";
 import { GithubInstallationAccessService } from "../../services/github-installation-access.service.ts";
@@ -30,6 +34,7 @@ import type {
   UpsertGithubInstallationInput,
 } from "../github-installations.repository.ts";
 
+const TURN_PERMISSIONS = { ...GITHUB_TURN_OPTIONAL_PERMISSIONS, ...GITHUB_WRITE_PERMISSIONS };
 function makeRepo(rows: GithubInstallationRow[] = []): GithubInstallationsRepository & {
   upsert: ReturnType<typeof vi.fn>;
   insertOrGetExisting: ReturnType<typeof vi.fn>;
@@ -108,6 +113,7 @@ function makeAppTokens(
         accountId: "9000",
         repositorySelection: "all",
         createdAt: new Date().toISOString(),
+        permissions: {},
       })),
   );
   vi.spyOn(tokens, "mintInstallationToken").mockImplementation(
@@ -195,6 +201,7 @@ describe("recordInstallation", () => {
           accountId: "9000",
           repositorySelection: "all",
           createdAt: new Date().toISOString(),
+          permissions: {},
         })),
       });
       const svc = service(repo, appTokens);
@@ -244,6 +251,7 @@ describe("recordInstallation", () => {
           accountId: "1234",
           repositorySelection: "all",
           createdAt: new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString(),
+          permissions: {},
         })),
       });
       const svc = service(repo, appTokens);
@@ -270,6 +278,7 @@ describe("recordInstallation", () => {
           accountId: "1234",
           repositorySelection: "all",
           createdAt: null,
+          permissions: {},
         })),
       });
       const svc = service(repo, appTokens);
@@ -301,6 +310,7 @@ describe("recordInstallation", () => {
           accountId: "1234",
           repositorySelection: "all",
           createdAt: new Date().toISOString(),
+          permissions: {},
         })),
       });
       const svc = service(repo, appTokens);
@@ -462,6 +472,7 @@ describe("handleWebhookEvent", () => {
             accountId: "9000",
             repositorySelection: "selected",
             createdAt: new Date().toISOString(),
+            permissions: {},
           })),
           listInstallationRepositories: vi.fn(async () => [
             { id: "77", fullName: "acme/service-x" },
@@ -528,9 +539,14 @@ describe("findTurnTokens", () => {
       const svc = service(repo, makeAppTokens({ mintInstallationToken: mint }));
       const [result] = await svc.findTurnTokens({ organizationId: "org-1" });
       expect(result?.token).toBe("ghs_all");
-      expect(result?.repoScopeKey).toBe(GithubAppTokenService.computeRepoScopeKey({}));
+      expect(result?.repoScopeKey).toBe(
+        GithubAppTokenService.computeRepoScopeKey({ permissions: TURN_PERMISSIONS }),
+      );
       // No repository_ids ⇒ full installation scope.
-      expect(mint).toHaveBeenCalledWith({ installationId: "inst-1" });
+      expect(mint).toHaveBeenCalledWith({
+        installationId: "inst-1",
+        optionalPermissions: GITHUB_TURN_OPTIONAL_PERMISSIONS,
+      });
       // The minted token is ephemeral: nothing about it reaches persistence.
       expect(repo.upsert).not.toHaveBeenCalled();
       expect(repo.insertOrGetExisting).not.toHaveBeenCalled();
@@ -556,11 +572,15 @@ describe("findTurnTokens", () => {
       });
       expect(result?.token).toBe("ghs_one");
       expect(result?.repoScopeKey).toBe(
-        GithubAppTokenService.computeRepoScopeKey({ repositoryIds: ["77"] }),
+        GithubAppTokenService.computeRepoScopeKey({
+          repositoryIds: ["77"],
+          permissions: TURN_PERMISSIONS,
+        }),
       );
       expect(mint).toHaveBeenCalledWith({
         installationId: "inst-1",
         repositoryIds: ["77"],
+        optionalPermissions: GITHUB_TURN_OPTIONAL_PERMISSIONS,
       });
     });
   });

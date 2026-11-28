@@ -13,6 +13,9 @@ export type PlanConfig = {
   repeatCount: number;
   simulatorModel: string | null;
   judgeModel: string | null;
+  /** The judge's trace wait in ms; unset leaves it to the scenario or the project. */
+  traceQuietPeriodMs?: number | null;
+  traceWaitTimeoutMs?: number | null;
 };
 
 /**
@@ -70,6 +73,8 @@ export function configurationKey(params: {
     `x${config.repeatCount}`,
     config.simulatorModel ?? "",
     config.judgeModel ?? "",
+    config.traceQuietPeriodMs ?? "",
+    config.traceWaitTimeoutMs ?? "",
     parametersKey(params.parameters),
   ].join("|");
 }

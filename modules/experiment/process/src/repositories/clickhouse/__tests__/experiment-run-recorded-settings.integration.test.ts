@@ -1,6 +1,7 @@
 /**
- * A run's concurrency and its targets' label versions survive the store and the read.
+ * A run's concurrency, repeat and its targets' label versions survive the store and the read.
  * @see modules/experiment/specs/experiment-run-recorded-settings.feature
+ * @see specs/experiments-v3/run-repeat.feature
  *
  * @integration
  * @vitest-environment node
@@ -59,8 +60,9 @@ const noStore: FoldProjectionStore<ExperimentRunStateData> = {
 };
 const fold = ExperimentRunStateFoldProjection.create({ store: noStore });
 
-const plan = (concurrency: number): ExperimentRunPlan => ({
+const plan = (concurrency: number, repeat?: number): ExperimentRunPlan => ({
   concurrency,
+  ...(repeat !== undefined ? { repeat } : {}),
   origin: "saved",
   persistResults: false,
   scope: { type: "full" },
@@ -77,9 +79,11 @@ const plan = (concurrency: number): ExperimentRunPlan => ({
 async function storeStartedRun({
   runId,
   concurrency,
+  repeat,
 }: {
   runId: string;
   concurrency?: number;
+  repeat?: number;
 }): Promise<void> {
   const event: ExperimentRunStartedEvent = {
     id: `event-${nanoid()}`,
@@ -104,7 +108,7 @@ async function storeStartedRun({
           agentVersion: 3,
         },
       ],
-      ...(concurrency !== undefined ? { plan: plan(concurrency) } : {}),
+      ...(concurrency !== undefined ? { plan: plan(concurrency, repeat) } : {}),
     },
   };
   const data = fold.apply(fold.init(), event);
@@ -185,6 +189,37 @@ describe("given a run stored with no concurrency", () => {
 
       expect(run?.runId).toBe(runId);
       expect(run?.concurrency).toBeNull();
+    });
+  });
+});
+
+describe("given a run stored with a repeat of 3", () => {
+  describe("when the run and the experiment's run list are read", () => {
+    /** @scenario "A stored repeated run reads back its repeat" */
+    it("carries the repeat on both reads, and an unrepeated run reads null", async () => {
+      const runId = `run-${nanoid()}`;
+      const unrepeatedId = `run-${nanoid()}`;
+      await storeStartedRun({ runId, concurrency: 2, repeat: 3 });
+      await storeStartedRun({ runId: unrepeatedId, concurrency: 2 });
+
+      const run = await runs.findRun({ projectId: tenantId, experimentId, runId });
+      const unrepeated = await runs.findRun({
+        projectId: tenantId,
+        experimentId,
+        runId: unrepeatedId,
+      });
+      const page = await runs.listPage({
+        projectId: tenantId,
+        experimentId,
+        page: 1,
+        pageSize: 20,
+      });
+      const listed = page.runs.find((entry) => entry.runId === runId);
+
+      expect(run?.repeat).toBe(3);
+      expect(listed?.repeat).toBe(3);
+      expect(unrepeated?.repeat).toBeNull();
+      expect(run?.targets?.[0]?.metadata ?? null).toBeNull();
     });
   });
 });

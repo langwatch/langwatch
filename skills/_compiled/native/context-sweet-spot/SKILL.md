@@ -14,8 +14,6 @@ This skill answers one question with the user's own data: at what context size d
 
 Use the `langwatch` CLI for everything: documentation (`langwatch docs ...`, `langwatch scenario-docs ...`) and platform operations (prompts, scenarios, evaluators, datasets, monitors, traces, analytics). Install it once with `npm install -g langwatch`, then run the `langwatch` binary directly; an unpinned `npx langwatch` re-resolves the package from the registry on every run.
 
-Coding-agent sessions live in the user's personal LangWatch workspace by default. On a laptop `langwatch login --device` signs this machine in. A project key in `LANGWATCH_API_KEY` stands in for that login only for its own project: it refuses `--project` for any other, so reaching a team project still needs `langwatch login --device`. Add `--project <slug>` on the read commands when the sessions live in a team project instead.
-
 ## Step 2: Collect the Sessions
 
 Pick one window and use it everywhere, because `trace export` defaults to the last 7 days. Compute a start and an end date once (30 days back to now is a good default) and pass both:
@@ -59,7 +57,7 @@ Write a single self-contained `context-sweet-spot-report.html` in the project ro
 - **Concrete habits**, each tied to the evidence: when to start a fresh session instead of pushing through, what to offload to sub-agents (the sub-agent keeps its context out of the main session), whether the user's compactions happen late, after the context already crossed the sweet spot
 - Links to example sessions in LangWatch for every claim
 
-Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/me/sessions`), so name it as the place to watch the habit change.
+Also state the top finding directly in the conversation, leading with the number. The LangWatch session detail shows the same cache-health stats per session (`/coding-agents/sessions`), so name it as the place to watch the habit change.
 
 ## Common Mistakes
 

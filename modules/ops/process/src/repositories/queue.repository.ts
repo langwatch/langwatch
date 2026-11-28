@@ -10,6 +10,7 @@ import type {
   OpsQueueReconcileOutcome,
   ParkedGroupInfo,
   QueueInfo,
+  TenantQueueCount,
 } from "@langwatch/ops-contract";
 
 /**
@@ -158,6 +159,23 @@ export abstract class QueueRepository {
 
   /** Jobs waiting across every registered group queue: what a paced migration holds behind. */
   abstract countWaitingJobs(): Promise<number>;
+
+  /**
+   * Per queue, the groups whose key starts with one of `tenantIds`: counts and the oldest waiting
+   * job's time. Reads at most `scanBudget` members of each set and `jobReadBudget` groups' jobs.
+   */
+  abstract countTenantGroups(params: {
+    queueNames: string[];
+    tenantIds: string[];
+    scanBudget: number;
+    jobReadBudget: number;
+  }): Promise<TenantQueueCount[]>;
+
+  /** One paced slice of the claimed-groups backfill (ADR-092); cursor "0" back means done. */
+  abstract fillTenantClaims(params: {
+    cursor: string;
+    maxScanCalls: number;
+  }): Promise<{ cursor: string; listed: number }>;
 }
 
 export class NullQueueRepository extends QueueRepository {
@@ -176,6 +194,10 @@ export class NullQueueRepository extends QueueRepository {
   /** No group queue runs here (the memory stack's queues are in-process), so nothing waits. */
   async countWaitingJobs(): Promise<number> {
     return 0;
+  }
+
+  async countTenantGroups(): Promise<TenantQueueCount[]> {
+    return [];
   }
 
   async scanQueues(): Promise<QueueInfo[]> {
@@ -305,5 +327,9 @@ export class NullQueueRepository extends QueueRepository {
 
   async readPublishedPendingDrift(): Promise<number> {
     return 0;
+  }
+
+  async fillTenantClaims(): Promise<{ cursor: string; listed: number }> {
+    return { cursor: "0", listed: 0 };
   }
 }

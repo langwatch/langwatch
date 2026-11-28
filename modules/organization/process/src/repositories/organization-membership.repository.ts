@@ -119,6 +119,8 @@ export interface OrganizationMemberSummary {
   createdAt: OrganizationUser["createdAt"];
   updatedAt: OrganizationUser["updatedAt"];
   user: { id: string; name: string | null; email: string | null };
+  /** A Billing-only member (ADR-205): no team, no seat. */
+  billingOnly?: boolean;
 }
 
 /**
@@ -161,6 +163,8 @@ export interface SetMemberDisabledInput {
   disabled: boolean;
   /** What the change does to the person's full seat; absent leaves it as it stands. */
   seat?: SeatTransition;
+  /** Who disabled or re-enabled them; null for a service credential. */
+  actorUserId?: string | null;
 }
 
 /** A waiting person given a full seat: their row becomes an enabled MEMBER awaiting its grant. */
@@ -170,6 +174,8 @@ export interface AdmitWaitingMemberInput {
   /** The grant the admission attaches next, so an unfinished one resumes (ADR-129). */
   pendingAdmissionId: string;
   seat: SeatTransition;
+  /** Who gave them the seat; null for a service credential or the system. */
+  actorUserId?: string | null;
 }
 
 /**
@@ -208,6 +214,8 @@ export interface MemberSeatStanding {
   seatPendingSince: Instant | null;
   email: string | null;
   name: string | null;
+  /** A Billing-only member holds no seat (ADR-205). */
+  billingOnly?: boolean;
 }
 
 /** A person admission left waiting for a seat. */
@@ -432,6 +440,8 @@ export abstract class OrganizationMembershipRepository {
     origin?: "web" | "cli";
     /** A full seat taken back from the person's hold: its date, and the hold goes. */
     seatTakenAt?: Instant;
+    /** The person who admitted them, when one did (an approved join request). */
+    actorUserId?: string | null;
   }) => Promise<OrganizationAdmission>;
 
   /** The person's seat standing: one entry, or none where they are not a member. */

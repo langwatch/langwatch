@@ -63,6 +63,12 @@ service:
 # your own Ingress). Paths, timeouts and body size:
 # docs/self-hosting/deployment/routing.
 
+# The gateway's externally reachable origin (https://gateway.your-corp.com),
+# rendered as A2A_PUBLIC_BASE_URL: the base of the /a2a URLs in the Agent
+# Cards the gateway proxies. Empty refuses Agent Card calls. Installed from
+# the langwatch chart, its gateway.publicUrl lands here.
+publicUrl: ""
+
 # Control-plane connection (LangWatch app). Left empty, this resolves to the
 # app Service of the install the gateway is part of, `<release>-app:5560` —
 # the cluster names that Service after the release, so a fixed address would

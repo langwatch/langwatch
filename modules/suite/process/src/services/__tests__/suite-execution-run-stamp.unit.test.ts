@@ -24,6 +24,7 @@ function recordingScenarios(
         secretParameters: {},
         scenarioVersion: 1,
       })),
+    assertSimulationRunAllowed: async () => {},
     queueSimulationRun: async (input) => {
       queued.push(input);
     },
@@ -38,7 +39,7 @@ async function executeAgainst(input: {
 }): Promise<QueueSimulationRunInput[]> {
   const queued: QueueSimulationRunInput[] = [];
   const service = SuiteExecutionService.create({
-    commands: { startSuiteRun: async () => {} },
+    commands: { startSuiteRun: async () => {}, completeSuiteRunItem: async () => {} },
     scenarios: recordingScenarios(queued, input.resolve),
   });
 

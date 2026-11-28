@@ -19,7 +19,7 @@ Peers call these through the token, declared at `../contract/src/dataset.api.ts:
 #### `upsertDataset`
 
 ```typescript
-upsertDataset(input: { projectId: string; datasetId?: string; slugOrId?: string; name?: string; columnTypes?: DatasetColumns; datasetRecords?: UpsertDatasetInput["datasetRecords"]; columnRenames?: UpsertDatasetInput["columnRenames"]; } & EditedBy): Promise<Dataset>;
+upsertDataset(input: { projectId: string; datasetId?: string; slugOrId?: string; name?: string; columnTypes?: DatasetColumns; datasetRecords?: UpsertDatasetInput["datasetRecords"]; columnRenames?: UpsertDatasetInput["columnRenames"]; /** * Refuse `datasetRecords` as an append does: above the plan's batch bound, or naming a * column `columnTypes` lacks. */ enforceBatchBound?: boolean; } & EditedBy): Promise<Dataset>;
 ```
 
 #### `validateDatasetName`
@@ -395,45 +395,45 @@ Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:157`.
 Answers at `/api/dataset`, `/api/v1/dataset`; also, undocumented, `/api/dataset/2026-08-07`, `/api/v1/dataset/2026-08-07`, `/api/dataset/latest`, `/api/v1/dataset/latest`.
 
 ```typescript
-// Query: datasetRestPaginationQuerySchema, ../contract/src/dataset-rest.schemas.ts:63
+// Query: datasetRestPaginationQuerySchema, ../contract/src/dataset-rest.schemas.ts:82
 interface Query {
   page?: number;
   limit?: number;
 }
-type Response = z.infer<typeof datasetRestListResponseSchema>; // ../contract/src/dataset-rest.schemas.ts:250
+type Response = z.infer<typeof datasetRestListResponseSchema>; // ../contract/src/dataset-rest.schemas.ts:269
 ```
 
 #### `POST /` · `postApiDataset`
 
-Create a new dataset
+Create a new dataset, optionally with its first rows in `entries`, written in the same call.
 
 Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:190`.
 
 Answers at `/api/dataset`, `/api/v1/dataset`; also, undocumented, `/api/dataset/2026-08-07`, `/api/v1/dataset/2026-08-07`, `/api/dataset/latest`, `/api/v1/dataset/latest`.
 
 ```typescript
-type Body = z.infer<typeof datasetRestCreateSchema>; // ../contract/src/dataset-rest.schemas.ts:41
-type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dataset-rest.schemas.ts:237
+type Body = z.infer<typeof datasetRestCreateSchema>; // ../contract/src/dataset-rest.schemas.ts:60
+type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dataset-rest.schemas.ts:256
 ```
 
 #### `POST /:slugOrId/records` · `postApiDatasetBySlugOrIdRecords`
 
 Create records in a dataset in batch
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:219`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:228`.
 
 Answers at `/api/dataset/:slugOrId/records`, `/api/v1/dataset/:slugOrId/records`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records`, `/api/v1/dataset/2026-08-07/:slugOrId/records`, `/api/dataset/latest/:slugOrId/records`, `/api/v1/dataset/latest/:slugOrId/records`.
 
 ```typescript
-// Params: datasetRestSlugOrIdParamsSchema, ../contract/src/dataset-rest.schemas.ts:112
+// Params: datasetRestSlugOrIdParamsSchema, ../contract/src/dataset-rest.schemas.ts:131
 interface Params {
   slugOrId: string;
 }
-// Body: datasetRestBatchCreateRecordsSchema, ../contract/src/dataset-rest.schemas.ts:75
+// Body: datasetRestBatchCreateRecordsSchema, ../contract/src/dataset-rest.schemas.ts:94
 interface Body {
   entries: Record<string, unknown>[];
 }
-// Response: datasetRestRecordsCreatedSchema, ../contract/src/dataset-rest.schemas.ts:271
+// Response: datasetRestRecordsCreatedSchema, ../contract/src/dataset-rest.schemas.ts:290
 interface Response {
   data: {
     id: string;
@@ -450,21 +450,21 @@ interface Response {
 
 Add entries to a dataset
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:243`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:252`.
 
 Answers at `/api/dataset/:datasetSlug/entries`, `/api/v1/dataset/:datasetSlug/entries`; also, undocumented, `/api/dataset/2026-08-07/:datasetSlug/entries`, `/api/v1/dataset/2026-08-07/:datasetSlug/entries`, `/api/dataset/latest/:datasetSlug/entries`, `/api/v1/dataset/latest/:datasetSlug/entries`.
 
 ```typescript
-// Params: datasetRestSlugParamsSchema, ../contract/src/dataset-rest.schemas.ts:118
+// Params: datasetRestSlugParamsSchema, ../contract/src/dataset-rest.schemas.ts:137
 interface Params {
   datasetSlug: string;
 }
-// Body: datasetRestLegacyEntriesSchema, ../contract/src/dataset-rest.schemas.ts:105
+// Body: datasetRestLegacyEntriesSchema, ../contract/src/dataset-rest.schemas.ts:124
 type Body = BodyDatasetPostEntries;
 type BodyDatasetPostEntries = {
   entries: Record<string, unknown>[];
 };
-// Response: datasetRestEntriesAddedSchema, ../contract/src/dataset-rest.schemas.ts:279
+// Response: datasetRestEntriesAddedSchema, ../contract/src/dataset-rest.schemas.ts:298
 interface Response {
   success: true;
 }
@@ -474,12 +474,12 @@ interface Response {
 
 Create a dataset from an uploaded file
 
-Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:266`.
+Permission `datasets:create`. Declared at `src/transport/dataset.rest.ts:275`.
 
 Answers at `/api/dataset/imports`, `/api/v1/dataset/imports`; also, undocumented, `/api/dataset/2026-08-07/imports`, `/api/v1/dataset/2026-08-07/imports`, `/api/dataset/latest/imports`, `/api/v1/dataset/latest/imports`.
 
 ```typescript
-type Body = z.infer<typeof datasetRestImportSchema>; // ../contract/src/dataset-rest.schemas.ts:146
+type Body = z.infer<typeof datasetRestImportSchema>; // ../contract/src/dataset-rest.schemas.ts:165
 // Response: datasetImportStartedSchema, ../contract/src/dataset.ts:667
 interface Response {
   datasetId: string;
@@ -492,13 +492,13 @@ interface Response {
 
 Import an uploaded file into a dataset
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:281`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:290`.
 
 Answers at `/api/dataset/:slugOrId/imports`, `/api/v1/dataset/:slugOrId/imports`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/imports`, `/api/v1/dataset/2026-08-07/:slugOrId/imports`, `/api/dataset/latest/:slugOrId/imports`, `/api/v1/dataset/latest/:slugOrId/imports`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-// Body: datasetRestAppendImportSchema, ../contract/src/dataset-rest.schemas.ts:156
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+// Body: datasetRestAppendImportSchema, ../contract/src/dataset-rest.schemas.ts:175
 type Body = BodyDatasetAppendImport;
 type BodyDatasetAppendImport = {
   storedObjectId: string;
@@ -514,26 +514,26 @@ interface Response {
 
 Create a new dataset from an uploaded file (CSV, JSON, JSONL)
 
-Permission `datasets:create`. Deprecated. Declared at `src/transport/dataset.rest.ts:298`.
+Permission `datasets:create`. Deprecated. Declared at `src/transport/dataset.rest.ts:307`.
 
 Answers at `/api/dataset/upload`, `/api/v1/dataset/upload`; also, undocumented, `/api/dataset/2026-08-07/upload`, `/api/v1/dataset/2026-08-07/upload`, `/api/dataset/latest/upload`, `/api/v1/dataset/latest/upload`.
 
 ```typescript
-// Multipart: { fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } } (inline, src/transport/dataset.rest.ts:301)
-type Response = z.infer<typeof datasetRestUploadCreatedSchema>; // ../contract/src/dataset-rest.schemas.ts:221
+// Multipart: { fields: datasetRestUploadFieldsSchema, files: { file: { required: true } } } (inline, src/transport/dataset.rest.ts:310)
+type Response = z.infer<typeof datasetRestUploadCreatedSchema>; // ../contract/src/dataset-rest.schemas.ts:240
 ```
 
 #### `POST /:slugOrId/upload` · `postApiDatasetBySlugOrIdUpload`
 
 Upload a file (CSV, JSON, JSONL) to an existing dataset
 
-Permission `datasets:update`. Deprecated. Declared at `src/transport/dataset.rest.ts:318`.
+Permission `datasets:update`. Deprecated. Declared at `src/transport/dataset.rest.ts:327`.
 
 Answers at `/api/dataset/:slugOrId/upload`, `/api/v1/dataset/:slugOrId/upload`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/upload`, `/api/v1/dataset/2026-08-07/:slugOrId/upload`, `/api/dataset/latest/:slugOrId/upload`, `/api/v1/dataset/latest/:slugOrId/upload`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-// Multipart: { fields: datasetRestNoUploadFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:322)
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+// Multipart: { fields: datasetRestNoUploadFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:331)
 type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/dataset.ts:693
 ```
 
@@ -541,16 +541,16 @@ type Response = z.infer<typeof datasetImportAppendedSchema>; // ../contract/src/
 
 Upload a file for an image or file column and get the reference a cell holds. The project is named by the `projectId` query parameter; the file goes in the `file` multipart field, with an optional `datasetId` field.
 
-Permission `datasets:manage`. Deprecated. Declared at `src/transport/dataset.rest.ts:343`.
+Permission `datasets:manage`. Deprecated. Declared at `src/transport/dataset.rest.ts:352`.
 
 Answers at `/api/dataset/attachments`, `/api/v1/dataset/attachments`; also, undocumented, `/api/dataset/2026-08-07/attachments`, `/api/v1/dataset/2026-08-07/attachments`, `/api/dataset/latest/attachments`, `/api/v1/dataset/latest/attachments`.
 
 ```typescript
-// Query: datasetRestAttachmentQuerySchema, ../contract/src/dataset-rest.schemas.ts:181
+// Query: datasetRestAttachmentQuerySchema, ../contract/src/dataset-rest.schemas.ts:200
 interface Query {
   projectId: string;
 }
-// Multipart: { fields: datasetRestAttachmentFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:347)
+// Multipart: { fields: datasetRestAttachmentFieldsSchema, files: { file: { required: true } }, } (inline, src/transport/dataset.rest.ts:356)
 // Response: storedDatasetAttachmentSchema, ../contract/src/dataset.ts:596
 type Response = ResponseDatasetAttachment;
 type ResponseDatasetAttachment = {
@@ -565,12 +565,12 @@ type ResponseDatasetAttachment = {
 
 Create an upload for an image or file cell
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:386`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:395`.
 
 Answers at `/api/dataset/attachments/uploads`, `/api/v1/dataset/attachments/uploads`; also, undocumented, `/api/dataset/2026-08-07/attachments/uploads`, `/api/v1/dataset/2026-08-07/attachments/uploads`, `/api/dataset/latest/attachments/uploads`, `/api/v1/dataset/latest/attachments/uploads`.
 
 ```typescript
-// Body: datasetRestAttachmentUploadSchema, ../contract/src/dataset-rest.schemas.ts:205
+// Body: datasetRestAttachmentUploadSchema, ../contract/src/dataset-rest.schemas.ts:224
 interface Body {
   filename: string;
   mediaType: string;
@@ -590,40 +590,40 @@ interface Response {
 
 Get a dataset by its slug or id, with every record inline. A dataset too large for one response is refused: read it page by page from `GET /{slugOrId}/records`.
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:408`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:417`.
 
 Answers at `/api/dataset/:slugOrId`, `/api/v1/dataset/:slugOrId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId`, `/api/v1/dataset/2026-08-07/:slugOrId`, `/api/dataset/latest/:slugOrId`, `/api/v1/dataset/latest/:slugOrId`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-type Response = z.infer<typeof datasetRestDetailResponseSchema>; // ../contract/src/dataset-rest.schemas.ts:261
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+type Response = z.infer<typeof datasetRestDetailResponseSchema>; // ../contract/src/dataset-rest.schemas.ts:280
 ```
 
 #### `PATCH /:slugOrId` · `patchApiDatasetBySlugOrId`
 
 Update a dataset by its slug or id. New `columnTypes` re-key every record; send `columnRenames` to say which existing column each renamed column came from, so a save that deletes one column and renames another moves the right values.
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:438`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:447`.
 
 Answers at `/api/dataset/:slugOrId`, `/api/v1/dataset/:slugOrId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId`, `/api/v1/dataset/2026-08-07/:slugOrId`, `/api/dataset/latest/:slugOrId`, `/api/v1/dataset/latest/:slugOrId`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-type Body = z.infer<typeof datasetRestUpdateSchema>; // ../contract/src/dataset-rest.schemas.ts:53
-type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dataset-rest.schemas.ts:237
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+type Body = z.infer<typeof datasetRestUpdateSchema>; // ../contract/src/dataset-rest.schemas.ts:72
+type Response = z.infer<typeof datasetRestSummarySchema>; // ../contract/src/dataset-rest.schemas.ts:256
 ```
 
 #### `DELETE /:slugOrId` · `deleteApiDatasetBySlugOrId`
 
 Archive a dataset (soft-delete)
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:483`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:492`.
 
 Answers at `/api/dataset/:slugOrId`, `/api/v1/dataset/:slugOrId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId`, `/api/v1/dataset/2026-08-07/:slugOrId`, `/api/dataset/latest/:slugOrId`, `/api/v1/dataset/latest/:slugOrId`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-// Response: datasetRestArchivedSchema, ../contract/src/dataset-rest.schemas.ts:303
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+// Response: datasetRestArchivedSchema, ../contract/src/dataset-rest.schemas.ts:322
 interface Response {
   id: string;
   archived: true;
@@ -634,45 +634,45 @@ interface Response {
 
 List records for a dataset (paginated). Each page also carries the dataset itself. A page too large for one response is refused with `dataset_page_too_large`: ask again with the smaller `limit` the error names.
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:500`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:509`.
 
 Answers at `/api/dataset/:slugOrId/records`, `/api/v1/dataset/:slugOrId/records`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records`, `/api/v1/dataset/2026-08-07/:slugOrId/records`, `/api/dataset/latest/:slugOrId/records`, `/api/v1/dataset/latest/:slugOrId/records`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-type Query = z.infer<typeof datasetRestPaginationQuerySchema>; // ../contract/src/dataset-rest.schemas.ts:63
-type Response = z.infer<typeof datasetRestRecordPageSchema>; // ../contract/src/dataset-rest.schemas.ts:292
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+type Query = z.infer<typeof datasetRestPaginationQuerySchema>; // ../contract/src/dataset-rest.schemas.ts:82
+type Response = z.infer<typeof datasetRestRecordPageSchema>; // ../contract/src/dataset-rest.schemas.ts:311
 ```
 
 #### `GET /:datasetSlug/entries` · `getApiDatasetBySlugEntries`
 
 List entries of a dataset (paginated). Same as GET /:slugOrId/records.
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:525`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:534`.
 
 Answers at `/api/dataset/:datasetSlug/entries`, `/api/v1/dataset/:datasetSlug/entries`; also, undocumented, `/api/dataset/2026-08-07/:datasetSlug/entries`, `/api/v1/dataset/2026-08-07/:datasetSlug/entries`, `/api/dataset/latest/:datasetSlug/entries`, `/api/v1/dataset/latest/:datasetSlug/entries`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:118
-type Query = z.infer<typeof datasetRestPaginationQuerySchema>; // ../contract/src/dataset-rest.schemas.ts:63
-type Response = z.infer<typeof datasetRestRecordPageSchema>; // ../contract/src/dataset-rest.schemas.ts:292
+type Params = z.infer<typeof datasetRestSlugParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:137
+type Query = z.infer<typeof datasetRestPaginationQuerySchema>; // ../contract/src/dataset-rest.schemas.ts:82
+type Response = z.infer<typeof datasetRestRecordPageSchema>; // ../contract/src/dataset-rest.schemas.ts:311
 ```
 
 #### `PATCH /:slugOrId/records/:recordId` · `patchApiDatasetBySlugOrIdRecordsByRecordId`
 
 Update or create a record in a dataset
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:548`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:557`.
 
 Answers at `/api/dataset/:slugOrId/records/:recordId`, `/api/v1/dataset/:slugOrId/records/:recordId`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records/:recordId`, `/api/v1/dataset/2026-08-07/:slugOrId/records/:recordId`, `/api/dataset/latest/:slugOrId/records/:recordId`, `/api/v1/dataset/latest/:slugOrId/records/:recordId`.
 
 ```typescript
-// Params: datasetRestRecordParamsSchema, ../contract/src/dataset-rest.schemas.ts:129
+// Params: datasetRestRecordParamsSchema, ../contract/src/dataset-rest.schemas.ts:148
 interface Params {
   slugOrId: string;
   recordId: string;
 }
-// Body: datasetRestUpdateRecordSchema, ../contract/src/dataset-rest.schemas.ts:139
+// Body: datasetRestUpdateRecordSchema, ../contract/src/dataset-rest.schemas.ts:158
 interface Body {
   entry: Record<string, unknown>;
 }
@@ -682,17 +682,17 @@ interface Body {
 
 Delete records from a dataset by IDs
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:569`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:578`.
 
 Answers at `/api/dataset/:slugOrId/records`, `/api/v1/dataset/:slugOrId/records`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/records`, `/api/v1/dataset/2026-08-07/:slugOrId/records`, `/api/dataset/latest/:slugOrId/records`, `/api/v1/dataset/latest/:slugOrId/records`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-// Body: datasetRestDeleteRecordsSchema, ../contract/src/dataset-rest.schemas.ts:87
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+// Body: datasetRestDeleteRecordsSchema, ../contract/src/dataset-rest.schemas.ts:106
 interface Body {
   recordIds: string[];
 }
-// Response: datasetRestRecordsDeletedSchema, ../contract/src/dataset-rest.schemas.ts:313
+// Response: datasetRestRecordsDeletedSchema, ../contract/src/dataset-rest.schemas.ts:332
 interface Response {
   deletedCount: number;
 }
@@ -702,26 +702,26 @@ interface Response {
 
 List dataset versions
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:592`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:601`.
 
 Answers at `/api/dataset/:slugOrId/versions`, `/api/v1/dataset/:slugOrId/versions`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/versions`, `/api/v1/dataset/2026-08-07/:slugOrId/versions`, `/api/dataset/latest/:slugOrId/versions`, `/api/v1/dataset/latest/:slugOrId/versions`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-type Response = z.infer<typeof datasetRestVersionListSchema>; // ../contract/src/dataset-rest.schemas.ts:363
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+type Response = z.infer<typeof datasetRestVersionListSchema>; // ../contract/src/dataset-rest.schemas.ts:382
 ```
 
 #### `POST /:slugOrId/versions` · `postApiDatasetBySlugOrIdVersions`
 
 Save a dataset version
 
-Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:606`.
+Permission `datasets:update`. Declared at `src/transport/dataset.rest.ts:615`.
 
 Answers at `/api/dataset/:slugOrId/versions`, `/api/v1/dataset/:slugOrId/versions`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/versions`, `/api/v1/dataset/2026-08-07/:slugOrId/versions`, `/api/dataset/latest/:slugOrId/versions`, `/api/v1/dataset/latest/:slugOrId/versions`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:112
-// Body: datasetRestSaveVersionSchema, ../contract/src/dataset-rest.schemas.ts:348
+type Params = z.infer<typeof datasetRestSlugOrIdParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:131
+// Body: datasetRestSaveVersionSchema, ../contract/src/dataset-rest.schemas.ts:367
 interface Body {
   name?: string;
 }
@@ -732,17 +732,17 @@ type Response = z.infer<typeof datasetVersionSchema>; // ../contract/src/dataset
 
 Get a dataset version
 
-Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:627`.
+Permission `datasets:view`. Declared at `src/transport/dataset.rest.ts:636`.
 
 Answers at `/api/dataset/:slugOrId/versions/:version`, `/api/v1/dataset/:slugOrId/versions/:version`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/versions/:version`, `/api/v1/dataset/2026-08-07/:slugOrId/versions/:version`, `/api/dataset/latest/:slugOrId/versions/:version`, `/api/v1/dataset/latest/:slugOrId/versions/:version`.
 
 ```typescript
-// Params: datasetRestVersionParamsSchema, ../contract/src/dataset-rest.schemas.ts:323
+// Params: datasetRestVersionParamsSchema, ../contract/src/dataset-rest.schemas.ts:342
 interface Params {
   slugOrId: string;
   version: number;
 }
-// Query: datasetRestVersionPageQuerySchema, ../contract/src/dataset-rest.schemas.ts:339
+// Query: datasetRestVersionPageQuerySchema, ../contract/src/dataset-rest.schemas.ts:358
 interface Query {
   page?: number;
   limit?: number;
@@ -754,13 +754,13 @@ type Response = z.infer<typeof datasetVersionPageSchema>; // ../contract/src/dat
 
 Restore a dataset version
 
-Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:648`.
+Permission `datasets:manage`. Declared at `src/transport/dataset.rest.ts:657`.
 
 Answers at `/api/dataset/:slugOrId/versions/:version/restore`, `/api/v1/dataset/:slugOrId/versions/:version/restore`; also, undocumented, `/api/dataset/2026-08-07/:slugOrId/versions/:version/restore`, `/api/v1/dataset/2026-08-07/:slugOrId/versions/:version/restore`, `/api/dataset/latest/:slugOrId/versions/:version/restore`, `/api/v1/dataset/latest/:slugOrId/versions/:version/restore`.
 
 ```typescript
-type Params = z.infer<typeof datasetRestVersionParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:323
-// Body: datasetRestNoBodySchema, ../contract/src/dataset-rest.schemas.ts:353
+type Params = z.infer<typeof datasetRestVersionParamsSchema>; // ../contract/src/dataset-rest.schemas.ts:342
+// Body: datasetRestNoBodySchema, ../contract/src/dataset-rest.schemas.ts:372
 type Body = Record<string, unknown>;
 type Response = z.infer<typeof datasetVersionRestoredSchema>; // ../contract/src/dataset-version.ts:209
 ```

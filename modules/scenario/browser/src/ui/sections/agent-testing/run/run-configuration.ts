@@ -121,6 +121,8 @@ export function configurationKeyOf({
       repeatCount: configuration.repeatCount,
       simulatorModel: configuration.simulatorModel,
       judgeModel: configuration.judgeModel,
+      traceQuietPeriodMs: configuration.traceQuietPeriodMs,
+      traceWaitTimeoutMs: configuration.traceWaitTimeoutMs,
     },
     scenarioIds: scenarioIdsOf(configuration.scope),
     parameters: runParameters,
@@ -157,6 +159,11 @@ type ConfigurationFacts = {
   models: string;
 };
 
+/** A judge trace wait setting as the row reads it, or nothing when unset. */
+function secondsLabel({ label, ms }: { label: string; ms?: number | null }): string | null {
+  return ms === null || ms === undefined ? null : `${label} ${ms / 1000}s`;
+}
+
 /** Every fact a row could state, whether or not it is worth stating. */
 function factsOf({
   entry,
@@ -167,7 +174,12 @@ function factsOf({
 }): ConfigurationFacts {
   const configuration = entry.configuration;
   const parameterNames = Object.keys(entry.runParameters).toSorted();
-  const models = [configuration.simulatorModel, configuration.judgeModel]
+  const models = [
+    configuration.simulatorModel,
+    configuration.judgeModel,
+    secondsLabel({ label: "quiet", ms: configuration.traceQuietPeriodMs }),
+    secondsLabel({ label: "trace wait", ms: configuration.traceWaitTimeoutMs }),
+  ]
     .filter((model): model is string => !!model)
     .join(", ");
 

@@ -14,6 +14,10 @@
     ".": {
       "types": "./dist/index.d.ts",
       "default": "./src/index.ts"
+    },
+    "./ingestion-source-lifecycle": {
+      "types": "./dist/features/ingestion/ingestion-source-lifecycle.events.d.ts",
+      "default": "./src/features/ingestion/ingestion-source-lifecycle.events.ts"
     }
   },
   "scripts": {
@@ -34,6 +38,7 @@
     "@langwatch/project-contract": "workspace:*",
     "@langwatch/secrets": "workspace:*",
     "@langwatch/time": "workspace:*",
+    "@langwatch/user-contract": "workspace:*",
     "zod": "catalog:"
   },
   "devDependencies": {

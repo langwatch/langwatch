@@ -8,6 +8,7 @@ import type { OrganizationDeparturesRepository } from "./organization-departures
 import type { OrganizationInviteRateLimitRepository } from "./organization-invite-rate-limit.repository.ts";
 import type { OrganizationInviteRepository } from "./organization-invite.repository.ts";
 import type { OrganizationMembershipRepository } from "./organization-membership.repository.ts";
+import type { OrganizationSeatPeakRepository } from "./organization-seat-peak.repository.ts";
 import type { OrganizationSeatRepository } from "./organization-seat.repository.ts";
 import type { OrganizationUserDirectoryRepository } from "./organization-user-directory.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
@@ -41,6 +42,8 @@ export interface OrganizationRepositories {
   readonly seats: OrganizationSeatRepository;
   /** The people removed or disabled, read from the organization's member facts. */
   readonly departures: OrganizationDeparturesRepository;
+  /** The monthly seat-peak fold, one row per organization (ADR-002). */
+  readonly seatPeak: OrganizationSeatPeakRepository;
   /** The organization's own reads of the people table. */
   readonly userDirectory: OrganizationUserDirectoryRepository;
   /** The private ClickHouse routes and S3 accounts this deployment names, by variable. */

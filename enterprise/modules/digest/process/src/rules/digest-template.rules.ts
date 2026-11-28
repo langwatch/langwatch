@@ -1,4 +1,5 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
+import type { DigestTestTemplate } from "@langwatch/enterprise-digest-contract";
 import { z } from "zod";
 
 /** Tuned from the Cloud admin gallery; the first eligible template wins. */
@@ -45,7 +46,7 @@ const digestTemplatePickSchema = z.discriminatedUnion("template", [
   z.object({ template: z.literal("digest-traces-week") }),
   z.object({ template: z.literal("digest-whats-new") }),
 ]);
-type DigestTemplatePick = z.infer<typeof digestTemplatePickSchema>;
+export type DigestTemplatePick = z.infer<typeof digestTemplatePickSchema>;
 
 /** Every eligible template in send order; what's new is always last. */
 export function eligibleDigestTemplates(input: DigestTemplateInput): DigestTemplatePick[] {
@@ -74,6 +75,75 @@ export function eligibleDigestTemplates(input: DigestTemplateInput): DigestTempl
 
   eligible.push({ template: "digest-whats-new" });
   return eligible;
+}
+
+/**
+ * The templates a send tries in turn: "auto" is the weekly send's own order. A forced one, for a
+ * staff test, is tried alone and past its threshold, but only when its data is there (see
+ * `forceDigestTemplate`); none to try means nothing is sent.
+ */
+export function pickDigestTemplatesToTry({
+  template,
+  input,
+}: {
+  template: DigestTestTemplate;
+  input: DigestTemplateInput;
+}): DigestTemplatePick[] {
+  if (template === "auto") return eligibleDigestTemplates(input);
+  const forced = forceDigestTemplate({ template, input });
+  return forced.kind === "ready" ? [forced.pick] : [];
+}
+
+/** A forced template: ready with its pick, or no data for it here, so it is not tried. */
+type ForcedDigestTemplate =
+  | Readonly<{ kind: "ready"; pick: DigestTemplatePick }>
+  | Readonly<{ kind: "no_data" }>;
+
+const NO_DATA: ForcedDigestTemplate = { kind: "no_data" };
+
+const ready = (pick: DigestTemplatePick): ForcedDigestTemplate => ({ kind: "ready", pick });
+
+/**
+ * Plan pressure needs an admin and a plan limit; a scenario trend runs this week and in the four
+ * before, and a rate that moved (either way, however little); coding-agent week a session;
+ * traces week a trace on the project the email is about.
+ */
+function forceDigestTemplate({
+  template,
+  input: { member, organization, project },
+}: {
+  template: Exclude<DigestTestTemplate, "auto">;
+  input: DigestTemplateInput;
+}): ForcedDigestTemplate {
+  switch (template) {
+    case "digest-plan-pressure":
+      return member.isOrganizationAdmin && organization.monthlyLimitUsedPercent !== null
+        ? ready({ template })
+        : NO_DATA;
+    case "digest-scenarios-trend":
+      return project ? scenarioDirectionOf({ project }) : NO_DATA;
+    case "digest-coding-agent-week":
+      return member.codingAgentSessions > 0 ? ready({ template }) : NO_DATA;
+    case "digest-traces-week":
+      return project && project.traces > 0 ? ready({ template }) : NO_DATA;
+  }
+}
+
+function scenarioDirectionOf({
+  project,
+}: {
+  project: NonNullable<DigestTemplateInput["project"]>;
+}): ForcedDigestTemplate {
+  const baselineRuns = sum(project.baselineWeeks.map((week) => week.runs));
+  const baselineFailures = sum(project.baselineWeeks.map((week) => week.failures));
+  if (project.scenarioRuns === 0 || baselineRuns === 0) return NO_DATA;
+  // Cross-multiplied so the rates compare exactly; an unchanged rate has no trend to show.
+  const moved = project.scenarioFailures * baselineRuns - baselineFailures * project.scenarioRuns;
+  if (moved === 0) return NO_DATA;
+  return ready({
+    template: "digest-scenarios-trend",
+    direction: moved > 0 ? "more_failing" : "getting_better",
+  });
 }
 
 export function pickDigestTemplate(input: DigestTemplateInput): DigestTemplatePick {

@@ -1,0 +1,19 @@
+{{- if and .Values.piiRedactionModel.enabled (include "langwatch.pdbRenders" (dict "name" "piiRedactionModel" "spec" .Values.piiRedactionModel.podDisruptionBudget "replicas" .Values.piiRedactionModel.replicaCount)) }}
+{{- with .Values.piiRedactionModel.podDisruptionBudget }}
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-pii-redaction-model-pdb
+  labels:
+    app.kubernetes.io/name: {{ $.Release.Name }}-pii-redaction-model
+    app.kubernetes.io/instance: {{ $.Release.Name }}
+    app.kubernetes.io/component: pii-redaction-model
+    {{- include "langwatch.componentLabels" $ | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $.Release.Name }}-pii-redaction-model
+      app.kubernetes.io/instance: {{ $.Release.Name }}
+  {{- toYaml . | nindent 2 }}
+{{- end }}
+{{- end }}

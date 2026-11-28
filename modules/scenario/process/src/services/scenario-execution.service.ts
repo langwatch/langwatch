@@ -8,6 +8,7 @@ import type {
   ScenarioRunHooks,
   ScenarioUnsuccessfulExecutionInput,
   SimulationService,
+  RedTeamRunReport,
 } from "@langwatch/scenario-contract";
 import { nowInstant } from "@langwatch/time";
 
@@ -80,6 +81,19 @@ export class ScenarioExecutionService extends ScenarioExecutionServiceContract {
       tenantId: input.projectId,
       scenarioRunId: input.scenarioRunId,
       hooks: input.hooks,
+      occurredAt: nowInstant().epochMilliseconds,
+    });
+  }
+
+  recordRedTeamReport(input: {
+    projectId: string;
+    scenarioRunId: string;
+    report: RedTeamRunReport;
+  }): Promise<void> {
+    return this.options.simulations.recordRedTeamReport({
+      tenantId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+      report: input.report,
       occurredAt: nowInstant().epochMilliseconds,
     });
   }

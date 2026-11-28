@@ -1,11 +1,13 @@
 import { credentialPrincipalOfToken, projectCredentialOfRequest } from "@langwatch/api/rest";
 import type { DashboardApi, DashboardServerConfig } from "@langwatch/dashboard-contract";
 import { defineProcessModule, type PublishedProcessModule } from "@langwatch/process";
+import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { DashboardModule } from "./app/dashboard.app.ts";
 import { dashboardRepositories } from "./repositories/dashboard-repositories.registry.ts";
 import { keyReachOfCredential } from "./rules/dashboard-widget-key-reach.rules.ts";
 import { widgetSourceOfCredential } from "./rules/dashboard-widget-source.rules.ts";
+import { MyDashboardMarkService } from "./services/my-dashboard-mark.service.ts";
 import { boardProjectRest } from "./transport/board-project.rest.ts";
 import { boardRest, releasedOrRefused } from "./transport/board.rest.ts";
 import { boardTrpcTransport } from "./transport/board.trpc.ts";
@@ -40,6 +42,21 @@ export const dashboardProcessModule: PublishedProcessModule<
     savedWorkbenchChartTrpcTransport,
     dashboardWidgetTrpcTransport,
   )
+  .withMigrations(({ repositories, dependencies }) => [
+    // After old writers are gone: an older image still makes My dashboards without the mark.
+    defineMigrationStep({
+      id: "dashboard:mark-my-dashboards",
+      kind: "data",
+      mode: "background",
+      needsOldWritersGone: true,
+      description: "Marks each member's existing My dashboard, so renaming it keeps it theirs.",
+      run: (args) =>
+        MyDashboardMarkService.create({
+          repository: repositories.boards,
+          projects: dependencies.projects,
+        }).runStep(args),
+    }),
+  ])
   // The saved-workbench-chart family declares this middleware context: the credential's
   // own project content protections, and the deployment's deep link back into
   // the analytics workbench — both resolved through the peer analytics app,

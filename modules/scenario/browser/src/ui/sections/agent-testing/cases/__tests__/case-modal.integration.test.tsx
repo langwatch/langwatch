@@ -1,9 +1,9 @@
-/** @vitest-environment jsdom */
-
 /**
+ * @vitest-environment jsdom
  * The Agent Testing scenario dialog: fields, footer, chip drawers, Save/Run.
  * @see specs/features/agent-testing/cases-table.feature
  * @see specs/features/agents/voice-agents-v1.feature
+ * @see modules/scenario/specs/red-team-scenario.feature
  */
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
 import { Temporal } from "@langwatch/time";
@@ -46,6 +46,11 @@ const onSuccessOf = vi.hoisted(
     }),
 );
 
+// The judge picker asks the judge preview flag; off in this suite.
+vi.mock("@langwatch/feature-flag-client", async (importOriginal) => ({
+  ...(await importOriginal<object>()),
+  useFeatureFlag: () => ({ enabled: false, isLoading: false }),
+}));
 vi.mock("../../../../../behavior/scenario-api.ts", () => ({
   api: {
     useUtils: () => ({
@@ -633,6 +638,65 @@ describe("the scenario dialog", () => {
     });
   });
 
+  describe("given a scenario saved with a judge trace wait", () => {
+    const openStored = () => {
+      mockGetById.mockReturnValue({
+        data: storedCase({ traceQuietPeriodMs: null, traceWaitTimeoutMs: 45_000 }),
+        isLoading: false,
+        refetch: vi.fn(),
+      });
+      openDrawerAs({ scenarioId: "case_1" });
+      renderWithDesignSystem(
+        <>
+          <AgentTestingCaseEditor />
+          <AgentTestingCaseEditorDrawer />
+        </>,
+      );
+    };
+
+    /** @scenario "The judge settings show the trace wait inputs in seconds" */
+    it("opens the models block with the advanced judge settings in seconds", async () => {
+      openStored();
+
+      const wait = (await screen.findByLabelText("Max trace wait")) as HTMLInputElement;
+      expect(wait.value).toBe("45");
+      const quiet = screen.getByLabelText("Quiet period") as HTMLInputElement;
+      expect(quiet.value).toBe("");
+      expect(quiet.placeholder).toBe("7");
+    });
+
+    describe("when the quiet period is set to 10 seconds and saved", () => {
+      it("sends both settings in milliseconds", async () => {
+        const user = userEvent.setup();
+        openStored();
+
+        await user.type(await screen.findByLabelText("Quiet period"), "10");
+        await user.click(screen.getByTestId("case-modal-save"));
+
+        expect(mockUpdate).toHaveBeenCalledWith(
+          expect.objectContaining({ traceQuietPeriodMs: 10_000, traceWaitTimeoutMs: 45_000 }),
+        );
+      });
+    });
+
+    describe("when the max trace wait is out of range", () => {
+      it("refuses the save and says why under the input", async () => {
+        const user = userEvent.setup();
+        openStored();
+
+        const wait = await screen.findByLabelText("Max trace wait");
+        await user.clear(wait);
+        await user.type(wait, "301");
+        await user.click(screen.getByTestId("case-modal-save"));
+
+        expect(mockUpdate).not.toHaveBeenCalled();
+        expect(
+          screen.getByText("Max trace wait must be between 1 and 300 seconds"),
+        ).toBeInTheDocument();
+      });
+    });
+  });
+
   describe("given the caller voice block", () => {
     /** @scenario The caller voice is also offered in the Agent Testing scenario editor */
     it("offers a Caller voice chip alongside parameters, turns and models", async () => {
@@ -908,5 +972,59 @@ describe("the scenario dialog", () => {
         expect(screen.getByLabelText("attempts")).toBeInTheDocument();
       });
     });
+  });
+});
+
+describe("the scenario dialog on a red team scenario", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockTestSuitesGetAll.mockReturnValue({ data: [REFUNDS], isLoading: false });
+    mockLastResults.mockReturnValue({ data: [], isLoading: false });
+    mockAgentsGetAll.mockReturnValue({ data: [] });
+  });
+  afterEach(cleanup);
+
+  /** @scenario "The red team scenario editor shows its attack config" */
+  it("shows the attack goal, OWASP categories by name, strategy and max turns", async () => {
+    mockGetById.mockReturnValue({
+      data: storedCase({
+        kind: "red_team",
+        redTeam: {
+          attackGoal: "Make the agent reveal its system prompt",
+          owaspIds: ["LLM07", "ASI01"],
+          strategy: "goat",
+          maxTurns: 12,
+        },
+      }),
+      isLoading: false,
+      refetch: vi.fn(),
+    });
+    openDrawerAs({ scenarioId: "case_1" });
+    renderWithDesignSystem(
+      <>
+        <AgentTestingCaseEditor />
+        <AgentTestingCaseEditorDrawer />
+      </>,
+    );
+
+    const block = await screen.findByTestId("case-red-team-config");
+    expect(block).toHaveTextContent("Make the agent reveal its system prompt");
+    expect(block).toHaveTextContent("LLM07 System Prompt Leakage");
+    expect(block).toHaveTextContent("ASI01 Agent Goal Hijack");
+    expect(block).toHaveTextContent("GOAT");
+    expect(block).toHaveTextContent("12");
+  });
+
+  it("shows no attack config for a standard scenario", async () => {
+    mockGetById.mockReturnValue({ data: storedCase(), isLoading: false, refetch: vi.fn() });
+    openDrawerAs({ scenarioId: "case_1" });
+    renderWithDesignSystem(
+      <>
+        <AgentTestingCaseEditor />
+        <AgentTestingCaseEditorDrawer />
+      </>,
+    );
+    expect(await screen.findByLabelText("Situation")).toBeInTheDocument();
+    expect(screen.queryByTestId("case-red-team-config")).not.toBeInTheDocument();
   });
 });

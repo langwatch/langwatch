@@ -11,19 +11,21 @@ import (
 	"github.com/langwatch/langwatch/pkg/ciscan"
 )
 
-// A push to main runs package-suites as one job, queues behind the run before
-// it and posts a red run to Slack. See specs/ci/package-suite-integration-lane.feature.
+// A push to main splits package-suites like a pull request, queues behind the run
+// before it and posts a red run to Slack. See specs/ci/package-suite-integration-lane.feature.
 
 // AppCIWorkflow is the workflow that runs the package suites.
 const AppCIWorkflow = ".github/workflows/langwatch-app-ci.yml"
 
 const (
-	oneJobOutput   = "${{ github.event_name == 'push' }}"
-	oneJobFlag     = "needs.changes.outputs.suites-one-job == 'true'"
-	mainQueues     = "${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}"
-	sharedCacheKey = "nx-suites-all-"
-	notifyCommand  = "go run ./cmd/slacknotify"
+	mainQueues    = "${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}"
+	shardCacheKey = "nx-suites-${{ matrix.shard }}-"
+	notifyCommand = "go run ./cmd/slacknotify"
 )
+
+// eventDependent are the expression fragments that would give main a different
+// split from a pull request.
+var eventDependent = []string{"github.event_name", "github.ref", "needs.changes.outputs"}
 
 // Every field a workflow may write as a scalar, a list or a mapping is a
 // yaml.Node, so any legal shape decodes and only the wrong one is reported.
@@ -51,8 +53,8 @@ type suitesStep struct {
 	Run  string            `yaml:"run"`
 }
 
-// MainSuites reports every way a push to main could stop running the suites as
-// one queued job, or stop telling Slack when that job fails or times out.
+// MainSuites reports every way a push to main could stop splitting the suites
+// like a pull request in a queued run, or stop telling Slack when a shard fails or times out.
 func MainSuites(repoRoot string) ([]string, error) {
 	raw, err := os.ReadFile(filepath.Join(repoRoot, AppCIWorkflow))
 	if err != nil {
@@ -67,40 +69,69 @@ func MainSuites(repoRoot string) ([]string, error) {
 	if cancel, _ := wf.Concurrency.CancelInProgress.(string); cancel != mainQueues {
 		problems = append(problems, "cancel-in-progress must be "+mainQueues+", so a push to main queues behind the run before it")
 	}
-	if output := wf.Jobs["changes"].Outputs["suites-one-job"]; output.Value != oneJobOutput {
-		problems = append(problems, "changes must output suites-one-job: "+oneJobOutput)
-	}
-	problems = append(problems, oneJobProblems(wf.Jobs["package-suites"])...)
+	problems = append(problems, shardProblems(wf.Jobs["package-suites"])...)
 	problems = append(problems, notifyProblems(wf.Jobs)...)
 
 	return problems, nil
 }
 
-func oneJobProblems(job suitesJob) []string {
-	var problems []string
-	if shard := mappingValue(job.Strategy.Matrix, "shard"); !strings.Contains(shard, oneJobFlag+" && '[1]'") {
-		problems = append(problems, "package-suites must run one shard when suites-one-job is true")
-	}
-	if !strings.Contains(job.Timeout.Value, oneJobFlag) {
-		problems = append(problems, "package-suites must lengthen its timeout when suites-one-job is true")
-	}
+func shardProblems(job suitesJob) []string {
+	problems := matrixProblems(job)
 	if !strings.Contains(job.Name, "strategy.job-total") {
 		problems = append(problems, "package-suites must name its shard count from strategy.job-total")
 	}
+
+	return append(problems, stepProblems(job.Steps)...)
+}
+
+// matrixProblems wants a shard list and a timeout that read nothing about the event.
+func matrixProblems(job suitesJob) []string {
+	shard := mappingValue(job.Strategy.Matrix, "shard")
+	if shard == "" {
+		shard = sequenceText(job.Strategy.Matrix, "shard")
+	}
+	if shard == "" {
+		return []string{"package-suites must list its shards in strategy.matrix.shard"}
+	}
+	var problems []string
+	for _, fragment := range eventDependent {
+		if strings.Contains(shard, fragment) || strings.Contains(job.Timeout.Value, fragment) {
+			problems = append(problems, "package-suites must split and time out alike on every event, not by "+fragment)
+		}
+	}
+
+	return problems
+}
+
+func stepProblems(steps []suitesStep) []string {
+	var problems []string
 	sharded, cached := false, 0
-	for _, step := range job.Steps {
+	for _, step := range steps {
 		if strings.Contains(step.Env["PACKAGE_SUITES_SHARD"], "strategy.job-total") {
 			sharded = true
 		}
-		if strings.Contains(step.With["restore-keys"], sharedCacheKey) {
+		if strings.Contains(step.With["restore-keys"], shardCacheKey) && strings.Contains(step.With["key"], shardCacheKey) {
 			cached++
+			problems = append(problems, cacheKeyProblems(step)...)
 		}
 	}
 	if !sharded {
 		problems = append(problems, "PACKAGE_SUITES_SHARD must take its total from strategy.job-total")
 	}
 	if cached != 2 {
-		problems = append(problems, fmt.Sprintf("both suite-result caches must fall back to %s, %d do", sharedCacheKey, cached))
+		problems = append(problems, fmt.Sprintf("both suite-result caches must key on and fall back to %s, %d do", shardCacheKey, cached))
+	}
+
+	return problems
+}
+
+// cacheKeyProblems wants a suite-result cache keyed alike on every event.
+func cacheKeyProblems(step suitesStep) []string {
+	var problems []string
+	for _, fragment := range eventDependent {
+		if strings.Contains(step.With["key"], fragment) || strings.Contains(step.With["restore-keys"], fragment) {
+			problems = append(problems, "the suite-result cache must key alike on every event, not by "+fragment)
+		}
 	}
 
 	return problems
@@ -125,6 +156,27 @@ func notifyProblems(jobs map[string]suitesJob) []string {
 	}
 
 	return []string{"no job after package-suites runs " + notifyCommand}
+}
+
+// sequenceText is key's flow or block sequence in a mapping node, written out
+// as one string so a fragment search reads every item.
+func sequenceText(node yaml.Node, key string) string {
+	if node.Kind != yaml.MappingNode {
+		return ""
+	}
+	for i := 0; i+1 < len(node.Content); i += 2 {
+		if node.Content[i].Value != key || node.Content[i+1].Kind != yaml.SequenceNode {
+			continue
+		}
+		items := make([]string, 0, len(node.Content[i+1].Content))
+		for _, item := range node.Content[i+1].Content {
+			items = append(items, item.Value)
+		}
+
+		return "[" + strings.Join(items, ", ") + "]"
+	}
+
+	return ""
 }
 
 // mappingValue is key's scalar in a mapping node, "" for any other shape.

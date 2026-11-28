@@ -14,6 +14,15 @@ const OPENAI_GPT5_PRO: ReasoningConfig = {
   canDisable: false,
 };
 
+/** OpenAI's 400 names these three for gpt-5.2-pro; a call without an effort runs medium. */
+const OPENAI_GPT52_PRO: ReasoningConfig = {
+  supported: true,
+  parameterName: "reasoning_effort",
+  allowedValues: ["medium", "high", "xhigh"],
+  defaultValue: "medium",
+  canDisable: false,
+};
+
 const OPENAI_GPT51: ReasoningConfig = {
   supported: true,
   parameterName: "reasoning_effort",
@@ -42,6 +51,47 @@ const OPENAI_O_SERIES: ReasoningConfig = {
   supported: true,
   parameterName: "reasoning_effort",
   allowedValues: ["low", "medium", "high"],
+  defaultValue: "medium",
+  canDisable: false,
+};
+
+// GPT-5.4 onward, from each model's page at developers.openai.com/api/docs/models/<id>.
+const OPENAI_GPT6_ALWAYS_REASONS: ReasoningConfig = {
+  supported: true,
+  parameterName: "reasoning_effort",
+  allowedValues: ["low", "medium", "high", "xhigh", "max"],
+  defaultValue: "medium",
+  canDisable: false,
+};
+
+const OPENAI_GPT56: ReasoningConfig = {
+  supported: true,
+  parameterName: "reasoning_effort",
+  allowedValues: ["none", "low", "medium", "high", "xhigh", "max"],
+  defaultValue: "medium",
+  canDisable: true,
+};
+
+const OPENAI_GPT55: ReasoningConfig = {
+  supported: true,
+  parameterName: "reasoning_effort",
+  allowedValues: ["none", "low", "medium", "high", "xhigh"],
+  defaultValue: "medium",
+  canDisable: true,
+};
+
+const OPENAI_GPT55_PRO: ReasoningConfig = {
+  supported: true,
+  parameterName: "reasoning_effort",
+  allowedValues: ["medium", "high", "xhigh"],
+  defaultValue: "high",
+  canDisable: false,
+};
+
+const OPENAI_GPT54_PRO: ReasoningConfig = {
+  supported: true,
+  parameterName: "reasoning_effort",
+  allowedValues: ["medium", "high", "xhigh"],
   defaultValue: "medium",
   canDisable: false,
 };
@@ -97,8 +147,35 @@ const DEEPSEEK_R1: ReasoningConfig = {
 /** Ordered: the first rule whose model-id test matches decides the configuration. */
 const REASONING_RULES: readonly { matches: (id: string) => boolean; config: ReasoningConfig }[] = [
   {
-    matches: (id) => id.includes("openai/") && includesAny(id, ["gpt-5-pro", "gpt-5.2-pro"]),
+    matches: (id) => isOpenAIModel(id, ["gpt-6-astra", "gpt-6.1-sol"]),
+    config: OPENAI_GPT6_ALWAYS_REASONS,
+  },
+  {
+    matches: (id) =>
+      isOpenAIModel(id, [
+        "gpt-6-sol",
+        "gpt-6-luna",
+        "gpt-6.1-terra",
+        "gpt-5.6-sol",
+        "gpt-5.6-terra",
+        "gpt-5.6-luna",
+      ]),
+    config: OPENAI_GPT56,
+  },
+  { matches: (id) => isOpenAIModel(id, ["gpt-5.5-pro"]), config: OPENAI_GPT55_PRO },
+  { matches: (id) => isOpenAIModel(id, ["gpt-5.5"]), config: OPENAI_GPT55 },
+  { matches: (id) => isOpenAIModel(id, ["gpt-5.4-pro"]), config: OPENAI_GPT54_PRO },
+  {
+    matches: (id) => isOpenAIModel(id, ["gpt-5.4", "gpt-5.4-mini", "gpt-5.4-nano"]),
+    config: OPENAI_GPT52,
+  },
+  {
+    matches: (id) => id.includes("openai/") && id.includes("gpt-5-pro"),
     config: OPENAI_GPT5_PRO,
+  },
+  {
+    matches: (id) => id.includes("openai/") && id.includes("gpt-5.2-pro"),
+    config: OPENAI_GPT52_PRO,
   },
   {
     matches: (id) => id.includes("openai/") && includesAny(id, ["gpt-5.2", "gpt-5.3"]),
@@ -114,7 +191,7 @@ const REASONING_RULES: readonly { matches: (id: string) => boolean; config: Reas
     config: OPENAI_O_SERIES,
   },
   {
-    matches: (id) => id.includes("openai/") && includesAny(id, ["/o1", "/o3"]),
+    matches: (id) => id.includes("openai/") && includesAny(id, ["/o1", "/o3", "/o4"]),
     config: OPENAI_O_SERIES,
   },
   {
@@ -163,6 +240,15 @@ export function getAllowedReasoningValues(modelId: string): readonly ReasoningEf
 /** Default reasoning effort for a model, or undefined if it takes none. */
 export function pickDefaultReasoningEffort(modelId: string): ReasoningEffortOption | undefined {
   return pickReasoningConfig(modelId)?.defaultValue;
+}
+
+/**
+ * Whether `id` is one of the named OpenAI models or its `:batch` twin. Exact, because a family
+ * prefix also matches the `-pro` and `-image` ids OpenAI documents no reasoning values for.
+ */
+function isOpenAIModel(id: string, names: readonly string[]): boolean {
+  const name = id.replace(/^openai\//, "").replace(/:batch$/, "");
+  return id.startsWith("openai/") && names.includes(name);
 }
 
 function includesAny(text: string, needles: readonly string[]): boolean {

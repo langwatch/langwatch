@@ -10,6 +10,7 @@ from ..types import UNSET, Unset
 
 if TYPE_CHECKING:
     from ..models.post_api_dataset_body_column_types_item import PostApiDatasetBodyColumnTypesItem
+    from ..models.post_api_dataset_body_entries_item import PostApiDatasetBodyEntriesItem
 
 
 T = TypeVar("T", bound="PostApiDatasetBody")
@@ -21,10 +22,13 @@ class PostApiDatasetBody:
     Attributes:
         name (str):
         column_types (list[PostApiDatasetBodyColumnTypesItem] | Unset):
+        entries (list[PostApiDatasetBodyEntriesItem] | Unset): The dataset's first rows, written with it in one call.
+            Each key must be a column in `columnTypes`.
     """
 
     name: str
     column_types: list[PostApiDatasetBodyColumnTypesItem] | Unset = UNSET
+    entries: list[PostApiDatasetBodyEntriesItem] | Unset = UNSET
     additional_properties: dict[str, Any] = _attrs_field(init=False, factory=dict)
 
     def to_dict(self) -> dict[str, Any]:
@@ -37,6 +41,13 @@ class PostApiDatasetBody:
                 column_types_item = column_types_item_data.to_dict()
                 column_types.append(column_types_item)
 
+        entries: list[dict[str, Any]] | Unset = UNSET
+        if not isinstance(self.entries, Unset):
+            entries = []
+            for entries_item_data in self.entries:
+                entries_item = entries_item_data.to_dict()
+                entries.append(entries_item)
+
         field_dict: dict[str, Any] = {}
         field_dict.update(self.additional_properties)
         field_dict.update(
@@ -46,12 +57,15 @@ class PostApiDatasetBody:
         )
         if column_types is not UNSET:
             field_dict["columnTypes"] = column_types
+        if entries is not UNSET:
+            field_dict["entries"] = entries
 
         return field_dict
 
     @classmethod
     def from_dict(cls: type[T], src_dict: Mapping[str, Any]) -> T:
         from ..models.post_api_dataset_body_column_types_item import PostApiDatasetBodyColumnTypesItem
+        from ..models.post_api_dataset_body_entries_item import PostApiDatasetBodyEntriesItem
 
         d = dict(src_dict)
         name = d.pop("name")
@@ -65,9 +79,19 @@ class PostApiDatasetBody:
 
                 column_types.append(column_types_item)
 
+        _entries = d.pop("entries", UNSET)
+        entries: list[PostApiDatasetBodyEntriesItem] | Unset = UNSET
+        if _entries is not UNSET:
+            entries = []
+            for entries_item_data in _entries:
+                entries_item = PostApiDatasetBodyEntriesItem.from_dict(entries_item_data)
+
+                entries.append(entries_item)
+
         post_api_dataset_body = cls(
             name=name,
             column_types=column_types,
+            entries=entries,
         )
 
         post_api_dataset_body.additional_properties = d

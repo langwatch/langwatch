@@ -223,7 +223,7 @@ export class PrismaMonitorRepository
         parameters: input.parameters as Prisma.InputJsonValue,
         mappings: input.mappings as Prisma.InputJsonValue,
         sample: input.sample,
-        enabled: true,
+        enabled: input.enabled ?? true,
         executionMode: input.executionMode,
         evaluatorId: input.evaluatorId,
         level: input.level ?? "trace",

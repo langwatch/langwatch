@@ -41,11 +41,11 @@ const MAIN_GUARDS: readonly MainGuard[] = [
   { page: "pages/[project]/workflows", permission: "workflows:view" },
   { page: "pages/[project]/sessions", flags: [GOVERNANCE_FLAG] },
   { page: "pages/[project]/pull-requests", flags: [GOVERNANCE_FLAG] },
-  { page: "pages/me/index", flags: [GOVERNANCE_FLAG] },
-  { page: "pages/me/configure", flags: [GOVERNANCE_FLAG] },
-  { page: "pages/me/pull-requests", flags: [GOVERNANCE_FLAG] },
-  { page: "pages/me/sessions", flags: [GOVERNANCE_FLAG] },
-  { page: "pages/me/budget/request", flags: [GOVERNANCE_FLAG] },
+  { page: "pages/coding-agents/index", flags: [GOVERNANCE_FLAG] },
+  { page: "pages/coding-agents/configure", flags: [GOVERNANCE_FLAG] },
+  { page: "pages/coding-agents/pull-requests", flags: [GOVERNANCE_FLAG] },
+  { page: "pages/coding-agents/sessions", flags: [GOVERNANCE_FLAG] },
+  { page: "pages/coding-agents/budget/request", flags: [GOVERNANCE_FLAG] },
   { page: "pages/settings", permission: "organization:view" },
   // Widened from main's organization:manage: every member reads Roles read-only.
   { page: "pages/settings/roles", permission: "members:view" },
@@ -196,8 +196,8 @@ describe("given the pages main guarded", () => {
     });
 
     /** @scenario "feature flag off hides the whole portal" */
-    it("answers /me with not-found, never the portal, while the governance flag is off", () => {
-      expect(accessFor({ page: "pages/me/index", grants: [], flagsOn: false })).toEqual({
+    it("answers /coding-agents with not-found, never the portal, while the governance flag is off", () => {
+      expect(accessFor({ page: "pages/coding-agents/index", grants: [], flagsOn: false })).toEqual({
         kind: "not-found",
       });
     });

@@ -51,6 +51,15 @@ Feature: CLI 402 license gate on /api/auth/cli/governance/*
     Then the response status is 402
     And the response body has `error: "payment_required"`
 
+  # Both read the activity monitor under `activityMonitor:view`, as the console's
+  # eventsForSource and sourceHealthMetrics do, so both name its plan.
+  @unit
+  Scenario: A source's events and its health answer the same plan refusal
+    Given an IngestionSource "src-123" exists in acme
+    When alice's CLI reads the events and then the health of "src-123"
+    Then both responses are 402 with `error: "payment_required"`
+    And both name "The activity monitor requires an Enterprise plan"
+
   # The 401 is the framework's canonical refusal, not main's OAuth-shaped body (Alex, 2026-10-06,
   # wire codes: the canonical envelope everywhere but the legacy-* families and the collector).
   @unit
@@ -90,5 +99,6 @@ Feature: CLI 402 license gate on /api/auth/cli/governance/*
   Scenario: CLI surfaces the upgrade URL in stderr on 402
     Given alice's CLI receives the 402 envelope from any governance endpoint
     When the CLI handles the GovernanceCliError
-    Then stderr contains the human-readable description "Ingestion sources require an Enterprise plan"
+    Then stderr contains the envelope's human-readable description
+      (for governance status, "Ingestion sources require an Enterprise plan")
     And stderr contains the upgrade URL on a separate line for click-targeting

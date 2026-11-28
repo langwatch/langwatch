@@ -40,6 +40,13 @@ const SIMULATOR_MODEL_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'simulato
 const JUDGE_MODEL_EXPR = `JSONExtractString(${LANGWATCH_METADATA}, 'judgeModel')`;
 
 /**
+ * The judge trace wait the plan was configured with, as the raw JSON number, '' when it set none.
+ * A run recorded before the settings were stamped reads as '' too.
+ */
+const TRACE_QUIET_PERIOD_EXPR = `JSONExtractRaw(${LANGWATCH_METADATA}, 'traceQuietPeriodMs')`;
+const TRACE_WAIT_TIMEOUT_EXPR = `JSONExtractRaw(${LANGWATCH_METADATA}, 'traceWaitTimeoutMs')`;
+
+/**
  * The resolved run parameters, as the raw JSON object they were stored as. Raw rather than a map
  * read: the values are strings, numbers and booleans, and re-typing them in SQL would lose which
  * they were. A run with no parameters extracts as the empty string.
@@ -107,6 +114,8 @@ export class RunConfigurationsClickHouseRepository extends RunConfigurationsRepo
           toString(RepeatCount)     AS RepeatCount,
           SimulatorModel,
           JudgeModel,
+          TraceQuietPeriodMs,
+          TraceWaitTimeoutMs,
           Parameters,
           FirstTargetParameters,
           toString(max(HasNote))    AS UsesNote,
@@ -118,6 +127,8 @@ export class RunConfigurationsClickHouseRepository extends RunConfigurationsRepo
             max(PairRuns)                          AS RepeatCount,
             max(SimulatorModel)                    AS SimulatorModel,
             max(JudgeModel)                        AS JudgeModel,
+            max(TraceQuietPeriodMs)                AS TraceQuietPeriodMs,
+            max(TraceWaitTimeoutMs)                AS TraceWaitTimeoutMs,
             if(countIf(TargetParameters = '') > 0,
                argMinIf(Parameters, FirstRunId, TargetParameters = ''),
                argMin(Parameters, FirstRunId))     AS Parameters,
@@ -135,6 +146,8 @@ export class RunConfigurationsClickHouseRepository extends RunConfigurationsRepo
               count()                    AS PairRuns,
               max(SimulatorModel)        AS SimulatorModel,
               max(JudgeModel)            AS JudgeModel,
+              max(TraceQuietPeriodMs)    AS TraceQuietPeriodMs,
+              max(TraceWaitTimeoutMs)    AS TraceWaitTimeoutMs,
               any(Parameters)            AS Parameters,
               max(HasNote)               AS HasNote,
               min(ScenarioRunId)         AS FirstRunId,
@@ -149,6 +162,8 @@ export class RunConfigurationsClickHouseRepository extends RunConfigurationsRepo
                 ${TARGET_PARAMETERS_EXPR}  AS TargetParameters,
                 ${SIMULATOR_MODEL_EXPR}    AS SimulatorModel,
                 ${JUDGE_MODEL_EXPR}        AS JudgeModel,
+                ${TRACE_QUIET_PERIOD_EXPR} AS TraceQuietPeriodMs,
+                ${TRACE_WAIT_TIMEOUT_EXPR} AS TraceWaitTimeoutMs,
                 ${RUN_PARAMETERS_EXPR}     AS Parameters,
                 ${HAS_NOTE_EXPR}           AS HasNote,
                 ${ATOM_SORT_KEY}           AS RunAt
@@ -161,7 +176,7 @@ export class RunConfigurationsClickHouseRepository extends RunConfigurationsRepo
         )
         GROUP BY
           SetId, Targets, RepeatCount, SimulatorModel, JudgeModel,
-          Parameters, FirstTargetParameters
+          TraceQuietPeriodMs, TraceWaitTimeoutMs, Parameters, FirstTargetParameters
         ORDER BY max(BatchRunAt) DESC
         LIMIT {configurationLimit:UInt32}`,
       query_params: {

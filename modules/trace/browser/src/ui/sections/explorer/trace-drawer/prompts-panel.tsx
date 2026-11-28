@@ -12,7 +12,7 @@ import {
   VStack,
 } from "@langwatch/design-system/primitives";
 import { PromptEditorDrawerToken } from "@langwatch/prompt-client";
-import type { SpanDetail, SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
+import type { SpanTreeNode, TraceHeader } from "@langwatch/trace-contract";
 import { type ReactNode, useMemo } from "react";
 import {
   LuCircleDashed,
@@ -26,12 +26,10 @@ import {
 import { useSpanPlaygroundHref } from "../../../../behavior/prompts/use-span-playground-href.ts";
 import { useSpansFull } from "../../../../features/span/behavior/use-spans-full.ts";
 import { usePromptByHandle } from "../../../../features/trace-drawer/behavior/use-prompt-by-handle.ts";
-import type { PromptReference } from "../../../../model/prompt-attributes.ts";
-import {
-  extractPromptReference,
-  parseTracePromptIds,
-  promptReferenceKey,
-} from "../../../../model/prompt-attributes.ts";
+import { BRAIDED_ACTION_DISABLED_REASON } from "../../../../model/braids/braided-span.ts";
+import { parseTracePromptIds, promptReferenceKey } from "../../../../model/prompt-attributes.ts";
+import { aggregatePromptUsage, type PromptUsage } from "../../../../model/prompt-usages.ts";
+import { UnavailableActionButton } from "./io-toolbar-buttons.tsx";
 
 interface PromptsPanelProps {
   trace: TraceHeader;
@@ -43,110 +41,6 @@ interface PromptsPanelProps {
    * so the heading isn't doubled.
    */
   hideHeader?: boolean;
-}
-
-interface PromptUsage {
-  ref: PromptReference;
-  /** Span IDs that referenced this prompt. */
-  spanIds: string[];
-  /** Variable values (latest seen per key, since spans may share vars). */
-  variables: Record<string, string>;
-}
-
-function indexPromptUsages(spansFull: SpanDetail[]): {
-  byKey: Map<string, PromptUsage>;
-  byHandle: Map<string, PromptUsage[]>;
-} {
-  const byKey = new Map<string, PromptUsage>();
-  const byHandle = new Map<string, PromptUsage[]>();
-
-  for (const span of spansFull) {
-    const ref = extractPromptReference(span.params);
-    if (!ref) continue;
-    const key = promptReferenceKey(ref);
-    let usage = byKey.get(key);
-    if (!usage) {
-      usage = { ref, spanIds: [], variables: {} };
-      byKey.set(key, usage);
-      const list = byHandle.get(ref.handle) ?? [];
-      list.push(usage);
-      byHandle.set(ref.handle, list);
-    }
-    usage.spanIds.push(span.spanId);
-    if (ref.variables) {
-      for (const [name, value] of Object.entries(ref.variables)) {
-        usage.variables[name] = value;
-      }
-    }
-    if (ref.draft && !usage.ref.draft) {
-      usage.ref = { ...usage.ref, draft: true };
-    }
-  }
-
-  return { byKey, byHandle };
-}
-
-function orderPromptUsages({
-  fallbackRefs,
-  byKey,
-  byHandle,
-}: {
-  fallbackRefs: PromptReference[];
-  byKey: Map<string, PromptUsage>;
-  byHandle: Map<string, PromptUsage[]>;
-}): PromptUsage[] {
-  const ordered: PromptUsage[] = [];
-  const seen = new Set<string>();
-
-  for (const ref of fallbackRefs) {
-    const key = promptReferenceKey(ref);
-    const exact = byKey.get(key);
-    if (exact) {
-      ordered.push(exact);
-      seen.add(key);
-      continue;
-    }
-
-    if (ref.versionNumber == null && !ref.tag) {
-      const candidates = byHandle.get(ref.handle);
-      if (candidates && candidates.length > 0) {
-        const usage = candidates[0]!;
-        ordered.push(usage);
-        seen.add(promptReferenceKey(usage.ref));
-        continue;
-      }
-    }
-
-    ordered.push({ ref, spanIds: [], variables: {} });
-    seen.add(key);
-  }
-
-  for (const [key, usage] of byKey) {
-    if (!seen.has(key)) ordered.push(usage);
-  }
-  return ordered;
-}
-
-/**
- * Aggregates spans by their prompt reference. Falls back to the trace-level
- * `langwatch.prompt_ids` summary when full span data hasn't loaded yet so the panel
- * always shows *which* prompts ran, even before variables stream in.
- */
-function aggregatePromptUsage(
-  spansFull: SpanDetail[] | undefined,
-  fallbackRefs: PromptReference[],
-): PromptUsage[] {
-  if (!spansFull || spansFull.length === 0) {
-    return fallbackRefs.map((ref) => ({ ref, spanIds: [], variables: {} }));
-  }
-
-  // Index span-derived usages by handle alone too, so a fallback ref with
-  // no version (e.g. `"handle:latest"` from `langwatch.prompt_ids`) can
-  // still match against spans on that handle even when version numbers
-  // differ. Without this, the panel rendered every fallback card with
-  // empty span lists and a bogus "still loading" message.
-  const index = indexPromptUsages(spansFull);
-  return orderPromptUsages({ fallbackRefs, ...index });
 }
 
 /** Which trace-level role a card plays, when more than one prompt ran. */
@@ -389,27 +283,47 @@ function PromptUsageCard({
             </Badge>
           )}
           {role && <PromptRoleChip role={role} />}
+          {usage.ownerName ? (
+            <Badge size="sm" variant="outline">
+              from {usage.ownerName}
+            </Badge>
+          ) : null}
         </HStack>
-        <HStack gap={0.5} flexShrink={0}>
-          <Button
-            size="xs"
-            variant="ghost"
-            color="fg.subtle"
-            gap={1}
-            onClick={() => onOpenPromptEditor(ref.handle)}
-          >
-            <Icon as={LuPencil} boxSize={3} />
-            Open prompt
-          </Button>
-          {playgroundHref && (
-            <Link href={playgroundHref} isExternal variant="plain">
-              <Button size="xs" variant="ghost" color="fg.subtle" gap={1}>
-                <Icon as={LuExternalLink} boxSize={3} />
-                Playground
-              </Button>
-            </Link>
-          )}
-        </HStack>
+        {usage.ownerName ? (
+          <HStack gap={0.5} flexShrink={0}>
+            <UnavailableActionButton
+              icon={LuPencil}
+              label="Open prompt"
+              reason={BRAIDED_ACTION_DISABLED_REASON}
+            />
+            <UnavailableActionButton
+              icon={LuExternalLink}
+              label="Playground"
+              reason={BRAIDED_ACTION_DISABLED_REASON}
+            />
+          </HStack>
+        ) : (
+          <HStack gap={0.5} flexShrink={0}>
+            <Button
+              size="xs"
+              variant="ghost"
+              color="fg.subtle"
+              gap={1}
+              onClick={() => onOpenPromptEditor(ref.handle)}
+            >
+              <Icon as={LuPencil} boxSize={3} />
+              Open prompt
+            </Button>
+            {playgroundHref && (
+              <Link href={playgroundHref} isExternal variant="plain">
+                <Button size="xs" variant="ghost" color="fg.subtle" gap={1}>
+                  <Icon as={LuExternalLink} boxSize={3} />
+                  Playground
+                </Button>
+              </Link>
+            )}
+          </HStack>
+        )}
       </HStack>
 
       {variableEntries.length > 0 && (

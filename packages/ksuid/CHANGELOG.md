@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.3](https://github.com/langwatch/langwatch/compare/ksuid@v2.0.2...ksuid@v2.0.3) (2026-11-14)
+
+
+### Bug Fixes
+
+* **ksuid:** write the timestamp big-endian so ids sort and match Go and Python ([#9577](https://github.com/langwatch/langwatch/issues/9577)) ([d391834](https://github.com/langwatch/langwatch/commit/d391834af0a20044ca3514e2f764cfc7f6842dc4))
+
 ## [2.0.2](https://github.com/langwatch/ksuid/compare/ksuid-javascript/v2.0.1...ksuid-javascript/v2.0.2) (2025-11-13)
 
 ### Bug Fixes

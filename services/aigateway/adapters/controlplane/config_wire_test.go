@@ -176,6 +176,30 @@ func TestProviderSlotToCredential_BaseURL(t *testing.T) {
 	})
 }
 
+// A managed Bedrock row names its private runtime endpoint as a Bedrock
+// credential field, never base_url: hosted gateways refuse a plain-http or
+// private base_url, while the Bedrock field has its own amazonaws.com check.
+//
+// Spec: specs/ai-gateway/managed-bedrock-vpce-endpoint.feature
+/** @scenario "The config bundle keeps a Bedrock row's runtime endpoint on the credential" */
+func TestProviderSlotToCredential_BedrockRuntimeEndpoint(t *testing.T) {
+	cred := providerSlotToCredential(providerSlotWire{
+		ID:   "mp-bedrock",
+		Type: "bedrock",
+		Credentials: map[string]interface{}{
+			"access_key":               "temporary-key",
+			"secret_key":               "temporary-secret",
+			"session_token":            "temporary-token",
+			"region":                   "eu-west-1",
+			"bedrock_runtime_endpoint": "http://vpce-0abc.vpce.amazonaws.com",
+		},
+	})
+	assert.Equal(t, domain.ProviderBedrock, cred.ProviderID)
+	assert.Equal(t, "http://vpce-0abc.vpce.amazonaws.com", cred.Extra["bedrock_runtime_endpoint"])
+	assert.Equal(t, "temporary-token", cred.Extra["session_token"])
+	assert.Empty(t, cred.Extra["base_url"])
+}
+
 // The control-plane writes aliases in "provider/model" form, which is a
 // routing instruction rather than a model ID. Keeping the prefix on Model
 // sends the provider a model name it has never heard of, and drops the
@@ -531,4 +555,37 @@ func TestConfigWire_BudgetsValidUntil(t *testing.T) {
 	t.Run("is zero when the key has no budgets at all", func(t *testing.T) {
 		assert.True(t, (&configWire{}).toDomain().Budget.ValidUntil.IsZero())
 	})
+}
+
+// A null or absent allow list admits any key of the project; an empty list
+// admits none. Decoding the two the same way would open a restricted target.
+func TestConfigWire_A2ATargetAllowList(t *testing.T) {
+	cases := []struct {
+		name       string
+		field      string
+		wantPolicy bool
+		wantIDs    []string
+	}{
+		{"null admits any key", `,"allowed_virtual_key_ids":null`, false, nil},
+		{"absent admits any key", ``, false, nil},
+		{"empty list denies every key", `,"allowed_virtual_key_ids":[]`, true, []string{}},
+		{"listed keys are kept", `,"allowed_virtual_key_ids":["vk_a"]`, true, []string{"vk_a"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			var wire configWire
+			require.NoError(t, json.Unmarshal(
+				[]byte(`{"a2a_targets":[{"name":"billing","upstream_url":"https://billing.acme.test"`+tc.field+`}]}`),
+				&wire,
+			))
+			targets := wire.toDomain().A2ATargets
+			require.Len(t, targets, 1)
+			if !tc.wantPolicy {
+				assert.Nil(t, targets[0].Policy)
+				return
+			}
+			require.NotNil(t, targets[0].Policy)
+			assert.Equal(t, tc.wantIDs, targets[0].Policy.AllowedVirtualKeyIDs)
+		})
+	}
 }

@@ -5,7 +5,7 @@ ARG CLICKHOUSE_VERSION=26.8.36.3
 ARG CLICKHOUSE_DIGEST=sha256:d426d2f612e1e189c90f9a3f8dcd85a03c6851273833817a296bb327e63aa7a7
 
 # Stage 1: Build Go config generator
-FROM golang:1.27.3-alpine AS builder
+FROM golang:1.27.4-alpine AS builder
 WORKDIR /build
 COPY go.mod go.sum ./
 RUN go mod download
@@ -16,8 +16,13 @@ RUN CGO_ENABLED=0 go build -ldflags="-s -w" -o /ch-config ./cmd/ch-config
 # Stage 2: ClickHouse image
 FROM clickhouse/clickhouse-server:${CLICKHOUSE_VERSION}@${CLICKHOUSE_DIGEST}
 
-RUN apt-get update \
-    && apt-get install -y --no-install-recommends \
+# Retried: a mirror mid-sync serves index files whose size does not match the
+# Release file, and apt-get update fails until the sync ends.
+RUN for i in 1 2 3; do \
+        apt-get -o Acquire::Retries=3 update && break; \
+        [ "$i" = 3 ] && exit 1; sleep 20; \
+    done \
+    && apt-get install -y -o Acquire::Retries=3 --no-install-recommends \
         ca-certificates \
         tini \
         curl \

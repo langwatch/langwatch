@@ -22,6 +22,10 @@ describe("ClickHouseMonitorPerformanceRepository", () => {
             ScoreCount: "2",
             PassSum: "0",
             PassCount: "0",
+            LabelCounts: [
+              ["", "resolved", "__proto__"],
+              ["2", "1", "3"],
+            ],
           } as T,
         ],
       };
@@ -34,25 +38,30 @@ describe("ClickHouseMonitorPerformanceRepository", () => {
       resolveClient: async () => client,
     });
 
-    await expect(
-      repository.findBuckets({
-        tenantId: "project_1",
-        evaluatorIds: ["monitor_1"],
-        previousStartMs: 1,
-        currentStartMs: 2,
-        endMs: 3,
-        timeZone: "UTC",
-      }),
-    ).resolves.toEqual([
-      {
-        evaluatorId: "monitor_1",
-        period: "current",
-        day: "2026-08-25",
-        scoreSum: 1.5,
-        scoreCount: 2,
-        passSum: 0,
-        passCount: 0,
-      },
+    const buckets = await repository.findBuckets({
+      tenantId: "project_1",
+      evaluatorIds: ["monitor_1"],
+      previousStartMs: 1,
+      currentStartMs: 2,
+      endMs: 3,
+      timeZone: "UTC",
+    });
+    const { labelCounts, ...totals } = buckets[0]!;
+
+    expect(buckets).toHaveLength(1);
+    expect(totals).toEqual({
+      evaluatorId: "monitor_1",
+      period: "current",
+      day: "2026-08-25",
+      scoreSum: 1.5,
+      scoreCount: 2,
+      passSum: 0,
+      passCount: 0,
+    });
+    // A label named "__proto__" stays a label, not the record's prototype.
+    expect(Object.entries(labelCounts)).toEqual([
+      ["resolved", 1],
+      ["__proto__", 3],
     ]);
 
     const request = requests[0]!;

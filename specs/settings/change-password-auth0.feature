@@ -96,7 +96,16 @@ Feature: Change password from /settings/security
       never through a fresh sign-in that could silently switch accounts
     And the provider id the product names differently is mapped to the one
       the identity library registered
-    And a refusal from the provider is shown with its own reason
+    And a refusal is handed back to be shown, rather than thrown
+
+  # The account-linking endpoint answers a refusal with a JSON error body, and whatever stands in
+  # front of it may answer with something that is not JSON at all. Neither is words for a person.
+  @unit
+  Scenario: A refused link says why in plain words, never the server's raw answer
+    When linking another sign-in method is refused
+    Then a refusal the product knows is explained in a plain sentence
+    And any other refusal, or an answer that is not JSON, gets one generic sentence
+    And the server's raw answer is never shown
 
   # A credential typed into a text field is one over-the-shoulder glance and one
   # screen recording away from being somebody else's.

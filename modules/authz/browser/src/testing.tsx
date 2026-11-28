@@ -4,13 +4,17 @@
  * fake RECORDS what a screen asked and reported. Not exported.
  */
 
-import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import {
+  UiHostServiceProvider,
+  UiHostServicesContextProvider,
+} from "@langwatch/browser-host/capabilities";
 import { uiDeclarations, type UiDrawerToken } from "@langwatch/browser-host/declarations";
+import { UiFlagsService } from "@langwatch/browser-host/feature-flag";
 import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { DesignSystemTestProvider } from "@langwatch/design-system/testing";
 import { ContactSalesToken } from "@langwatch/enterprise-billing-client";
 import { render } from "@testing-library/react";
-import type { ReactElement } from "react";
+import type { ReactElement, ReactNode } from "react";
 
 import {
   AuthzHostApi,
@@ -37,6 +41,7 @@ export class FakeAuthzHost extends AuthzHostApi {
       plan?: AuthzPlanReading;
       query?: Readonly<Record<string, string | undefined>>;
       structure?: AuthzOrganizationStructure;
+      projectSwitcher?: ReactNode;
     } = {},
   ) {
     super();
@@ -81,6 +86,10 @@ export class FakeAuthzHost extends AuthzHostApi {
   failed(failure: AuthzFailureNotice): void {
     this.failures.push(failure);
   }
+
+  projectSwitcher(): ReactNode | null {
+    return this.options.projectSwitcher ?? null;
+  }
 }
 
 /** Renders a screen inside the Design System's provider and a host. */
@@ -105,16 +114,31 @@ const billingLendsContactSales = {
   ]),
 };
 
+/** `release_braids` as the screen reads it: on unless a suite says otherwise. */
+function braidsFlag(braidsReleased: boolean) {
+  return new Map([
+    [
+      UiFlagsService.name,
+      {
+        flag: ({ name }: { name: string }) => (name === "release_braids" ? braidsReleased : false),
+      },
+    ],
+  ]);
+}
+
 export function renderWithAuthzHost(
   element: ReactElement,
   host: FakeAuthzHost = new FakeAuthzHost(),
+  { braidsReleased = true }: { braidsReleased?: boolean } = {},
 ) {
   return {
     host,
     ...render(
       <DesignSystemTestProvider>
         <UiHostServicesContextProvider value={billingLendsContactSales}>
-          <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
+          <UiHostServiceProvider value={braidsFlag(braidsReleased)}>
+            <AuthzHostProvider value={host}>{element}</AuthzHostProvider>
+          </UiHostServiceProvider>
         </UiHostServicesContextProvider>
       </DesignSystemTestProvider>,
     ),

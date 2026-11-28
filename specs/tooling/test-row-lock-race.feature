@@ -20,6 +20,21 @@ Feature: Two writes on one Postgres row are staged, not hoped for
       When the race completes
       Then the first write's value and the second write's value are both returned
 
+  Rule: several racing writes all park before the first commits
+
+    @integration
+    Scenario: A second step with several writes parks every one of them
+      Given a second step that sends three conditional writes at once
+      When the race is asked to wait for three parked writes
+      Then the first write commits only once all three wait on the row lock
+      And each of the three re-reads the committed row
+
+    @integration
+    Scenario: A race waiting for more parked writes than are sent says so
+      Given a second step that sends one write
+      When the race is asked to wait for three parked writes
+      Then it rejects, naming the parked writes it waited for
+
   Rule: a first write that fails fails the race at once
 
     @integration

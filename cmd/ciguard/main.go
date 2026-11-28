@@ -46,18 +46,24 @@ func main() {
 		{name: "pr-workflow", run: ciguard.PRWorkflow},
 		{name: "static-cloud-keys", run: ciguard.StaticCloudKeys},
 		{name: "lambda-workdir", run: ciguard.LambdaWorkdir},
+		{name: "lambda-extensions", run: ciguard.LambdaExtensions},
 		{name: "publish-shape", run: ciguard.PublishShape},
 		{name: "ecr-skip-gates", run: ciguard.ECRSkipGates},
 		{name: "ecr-dispatch-tags", run: ciguard.ECRDispatchTags},
 		{name: "ecr-inputs", run: ciguard.ECRInputs},
 		{name: "ecr-inputs-readable", run: ciguard.ECRInputsReadable},
 		{name: "transform-cache", run: ciguard.TransformCacheProblems},
+		{name: "ffmpeg-cache", run: ciguard.FfmpegCacheProblems},
+		{name: "playwright-chromium", run: ciguard.PlaywrightChromiumProblems},
+		{name: "apt-ubuntu-sources", run: ciguard.AptUbuntuSourcesProblems},
 		{name: "vitest-transform-flag", run: ciguard.UncachedVitestScripts},
 		{name: "main-suites", run: ciguard.MainSuites},
+		{name: "upgradelab-trigger", run: ciguard.UpgradelabTrigger},
+		{name: "app-ci-datastores", run: ciguard.AppCIDatastores},
 	}
 
 	if failed := runAll(guards, repoRoot); failed {
-		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature and specs/ci/package-suites-transform-cache.feature")
+		fmt.Fprintln(os.Stderr, "\nSee specs/ci/lean-checkout.feature, specs/ci/go-version-consistency.feature, specs/ci/pr-review-bot.feature, specs/ci/one-pull-request-workflow.feature specs/ci/no-static-cloud-keys.feature, specs/ci/publish-ecr-images.feature, specs/ci/publish-prerelease-charts-to-ecr.feature and specs/ci/package-suites-transform-cache.feature, specs/ci/path-filters.feature and specs/ci/app-ci-datastores.feature")
 		os.Exit(1)
 	}
 }

@@ -65,6 +65,11 @@
       "cells": ["C3", "C4"],
       "note": "not in plan 3.4; needs usage traffic in the window"
     },
+    "dashboard:mark-my-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs My dashboards without the owner mark, as the previous release wrote them"
+    },
     "data-retention:keep-control-plane-events-forever": {
       "status": "seeded",
       "seed": "heavy:product.retention",
@@ -87,6 +92,11 @@
       "seed": "product-seeds:dataset",
       "cells": ["C1", "C3"],
       "note": "datasets seeded before the step get version 1; needs rows by the REST rows route"
+    },
+    "entitlement:materialise-billable-events-ttl": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs My dashboards without the owner mark, as the previous release wrote them"
     },
     "evaluator:backfill-versions": {
       "status": "pending",
@@ -126,6 +136,11 @@
       "cells": ["C1", "C2"],
       "note": "rows the old image changed after the copy, and accounts identity reopened, reach the new steps"
     },
+    "trace:link-unowned-trace-media": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs trace media stored without an owner link, as the previous release wrote it"
+    },
     "trace:send-month-trace-ids": {
       "status": "seeded",
       "seed": "traffic:otlp",
@@ -137,6 +152,12 @@
       "seed": "tenancy-sql:governance",
       "cells": ["C2"],
       "note": "no headless door on the old image: SQL, flagged"
+    },
+    "governance:seed-agent-registry": {
+      "status": "pending",
+      "seed": "tenancy-sql:governance",
+      "cells": ["C2"],
+      "note": "new tables, filled from agents, discovered agents and traffic; pending until a C2 seed writes those rows"
     },
     "governance:record-coding-assistant-billing": {
       "status": "pending",
@@ -190,6 +211,91 @@
       "seed": "unplanned",
       "note": "main has no headless door for a plaintext custom key: SQL row not written yet"
     },
+    "nurturing:replay-identity-erasure-marks": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-user-erasure-marks": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-virtual-keys": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-auth-members": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs auth's sso_auto_added facts and erased members, as the old release wrote them; no seed door written yet"
+    },
+    "nurturing:replay-organization-admins": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs projects with an admin and organizations whose admin was erased, as the old release wrote them; no seed door written yet"
+    },
+    "nurturing:replay-organization-members": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with active, disabled and erased members listed by organization:list-member-facts; no seed door written yet"
+    },
+    "nurturing:replay-organizations-created": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with a created fact in organization's log; no seed door written yet"
+    },
+    "nurturing:replay-project-placements": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs projects with a created fact in project's log; no seed door written yet"
+    },
+    "nurturing:replay-personal-owners-from-organization": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal_team_created facts in organization's log; the seed writes no events"
+    },
+    "nurturing:replay-personal-owners-from-project": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal_owner_listed facts, which project's listing step records; the seed writes no events"
+    },
+    "nurturing:replay-traced-projects-from-trace": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs project_traced facts in trace's log; the seed writes no events"
+    },
+    "nurturing:replay-traced-projects-from-project": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs first_message_listed facts, which project's listing step records; the seed writes no events"
+    },
+    "nurturing:replay-last-traces": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs first_trace_recorded or trace_received facts in trace's log; the seed writes no events"
+    },
+    "nurturing:replay-evaluation-days": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs evaluation lifecycle_completed facts since 2026-10-19 in the event log; no seed records one yet"
+    },
+    "nurturing:replay-trace-day-spans": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-trace-day-failures": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "projection replay from the owner's event log; no seed door written yet"
+    },
+    "nurturing:replay-organization-plans": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs billing subscription_changed facts in the event log; no seed records one yet"
+    },
     "ops:checkup-canary-project": {
       "status": "pending",
       "seed": "unplanned",
@@ -205,16 +311,36 @@
       "seed": "unplanned",
       "note": "needs ADMIN_EMAILS operators; cloud profile sets none"
     },
+    "organization:list-member-facts": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with active, disabled and deactivated members, as the old release wrote them; no seed door written yet"
+    },
     "organization:record-presence-settings": {
       "status": "pending",
       "seed": "unplanned",
       "note": "no seed door written yet"
+    },
+    "organization:record-seat-peak-opening-snapshots": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs organizations with seat holders as the old release wrote them; no seed door written yet"
+    },
+    "project:list-personal-owner-and-first-message-facts": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs personal projects and projects that already received a first message, as the old release wrote them; no seed door written yet"
     },
     "project:record-created-facts": {
       "status": "seeded",
       "seed": "heavy:product.org",
       "note": "projects made by main onboarding in each heavy organization",
       "cells": ["C1", "C3"]
+    },
+    "project:reslug-reserved-dashboards": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs a project whose slug is exactly dashboards, which no release since the slug suffix can mint; nothing to seed"
     },
     "prompt:seed-tags-for-untagged-organizations": {
       "status": "seeded",
@@ -232,6 +358,11 @@
       "seed": "tenancy-sql:sso",
       "cells": ["C2"],
       "note": "SSO connection and SCIM state by SQL"
+    },
+    "stored-object:import-clickhouse-index": {
+      "status": "seeded",
+      "seed": "traffic:otlp",
+      "note": "the step form of the stored objects clickhouse import system migration; declared in its migrations file, not the module file"
     },
     "suite:replay-scenario-facts-for-open-runs": {
       "status": "seeded",
@@ -260,6 +391,38 @@
       "seed": "heavy:otlp",
       "note": "the same spans fold trace_analytics rows whose metadata columns the mutation stores",
       "cells": ["C1", "C3"]
+    },
+    "trace:replay-trace-analytics-widget-columns": {
+      "status": "seeded",
+      "seed": "heavy:otlp",
+      "note": "the seeded spans' events refold trace_analytics rows with the fold's metadata columns",
+      "cells": ["C1", "C3"]
+    },
+    "trace:replay-trace-analytics-managed-prompt-version": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs traces with managed prompt versions written by the old release; no seed carries them yet"
+    },
+    "trace:replay-trace-analytics-app-version": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs traces with service.version or metadata.version written by the old release; no seed carries them yet"
+    },
+    "trace:replay-span-analytics": {
+      "status": "seeded",
+      "seed": "heavy:otlp",
+      "note": "the seeded spans' events map to the span_analytics rows the replay writes",
+      "cells": ["C1", "C3"]
+    },
+    "trace:record-evaluation-outcomes": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "needs evaluations of the last 62 days written by the old release; traffic:evaluation may cover it, unverified"
+    },
+    "trace:replay-trace-evaluation-analytics": {
+      "status": "pending",
+      "seed": "unplanned",
+      "note": "refolds the traces those evaluations land on; seeds with trace:record-evaluation-outcomes"
     },
     "upcast:entitlement:lw.usage.month_counted": {
       "status": "unheld",

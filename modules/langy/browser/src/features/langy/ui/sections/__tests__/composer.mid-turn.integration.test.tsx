@@ -1,6 +1,6 @@
 /**
- * The composer takes no queue: while a turn is in flight Enter sends nothing, and the draft
- * waits in the field until the turn ends.
+ * While a turn is in flight the composer still sends: the panel queues what it is handed, and the
+ * field says a message sent now goes next.
  * @vitest-environment jsdom
  * @see specs/langy/langy-composer-feedback-and-cards.feature
  */
@@ -31,7 +31,7 @@ vi.mock("../../elements/langy-model-pill.tsx", () => ({
 import { useLangyStore } from "../../../../../behavior/langy.store.ts";
 import { Composer } from "../composer.tsx";
 
-const MID_TURN_PLACEHOLDER = "Langy is working. You can send when it stops.";
+const MID_TURN_PLACEHOLDER = "Langy is working. Send a message and it goes next.";
 const IDLE_PLACEHOLDER = "Ask Langy or describe what you want…";
 
 function renderComposer(
@@ -45,7 +45,6 @@ function renderComposer(
         modelOptions={["openai/gpt-5-mini"]}
         onModelChange={() => {}}
         onSend={onSend}
-        onStop={() => {}}
         disabled={false}
         {...over}
       />
@@ -79,8 +78,8 @@ describe("given the turn has ended", () => {
 
 describe("given a Langy turn is in flight", () => {
   describe("when the user reads the composer", () => {
-    /** @scenario The message field says a message waits while Langy works */
-    it("says the message waits, rather than inviting one it will not send", () => {
+    /** @scenario The message field says a message goes next while Langy works */
+    it("says a message sent now goes next", () => {
       useLangyStore.setState({ turnPhase: "active" });
       renderComposer(() => {});
 
@@ -129,9 +128,9 @@ describe("given a Langy turn is in flight", () => {
     });
   });
 
-  describe("when the user presses Enter anyway", () => {
-    /** @scenario Enter during a turn keeps the message instead of sending it */
-    it("sends nothing and keeps the draft for when the turn ends", () => {
+  describe("when the user presses Enter", () => {
+    /** @scenario Enter during a turn sends the message on to be queued */
+    it("hands the message to the panel, which queues it", () => {
       const onSend = vi.fn();
       useLangyStore.setState({ turnPhase: "active" });
       renderComposer(onSend);
@@ -140,15 +139,23 @@ describe("given a Langy turn is in flight", () => {
       fireEvent.change(field, { target: { value: "try another version" } });
       fireEvent.keyDown(field, { key: "Enter" });
 
-      expect(onSend).not.toHaveBeenCalled();
-      expect(useLangyStore.getState().draft).toBe("try another version");
+      expect(onSend).toHaveBeenCalledWith("try another version");
+    });
+
+    /** @scenario The composer keeps Send while Langy is working */
+    it("shows Send and no Stop", () => {
+      useLangyStore.setState({ turnPhase: "active" });
+      renderComposer(() => {});
+
+      expect(screen.getByRole("button", { name: "Send" })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: "Stop" })).toBeNull();
     });
   });
 });
 
 describe("given the turn has ended", () => {
   describe("when the user presses Enter on the draft they typed during it", () => {
-    /** @scenario The kept message sends once the turn ends */
+    /** @scenario A message typed during a turn sends once the customer presses Enter */
     it("sends it", () => {
       const onSend = vi.fn();
       useLangyStore.setState({ turnPhase: "active" });
@@ -158,8 +165,6 @@ describe("given the turn has ended", () => {
       fireEvent.change(midTurnField, {
         target: { value: "try another version" },
       });
-      fireEvent.keyDown(midTurnField, { key: "Enter" });
-      expect(onSend).not.toHaveBeenCalled();
 
       useLangyStore.setState({ turnPhase: "idle" });
       rerender(
@@ -169,7 +174,6 @@ describe("given the turn has ended", () => {
             modelOptions={["openai/gpt-5-mini"]}
             onModelChange={() => {}}
             onSend={onSend}
-            onStop={() => {}}
             disabled={false}
           />
         </DesignSystemProvider>,

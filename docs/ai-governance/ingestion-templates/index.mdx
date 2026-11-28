@@ -12,7 +12,7 @@ LangWatch's **Ingestion Templates** let you connect tool-specific telemetry sour
 without LangWatch ever participating in the upstream tool's authentication.
 
 You install a template, paste an **ingestion key** into your tool's OTLP exporter, and
-traces land at `/me/traces` already shaped into the canonical `gen_ai.*` form, cost,
+traces land in your personal project at `/<personal project slug>/traces` already shaped into the canonical `gen_ai.*` form, cost,
 tokens, and model populated automatically.
 
 An ingestion key is one
@@ -74,21 +74,21 @@ org-customizable for admins who need it.
 
 ## Worked example: connect Claude Code on Anthropic 20x
 
-By the end of this flow you have a Claude Code trace visible at `/me/traces` with
+By the end of this flow you have a Claude Code trace visible at `/<personal project slug>/traces` with
 `gen_ai.usage.*`, `gen_ai.response.model`, and `langwatch.cost.usd` populated.
 
 > **Before you start:** you need a LangWatch account. If you're brand new, start with the
 > [getting started guide](/ai-governance/getting-started-developer) and then sign in to
 > LangWatch. First-time sign-in completes onboarding and lands you on your **personal
-> workspace** (`/me`). On self-hosted instances the same path works against your own
+> workspace** (`/coding-agents`). On self-hosted instances the same path works against your own
 > deployment's host.
 
 ### Step 1: open the catalog
 
-Navigate to `/me` and scroll to the **Trace Ingest** section (or jump straight to
-`/me#trace-ingest`).
+Navigate to `/coding-agents` and scroll to the **Trace Ingest** section (or jump straight to
+`/coding-agents#trace-ingest`).
 
-![/me Trace Ingest section, 4 tiles populated](/images/ai-governance/post-bypass/10-me-trace-ingest-scrolled.png)
+![/coding-agents Trace Ingest section, 4 tiles populated](/images/ai-governance/post-bypass/10-me-trace-ingest-scrolled.png)
 
 You'll see four tiles: **Claude Code**, **Cursor**, **Claude cowork**, and the
 **Raw OTLP (advanced)** discovery card. The first three are tool-specific templates; the
@@ -130,11 +130,12 @@ Open a new terminal so the env vars take effect, then run Claude Code as you nor
 would. As soon as Claude Code completes its first action, OpenTelemetry exports the span
 to your LangWatch personal workspace.
 
-### Step 4: see the trace at /me/traces
+### Step 4: see the trace in your personal project
 
-Click **View traces →** on the tile, or navigate directly to `/me/traces`.
+Open **Traces** in the Coding agents sidebar, or navigate directly to
+`/<personal project slug>/traces`.
 
-![/me/traces, Claude Code traces with tokens + model populated](/images/ai-governance/post-bypass/12-traces-populated.png)
+![Personal project traces, Claude Code traces with tokens + model populated](/images/ai-governance/post-bypass/12-traces-populated.png)
 
 Open the trace. You should see:
 
@@ -246,7 +247,7 @@ The `protectedTemplateAttributeKeys` closed list:
 - `langwatch.origin`, receiver-stamped provenance (`coding_agent` for a CLI
   assistant, `ai_tool` for any other ingest source).
 - `langwatch.source`, receiver-stamped provenance (used for tile filtering at
-  `/me/traces`).
+  `/<personal project slug>/traces`).
 
 Notably **not** in the list:
 
@@ -274,14 +275,14 @@ boundary articulation.
 
 If you have a custom telemetry pipeline, your own spans, your own normalisation, your
 own cost calculations, you don't want a template's OTTL rewriting your shape. Use the
-**Raw OTLP (advanced)** card on `/me` Trace Ingest instead.
+**Raw OTLP (advanced)** card on `/coding-agents` Trace Ingest instead.
 
-The card deep-links to the **Personal OTLP Endpoint** panel at `/me/settings#otlp`,
+The card deep-links to the **Personal OTLP Endpoint** panel at `/coding-agents/configure#otlp`,
 which surfaces your personal-project's existing OTLP endpoint and API key for ad-hoc /
-custom telemetry. No template OTTL is applied; your spans land at `/me/traces` exactly
+custom telemetry. No template OTTL is applied; your spans land at `/<personal project slug>/traces` exactly
 as you emit them.
 
-![Personal OTLP Endpoint panel on /me/settings](/images/ai-governance/post-bypass/04-me-settings.png)
+![Personal OTLP Endpoint panel on /coding-agents/configure](/images/ai-governance/post-bypass/04-me-settings.png)
 
 ### When to choose Raw OTLP vs a template
 
@@ -290,7 +291,7 @@ as you emit them.
 | Claude Code, Cursor, Claude cowork tile | You run that tool and want LangWatch's catalog OTTL to normalise the spans for you.                                         |
 | Raw OTLP (advanced)                     | You have a custom pipeline, or your spans already follow `gen_ai.*` conventions, or you want to keep your own field shapes. |
 
-You can also surface the same endpoint + token from `/me/settings → Personal OTLP Endpoint`
+You can also surface the same endpoint + token from `/coding-agents/configure → Personal OTLP Endpoint`
 without going through the catalog tile.
 
 ---
@@ -347,7 +348,7 @@ re-stamp regardless of OTTL, admin OTTL in org-A cannot misattribute cost to org
 
 A tile flips to green-checked only after the template is verified end to end on a real
 install: an admin publishes it via `/governance/inventory?tab=catalog`, a user installs it
-via `/me`, the upstream tool emits a real trace, and the resulting attribution holds up
+via `/coding-agents`, the upstream tool emits a real trace, and the resulting attribution holds up
 under cross-user isolation and forge attempts against both protected lists.
 
 ### What is audited

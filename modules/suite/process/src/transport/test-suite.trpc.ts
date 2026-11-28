@@ -29,4 +29,12 @@ export const testSuiteTrpcTransport: TrpcRouterDeclaration<SuiteApi, typeof test
     .procedure("archive")
     .withPermission("scenarios:manage")
     .handle(({ app, input }) => app.archiveTestSuite(input))
+
+    .procedure("listTemplates")
+    .withPermission("scenarios:view")
+    .handle(({ app, input }) => app.listTemplates(input))
+
+    .procedure("applyTemplate")
+    .withPermission("scenarios:manage")
+    .handle(({ app, input, actor }) => app.applyTemplate(input, { id: actor.id, label: "user" }))
     .build();

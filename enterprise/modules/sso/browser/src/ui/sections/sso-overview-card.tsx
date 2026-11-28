@@ -326,7 +326,7 @@ export function SingleSignOnPreviewCard({
           feature="Single sign-on"
           description="Your people sign in with your company's identity provider, and you decide there who still has access."
           canManage={canActivate}
-          compact
+          inset
           data-testid="sso-card-enterprise-gate"
         />
       )}

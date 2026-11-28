@@ -1,7 +1,5 @@
 import type { SystemStyleObject } from "@langwatch/design-system/primitives";
 
-export type FacetValueState = "neutral" | "include" | "exclude";
-
 /**
  * Per-value aggregates the evaluator facet attaches so its sidebar
  * drilldown can render verdict pills + score range inline without

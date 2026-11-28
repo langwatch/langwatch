@@ -24,6 +24,8 @@ interface DerivedDatasetDedup {
   readonly keyColumns?: readonly string[];
   readonly strategy?: LangWatchQLViewDefinition["dedup"]["strategy"];
   readonly versionColumn?: string;
+  readonly tieBreakColumns?: LangWatchQLViewDefinition["dedup"]["tieBreakColumns"];
+  readonly stableColumns?: LangWatchQLViewDefinition["dedup"]["stableColumns"];
   readonly aggregating?: boolean;
 }
 
@@ -392,6 +394,8 @@ function buildDedup(
     keyColumns: dedup.keyColumns ?? parseSortingKey(manifestTable.sortingKey),
     ...(dedup.strategy ? { strategy: dedup.strategy } : {}),
     ...(dedup.versionColumn ? { versionColumn: dedup.versionColumn } : {}),
+    ...(dedup.tieBreakColumns ? { tieBreakColumns: dedup.tieBreakColumns } : {}),
+    ...(dedup.stableColumns ? { stableColumns: dedup.stableColumns } : {}),
     ...(dedup.aggregating ? { aggregating: dedup.aggregating } : {}),
   };
 }

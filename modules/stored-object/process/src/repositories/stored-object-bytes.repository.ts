@@ -49,6 +49,12 @@ export abstract class StoredObjectBytesRepository {
     address: StoredObjectStorageAddress;
   }): Promise<ObjectDigest>;
 
+  /** Whether bytes are at the address, asked without opening them. */
+  abstract exists(input: {
+    projectId: StoredObjectProjectId;
+    address: StoredObjectStorageAddress;
+  }): Promise<boolean>;
+
   /** Throws `StoredObjectNotFoundError` when no bytes are at the address. */
   abstract getBytes(input: {
     projectId: StoredObjectProjectId;
@@ -64,6 +70,15 @@ export abstract class StoredObjectBytesRepository {
   abstract resolveDestination(input: {
     projectId: StoredObjectProjectId;
   }): Promise<StoredObjectStorageDestination>;
+
+  /** Whether this project's account sends clients' upload bytes through the process. */
+  abstract uploadsThroughProcess(input: { projectId: StoredObjectProjectId }): Promise<boolean>;
+
+  /** Signs a direct upload to a key no object takes and discards it: proves the account can. */
+  abstract signCheckupUpload(input: {
+    projectId: StoredObjectProjectId;
+    expiresAt: Instant;
+  }): Promise<void>;
 
   /** Writes a small object where the project's bytes go, then removes it. */
   abstract probe(input: { projectId: StoredObjectProjectId }): Promise<void>;

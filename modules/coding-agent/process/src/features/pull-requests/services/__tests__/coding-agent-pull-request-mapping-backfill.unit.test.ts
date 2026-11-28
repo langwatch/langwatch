@@ -10,6 +10,7 @@ import {
   createTestProjects,
   type TestProjects,
   TestSessions,
+  storedTracesFixture,
   TestTraceSessions,
   session,
 } from "../../../../__tests__/fixtures/coding-agent.fixture.ts";
@@ -29,6 +30,7 @@ function serviceWith(input: {
   return CodingAgentFeatureService.create({
     sessions: input.sessions,
     traceSessions: new TestTraceSessions(),
+    storedTraces: storedTracesFixture(),
     metricSeries: new TestMetricSeries(),
     sessionEvents: new TestEvents(),
     github: input.github,

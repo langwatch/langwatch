@@ -50,6 +50,21 @@ export const retentionScopeAvailableSchema: RetentionScopeAvailableSchema =
   retentionScopeAvailableSchemaDefinition;
 export type RetentionScopeAvailable = z.infer<typeof retentionScopeAvailableSchema>;
 
+/**
+ * Whether a scope's last saved change reached its stored data: `applied` at the covering apply,
+ * or `pending` since the change. Spec: modules/data-retention/specs/retention-apply-record.feature
+ */
+const storedApplyStatusSchemaDefinition = z.object({
+  scopeType: retentionScopeSchema,
+  scopeId: z.string(),
+  status: z.enum(["applied", "pending"]),
+  /** Epoch milliseconds: the covering apply when applied, the last change when pending. */
+  at: z.number(),
+});
+export interface StoredApplyStatusSchema extends Named<typeof storedApplyStatusSchemaDefinition> {}
+export const storedApplyStatusSchema: StoredApplyStatusSchema = storedApplyStatusSchemaDefinition;
+export type StoredApplyStatus = z.infer<typeof storedApplyStatusSchema>;
+
 /** Everything one render of the retention settings page is built from. */
 const retentionPolicySnapshotSchemaDefinition = z.object({
   projectId: z.string(),
@@ -60,6 +75,8 @@ const retentionPolicySnapshotSchemaDefinition = z.object({
   effective: resolvedRetentionSchema,
   /** Override rows the caller can read, one per (scope, category). */
   rules: z.array(retentionRuleSchema),
+  /** Per readable rule scope with a recorded change, whether that change reached stored data. */
+  storedApply: z.array(storedApplyStatusSchema),
   /** Scopes the caller can write to (RBAC-filtered), for the chip picker. */
   available: retentionScopeAvailableSchema,
   /**
@@ -67,6 +84,11 @@ const retentionPolicySnapshotSchemaDefinition = z.object({
    * see the snapshot but must not be offered the add, edit or delete controls.
    */
   canConfigureRetention: z.boolean(),
+  /**
+   * Whether a length above 90 days, or keeping forever, adds storage to this organization's bill.
+   * Such a length is saved through `setBilledForScope`, which asks `subscription:manage`.
+   */
+  storageBilled: z.boolean(),
 });
 export interface RetentionPolicySnapshotSchema extends Named<
   typeof retentionPolicySnapshotSchemaDefinition
@@ -89,3 +111,59 @@ export interface RetentionStorageUsageSchema extends Named<
 export const retentionStorageUsageSchema: RetentionStorageUsageSchema =
   retentionStorageUsageSchemaDefinition;
 export type RetentionStorageUsage = z.infer<typeof retentionStorageUsageSchema>;
+
+/** One category's stored items past its projects' period; null days when the projects differ. */
+const storedPastRetentionCountSchemaDefinition = z.object({
+  rows: z.number().int().nonnegative(),
+  retentionDays: z.number().int().nonnegative().nullable(),
+});
+export interface StoredPastRetentionCountSchema extends Named<
+  typeof storedPastRetentionCountSchemaDefinition
+> {}
+export const storedPastRetentionCountSchema: StoredPastRetentionCountSchema =
+  storedPastRetentionCountSchemaDefinition;
+export type StoredPastRetentionCount = z.infer<typeof storedPastRetentionCountSchema>;
+
+/**
+ * What applying the scope's periods to stored data would delete, per category, over every
+ * project the apply rewrites (archived included). Aggregate only: no project is named.
+ */
+const storedPastRetentionSchemaDefinition = z.object({
+  projectCount: z.number().int().nonnegative(),
+  traces: storedPastRetentionCountSchema,
+  scenarios: storedPastRetentionCountSchema,
+  experiments: storedPastRetentionCountSchema,
+});
+export interface StoredPastRetentionSchema extends Named<
+  typeof storedPastRetentionSchemaDefinition
+> {}
+export const storedPastRetentionSchema: StoredPastRetentionSchema =
+  storedPastRetentionSchemaDefinition;
+export type StoredPastRetention = z.infer<typeof storedPastRetentionSchema>;
+
+/**
+ * What an organization stores today and how many days of data that is, so the upgrade dialog
+ * can price a longer retention before the buyer picks it.
+ */
+const organizationStorageEstimateSchemaDefinition = z.object({
+  totalBytes: z.number().nonnegative(),
+  /** The organization's traces retention, or its age in days when it is younger than that. */
+  coveredDays: z.number().int().positive(),
+});
+export interface OrganizationStorageEstimateSchema extends Named<
+  typeof organizationStorageEstimateSchemaDefinition
+> {}
+export const organizationStorageEstimateSchema: OrganizationStorageEstimateSchema =
+  organizationStorageEstimateSchemaDefinition;
+export type OrganizationStorageEstimate = z.infer<typeof organizationStorageEstimateSchema>;
+
+/** The traces retention the organization keeps, as the plan card names it; 0 keeps it forever. */
+const organizationRetentionSchemaDefinition = z.object({
+  retentionDays: z.number().int().nonnegative(),
+});
+export interface OrganizationRetentionSchema extends Named<
+  typeof organizationRetentionSchemaDefinition
+> {}
+export const organizationRetentionSchema: OrganizationRetentionSchema =
+  organizationRetentionSchemaDefinition;
+export type OrganizationRetention = z.infer<typeof organizationRetentionSchema>;

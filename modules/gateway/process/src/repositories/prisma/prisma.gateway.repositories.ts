@@ -6,6 +6,7 @@ import type {
   GatewayTransactionRepository,
 } from "../gateway-transaction.repository.ts";
 import type { GatewayCipher, GatewayRepositories } from "../gateway.repositories.ts";
+import { PrismaGatewayA2aTargetRepository } from "./prisma.gateway-a2a-target.repository.ts";
 import { PrismaGatewayAuditRepository } from "./prisma.gateway-audit.repository.ts";
 import { PrismaGatewayBudgetRepository } from "./prisma.gateway-budget.repository.ts";
 import { PrismaGatewayCacheRuleRepository } from "./prisma.gateway-cache-rule.repository.ts";
@@ -43,6 +44,7 @@ type GatewayPostgresRepositories = Pick<
   | "directBudgets"
   | "spendScope"
   | "connectUpstream"
+  | "a2aTargets"
   | "realtimeSessions"
   | "internalStore"
   | "traceExportKeys"
@@ -88,6 +90,7 @@ export class PostgresGatewayRepositories {
         prisma,
         cipher: encryption,
       }),
+      a2aTargets: PrismaGatewayA2aTargetRepository.create({ prisma, cipher: encryption }),
       realtimeSessions: PrismaGatewayRealtimeSessionRepository.create({ database: prisma }),
       internalStore: PrismaGatewayInternalStoreRepository.create({ database: prisma }),
       traceExportKeys: PrismaGatewayTraceExportKeyRepository.create({ prisma, cipher: encryption }),

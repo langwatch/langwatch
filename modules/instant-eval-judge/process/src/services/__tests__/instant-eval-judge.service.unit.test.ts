@@ -664,7 +664,7 @@ describe("given a judge call that carries a route", () => {
     const { judgement } = answer as Extract<typeof answer, { outcome: "judged" }>;
     expect(judgement.routing).toBeUndefined();
     expect(judgement.costNanoUsd).toBeUndefined();
-    expect(recorded[0]).toMatchObject({ model: "jev", inputTokens: 500 });
+    expect(recorded[0]).toMatchObject({ model: "langwatch-instant-preview", inputTokens: 500 });
   });
 
   /** @scenario "A call with no route keeps today's single classifier call" */
@@ -685,7 +685,7 @@ describe("given a judge call that carries a route", () => {
         organizationId: ORGANIZATION_ID,
         projectId: PROJECT_ID,
         requestId: "minted-1",
-        model: "jev",
+        model: "langwatch-instant-preview",
         rateVersion: "instant_eval@0.042x1.3",
         inputTokens: 500,
         priceNanoUsd: 27_300,
@@ -922,6 +922,31 @@ describe("given the unmetered classify the Api and the judge call share", () => 
       expect(classifier.classify).not.toHaveBeenCalled();
       expect(judgement.costNanoUsd).toBe(1_000_000_000);
       expect(recorded).toEqual([]);
+    });
+  });
+
+  describe("when the routed call carries a cost ceiling with no room", () => {
+    /** @scenario "A send whose worst case passes the ceiling is not sent" */
+    it("hands the ceiling to the router, which sends nothing and skips on the query cost ceiling", async () => {
+      const { service, classifier } = harness();
+      const held: number[] = [];
+
+      const judgement = await service.classifyOnce({
+        ...call,
+        route: { job: "search", tokens: 100 },
+        costCeiling: {
+          hold: async (nanoUsd) => {
+            held.push(nanoUsd);
+            return false;
+          },
+          settle: () => {},
+        },
+      });
+
+      expect(held.length).toBeGreaterThan(0);
+      expect(classifier.classify).not.toHaveBeenCalled();
+      expect(judgement.skippedReason).toBe("query_cost_ceiling");
+      expect(judgement.costNanoUsd ?? 0).toBe(0);
     });
   });
 

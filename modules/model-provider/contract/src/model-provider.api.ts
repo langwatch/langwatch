@@ -24,6 +24,7 @@ import type {
   ModelDefaultScope,
   ModelDefaultSnapshot,
   ModelProvider,
+  ModelProviderSave,
   ModelProviderAlternateResolution,
   ModelProviderCodexGatewayRefresh,
   ModelProviderCodexGatewayRefreshInput,
@@ -195,6 +196,11 @@ export interface ModelProviderUsageCount {
 export type ModelProviderCustomKeys = Pick<ModelProvider, "id" | "provider" | "organizationId"> &
   Readonly<{ customKeys: Record<string, unknown> }>;
 
+/** A listed provider and the model ids its own model list answers with, null when unknown. */
+export type ModelProviderWithServedModels = ModelProviderSummary & {
+  servedModels: string[] | null;
+};
+
 /** Callable model-provider operations shared by process peers after composition. */
 export interface ModelProviderApi {
   estimateCost(input: ModelCostEstimateInput): number;
@@ -222,6 +228,13 @@ export interface ModelProviderApi {
   getExecutionProviders(
     input: ModelProviderListProjectInput,
   ): Promise<Record<string, ModelProviderExecution>>;
+  /**
+   * `listForProject`, each row carrying the bare ids its provider's own model list answers with
+   * (cached per credential), or null when the provider was not asked or did not answer.
+   */
+  listForProjectWithServedModels(
+    input: ModelProviderListProjectInput,
+  ): Promise<ModelProviderWithServedModels[]>;
   prepareExecution(
     input: ModelProviderExecutionPrepareInput,
   ): Promise<ModelProviderExecutionParameters>;
@@ -244,13 +257,13 @@ export interface ModelProviderApi {
     input: ModelProviderPlaygroundRequest,
   ): Promise<ModelProviderPlaygroundCompletion>;
   /** Stores or replaces a provider row and answers it with its credentials masked. */
-  upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProvider>;
+  upsert(input: ModelProviderWriteRequest, by: ModelProviderCaller): Promise<ModelProviderSave>;
   /**
    * The write a project credential makes, which names no person to attribute
    * it to and no person to authorize it against: the key's own project
    * permission is the whole gate. Answers the row with its credentials masked.
    */
-  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProvider>;
+  upsertUnattributed(input: ModelProviderWriteRequest): Promise<ModelProviderSave>;
   delete(input: ModelProviderDeleteRequest, by: ModelProviderCaller): Promise<void>;
   /**
    * Probes a credential the caller supplied, after checking they may write
@@ -378,6 +391,16 @@ export interface ModelProviderApi {
    * and `ModelProviderCustomKeysMissingError` for a row that stores none.
    */
   getCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+  /**
+   * The keys the AI gateway runs a row with: its stored keys, plus for a managed Bedrock
+   * organization the customer role's session and private endpoint (as the runtime endpoint key).
+   */
+  getGatewayCustomKeys(input: { modelProviderId: string }): Promise<ModelProviderCustomKeys>;
+  /**
+   * Names the window the organization's minted managed sessions belong to, so the gateway's
+   * config version moves before a session expires. Empty for an organization with none.
+   */
+  getGatewayKeysEpoch(input: { organizationId: string }): string;
 }
 
 export const ModelProviderApi = moduleApi<ModelProviderApi>()("model-provider");

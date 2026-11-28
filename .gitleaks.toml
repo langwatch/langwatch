@@ -121,6 +121,17 @@ regexes = ['''^(0123456789abcdef){4}$''']
 description = "AWS-shaped fixture credentials planted by the secrets-gate scoping tests"
 regexes = ['''AKIAQYLPMN5HHHFPZAM2''', '''A1B2C3D4E5F6G7H8I9J0K1L2M3N4O5P6Q7R8S9T0''']
 
+# The temporary key a fake STS client returns in the Security Lake assume-role
+# unit test. The value spells a word, names no AWS account, and is gone from the
+# tip, but gitleaks scans the whole commit range. Scoped by value AND path.
+[[allowlists]]
+description = "Fake STS temporary key in the Security Lake assume-role unit test"
+condition = "AND"
+paths = [
+  '''enterprise/modules/governance/process/src/features/ocsf/services/__tests__/security-lake-assume-role\.unit\.test\.ts''',
+]
+regexes = ['''^ASIATEMPORARYROLEKEY$''']
+
 # The synthetic credentials the secrets-redaction suite feeds to the redactor.
 # This suite's whole job is to hand credential-shaped strings to `redact()` and
 # assert they come back as `[SECRET]`, so a fixture no scanner recognises would
@@ -164,6 +175,22 @@ paths = [
   '''docs/ai-gateway/cookbooks/metering-and-rebilling\.mdx''',
   '''docs/llms-full\.txt''',
 ]
+
+# Placeholder bearer values in the docs' curl examples, as regenerated into
+# `llms-full.txt`: truncated keys (`vk-lw-01JXXX...`), `your_api_key` and
+# `sk-your-litellm-key`. None names a real credential.
+#
+# `condition = "AND"` because the default is OR, and under OR the path alone
+# would allowlist every curl-auth-header finding in this file. No
+# `regexTarget = "line"`: this rule can match across several lines of one
+# example, so a placeholder on a neighbouring line could carry a real token
+# through. The patterns apply to the matched secret itself.
+[[allowlists]]
+description = "Placeholder bearer keys in the docs' curl examples, not credentials"
+targetRules = ["curl-auth-header"]
+condition = "AND"
+paths = ['''docs/llms-full\.txt''']
+regexes = ['''^(?:.*\.\.\.|.*…)$''', '''^your[-_]api[-_]key$''', '''^sk-your-litellm-key$''']
 
 # `azure-secret-hygiene.unit.test.ts` proves the opposite of a leak: that
 # `redactAuthorizationMaterial` strips bearer tokens out of Azure error text
@@ -615,3 +642,26 @@ condition = "AND"
 targetRules = ["generic-api-key"]
 paths = ['''^services/nlpgo/app/engine/blocks/codeblock/runner_stderr_test\.go$''']
 regexes = ['''^CAPSECRET-0123456789$''']
+
+# `vk-lw-a2a-matching-` and `vk-lw-a2a-other-` are made-up key prefixes in the
+# authresolver change-feed test, hashed to fill the L1 cache; they authenticate
+# against nothing. Scoped to those values in that file and to `generic-api-key`.
+[[allowlists]]
+description = "Made-up virtual key prefixes in the authresolver A2A change-feed test"
+condition = "AND"
+targetRules = ["generic-api-key"]
+paths = ['''^services/aigateway/adapters/authresolver/service_test\.go$''']
+regexes = ['''^vk-lw-a2a-(matching|other)-''']
+
+# `ghp_aB3dE5fG7hJ9kL1mN3pQ5rS7tU9vW1xY3zA5` is a made-up GitHub token shape in
+# the A2A proxy scan tests: the guardrail fake denies it, and the tests prove it
+# never reaches the upstream or the caller. A test of a secret scan needs a
+# secret-shaped value; this one is an alternating-case alphabet that names no
+# account. Scoped to that value in that file (`condition = "AND"`) and to
+# `github-pat` and `generic-api-key`, so any other token in the file is still caught.
+[[allowlists]]
+description = "Made-up GitHub token shape in the A2A proxy guardrail scan tests"
+condition = "AND"
+targetRules = ["github-pat", "generic-api-key"]
+paths = ['''^services/aigateway/adapters/a2aproxy/scan_test\.go$''']
+regexes = ['''^ghp_aB3dE5fG7hJ9kL1mN3pQ5rS7tU9vW1xY3zA5$''']

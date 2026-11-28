@@ -9,6 +9,7 @@ import type { UiLinkSignInMethodOutcome } from "@langwatch/auth-contract";
 import type { TimeInput } from "@langwatch/time";
 import { createAuthClient } from "better-auth/react";
 
+import { linkRefusalReason } from "../model/link-refusal-copy.ts";
 import { rememberPasskeyOnThisDevice } from "../model/passkey-on-this-device.ts";
 
 export type { UiLinkSignInMethodOutcome };
@@ -147,7 +148,8 @@ export async function linkUiSignInMethod(
     body: JSON.stringify({ provider: providerId(provider), callbackURL: callbackUrl }),
   });
   if (!response.ok) {
-    return { ok: false, reason: await response.text() };
+    const body = await response.text().catch(() => "");
+    return { ok: false, reason: linkRefusalReason({ body }) };
   }
   const body = (await response.json()) as { url?: string; redirect?: boolean };
   if (body.url && body.redirect !== false) {

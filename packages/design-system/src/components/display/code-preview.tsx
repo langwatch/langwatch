@@ -1,6 +1,6 @@
 import { Check, Clipboard, Copy, Eye, EyeOff, WandSparkles } from "lucide-react";
 import type React from "react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { useColorMode } from "../../color-mode/index.tsx";
 import {
@@ -280,11 +280,23 @@ function SnippetCopyButton({
   copyText: SnippetCopy;
 }) {
   const [copied, setCopied] = useState(false);
+  const resetTimer = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+  const isMountedRef = useRef(false);
+  // Cleanup runs before an await resumes, so the mounted flag guards the resumed copy.
+  useEffect(() => {
+    isMountedRef.current = true;
+    return () => {
+      isMountedRef.current = false;
+      clearTimeout(resetTimer.current);
+    };
+  }, []);
   const name = `Copy ${label.toLowerCase()}`;
   const copy = async (value: string) => {
-    if (!(await copyText({ text: value, what: label }))) return;
+    const didCopy = await copyText({ text: value, what: label });
+    if (!isMountedRef.current || !didCopy) return;
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    clearTimeout(resetTimer.current);
+    resetTimer.current = setTimeout(() => setCopied(false), 2000);
   };
   return (
     <Tooltip content={copied ? "Copied!" : name} openDelay={0} showArrow>

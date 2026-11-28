@@ -8,13 +8,10 @@ import * as fs from "node:fs";
 import * as path from "node:path";
 
 import { SHELL_FUNCTION_TOOLS } from "./shell-rc";
-import { aliasShellFor } from "./wrapper-info-run";
+import { aliasShellFor, shellQuote } from "./wrapper-info-run";
 
 /** Past this the shell lookup is abandoned and the tool counts as found. */
 const SHELL_LOOKUP_TIMEOUT_MS = 10_000;
-
-/** Single-quote a string for safe interpolation into a `sh -c` command. */
-const shellQuote = (s: string): string => `'${s.replace(/'/g, "'\\''")}'`;
 
 /**
  * The stdin a shell lookup gets: the terminal when the launch shell will have it, so an rc that

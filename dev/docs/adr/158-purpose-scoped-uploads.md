@@ -2,14 +2,15 @@
 
 **Date:** 2026-09-24
 
-**Status:** Accepted (Alex, 2026-09-24); §3, §5, §8 and §10 revised the same day ("Keep purpose read checks"); §8, §9 and §10 amended the same day: `/attachments` kept deprecated, the web-only `/direct-upload*` routes removed
+**Status:** Accepted (Alex, 2026-09-24); §3, §5, §8 and §10 revised the same day ("Keep purpose read checks"); §8, §9 and §10 amended the same day: `/attachments` kept deprecated, the web-only `/direct-upload*` routes removed; §4, §7 and Consequences amended 2026-11-17 (#9666), proposed: needs Alex's approval
 
 **Relates to:** [ADR-155](./155-migrations-are-never-breaking.md) (every schema and wire step below is expand-then-contract),
 [stored-object ADR-001](../../../modules/stored-object/adrs/001-package-boundary.md) (one Postgres row is an object's whole state),
 `dev/docs/ARCHITECTURE.md` §3.2, §3.3, §6, §7, §8.
 
 **Behavioural contract:** [purpose-scoped-upload.feature](../../../modules/stored-object/specs/purpose-scoped-upload.feature),
-[dataset-attachments.feature](../../../specs/datasets/dataset-attachments.feature).
+[dataset-attachments.feature](../../../specs/datasets/dataset-attachments.feature),
+[uploads-through-langwatch.feature](../../../modules/stored-object/specs/uploads-through-langwatch.feature) (#9666).
 
 ## Context
 
@@ -162,6 +163,10 @@ confirmUpload(input: { projectId; objectId }): Promise<StoredObjectReference>
     - The claims inside `sig` are project, object, byte length, media type and expiry.
     - They are sealed by the process's `encryption` member, AES-256-GCM, whose seal is its own
       signature. Precedent: `hosted-mcp.app.ts:45`. No new secret is needed.
+  - **S3 or Azure set to upload through LangWatch** (amended 2026-11-17, #9666): the same signed
+    route, when the account's upload setting is `through-langwatch` (§7). For a bucket that browsers
+    and SDK clients cannot reach, such as one only reachable inside the cluster. The default stays
+    the direct URL above. There is no browser-side fallback: a second `createUpload` mints a new id.
 - **The local signed route.** `PUT /api/stored-objects/uploads/:storedObjectId/content` is hidden from
   the docs, and clients only ever receive it as an `uploadUrl`.
   - Access is public, with the stated reason "signed URL". The body is read with
@@ -172,15 +177,21 @@ confirmUpload(input: { projectId; objectId }): Promise<StoredObjectReference>
     - stops at `byteLength + 1` (413) and leaves no partial file. There is no earlier 413 from
       `Content-Length`: the REST handler sees no request headers, and nothing past the cap is kept.
 
-  **This is the one standing place the server accepts upload bytes.**
+  **This is the one standing place the server accepts upload bytes**, on every backend set to
+  upload through LangWatch. The api's listener gives a request body two hours, not Node's 300 s.
 
 - **`confirmUpload` hashes on confirm.**
   - It reads `objectStorage.digest`: the backend's own SHA-256 where it holds one (the digest the local
     write computed), otherwise the object streamed back through the hash (S3 and Azure uploads).
+    Amended 2026-11-17 (#9666): an upload that came through the signed route confirms on the digest
+    and length that route recorded, without reading the object back, for 24 hours after its
+    bytes landed, past its 15-minute window. The signed address takes one landed file.
   - The stored size must equal the declared `byteLength`.
   - It records `sha256` and moves the record to `available`.
   - It is idempotent.
-  - Pending records expire after 15 minutes and are reaped from the same record.
+  - Pending records expire after 15 minutes and are reaped from the same record. Amended
+    2026-11-17 (#9666): a scheduled reaper deletes the bytes of expired pending uploads and marks
+    their records failed; before, nothing scheduled it.
 - **Uploading is authorised by the request's ordinary project scope.** No upload check depends on the
   purpose; reading one back does (§5).
   - Browser (tRPC, in `stored-object.trpc.ts`): `storedObjects.createUpload` and
@@ -249,6 +260,11 @@ confirmUpload(input: { projectId; objectId }): Promise<StoredObjectReference>
 - Stored-object declares nothing new. The local URL's origin comes from the `publicBaseUrl` member
   (precedent `dataset.app.ts:128`). The limits and the 15-minute TTL are constants.
 - There is no supply token: object storage is a store.
+- **One new environment variable** (amended 2026-11-17, #9666): `STORED_OBJECTS_UPLOADS`, `direct`
+  (default) or `through-langwatch`, the stores owner's, read with the shared S3 or Azure account. A
+  per-organisation S3 account sets its own `uploads` key. It exists because a bucket reachable only
+  inside the cluster cannot take a direct PUT, and nothing else in the deployment says so. Boot
+  refuses an unknown value by name; the storage checkup fails when no `publicBaseUrl` is set.
 - Both `.withMember("storageResolver", () => void 0)` lines are deleted.
 
 ### 8. Wire compared with main, and the time-boxed exception
@@ -337,11 +353,13 @@ client's `sha256` and content-derived ids. Nothing else changed.
 ## Consequences
 
 - **Where upload bytes enter.** They reach our server only at the local signed route, which streams to
-  disk, until the two deprecated multipart routes retire.
+  disk, or to the bucket for an account set to upload through LangWatch (#9666), until the two
+  deprecated multipart routes retire. Such an install's ingress must accept 5 GiB bodies; the chart
+  gives the route its own nginx Ingress.
 - **One flow.** Clients have one flow on every backend: create, PUT, confirm.
 - **Readable wherever referenced.** There is one index, and `/api/files` reads it.
-- **Every hash is taken over a stream,** once, at confirm or write. Confirming an S3 or Azure upload
-  reads it back once: up to 5 GiB for an import.
+- **Every hash is taken over a stream,** once, at confirm or write. Confirming a direct S3 or Azure
+  upload reads it back once: up to 5 GiB for an import. One through LangWatch is not read back.
 - **One object per write.** Every write is a new object with a new KSUID. Identical bytes written twice
   are stored twice; that is accepted in exchange for ids that never depend on content. Trace media
   that repeats across spans is stored per write.
@@ -354,5 +372,5 @@ client's `sha256` and content-derived ids. Nothing else changed.
   project's current backend has. This is a post-merge gap that needs a config design.
 - **`storeFromBytes` still collects a stream input** (at most 100 MiB) to learn its length, because
   the member's write needs `byteLength` up front. Every caller passes a buffer today; a follow-up.
-- **New schema and codes.** One new nullable column, one new error code, no new secret and no new
-  environment variable.
+- **New schema and codes.** One new nullable column, one new error code, no new secret, and one new
+  environment variable, `STORED_OBJECTS_UPLOADS` (§7, amended 2026-11-17, #9666).

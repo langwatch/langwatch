@@ -3,32 +3,114 @@
 .mailroom-inspect {
   display: grid;
   grid-template-columns: 280px minmax(0, 1fr);
-  grid-template-rows: auto 1fr;
-  grid-template-areas:
-    "messages preview"
-    "props preview";
   gap: var(--space-4);
   align-items: start;
 }
 
 .mailroom-messages {
-  grid-area: messages;
   min-width: 0;
 }
 
-/* Twenty-odd messages would push the props a screen down; the list scrolls instead. */
 .mailroom-message-list {
-  max-height: 440px;
+  max-height: max(640px, calc(100vh - 200px));
+}
+
+/* Sections read as blocks: a sentence-case heading over a hairline, not a small caps label. */
+.mailroom-group + .mailroom-group {
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--line);
+}
+
+.mailroom-group-heading {
+  margin: 0 0 var(--space-2);
+  padding: 0 var(--space-3);
+  font-size: var(--text-lg);
+  font-weight: 600;
+  line-height: 1.3;
+  color: var(--ink-900);
+}
+
+.mailroom-group-list {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.mailroom-variants {
+  padding: var(--space-1) var(--space-3) var(--space-2);
+}
+
+.mailroom-row {
+  display: block;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: none;
+  color: var(--ink-600);
+  font: inherit;
+  font-size: var(--text-md);
+  line-height: 1.45;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mailroom-row:hover {
+  background: var(--paper-deep);
+  color: var(--ink-900);
+}
+
+.mailroom-row:focus-visible {
+  outline: var(--focus-ring);
+  outline-offset: -2px;
+}
+
+/* The brand edge marks the open email without leaning on colour alone. */
+.mailroom-row[aria-current] {
+  background: var(--brand-soft);
+  box-shadow: inset 3px 0 0 var(--brand);
+  color: var(--ink-900);
+  font-weight: 600;
 }
 
 .mailroom-preview {
-  grid-area: preview;
   min-width: 0;
 }
 
-.mailroom-props {
-  grid-area: props;
-  min-width: 0;
+.mailroom-props > summary {
+  cursor: pointer;
+  color: var(--ink-600);
+  font-size: var(--text-md);
+}
+
+.mailroom-props[open] > summary {
+  margin-bottom: var(--space-3);
+}
+
+.mailroom-review-heading {
+  margin: 0;
+  font-size: var(--text-md);
+  color: var(--ink-900);
+}
+
+.mailroom-review-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(360px, 1fr));
+  align-items: start;
+  gap: var(--space-5);
+}
+
+.mailroom-review-empty {
+  padding: var(--space-4);
+  border: 1px dashed var(--ink-500);
+  border-radius: var(--radius-sm);
+}
+
+.mailroom-guide {
+  padding: var(--space-4) var(--space-8) 0;
 }
 
 /* Only the mail's own paint sits on this stage; the frame is the one line around it. */
@@ -60,21 +142,6 @@
   min-width: 0;
 }
 
-.mailroom-gallery {
-  display: grid;
-  grid-auto-rows: max-content;
-  align-items: start;
-  gap: var(--space-5);
-}
-
-.mailroom-gallery[data-density="compact"] {
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-}
-
-.mailroom-gallery[data-density="comfortable"] {
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-}
-
 .mailroom-card-preview {
   position: relative;
   overflow: hidden;
@@ -102,11 +169,10 @@
 @media (max-width: 1023px) {
   .mailroom-inspect {
     grid-template-columns: minmax(0, 1fr);
-    grid-template-rows: none;
-    grid-template-areas:
-      "messages"
-      "preview"
-      "props";
+  }
+
+  .mailroom-message-list {
+    max-height: 320px;
   }
 }
 

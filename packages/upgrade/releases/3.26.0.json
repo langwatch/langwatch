@@ -1,0 +1,42 @@
+{
+  "release": "3.26.0",
+  "previous": "3.25.0",
+  "cutAt": "2026-11-22T13:27:34+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261118150000_governance_agent_kill_switch",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: governance agent kill switch"
+    },
+    {
+      "id": "prisma:20261118150001_governance_agent_stop_plan_version",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: governance agent stop plan version"
+    },
+    {
+      "id": "prisma:20261118150002_scenario_judge_trace_wait",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: scenario judge trace wait"
+    },
+    {
+      "id": "prisma:20261118150003_simulation_suite_judge_trace_wait",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: simulation suite judge trace wait"
+    },
+    {
+      "id": "prisma:20261118150004_langy_pull_requests",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: langy pull requests"
+    }
+  ]
+}

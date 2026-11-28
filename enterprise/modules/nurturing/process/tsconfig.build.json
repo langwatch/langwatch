@@ -24,13 +24,13 @@
   ],
   "references": [
     {
-      "path": "../../../../modules/insight/contract/tsconfig.build.json"
-    },
-    {
       "path": "../../../../modules/workflow/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/user/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../packages/upgrade/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/trace/contract/tsconfig.build.json"
@@ -69,10 +69,22 @@
       "path": "../../../../modules/langy/contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/insight/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/identity/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/gateway/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../../../modules/experiment/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../packages/eventing/tsconfig.build.json"
+    },
+    {
+      "path": "../../../../modules/evaluator/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/evaluation/contract/tsconfig.build.json"
@@ -84,7 +96,13 @@
       "path": "../contract/tsconfig.build.json"
     },
     {
+      "path": "../../../../modules/entitlement/contract/tsconfig.build.json"
+    },
+    {
       "path": "../../billing/contract/tsconfig.build.json"
+    },
+    {
+      "path": "../../governance/contract/tsconfig.build.json"
     },
     {
       "path": "../../../../modules/coding-agent/contract/tsconfig.build.json"

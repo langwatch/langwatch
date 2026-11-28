@@ -3,16 +3,23 @@
  * @see specs/langy/langy-cli-tool-envelope.feature
  *      "A failure keeps its structure all the way to the card"
  */
+import type { SerializedReason } from "@langwatch/handled-error";
 import {
   type CliErrorDocumentRead,
+  type LangWatchHandledErrorReason,
   type LangWatchHandledErrorShape,
   isTerminalFailure,
   readCliErrorDocument,
 } from "@langwatch/handled-error/langwatch-handled-error";
-import { explainHandledError } from "@langwatch/handled-error/presentation";
+import {
+  explainHandledError,
+  supplementalTips,
+  UNKNOWN_ERROR_PRESENTATION,
+} from "@langwatch/handled-error/presentation";
 import { parseCliJson } from "@langwatch/langy-contract";
 
 import { LIMIT_TYPE_LABELS } from "../../../../model/limit-type-labels.ts";
+import { cleanTerminalText, readShellFailure } from "./langy-terminal-output.ts";
 
 /** The plan allowance a failure ran into, in the customer's own words. */
 export interface LangyToolFailureLimit {
@@ -107,7 +114,7 @@ function rawFailureText(errorText: unknown): string | undefined {
   const value = asRecord(errorText);
   const text = readFailureText({ errorText, value });
   if (!text) return undefined;
-  const cleaned = text.replace(/\p{Cc}\[[0-9;]*m/gu, "").trim();
+  const cleaned = cleanTerminalText(text).trim();
   return cleaned.length > 0 ? cleaned : undefined;
 }
 
@@ -159,9 +166,27 @@ const ACCESS_DENIAL_CODES = new Set([
   "api_key_permission_denied",
   "api_key_not_owned",
   "api_key_scope_violation",
-  // The CLI's own status-derived code, for a 403 that carried no body.
+  "permission_denied",
+  "project_permission_denied",
+  // From the governance CLI client; a body-less 403 becomes "unauthorized" in codeForStatus.
   "forbidden",
 ]);
+
+/**
+ * The denial reasons that mean the reader's own access was removed or reduced since the key
+ * was minted.
+ */
+const ACCESS_REMOVED_REASONS = new Set(["owner-ceiling", "no-membership", "membership-disabled"]);
+
+/** The denial reasons that mean the reader's seat does not include this; a grant cannot lift it. */
+const SEAT_LIMIT_REASONS = new Set(["developer-restricted", "lite-member-restricted"]);
+
+/** owner-ceiling is also a role change: it speaks of one action, never the whole project. */
+function removedAccessMessage({ reason, needed }: { reason: string; needed: string | undefined }) {
+  if (reason !== "owner-ceiling") return "You no longer have access to this project.";
+  if (needed) return `You can no longer ${needed} in this project.`;
+  return "This action isn't available to you any more in this project.";
+}
 
 /**
  * The codes that mean a CLI credential was missing or refused. In the sandbox that is
@@ -215,9 +240,28 @@ const credentialFault = ({
 };
 
 /**
+ * Whether a failure is Langy's own sandbox credential. Its tool output is the CLI telling
+ * the reader to log in, so the receipt shows Langy's copy in its place.
+ */
+export const isSandboxCredentialFault = ({
+  presentation,
+  toolName,
+}: {
+  presentation: LangyToolErrorPresentation;
+  toolName: string | undefined;
+}): boolean => credentialFault({ code: presentation.code, toolName }) === "sandbox";
+
+/**
+ * Whether the turn's GitHub connect card speaks for this failure: the sandbox had no GitHub
+ * access, the manager's gate stopped the turn on it, and that card says what to do.
+ */
+export const isAnsweredByGitHubConnectCard = (presentation: LangyToolErrorPresentation): boolean =>
+  presentation.code !== undefined && normalizeCode(presentation.code) === GITHUB_NOT_CONNECTED_CODE;
+
+/**
  * Whether the reader has to act, so the failure keeps its card. A credential failure
  * keeps it on a local tool and folds in the sandbox; an access-denial code, a terminal
- * github-not-connected, 401 or 403 keep it. A terminal not-found folds.
+ * 401 or 403 keep it. A terminal not-found and a missing GitHub connection fold.
  */
 export const readerMustAct = ({
   presentation,
@@ -229,10 +273,10 @@ export const readerMustAct = ({
   const { code, httpStatus, terminal } = presentation;
   const fault = credentialFault({ code, toolName });
   if (fault !== null) return fault === "local";
+  if (isAnsweredByGitHubConnectCard(presentation)) return false;
   const normalised = code === undefined ? undefined : normalizeCode(code);
   if (normalised !== undefined && ACCESS_DENIAL_CODES.has(normalised)) return true;
   if (!terminal) return false;
-  if (normalised === GITHUB_NOT_CONNECTED_CODE) return true;
   return httpStatus !== undefined && ACCESS_STATUSES.has(httpStatus);
 };
 
@@ -309,8 +353,24 @@ function describeFailure({
   }
 
   if (isAccessDenial(domain)) {
-    // ONE sentence for the fact, one for what to do.
     const needed = humanPermission(domain.meta.permission);
+    const reason = domain.meta.denialReason;
+    if (typeof reason === "string" && ACCESS_REMOVED_REASONS.has(reason)) {
+      return {
+        message: removedAccessMessage({ reason, needed }),
+        detail: "Ask whoever manages access for your team if you need it back.",
+        remediationApplies: false,
+      };
+    }
+    // The server's sentence already names the seat, so it stays; a grant cannot lift a seat limit.
+    if (typeof reason === "string" && SEAT_LIMIT_REASONS.has(reason)) {
+      return {
+        message: domain.message,
+        detail: "Ask whoever manages seats for your team if you need it.",
+        remediationApplies: false,
+      };
+    }
+    // ONE sentence for the fact, one for what to do.
     return {
       message: needed
         ? `You can't ${needed} in this project.`
@@ -325,13 +385,46 @@ function describeFailure({
     };
   }
 
-  return { message: domain.message, remediationApplies: true };
+  return { message: platformSentence(domain), remediationApplies: true };
+}
+
+/** The platform's sentence; the registry's when the wire carried only the code (#5984). */
+function platformSentence(domain: LangWatchHandledErrorShape): string {
+  if (domain.message.trim() !== "" && domain.message !== domain.code) return domain.message;
+  const copy = explainHandledError({
+    code: domain.code,
+    meta: domain.meta,
+    httpStatus: domain.httpStatus,
+    fault: "customer",
+    retryable: domain.retryable,
+    tips: [],
+    docsUrl: undefined,
+    traceId: undefined,
+    reasons: serializedReasons(domain.reasons),
+  });
+  if (!copy.isRegistered) {
+    return domain.code.trim() !== "" ? copy.title : UNKNOWN_ERROR_PRESENTATION.title;
+  }
+  return copy.description !== "" ? copy.description : copy.title;
+}
+
+/** The CLI's reason chain in the registry's shape: `kind` is the reason's code. */
+function serializedReasons(
+  reasons: readonly LangWatchHandledErrorReason[] = [],
+): SerializedReason[] {
+  return reasons.map((reason) => ({
+    code: reason.kind,
+    kind: reason.kind,
+    retryable: reason.retryable,
+    ...(reason.meta ? { meta: reason.meta } : {}),
+    reasons: serializedReasons(reason.reasons),
+  }));
 }
 
 /**
- * Rewrites `gh`'s "please run: gh auth login" from the sandbox — telling the customer to log
- * into a machine they cannot open — into the real fix: install the LangWatch GitHub App. Local
- * tools are left alone, since gh's own instruction is correct on the developer's own machine.
+ * Rewrites the sandbox `gh`'s "please run: gh auth login" (a machine the customer cannot open)
+ * into what happened: Langy has no GitHub access. The turn's connect card carries the fix. Local
+ * tools keep gh's words, which are correct on the developer's own machine.
  */
 function githubAppNotInstalled({
   toolName,
@@ -344,25 +437,48 @@ function githubAppNotInstalled({
   if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
   if (!/\bgh auth login\b/i.test(raw)) return null;
 
-  const copy = explainHandledError({
-    code: GITHUB_NOT_CONNECTED_CODE,
-    meta: {},
-    httpStatus: 409,
-    fault: "customer",
-    retryable: false,
-    tips: [],
-    docsUrl: undefined,
-    traceId: undefined,
-    reasons: [],
-  });
-
   return {
-    title: copy.title,
-    message: copy.description,
-    tips: ["Install it from Settings, under Integrations."],
+    title: "GitHub is not connected",
+    message: "Langy has no GitHub access here, so this step could not run.",
     code: GITHUB_NOT_CONNECTED_CODE,
     terminal: true,
     raw,
+  };
+}
+
+/**
+ * The lines the CLI prints in text mode when it has no key (sdks/typescript/src/cli/utils/
+ * apiKey.ts: `missingCredentialsLines` and `checkOrgApiKey`). A whole output line must equal
+ * one, so a tool that only echoes it (a grep hit, a printed log) is not reclassified.
+ */
+export const CLI_MISSING_KEY_LINES = [
+  "Error: you're not logged in, and LANGWATCH_API_KEY is not set.",
+  "Error: LANGWATCH_API_KEY not found.",
+];
+
+/** Per line, since `raw` (from rawFailureText) has its colour codes stripped already. */
+function printsCliMissingKeyLine(raw: string): boolean {
+  return raw.split("\n").some((line) => CLI_MISSING_KEY_LINES.includes(line.trim()));
+}
+
+/** Text mode carries no code, so the sandbox CLI's own line stands in for `missing_api_key`. */
+function sandboxMissingKeyFromText({
+  toolName,
+  raw,
+}: {
+  toolName: string | undefined;
+  raw: string | undefined;
+}): LangWatchHandledErrorShape | null {
+  if (!raw || !printsCliMissingKeyLine(raw)) return null;
+  if (toolName?.startsWith(LOCAL_TOOL_PREFIX)) return null;
+  return {
+    code: "missing_api_key",
+    kind: "missing_api_key",
+    message: "",
+    httpStatus: 0,
+    meta: {},
+    isHandled: true,
+    retryable: false,
   };
 }
 
@@ -384,6 +500,31 @@ function buildNoDomainPresentation(
     message: "This step couldn't be completed.",
     ...(detail ? { detail } : {}),
     ...(raw ? { raw } : {}),
+  };
+}
+
+/**
+ * A shell command on the developer's own machine that exited non-zero. Keyed on the text,
+ * which only the worker's local shell path writes: a folder-bound `bash` arrives named
+ * `bash`. The reader wrote that code, so its last error line, an exception too, is theirs.
+ */
+function buildShellPresentation({
+  title,
+  raw,
+}: {
+  title: string;
+  raw: string | undefined;
+}): LangyToolErrorPresentation | null {
+  const failure = raw ? readShellFailure(raw) : null;
+  if (!failure) return null;
+  return {
+    title: `${title} failed`,
+    message:
+      failure.exitCode === null
+        ? "The command stopped without an exit code."
+        : `The command stopped with exit code ${failure.exitCode}.`,
+    ...(failure.lastErrorLine ? { detail: failure.lastErrorLine } : {}),
+    raw,
   };
 }
 
@@ -410,6 +551,9 @@ function buildDomainPresentation({
   const logsUrl = safeHttpUrl(domain.logsUrl) ?? safeHttpUrl(trace?.logsUrl);
   const docsUrl = safeHttpUrl(domain.docUrl);
   const { message, detail, limit, remediationApplies } = describeFailure({ domain, toolName });
+  // The CLI's own text for Langy's key tells the reader to log in, so it never reaches them.
+  const keepsRaw = credentialFault({ code: domain.code, toolName }) !== "sandbox";
+  const tips = supplementalTips({ tips: domain.suggestions ?? [], description: message });
 
   return {
     title: `${title} failed`,
@@ -423,13 +567,13 @@ function buildDomainPresentation({
     ...(isTerminalFailure(domain) ? { terminal: true } : {}),
     // The platform's own next steps (ADR-045's remediation channel), shown as written —
     // paraphrasing them here would put the card out of step with the docs they are
-    // pinned to.
-    ...(remediationApplies && domain.suggestions?.length ? { tips: domain.suggestions } : {}),
+    // pinned to. A step pointing at `meta` (for API callers) or repeating the message is left out.
+    ...(remediationApplies && tips.length ? { tips } : {}),
     ...(remediationApplies && docsUrl ? { docsUrl } : {}),
     ...(traceId ? { traceId } : {}),
     ...(traceUrl ? { traceUrl } : {}),
     ...(logsUrl ? { logsUrl } : {}),
-    ...(raw ? { raw } : {}),
+    ...(raw && keepsRaw ? { raw } : {}),
   };
 }
 
@@ -454,10 +598,13 @@ export function presentLangyToolError({
 }): LangyToolErrorPresentation {
   const raw = rawFailureText(errorText);
   const structured = readStructuredError(errorText);
-  const domain = structured.kind === "error" ? structured.error : null;
+  const domain =
+    structured.kind === "error" ? structured.error : sandboxMissingKeyFromText({ toolName, raw });
 
   const notInstalled = githubAppNotInstalled({ toolName, raw });
   if (notInstalled) return notInstalled;
+  const shell = domain ? null : buildShellPresentation({ title, raw });
+  if (shell) return shell;
 
   return domain
     ? buildDomainPresentation({ title, domain, raw, toolName })
@@ -473,7 +620,8 @@ const TRACEBACK_SIGNALS = [
   /^\s*Traceback \(most recent call last\)/m,
   /^\s*File "[^"]+", line \d+/m,
   /^\s*at [\w$.<>[\] ]+ \(?[^\s]+:\d+:\d+\)?$/m,
-  /^[A-Za-z_][\w.]*(?:Error|Exception|Warning)\s*:/m,
+  // Warnings are not here: uv and Python print them on runs that went fine.
+  /^[A-Za-z_][\w.]*(?:Error|Exception)\s*:/m,
 ];
 
 /** Whether raw failure text is a stack trace rather than a sentence. */

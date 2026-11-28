@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
-/** @see enterprise/modules/billing/specs/billing.feature */
+/**
+ * @see enterprise/modules/billing/specs/billing.feature
+ * @see modules/instant-eval/specs/instant-eval-billing.feature
+ */
 import { stripeDouble } from "@langwatch/test-harness/client-doubles/stripe";
 import Stripe from "stripe";
 import { describe, expect, it } from "vitest";
@@ -9,6 +12,7 @@ import type {
   BillingCheckoutRequest,
   BillingSubscription,
 } from "../../rules/billing-stripe-shapes.rules.ts";
+import { priceLineOf } from "../../rules/price-line.rules.ts";
 import { HttpStripeSubscriptionsChannel } from "../http/http.stripe-subscriptions.channel.ts";
 import { MemoryStripeSubscriptionsChannel } from "../memory/memory.stripe-subscriptions.channel.ts";
 import type { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
@@ -26,6 +30,7 @@ const ACTIVE = {
     data: [
       {
         id: "si_seat",
+        created: 1_700_000_000,
         price: { id: "price_seat", unit_amount: 2500, recurring: { interval: "month" } },
         quantity: 2,
       },
@@ -40,7 +45,14 @@ const ACTIVE_HELD: BillingSubscription = {
   canceledAt: null,
   billingThreshold: null,
   items: [
-    { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+    {
+      id: "si_seat",
+      priceId: "price_seat",
+      unitAmount: 2500,
+      interval: "month",
+      quantity: 2,
+      createdAt: 1_700_000_000,
+    },
   ],
   currentPeriodEnd: 1_701_388_800,
   currency: "eur",
@@ -301,7 +313,14 @@ describe("Billing's subscription shapes over the provider", () => {
       canceledAt: 1_699_000_000,
       billingThreshold: { amountGte: 75_000, resetBillingCycleAnchor: false },
       items: [
-        { id: "si_seat", priceId: "price_seat", unitAmount: 2500, interval: "month", quantity: 2 },
+        {
+          id: "si_seat",
+          priceId: "price_seat",
+          unitAmount: 2500,
+          interval: "month",
+          quantity: 2,
+          createdAt: 1_700_000_000,
+        },
         {
           id: "si_events",
           priceId: "price_events",
@@ -313,6 +332,119 @@ describe("Billing's subscription shapes over the provider", () => {
       currentPeriodEnd: 1_701_388_800,
       currency: "eur",
     });
+  });
+
+  /** @scenario "A re-priced Instant Evals line is still recognised" */
+  it("reads a line's lookup key and langwatch_key, and never its nickname", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          items: {
+            data: [
+              {
+                id: "si_instant",
+                price: {
+                  id: "price_instant_v2",
+                  unit_amount: null,
+                  recurring: { interval: "month" },
+                  lookup_key: "GROWTH_INSTANT_EVAL_USD",
+                  nickname: "Renamed in the dashboard",
+                  metadata: { langwatch_key: "GROWTH_INSTANT_EVAL_USD" },
+                },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.items).toEqual([
+      {
+        id: "si_instant",
+        priceId: "price_instant_v2",
+        unitAmount: null,
+        interval: "month",
+        quantity: null,
+        lookupKey: "GROWTH_INSTANT_EVAL_USD",
+        langwatchKey: "GROWTH_INSTANT_EVAL_USD",
+      },
+    ]);
+  });
+
+  /** @scenario "A re-priced Instant Evals line is still recognised" */
+  it("never takes a nickname for the key, so a line named alike only is held", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          items: {
+            data: [
+              {
+                id: "si_lookalike",
+                price: {
+                  id: "price_lookalike",
+                  unit_amount: null,
+                  recurring: { interval: "month" },
+                  lookup_key: null,
+                  nickname: "GROWTH_INSTANT_EVAL_USD",
+                  metadata: {},
+                },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.items[0]).not.toHaveProperty("lookupKey");
+    expect(subscription.items[0]).not.toHaveProperty("langwatchKey");
+    expect(
+      priceLineOf({
+        subscriptions: [subscription],
+        prices: [{ priceName: "GROWTH_INSTANT_EVAL_USD", priceId: "price_catalogue" }],
+        billingMonth: "2026-02",
+      }),
+    ).toEqual({ carried: false });
+  });
+
+  /** @scenario "A re-priced Instant Evals line is still recognised" */
+  it("reads the langwatchKey metadata spelling the price sync also accepts", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          items: {
+            data: [
+              {
+                id: "si_instant",
+                price: {
+                  id: "price_instant_v3",
+                  unit_amount: null,
+                  recurring: { interval: "month" },
+                  lookup_key: null,
+                  metadata: { langwatchKey: "GROWTH_INSTANT_EVAL_USD" },
+                },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.items[0]).toMatchObject({ langwatchKey: "GROWTH_INSTANT_EVAL_USD" });
   });
 
   it("sends a seat change and a billing threshold as Stripe's update parameters and timeout", async () => {
@@ -441,5 +573,69 @@ describe("Billing's subscription shapes over the provider", () => {
       { priceId: "price_seat", quantity: 4 },
       { priceId: null, quantity: null },
     ]);
+  });
+
+  /** @scenario "The line's creation and the subscription's end are read off Stripe" */
+  it("reads when each line was created and when the subscription ended", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          status: "canceled",
+          ended_at: 1_700_500_000,
+          items: {
+            data: [
+              {
+                id: "si_instant",
+                created: 1_700_000_000,
+                price: { id: "price_instant", unit_amount: null, recurring: { interval: "month" } },
+              },
+            ],
+          },
+        }),
+      },
+    });
+
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(subscription.endedAt).toBe(1_700_500_000);
+    expect(subscription.items[0]?.createdAt).toBe(1_700_000_000);
+  });
+
+  /** @scenario "A line with no recorded creation is refused as a failed read" */
+  it("refuses to date a usage line Stripe answered without its creation time", async () => {
+    const stripe = stripeDouble({
+      subscriptions: {
+        retrieve: async () => ({
+          ...ACTIVE,
+          items: {
+            data: [
+              {
+                id: "si_instant",
+                price: {
+                  id: "price_instant",
+                  unit_amount: null,
+                  recurring: { interval: "month" },
+                  lookup_key: "GROWTH_INSTANT_EVAL_USD",
+                },
+              },
+            ],
+          },
+        }),
+      },
+    });
+    const subscription = await HttpStripeSubscriptionsChannel.create({ stripe }).getSubscription({
+      subscriptionId: "sub_1",
+    });
+
+    expect(() =>
+      priceLineOf({
+        subscriptions: [subscription],
+        prices: [{ priceName: "GROWTH_INSTANT_EVAL_USD", priceId: "price_instant" }],
+        billingMonth: "2026-02",
+      }),
+    ).toThrow(/has no creation time/);
   });
 });

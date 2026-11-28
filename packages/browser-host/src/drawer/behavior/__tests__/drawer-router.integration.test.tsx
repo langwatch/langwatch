@@ -6,11 +6,13 @@
  */
 
 import { act, cleanup, render, screen, waitFor } from "@testing-library/react";
+import { useEffect } from "react";
 import {
   createBrowserRouter,
   createMemoryRouter,
   MemoryRouter,
   type NavigateFunction,
+  Outlet,
   RouterProvider,
   useBlocker,
   useLocation,
@@ -220,6 +222,61 @@ describe("given an address carrying the parameters of a previously opened drawer
       expect(params.get("view")).toBe("grid");
       expect(params.has("drawer.tab")).toBe(false);
       expect(address).not.toContain("agent_old");
+    });
+  });
+});
+
+describe("given a page with an open drawer that writes its address when it unmounts", () => {
+  describe("when a link takes the reader to another page", () => {
+    /** @scenario "Opening settings from the AI-call-failed toast stays on Model Providers" */
+    it.each([
+      ["a no-op write", { edit: undefined }],
+      ["a real write", { edit: "1" }],
+    ])("lands on the new page and stays there after %s", async (_label, updates) => {
+      window.history.replaceState(
+        null,
+        "",
+        "/acme/traces?drawer.open=traceV2Details&drawer.traceId=t1",
+      );
+      function DrawerWriter() {
+        useDrawerRouter();
+        useEffect(() => () => updateDrawerParams(updates, { push: false }), []);
+        return null;
+      }
+      // The writer unmounts before the page's other navigator, which is still registered then.
+      function TracesPage() {
+        return (
+          <>
+            <DrawerWriter />
+            <Navigator />
+            <Probe />
+          </>
+        );
+      }
+      const router = createBrowserRouter([
+        {
+          element: (
+            <>
+              <Navigator />
+              <Outlet />
+            </>
+          ),
+          children: [
+            { path: "/acme/traces", element: <TracesPage /> },
+            { path: "/settings/model-providers", element: <Probe /> },
+          ],
+        },
+      ]);
+      render(<RouterProvider router={router} />);
+
+      await act(async () => {
+        await router.navigate("/settings/model-providers#role-fast");
+        await new Promise((resolve) => setTimeout(resolve, 50));
+      });
+
+      expect(window.location.pathname).toBe("/settings/model-providers");
+      expect(router.state.location.pathname).toBe("/settings/model-providers");
+      router.dispose();
     });
   });
 });

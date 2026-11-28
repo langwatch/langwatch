@@ -11,7 +11,7 @@ import { defineTemplate } from "./registry.ts";
 
 export const digestWhatsNewProps = z.object({
   weekLabel: digestCommonFields.weekLabel,
-  unsubscribeUrl: digestCommonFields.unsubscribeUrl,
+  preferencesUrl: digestCommonFields.preferencesUrl,
   update: digestUpdateSchema.describe("This week's update, always present in this template"),
   nudge: z.object({
     text: z.string().min(1).describe("One sentence suggesting the next useful thing to do"),
@@ -27,7 +27,7 @@ export const digestWhatsNewSubject = ({ update }: DigestWhatsNewProps): string =
 
 export const DigestWhatsNew = ({
   weekLabel,
-  unsubscribeUrl,
+  preferencesUrl,
   update,
   nudge,
 }: DigestWhatsNewProps) => (
@@ -35,7 +35,7 @@ export const DigestWhatsNew = ({
     preview={update.body}
     heading={`What is new on LangWatch, ${weekLabel}`}
     reason="You have a LangWatch account."
-    unsubscribeUrl={unsubscribeUrl}
+    preferencesUrl={preferencesUrl}
   >
     <WhatsNewCard update={update} />
     <Paragraph>{nudge.text}</Paragraph>
@@ -54,7 +54,7 @@ export const digestWhatsNewTemplate = defineTemplate({
   fixtures: {
     "update with a setup nudge": {
       weekLabel: "Sep 22 to 28",
-      unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
+      preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub4Zr1",
       update: {
         title: "Scenario suites in CI",
         body: "Run a suite on every pull request and see the diff against main.",
@@ -70,7 +70,7 @@ export const digestWhatsNewTemplate = defineTemplate({
     },
     "update with an evaluation nudge": {
       weekLabel: "Sep 29 to Oct 5",
-      unsubscribeUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub9Ab3",
+      preferencesUrl: "https://app.langwatch.ai/api/digest/c/tk_unsub9Ab3",
       update: {
         title: "Budgets for coding agents",
         body: "Set a weekly spend limit per person and get warned before it is reached.",

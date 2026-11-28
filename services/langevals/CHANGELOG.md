@@ -19,14 +19,11 @@
 ### Miscellaneous
 
 - **deps-dev:** bump pandas from 2.3.3 to 3.0.5 in /services/langevals ([#7252](https://github.com/langwatch/langwatch/issues/7252)) ([1f7aba9](https://github.com/langwatch/langwatch/commit/1f7aba9b37bf9804951e9975023e20aec308e7c8))
-- **deps:** bump arize-phoenix ([df74857](https://github.com/langwatch/langwatch/commit/df74857b57c53c959164917640791e240a38afab))
 - **deps:** bump arize-phoenix from 14.6.0 to 20.0.0 in /services/langevals in the arize group across 1 directory ([#7289](https://github.com/langwatch/langwatch/issues/7289)) ([df74857](https://github.com/langwatch/langwatch/commit/df74857b57c53c959164917640791e240a38afab))
-- **deps:** bump boto3 ([bc87542](https://github.com/langwatch/langwatch/commit/bc87542fac41b544665f4976a174955e189f65bf))
 - **deps:** bump boto3 from 1.43.68 to 1.43.69 in /services/langevals in the minor-and-patch group across 1 directory ([#7293](https://github.com/langwatch/langwatch/issues/7293)) ([bc87542](https://github.com/langwatch/langwatch/commit/bc87542fac41b544665f4976a174955e189f65bf))
 - **deps:** bump gunicorn from 25.0.1 to 26.0.0 in /services/langevals ([#7256](https://github.com/langwatch/langwatch/issues/7256)) ([b5c1746](https://github.com/langwatch/langwatch/commit/b5c1746e2055bcbf3afe6e3a8713da8fcec7964d))
 - **deps:** bump structlog from 25.5.0 to 26.1.0 in /services/langevals ([#7255](https://github.com/langwatch/langwatch/issues/7255)) ([c53a68a](https://github.com/langwatch/langwatch/commit/c53a68a3eac3bc40a29a30c1d4368dc454b3b649))
 - **deps:** bump tenacity from 8.5.0 to 9.1.4 in /services/langevals ([#7254](https://github.com/langwatch/langwatch/issues/7254)) ([883c0d2](https://github.com/langwatch/langwatch/commit/883c0d218573534fcad830b867a1b94660e12ecb))
-- **deps:** bump the minor-and-patch group ([b81bc60](https://github.com/langwatch/langwatch/commit/b81bc60bb93d374ff6b4fa2cca544532aeaeca13))
 - **deps:** bump the minor-and-patch group in /services/langevals with 23 updates ([#7251](https://github.com/langwatch/langwatch/issues/7251)) ([b81bc60](https://github.com/langwatch/langwatch/commit/b81bc60bb93d374ff6b4fa2cca544532aeaeca13))
 - **deps:** bump zipp from 3.23.0 to 4.1.0 in /services/langevals ([#7257](https://github.com/langwatch/langwatch/issues/7257)) ([4be2c51](https://github.com/langwatch/langwatch/commit/4be2c5189187052c4d654de3e0cc1c1e51cb7181))
 - **security:** clear the dependabot alert backlog (278 open alerts triaged) ([#7195](https://github.com/langwatch/langwatch/issues/7195)) ([e5e64aa](https://github.com/langwatch/langwatch/commit/e5e64aa692c519eeebd5dc2e6b36c4263ec2191d))

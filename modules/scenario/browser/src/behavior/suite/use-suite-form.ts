@@ -13,6 +13,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useForm, useWatch } from "react-hook-form";
 import { z } from "zod";
 
+import type { JudgeTraceWaitInput } from "../../model/judge-trace-wait.ts";
 import {
   filterScenarios,
   filterTargets,
@@ -90,6 +91,7 @@ export function useSuiteForm({
   const scope = suiteScopeSchema.parse(useWatch({ control: form.control, name: "scope" }));
   const simulatorModel = useWatch({ control: form.control, name: "simulatorModel" });
   const judgeModel = useWatch({ control: form.control, name: "judgeModel" });
+  const traceWait = useWatch({ control: form.control, name: "traceWait" });
 
   const availableTargets = useMemo(() => getAvailableTargets(agents, prompts), [agents, prompts]);
 
@@ -264,6 +266,12 @@ export function useSuiteForm({
       form.setValue("simulatorModel", value, { shouldDirty: true }),
     setJudgeModel: (value: string | null) =>
       form.setValue("judgeModel", value, { shouldDirty: true }),
+    traceWait,
+    setTraceWait: (value: JudgeTraceWaitInput) =>
+      form.setValue("traceWait", value, {
+        shouldDirty: true,
+        shouldValidate: form.formState.isSubmitted,
+      }),
     executionOptionsOpen,
     setExecutionOptionsOpen,
     scenarioSearch,

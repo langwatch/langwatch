@@ -4,6 +4,7 @@ import { defineProcessModule, type PublishedProcessModule } from "@langwatch/pro
 import { defineMigrationStep } from "@langwatch/upgrade/step";
 
 import { AuthzModule } from "./app/authz.app.ts";
+import { authzChannels } from "./channels/authz-channels.registry.ts";
 import { authzAggregateReadEventing } from "./eventing/authz-aggregate-read.pipeline.ts";
 import { authzEventing } from "./eventing/authz-grant.pipeline.ts";
 import { authzMemberOffboardedEventing } from "./eventing/authz-member-offboarded.pipeline.ts";
@@ -29,6 +30,7 @@ function organizationContextOf(credential: {
 export const authzProcessModule: PublishedProcessModule<"authz", AuthzApi, AuthzServerConfig> =
   defineProcessModule("authz")
     .withRepositories(authzRepositories)
+    .withChannels(authzChannels)
     .withApi(AuthzModule)
     .withTransports(authzGrantRest, authzRoleBindingRest, authzTrpcTransport)
     // The ledger row records the member behind the key, or the system where the

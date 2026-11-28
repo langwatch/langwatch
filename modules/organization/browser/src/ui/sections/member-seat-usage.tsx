@@ -1,4 +1,5 @@
 import { SimpleGrid } from "@langwatch/design-system/primitives";
+import { isUncappedSeats } from "@langwatch/enterprise-billing-contract";
 import type { Plan as PlanInfo } from "@langwatch/entitlement-contract";
 
 import { ResourceLimitRow } from "../../behavior/lent-resource-limit-row.tsx";
@@ -6,8 +7,8 @@ import { api } from "../../behavior/organization-api.ts";
 import { SEAT_TYPE_COPY } from "../../model/seat-type-copy.ts";
 
 /**
- * Each kind of seat in use. Developer seats (ADR-171) are counted with no limit; a
- * plan with no Lite seats and none taken (Free) shows no Lite card, not "0 / 0".
+ * Each kind of seat in use against the plan's cap. Free (no Lite seats, none taken) shows
+ * no Lite card; Developer seats always show, so a Developer over a cap of 0 reads as such.
  * Spec: specs/licensing/seat-reconciliation.feature, specs/members/developer-seat.feature
  */
 export function MemberSeatUsage({
@@ -21,6 +22,10 @@ export function MemberSeatUsage({
 
   if (!usage.data) return null;
   const showsLite = activePlan.maxMembersLite > 0 || usage.data.membersLiteCount > 0;
+  const fromLicence = activePlan.planSource === "license";
+  /** The catalogue's stand-in for no cap reads as Unlimited, not 9,999. */
+  const shownCap = (cap: number): number =>
+    isUncappedSeats({ cap, fromLicence }) ? Infinity : cap;
 
   return (
     <SimpleGrid
@@ -33,18 +38,19 @@ export function MemberSeatUsage({
       <ResourceLimitRow
         limitType="members"
         current={usage.data.membersCount}
-        max={activePlan.maxMembers}
+        max={shownCap(activePlan.maxMembers)}
       />
       {showsLite && (
         <ResourceLimitRow
           limitType="membersLite"
           current={usage.data.membersLiteCount}
-          max={activePlan.maxMembersLite}
+          max={shownCap(activePlan.maxMembersLite)}
         />
       )}
       <ResourceLimitRow
         label={SEAT_TYPE_COPY.developerSeatsLabel}
         current={usage.data.membersDeveloperCount}
+        max={shownCap(activePlan.maxMembersDeveloper)}
       />
     </SimpleGrid>
   );

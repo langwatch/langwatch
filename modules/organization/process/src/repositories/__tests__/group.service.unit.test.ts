@@ -169,6 +169,7 @@ describe("OrganizationService groups", () => {
 
     expect(teamRepository.getOrganizationMembers).toHaveBeenCalledWith({
       organizationId: "org_1",
+      grantingAccess: true,
       userIds: ["member_1", "foreign_user"],
     });
     expect(groupRepository.create).not.toHaveBeenCalled();
@@ -474,6 +475,7 @@ describe("OrganizationService groups", () => {
 
       expect(teamRepository.getOrganizationMembers).toHaveBeenCalledWith({
         organizationId: "org_1",
+        grantingAccess: true,
         userIds: ["outsider"],
       });
       expect(groupRepository.addMember).not.toHaveBeenCalled();

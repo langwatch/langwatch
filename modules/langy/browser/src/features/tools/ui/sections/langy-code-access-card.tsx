@@ -1,3 +1,7 @@
+/**
+ * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
+ * than the tool call, which is only where the card hangs, never what it says.
+ */
 import { GitHubIcon } from "@langwatch/design-system/icons";
 import {
   Box,
@@ -8,23 +12,23 @@ import {
   Text,
   VStack,
 } from "@langwatch/design-system/primitives";
+import { useFeatureFlag } from "@langwatch/feature-flag-client";
+import { FrontendFlags, NOT_TARGETED } from "@langwatch/feature-flag-contract";
 import type {
   LangyChoiceSelection,
   LangyControlRequestState,
   LangyDerivedChoicesCard,
 } from "@langwatch/langy-contract";
-import { SHARE_CONTROL_COMMAND } from "@langwatch/langy-contract";
-/**
- * The code access card (ADR-129): four states, all read from `langy.getLocalWorkspace` rather
- * than the tool call, which is only where the card hangs, never what it says.
- */
+import { shareControlCommand } from "@langwatch/langy-contract";
 import { nowInstant, toEpochMs } from "@langwatch/time";
 import { Check, FolderCode, FolderOpen, GitPullRequest } from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
+import { useSession } from "../../../../behavior/auth-session.ts";
 import { describeError } from "../../../../behavior/errors.tsx";
 import { api } from "../../../../behavior/langy-api.ts";
 import { useLangyLocalControlStore } from "../../../../behavior/langy-local-control.store.ts";
+import { selectConversationReadable, useLangyStore } from "../../../../behavior/langy.store.ts";
 import {
   type LangyLocalWorkspaceRead,
   parseLangyLocalWorkspace,
@@ -177,17 +181,18 @@ export function LangyCodeAccessCard(props: LangyCodeAccessCardProps) {
   const { projectId, conversationId } = props;
   const superseded = props.superseded ?? false;
   const workspaceRevision = useLangyLocalControlStore((s) => s.workspaceRevision);
+  const readable = useLangyStore((s) => selectConversationReadable(s, conversationId));
   const workspace = api.langy.getLocalWorkspace.useQuery(
     { projectId, conversationId },
-    { select: parseLangyLocalWorkspace, enabled: !!projectId && !!conversationId && !superseded },
+    { select: parseLangyLocalWorkspace, enabled: !!projectId && readable && !superseded },
   );
 
   // The live stream says the folder came or went; the query says what it is.
   const refetch = workspace.refetch;
   useEffect(() => {
-    if (workspaceRevision === 0) return;
+    if (workspaceRevision === 0 || !readable) return;
     void refetch();
-  }, [workspaceRevision, refetch]);
+  }, [workspaceRevision, refetch, readable]);
 
   if (superseded) return <SupersededState />;
   const data = workspace.data;
@@ -211,6 +216,7 @@ function CodeAccessBody({
   onRefetch: () => void;
 }) {
   const { projectId, conversationId, callId, onAskAgain, now } = props;
+  const command = useShareControlCommand({ projectId, organizationId: props.organizationId });
   const [pickedLocal, setPickedLocal] = useState(() =>
     readLocalFolderPick({ conversationId, callId }),
   );
@@ -252,6 +258,7 @@ function CodeAccessBody({
     return (
       <CardShell>
         <WaitingState
+          command={command}
           requestState={folder.requestState}
           expiresAt={request ? toEpochMs(request.expiresAt) : null}
           now={now ?? (() => nowInstant().epochMilliseconds)}
@@ -264,6 +271,22 @@ function CodeAccessBody({
     );
   }
   return <AskingState {...props} onPickLocal={pickLocal} />;
+}
+
+/** The share command; it names the reader, who is the asker since only they see their request. */
+function useShareControlCommand({
+  projectId,
+  organizationId,
+}: {
+  projectId: string;
+  organizationId?: string | null;
+}): string {
+  const session = useSession();
+  const namesAsker = useFeatureFlag(FrontendFlags.release_ui_langy_share_command_names_asker, {
+    projectId,
+    organizationId: organizationId ?? NOT_TARGETED,
+  });
+  return shareControlCommand({ email: namesAsker.enabled ? session.data?.user.email : null });
 }
 
 /** The older ask, once Langy has asked again: readable, closed, unanswerable. */
@@ -484,18 +507,21 @@ function AskingState({
           disabled={!onChoiceSelect}
           onClick={onPickLocal}
         />
-        <OptionRow
-          icon={<GitHubIcon size={15} />}
-          label={GITHUB_LABEL}
-          subtitle={GITHUB_SUBTITLE}
-          note={githubInstallNote({
-            known: !!organizationId && !github.isLoading,
-            installed,
-            account: installations[0]?.accountLogin,
-          })}
-          disabled={!onChoiceSelect || rememberChoice.isPending}
-          onClick={chooseGithub}
-        />
+        {/* An instance with no GitHub App has nothing to install: the folder is the only way. */}
+        {github.data?.configured === false ? null : (
+          <OptionRow
+            icon={<GitHubIcon size={15} />}
+            label={GITHUB_LABEL}
+            subtitle={GITHUB_SUBTITLE}
+            note={githubInstallNote({
+              known: !!organizationId && !github.isLoading,
+              installed,
+              account: installations[0]?.accountLogin,
+            })}
+            disabled={!onChoiceSelect || rememberChoice.isPending}
+            onClick={chooseGithub}
+          />
+        )}
         {installing && organizationId ? (
           <LangyGitHubConnectCard
             organizationId={organizationId}
@@ -566,6 +592,7 @@ function RememberBox({
 
 /** The waiting state: the one command, the countdown, and what comes next. */
 function WaitingState({
+  command,
   requestState,
   expiresAt,
   now,
@@ -574,6 +601,7 @@ function WaitingState({
   tryingAgain,
   failure,
 }: {
+  command: string;
   requestState: LangyControlRequestState;
   expiresAt: number | null;
   now: () => number;
@@ -635,12 +663,12 @@ function WaitingState({
           fontFamily="mono"
           color="fg"
           flex={1}
-          overflowX="auto"
-          whiteSpace="nowrap"
+          paddingY={1}
+          overflowWrap="anywhere"
         >
-          {SHARE_CONTROL_COMMAND}
+          {command}
         </Text>
-        <LangyCopyButton size="xs" value={SHARE_CONTROL_COMMAND} label="The command" />
+        <LangyCopyButton size="xs" value={command} label="The command" />
       </HStack>
       <HStack gap={2}>
         <Spinner size="xs" />

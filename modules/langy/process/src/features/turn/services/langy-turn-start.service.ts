@@ -11,10 +11,13 @@ import {
 } from "@langwatch/langy-contract";
 import { trace } from "@opentelemetry/api";
 
+import type { LangyTurnAdmissionClaim } from "../../../repositories/langy-turn-admission.repository.ts";
+import { LANGY_LAST_REPLY_SAVING, LangyEndedTurnService } from "./langy-ended-turn.service.ts";
 import { LangyTurnAttemptService } from "./langy-turn-attempt.service.ts";
 import { LangyTurnBaseDependenciesService } from "./langy-turn-base-dependencies.service.ts";
 import { LangyTurnPreparationService } from "./langy-turn-preparation.service.ts";
 import {
+  type LangyCiFollowUpTurn,
   type LangyTurnServiceDependencies,
   type StartConversationTurnInput,
 } from "./langy-turn-shared.service.ts";
@@ -33,8 +36,14 @@ type ClaimedTurn = {
 export class LangyTurnStartService {
   private readonly preparation: LangyTurnPreparationService;
 
+  private readonly endedTurns: LangyEndedTurnService;
+
   private constructor(private readonly deps: LangyTurnServiceDependencies) {
     this.preparation = LangyTurnPreparationService.create(deps);
+    this.endedTurns = LangyEndedTurnService.create({
+      tokenBuffer: deps.tokenBuffer,
+      ...deps.endedTurnWait,
+    });
   }
 
   static create(deps: LangyTurnServiceDependencies): LangyTurnStartService {
@@ -56,9 +65,10 @@ export class LangyTurnStartService {
         ...(input.adoptConversationId ? { adoptConversationId: true } : {}),
         ...(input.modelOverride ? { modelOverride: input.modelOverride } : {}),
         ...(input.unattended ? { unattended: true } : {}),
+        ...(input.ciFollowUp ? { ciFollowUpRepository: input.ciFollowUp.repositoryFullName } : {}),
       });
     const turnModel = this.requireTurnModel(input.modelOverride, resolvedModel);
-    const admission = await this.deps.admission.claim({
+    const admission = await this.claimAdmission({
       projectId: input.projectId,
       userId: request.userId,
       idempotencyKey: input.idempotencyKey,
@@ -84,6 +94,30 @@ export class LangyTurnStartService {
       claimed,
       readOnly,
     });
+  }
+
+  /**
+   * The claim, waiting out a turn that already ended for the person but whose terminal event has
+   * not released the conversation yet. A turn still replying is refused at once.
+   */
+  private async claimAdmission(
+    claim: Parameters<LangyTurnServiceDependencies["admission"]["claim"]>[0],
+  ): ReturnType<LangyTurnServiceDependencies["admission"]["claim"]> {
+    const first = await this.deps.admission.claim(claim);
+    if (first.kind !== "busy") return first;
+    const ended = await this.endedTurns.hasEnded({
+      conversationId: first.conversationId,
+      turnId: first.heldTurnId,
+    });
+    if (!ended) return first;
+    const look = await this.endedTurns.lookUntilFree<LangyTurnAdmissionClaim>(async () => {
+      const again = await this.deps.admission.claim(claim);
+      if (again.kind === "busy") return { kind: "held" as const };
+      return { kind: "free" as const, value: again };
+    });
+    if (look.kind === "free") return look.value;
+    this.deps.metrics.count({ outcome: "rejected" });
+    throw new LangyAgentUnavailableError(LANGY_LAST_REPLY_SAVING);
   }
 
   private requireRuntime() {
@@ -244,6 +278,7 @@ export class LangyTurnStartService {
     try {
       // After the claim: a replay answered above, so the same turn asked again counts nothing.
       await input.unattended?.countTurn();
+      await input.ciFollowUp?.countTurn();
       const settled = await this.settleKickoff({
         input,
         request,
@@ -261,6 +296,7 @@ export class LangyTurnStartService {
         turnContext: input.turnContext,
         readOnly,
         ...(input.unattended ? { unattended: input.unattended } : {}),
+        ...(input.ciFollowUp ? { ciFollowUp: ciFollowUpRecordOf(input.ciFollowUp) } : {}),
         ...runtime,
         credentials,
         turnModel,
@@ -280,6 +316,11 @@ export class LangyTurnStartService {
       throw error;
     }
   }
+}
+
+/** What the recorded user message keeps of a CI follow-up: the pull request commit, no callback. */
+function ciFollowUpRecordOf({ repositoryFullName, prNumber, headSha }: LangyCiFollowUpTurn) {
+  return { repositoryFullName, prNumber, headSha };
 }
 
 function turnStartFailureOutcomeOf(error: unknown) {

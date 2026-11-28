@@ -26,6 +26,7 @@ function recordingLicenses(rows: MemoryOrganizationLicenseRepository): {
       findLicense: (input) => rows.findLicense(input),
       restoreLicense: (input) => rows.restoreLicense(input),
       saveLicense: (input) => rows.saveLicense(input),
+      replaceLicense: (input) => rows.replaceLicense(input),
       clearLicense: (input) => rows.clearLicense(input),
       findLicensePairs: (input) => rows.findLicensePairs(input),
       overwriteLicenses: (input) => rows.overwriteLicenses(input),

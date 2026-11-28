@@ -1,4 +1,5 @@
-import { Button, Icon } from "@langwatch/design-system/primitives";
+import { Box, Button, Icon } from "@langwatch/design-system/primitives";
+import { Tooltip } from "@langwatch/design-system/tooltip";
 import { forwardRef, useState } from "react";
 import type { IconType } from "react-icons";
 import { LuCheck, LuCopy, LuLanguages, LuLightbulb, LuPlay } from "react-icons/lu";
@@ -132,5 +133,24 @@ export function CopyButton({ text }: { text: string }) {
     >
       <Icon as={copied ? LuCheck : LuCopy} boxSize={3} color={copied ? "green.fg" : "fg.subtle"} />
     </Button>
+  );
+}
+
+/** An action that does not apply here, kept in place and saying why. */
+export function UnavailableActionButton({
+  icon,
+  label,
+  reason,
+}: {
+  icon: IconType;
+  label: string;
+  reason: string;
+}) {
+  return (
+    <Tooltip content={reason} positioning={{ placement: "top" }}>
+      <Box as="span" display="inline-flex">
+        <ActionButton icon={icon} label={label} disabled aria-label={`${label}: ${reason}`} />
+      </Box>
+    </Tooltip>
   );
 }

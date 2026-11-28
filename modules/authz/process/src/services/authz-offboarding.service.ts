@@ -2,24 +2,30 @@ import type { LedgerActor } from "@langwatch/authorization";
 import { OffboardIncompleteError, type AuthzOffboardOutput } from "@langwatch/authz-contract";
 
 import type { AuthzGrantRepository } from "../repositories/authz-grant.repository.ts";
+import type { AuthzOrganizationPolicyRepository } from "../repositories/authz-organization-policy.repository.ts";
 import type { AuthzReadRepository } from "../repositories/authz-read.repository.ts";
 import { AuthzCollectorService } from "./authz-collector.service.ts";
 import type { AuthzMemberOffboardedNotice } from "./authz-member-offboarded-notice.service.ts";
+
+type OrganizationPolicies = Pick<AuthzOrganizationPolicyRepository, "getPolicy">;
 
 export class AuthzOffboardingService {
   static create({
     repository,
     offboarded,
+    policies,
   }: {
     repository: AuthzGrantRepository;
     offboarded: AuthzMemberOffboardedNotice;
+    policies: OrganizationPolicies;
   }): AuthzOffboardingService {
-    return new AuthzOffboardingService(repository, offboarded);
+    return new AuthzOffboardingService(repository, offboarded, policies);
   }
 
   private constructor(
     private readonly repository: AuthzGrantRepository,
     private readonly offboarded: AuthzMemberOffboardedNotice,
+    private readonly policies: OrganizationPolicies,
   ) {}
 
   async offboard({
@@ -63,7 +69,10 @@ export class AuthzOffboardingService {
     userId: string;
     organizationId: string;
   }): Promise<void> {
-    const grants = await AuthzCollectorService.create({ reader }).collectGrants({
+    const grants = await AuthzCollectorService.create({
+      reader,
+      policies: this.policies,
+    }).collectGrants({
       principal: { type: "user", id: userId },
       organizationId,
     });

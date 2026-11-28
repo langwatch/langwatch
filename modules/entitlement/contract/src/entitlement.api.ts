@@ -11,6 +11,7 @@ import type {
 import type { PlanNextStep } from "./plan-next-step.ts";
 import type { Plan } from "./plan.ts";
 import type { ResolvePlanInput } from "./provider.ts";
+import type { OrganizationUsageLimits } from "./usage-limits.ts";
 import type { UsageMonthBreakdown, UsageStats } from "./usage.ts";
 
 /**
@@ -23,8 +24,23 @@ export interface EntitlementApi {
   getUsage(input: GetUsageInput): Promise<UsageStats>;
   /** This month day by day and project by project, for the usage page. */
   getUsageMonthBreakdown(input: { organizationId: string }): Promise<UsageMonthBreakdown>;
+  /**
+   * The plan's code and each limit it sets with its count: a staff investigation read
+   * (ADR-202). Codes and numbers only, never a plan's display name or a price.
+   */
+  getUsageLimits(input: Readonly<{ organizationId: string }>): Promise<OrganizationUsageLimits>;
   /** Throws `ERR_PLAN_LIMIT` (402) once the organization spent its monthly allowance. */
   assertWithinUsageLimit(input: { organizationId: string }): Promise<void>;
+  /**
+   * Throws `LimitExceededError` (`scenarioRuns`) once a capped plan's month of runs is spent.
+   * `shouldCountRun: false` only asks. `runKey` is the run start's meter key: a run already
+   * admitted or metered under it passes again without being counted twice.
+   */
+  assertScenarioRunAllowed(input: {
+    organizationId: string;
+    shouldCountRun?: boolean | undefined;
+    runKey?: { projectId: string; deduplicationKey: string } | undefined;
+  }): Promise<void>;
   sendUsageLimitWarning(input: SendUsageLimitWarningInput): Promise<UsageLimitWarning>;
   listOrganizationSpend(input: ListOrganizationSpendInput): Promise<ProjectSpendRollup[]>;
   /**

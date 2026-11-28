@@ -60,7 +60,7 @@ type GovernanceMcpOperations = Pick<
   GovernanceRestApi,
   | "templateListForUser"
   | "templateListForOrgAdmin"
-  | "templateGetByIdForOrg"
+  | "templateGetByIdForMember"
   | "templateCreateOrg"
   | "templateUpdateOttlRules"
   | "templateCloneFromPlatform"
@@ -124,7 +124,7 @@ export class GovernanceMcpToolsService {
   /** A cross-organization probe answers null, as on main, rather than naming the template. */
   private async templateOrNull(input: { id: string; organizationId: string }) {
     try {
-      return await this.governance.templateGetByIdForOrg(input);
+      return await this.governance.templateGetByIdForMember(input);
     } catch (error) {
       if (error instanceof TemplateNotFoundError) return null;
       throw error;
@@ -220,7 +220,7 @@ export class GovernanceMcpToolsService {
 
     server.tool(
       "governance_ingestion_templates_get",
-      "Fetch a single ingestion template by id. Cross-org probes return null. Mirrors GET /api/governance/ingestion-templates/:id.",
+      "Fetch a single ingestion template by id, without the OTTL source (as in the list). Cross-org probes return null.",
       { id: z.string().describe("IngestionTemplate id") },
       ({ id }) =>
         this.read(session, "aiTools:view", (organizationId) =>

@@ -11,7 +11,7 @@ import { ownProof } from "../../__tests__/support/authorization-proofs.fixture.t
 import { SpanCostSuggestionService } from "../../features/span/services/span-cost-suggestion.service.ts";
 import { openProtections } from "../../repositories/clickhouse/__tests__/open-protections.ts";
 import type { TraceViewerProtectionService } from "../../services/trace-viewer-protection.service.ts";
-import type { TracesSpanReader } from "../trace.app.ts";
+import type { TraceAppDependencies, TracesSpanReader } from "../trace.app.ts";
 import { createTraceAppHarness } from "./support/trace-app.harness.ts";
 
 const PROJECT_ID = "project-1";
@@ -75,6 +75,10 @@ async function readDetail({ span, rules = [] }: { span: Span; rules?: ModelCost[
       modelProviders: createApiFixture<ModelProviderApi>({ listCosts }, "modelProviders"),
     }),
     traces: {
+      summary: createApiFixture<TraceAppDependencies["traces"]["summary"]>(
+        { getTraceAuthorization: async ({ authorization }) => authorization },
+        "summary",
+      ),
       spans: createApiFixture<TracesSpanReader>(
         { findSpanById: async () => span, getSpanEvents: async () => [] },
         "spans",

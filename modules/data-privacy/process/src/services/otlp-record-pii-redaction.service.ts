@@ -140,6 +140,9 @@ export class OtlpRecordPiiRedactionService {
        * The real OTLP attribute name behind each key of `attributes`, where the two differ.
        */
       attributeNames?: Record<string, string>;
+
+      /** The record's own key; see `DataPrivacyLogRecord.recordKey`. */
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -158,7 +161,7 @@ export class OtlpRecordPiiRedactionService {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
         projectId: tenantId,
-        resolvedPiiLevel: native.level,
+        effectivePiiLevel: native.level,
       });
     }
   }
@@ -169,13 +172,14 @@ export class OtlpRecordPiiRedactionService {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       attributeNames?: Record<string, string>;
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       projectId?: string | undefined;
-      resolvedPiiLevel?: PiiLevel | undefined;
+      effectivePiiLevel?: PiiLevel | undefined;
     },
   ): Promise<void> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -183,7 +187,7 @@ export class OtlpRecordPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: lambda?.projectId,
-      resolvedPiiLevel: lambda?.resolvedPiiLevel,
+      effectivePiiLevel: lambda?.effectivePiiLevel,
     });
     if (redaction.kind === "skip_redaction") {
       return;
@@ -208,7 +212,7 @@ export class OtlpRecordPiiRedactionService {
     this.collectRecordEntries(batch, log.attributes, log.attributeNames);
     this.collectRecordEntries(batch, log.resourceAttributes);
 
-    await this.applyRedactionBatch(batch, options);
+    await this.applyRedactionBatch(batch, options, log.recordKey);
   }
 
   /**
@@ -221,6 +225,8 @@ export class OtlpRecordPiiRedactionService {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       attributeNames?: Record<string, string>;
+      /** The point's own key; see `DataPrivacyMetricAttributes.recordKey`. */
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     tenantId?: TenantId,
@@ -253,7 +259,7 @@ export class OtlpRecordPiiRedactionService {
         entities: lambda.entities,
         exceptPatterns: lambda.exceptPatterns,
         projectId: tenantId,
-        resolvedPiiLevel: native.level,
+        effectivePiiLevel: native.level,
       });
     }
   }
@@ -263,13 +269,15 @@ export class OtlpRecordPiiRedactionService {
       attributes: Record<string, string>;
       resourceAttributes: Record<string, string>;
       attributeNames?: Record<string, string>;
+      /** The point's own key; see `DataPrivacyMetricAttributes.recordKey`. */
+      recordKey?: string;
     },
     piiRedactionLevel: PIIRedactionLevel,
     lambda?: {
       entities?: readonly string[];
       exceptPatterns?: readonly string[];
       projectId?: string | undefined;
-      resolvedPiiLevel?: PiiLevel | undefined;
+      effectivePiiLevel?: PiiLevel | undefined;
     },
   ): Promise<void> {
     const redaction = await this.policy.resolveRedactionOptions({
@@ -277,7 +285,7 @@ export class OtlpRecordPiiRedactionService {
       entities: lambda?.entities,
       exceptPatterns: lambda?.exceptPatterns,
       projectId: lambda?.projectId,
-      resolvedPiiLevel: lambda?.resolvedPiiLevel,
+      effectivePiiLevel: lambda?.effectivePiiLevel,
     });
     if (redaction.kind === "skip_redaction") {
       return;
@@ -288,7 +296,7 @@ export class OtlpRecordPiiRedactionService {
     this.collectRecordEntries(batch, metric.attributes, metric.attributeNames);
     this.collectRecordEntries(batch, metric.resourceAttributes);
 
-    await this.applyRedactionBatch(batch, options);
+    await this.applyRedactionBatch(batch, options, metric.recordKey);
   }
 
   private createRedactionBatch(): RedactionBatch {
@@ -349,15 +357,23 @@ export class OtlpRecordPiiRedactionService {
     }
   }
 
+  /**
+   * `recordKey` names the log record or metric point, so the same text sent again in another
+   * record is priced as another model call rather than folded into the first (ADR-201).
+   */
   private async applyRedactionBatch(
     batch: RedactionBatch,
     options: PIICheckOptions,
+    recordKey: string | undefined,
   ): Promise<void> {
     if (batch.items.length === 0) {
       return;
     }
 
-    const results = await this.policy.clearBatch(batch.items, options);
+    const results = await this.policy.clearBatch(
+      batch.items,
+      recordKey === undefined ? options : { ...options, recordKey },
+    );
 
     batch.writes.forEach((write, index) => {
       const redacted = results[index];

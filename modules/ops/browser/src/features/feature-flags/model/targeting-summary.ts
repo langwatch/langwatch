@@ -1,5 +1,5 @@
 import type { FeatureFlagRules } from "@langwatch/feature-flag-contract";
-import { emailDomainsOf, projectIdsOf } from "@langwatch/feature-flag-contract";
+import { emailDomainsOf, projectIdsOf, userIdsOf } from "@langwatch/feature-flag-contract";
 import { toEpochMs, readableDate } from "@langwatch/time";
 
 /**
@@ -17,6 +17,7 @@ export interface TargetingSummary {
   enabledForEveryone: boolean;
   enabledOrganizationCount: number;
   enabledProjectCount: number;
+  enabledUserCount: number;
   /** The first stretch of creation dates a rule switches the flag on for. */
   enabledNewUsers: AgeRange | null;
   /** The share of users, in percent, the first percentage rule switches on. */
@@ -30,10 +31,11 @@ export interface TargetingSummary {
    */
   excludedOrganizationCount: number;
   excludedProjectCount: number;
+  excludedUserCount: number;
   excludedNewUsers: AgeRange[];
 }
 
-type TargetKey = "organizationId" | "projectId";
+type TargetKey = "organizationId" | "projectId" | "userId";
 
 export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
   const { reachable, catchAllEnabled } = splitAtCatchAll(rules);
@@ -45,6 +47,7 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
     rules: reachable,
     key: "projectId",
   });
+  const users = firstDecisionPerTarget({ rules: reachable, key: "userId" });
   const ages = ageRanges(reachable);
 
   return {
@@ -54,6 +57,7 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
       enabled: true,
     }),
     enabledProjectCount: count({ decisions: projects, enabled: true }),
+    enabledUserCount: count({ decisions: users, enabled: true }),
     enabledNewUsers: bare(ages.find((range) => range.enabled)),
     enabledPercentage: enabledPercentage(reachable),
     enabledEmailDomains: enabledEmailDomains(reachable),
@@ -62,6 +66,7 @@ export function summarizeTargeting(rules: FeatureFlagRules): TargetingSummary {
       enabled: false,
     }),
     excludedProjectCount: count({ decisions: projects, enabled: false }),
+    excludedUserCount: count({ decisions: users, enabled: false }),
     excludedNewUsers: ages.filter((range) => !range.enabled).flatMap((range) => bare(range) ?? []),
   };
 }
@@ -79,6 +84,7 @@ export function targetingLabel(summary: TargetingSummary): string | null {
         noun: "organization",
       }),
       pluralize({ count: summary.excludedProjectCount, noun: "project" }),
+      pluralize({ count: summary.excludedUserCount, noun: "user" }),
       ...summary.excludedNewUsers.map(describeRange),
     ]);
     return exceptions
@@ -91,6 +97,7 @@ export function targetingLabel(summary: TargetingSummary): string | null {
       noun: "organization",
     }),
     pluralize({ count: summary.enabledProjectCount, noun: "project" }),
+    pluralize({ count: summary.enabledUserCount, noun: "user" }),
     summary.enabledNewUsers ? describeRange(summary.enabledNewUsers) : null,
     summary.enabledPercentage !== null ? `${summary.enabledPercentage}% of users` : null,
     summary.enabledEmailDomains.length > 0
@@ -155,14 +162,20 @@ function firstDecisionPerTarget({
 }): Map<string, boolean> {
   const decisions = new Map<string, boolean>();
   for (const rule of rules) {
-    const targets =
-      key === "projectId" ? projectIdsOf(rule.match.projectId) : [rule.match[key] ?? ""];
+    const targets = idsNamedBy({ rule, key });
     for (const target of targets) {
       if (!target || decisions.has(target)) continue;
       decisions.set(target, rule.enabled);
     }
   }
   return decisions;
+}
+
+/** The ids one rule names under a key, one or several. */
+function idsNamedBy({ rule, key }: { rule: FeatureFlagRules[number]; key: TargetKey }): string[] {
+  if (key === "projectId") return projectIdsOf(rule.match.projectId);
+  if (key === "userId") return userIdsOf(rule.match.userId);
+  return [rule.match.organizationId ?? ""];
 }
 
 interface DecidedRange extends AgeRange {

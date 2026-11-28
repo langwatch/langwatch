@@ -20,6 +20,7 @@ import {
   PrismaExperimentRepository,
 } from "../prisma/prisma.experiment.repository.ts";
 import { RedisExperimentRunAbortRepository } from "../redis/redis.experiment-run-abort.repository.ts";
+import { RedisExperimentRunActivityRepository } from "../redis/redis.experiment-run-activity.repository.ts";
 import { RedisExperimentRunEventStreamRepository } from "../redis/redis.experiment-run-event-stream.repository.ts";
 import { RedisExperimentRunFoldRepository } from "../redis/redis.experiment-run-fold.repository.ts";
 import { RedisExperimentRunProcessingRepository } from "../redis/redis.experiment-run-processing.repository.ts";
@@ -47,6 +48,7 @@ export class LiveExperimentRepositories {
     const folds = RedisExperimentRunFoldRepository.create({ redis });
     const abort = RedisExperimentRunAbortRepository.create({ redis });
     const stream = RedisExperimentRunEventStreamRepository.create({ redis });
+    const activity = RedisExperimentRunActivityRepository.create({ redis });
 
     return {
       experiments: PrismaExperimentRepository.create(prisma),
@@ -69,6 +71,7 @@ export class LiveExperimentRepositories {
           return {
             folds,
             abort,
+            activity,
             stream,
             idLookup: ClickHouseExperimentRunProcessingRepository.create({
               resolveClient,

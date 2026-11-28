@@ -48,6 +48,8 @@ const issuedLicenseViewSchemaDefinition = z.object({
   maxMembers: z.number(),
   maxMembersLite: z.number().nullable(),
   liteSeatsUnlimited: z.boolean(),
+  /** Null when the licence states none, which sells none. */
+  maxMembersDeveloper: z.number().nullable(),
   issuedAt: z.string(),
   expiresAt: z.string(),
   source: issuedLicenseSourceSchema,
@@ -99,6 +101,17 @@ const issuedLicensePageSchemaDefinition = z.object({
 export interface IssuedLicensePageSchema extends Named<typeof issuedLicensePageSchemaDefinition> {}
 export const issuedLicensePageSchema: IssuedLicensePageSchema = issuedLicensePageSchemaDefinition;
 export type IssuedLicensePage = z.infer<typeof issuedLicensePageSchema>;
+
+/** Every license one reissue chain holds, the newest first (ADR-156). */
+const issuedLicenseChainSchemaDefinition = z.object({
+  licenses: z.array(issuedLicenseViewSchema),
+});
+export interface IssuedLicenseChainSchema extends Named<
+  typeof issuedLicenseChainSchemaDefinition
+> {}
+export const issuedLicenseChainSchema: IssuedLicenseChainSchema =
+  issuedLicenseChainSchemaDefinition;
+export type IssuedLicenseChain = z.infer<typeof issuedLicenseChainSchema>;
 
 /** The customer a license is issued to: one that exists, or a new one to create. */
 const licenseCustomerSchemaDefinition = z.union([

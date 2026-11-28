@@ -5,7 +5,7 @@ import { it } from "node:test";
 import { parseArgs } from "node:util";
 
 import { assertAgentSetup, tracingPrompt } from "./browser-checks.mjs";
-import { withPreviewBrowser } from "./browser-fixture.mjs";
+import { copyAndRead, withPreviewBrowser } from "./browser-fixture.mjs";
 
 const { values } = parseArgs({ options: { "out-dir": { type: "string" } } });
 const outDir = path.resolve(values["out-dir"] ?? "dist");
@@ -45,9 +45,9 @@ await it("keeps agent commands deliberate and setup prompts complete in both the
           const select = launcher.getByLabel("Coding agent");
           assert.equal(await select.evaluate((node) => getComputedStyle(node).opacity), "1");
           await select.selectOption("opencode");
-          await launcher.getByRole("button").click();
-          await page.waitForFunction(() =>
-            navigator.clipboard.readText().then((text) => text === "npx langwatch opencode"),
+          assert.equal(
+            await copyAndRead(page, launcher.getByRole("button")),
+            "npx langwatch opencode",
           );
           await page.locator('.docs-left-rail a[href="/integration/overview"]').first().click();
           await page.waitForURL("**/integration/overview");
@@ -157,11 +157,12 @@ await it("makes API data, skill actions and selection movement readable", async 
             await page.evaluate(() => navigator.clipboard.readText()),
             await tracingPrompt({ outDir }),
           );
-          await card
-            .getByRole("button", { name: "Copy npx skills add langwatch/skills/tracing" })
-            .click();
-          await page.waitForFunction(async () =>
-            (await navigator.clipboard.readText()).startsWith("npx skills add"),
+          assert.equal(
+            await copyAndRead(
+              page,
+              card.getByRole("button", { name: "Copy npx skills add langwatch/skills/tracing" }),
+            ),
+            "npx skills add langwatch/skills/tracing",
           );
           const [chevron, label] = await card
             .locator("summary > *")

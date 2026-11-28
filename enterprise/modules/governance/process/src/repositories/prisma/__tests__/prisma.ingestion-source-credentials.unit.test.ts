@@ -178,4 +178,35 @@ describe("the ingestion-source store's credentials at rest", () => {
       expect(mapper.open(legacy)).toEqual(legacy);
     });
   });
+
+  describe("given an admin saves a Google Cloud source with a service account key", () => {
+    /** @scenario "The service account key is sealed and never read back" */
+    it("stores the key sealed under the source's credentials", async () => {
+      const serviceAccountJson = '{"type":"service_account","private_key":"-----BEGIN KEY-----"}';
+      const { repository, written } = repositoryOver(row({}));
+
+      await repository.create({
+        organizationId: "org-1",
+        teamId: null,
+        traceProjectId: null,
+        sourceType: "gcp_vertex_agent_engine",
+        name: "Google Cloud",
+        description: null,
+        ingestSecretHash: "",
+        parserConfig: {
+          adapter: "gcp_vertex_agent_engine",
+          targets: [{ projectId: "acme-ml", location: "europe-west4" }],
+          credentials: { serviceAccountJson },
+        },
+        pullSchedule: "0 * * * *",
+        status: "awaiting_first_event",
+        createdById: "user-1",
+        providerAccountId: null,
+      });
+
+      const [stored] = written();
+      expect(JSON.stringify(stored)).not.toContain("BEGIN KEY");
+      expect(openedTheOldWay(stored?.credentials as string)).toEqual({ serviceAccountJson });
+    });
+  });
 });

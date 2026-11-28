@@ -1176,7 +1176,8 @@ describe("All MCP tools integration", () => {
         const result = await formatSchema("lwql");
 
         expect(result).toContain("## Analytics SQL");
-        expect(result).toContain("analytics.traces");
+        expect(result).toContain("FROM traces");
+        expect(result).not.toContain("analytics.traces");
         expect(result).toContain("OccurredAt");
         expect(result).toContain("```sql");
       });
@@ -1282,7 +1283,7 @@ describe("All MCP tools integration", () => {
       it("sends the statement unchanged and renders a markdown table", async () => {
         const { handleRunQuery } = await import("../tools/run-query.ts");
         const sql =
-          "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM analytics.traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day";
+          "SELECT toStartOfDay(OccurredAt) AS day, count() AS traces FROM traces WHERE OccurredAt >= subtractDays(now(), 7) GROUP BY day";
         const result = await handleRunQuery({ sql });
 
         expect(JSON.parse(lastRequests["POST /api/v1/query"]!.body).sql).toBe(sql);
@@ -1748,6 +1749,41 @@ describe("All MCP tools integration", () => {
         expect(parsed).not.toHaveProperty("outputs");
         expect(parsed).not.toHaveProperty("temperature");
         expect(parsed).not.toHaveProperty("responseFormat");
+      });
+    });
+
+    describe("when an update names inputs, outputs and parameters", () => {
+      /** @scenario Changing inputs, outputs and parameters through platform_update_prompt */
+      it("sends those fields unchanged in the update request", async () => {
+        const { handleUpdatePrompt } = await import("../tools/update-prompt.ts");
+        const fields = {
+          inputs: [
+            { identifier: "question", type: "str" },
+            { identifier: "language", type: "str" },
+          ],
+          outputs: [
+            {
+              identifier: "answer",
+              type: "json_schema",
+              json_schema: { type: "object", properties: { answer: { type: "string" } } },
+            },
+          ],
+          parameters: { search_iterations: 5 },
+          temperature: 0.2,
+          maxTokens: 512,
+        };
+        await handleUpdatePrompt({
+          idOrHandle: "greeting-bot",
+          commitMessage: "Add a language variable",
+          ...fields,
+        });
+
+        const req = lastRequests["PUT /api/v1/prompts/greeting-bot"];
+        expect(req).toBeDefined();
+        expect(JSON.parse(req!.body)).toEqual({
+          commitMessage: "Add a language variable",
+          ...fields,
+        });
       });
     });
 

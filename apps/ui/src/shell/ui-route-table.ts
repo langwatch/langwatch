@@ -4,6 +4,16 @@
  * entry with only the loader repointed. Turned into routes elsewhere.
  */
 
+import { installedModuleScreens } from "@langwatch/browser/module-screens";
+import {
+  CODING_AGENTS_PATH,
+  codingAgentsPath,
+  RETIRED_PERSONAL_PATH,
+  RETIRED_PERSONAL_SEGMENT,
+} from "@langwatch/user-contract";
+
+import { browserModules } from "../browser-modules.generated.ts";
+
 export type UiRedirectDescriptor = {
   /**
    * The retired address; whatever the matched path carries BEYOND this
@@ -35,7 +45,10 @@ export type UiPageRouteDescriptor = {
   readonly page: string;
   /** The explicit native route mount point for a pre-router web installation. */
   readonly webRouteParent?: "project";
-  /** An account page (`/me`, Settings > Profile and Security): the shell draws its title large. */
+  /**
+   * An account page (`/coding-agents`, Settings > Profile and Security): the
+   * shell draws its title large.
+   */
   readonly heading?: "account";
   readonly children?: readonly UiRouteDescriptor[];
 };
@@ -185,6 +198,10 @@ export const uiLegacyRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
   },
 ];
 
+/**
+ * The table as data, one literal so the README extractor can read it. The router mounts
+ * `uiMountedRouteTable`, which adds the /me redirect rows derived from this table.
+ */
 export const uiRouteTable: readonly UiRouteDescriptor[] = [
   // Auth (public), under the host every front-door screen reads its
   // deployment shape and its own address through.
@@ -400,6 +417,14 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/settings/roles",
           },
           {
+            path: "/settings/braids",
+            page: "pages/settings/braids",
+          },
+          {
+            path: "/settings/organization-braids",
+            page: "pages/settings/organization-braids",
+          },
+          {
             path: "/settings/api-keys",
             page: "pages/settings/api-keys",
           },
@@ -531,41 +556,31 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             page: "pages/governance/users/[id]",
           },
 
-          // Personal-scope governance routes (must precede the /:project catch-all
-          // so "me" doesn't get treated as a project slug)
+          // Coding agents: the personal-scope routes (must precede the /:project
+          // catch-all so "coding-agents" doesn't get treated as a project slug)
           {
-            path: "/me",
-            page: "pages/me/index",
+            path: CODING_AGENTS_PATH,
+            page: "pages/coding-agents/index",
           },
           {
-            path: "/me/configure",
-            page: "pages/me/configure",
+            path: `${CODING_AGENTS_PATH}/configure`,
+            page: "pages/coding-agents/configure",
           },
           {
-            // The devices inventory moved into a tab of /me/configure, and this
-            // path keeps resolving so old links do not dead-end.
-            path: "/me/devices",
-            redirect: {
-              from: "/me/devices",
-              to: "/me/configure",
-              pinParams: { tab: "devices" },
-            },
+            path: `${CODING_AGENTS_PATH}/pull-requests`,
+            page: "pages/coding-agents/pull-requests",
           },
           {
-            path: "/me/pull-requests",
-            page: "pages/me/pull-requests",
-          },
-          {
-            path: "/me/sessions",
-            page: "pages/me/sessions",
+            path: `${CODING_AGENTS_PATH}/sessions`,
+            page: "pages/coding-agents/sessions",
           },
           {
             // Budget-increase request page that the CLI's `langwatch request-increase`
             // opens. The page file existed but routes.tsx is explicit (Vite migration)
             // - without this entry the URL 404'd, breaking the per-spec
             // budget-exceeded → request flow Ariana caught in dogfood.
-            path: "/me/budget/request",
-            page: "pages/me/budget/request",
+            path: `${CODING_AGENTS_PATH}/budget/request`,
+            page: "pages/coding-agents/budget/request",
           },
 
           // AI Gateway: org-scoped admin pages live under /gateway/** at the top level,
@@ -618,6 +633,17 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
             path: "/gateway/webhooks",
             page: "pages/gateway/webhooks",
           },
+
+          // The organization's Dashboards area: no project in the address, so no project chip
+          // (ADR-002). With its flag off `/dashboards` forwards to the reader's project, as
+          // before; with Dashboards off in the organization the shell answers not-found.
+          { path: "/dashboards", page: "pages/dashboards/index" },
+          { path: "/dashboards/templates", page: "pages/dashboards/templates" },
+          {
+            path: "/dashboards/curated/:templateId",
+            page: "pages/dashboards/curated/[templateId]",
+          },
+          { path: "/dashboards/:dashboardId", page: "pages/dashboards/[dashboardId]" },
           ...uiLegacyRedirectRoutes,
         ],
       },
@@ -913,6 +939,12 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
         page: "pages/ops/feature-flags",
       },
       { path: "/ops/foundry", page: "pages/ops/foundry" },
+      // Agent access: an operator's agents and the passkey approval page a request links to.
+      { path: "/ops/agents", page: "pages/ops/agents" },
+      {
+        path: "/ops/agents/approve/:requestId",
+        page: "pages/ops/agents/approve/[requestId]",
+      },
       {
         // Organization steps are the Organizations tab of the Upgrades page.
         path: "/ops/migrations",
@@ -989,4 +1021,102 @@ export const uiRouteTable: readonly UiRouteDescriptor[] = [
       },
     ],
   },
+];
+
+/**
+ * Every path the router serves: the table's own, then the project pages the installed modules
+ * declare, which the table never sees.
+ */
+const servedPaths: readonly string[] = [
+  ...uiRouteDescriptors(uiRouteTable).flatMap((descriptor) => descriptor.path ?? []),
+  ...installedModuleScreens(browserModules).routes.project.flatMap((route) => route.path ?? []),
+];
+
+/** The first segment of every `/:project/<segment>` page, in served order. */
+function projectSegments(paths: readonly string[]): string[] {
+  const segments = paths.flatMap((path) => path.match(/^\/:project\/([^/:*]+)/)?.[1] ?? []);
+  return [...new Set(segments)];
+}
+
+/**
+ * Each deep `/:project/<segment>/<more>` page with `:project` swapped for `me`. A static `me`
+ * outranks `:project` at any depth, where the `/me/<segment>/*` rows lose to a deeper project
+ * page. One-segment pages and a bare `/*` tail are already covered by those rows.
+ */
+function projectPageTwins(paths: readonly string[]): string[] {
+  const deep = paths.filter((path) => /^\/:project\/[^/]+\/(?!\*$)/.test(path));
+  const twins = deep.map((path) => path.replace(":project", RETIRED_PERSONAL_SEGMENT));
+  return [...new Set(twins)];
+}
+
+/** Every page under `/coding-agents/`, as the path after it: `sessions`, `budget/request`. */
+function codingAgentsPages(table: readonly UiRouteDescriptor[]): string[] {
+  return uiRouteDescriptors(table).flatMap((descriptor) => {
+    const prefix = `${CODING_AGENTS_PATH}/`;
+    const page = descriptor.path?.startsWith(prefix) ? descriptor.path.slice(prefix.length) : "";
+    return page === "" || /[:*]/.test(page) ? [] : [page];
+  });
+}
+
+const codingAgentsPageList = codingAgentsPages(uiRouteTable);
+
+/**
+ * Old first segments with their own /coding-agents page keep their sub-path there; any other
+ * segment lands on the Coding agents home, and the query and hash still travel. Deeper pages
+ * such as `budget/request` get exact rows below.
+ */
+const KEPT_SEGMENTS: Readonly<Record<string, string>> = Object.fromEntries(
+  codingAgentsPageList.filter((page) => !page.includes("/")).map((page) => [page, page]),
+);
+
+const toCodingAgents = {
+  from: RETIRED_PERSONAL_PATH,
+  to: CODING_AGENTS_PATH,
+  mapSegment: KEPT_SEGMENTS,
+} as const;
+
+/**
+ * Moved /me to /coding-agents; CLIs still print /me links. Mounted above the chrome, which would
+ * wait for a project and never redirect. /:project/<segment> outranks /me/*, so every project
+ * page gets a /me twin derived from the served paths. Spec: coding-agents-url-move.feature
+ */
+export const uiCodingAgentsRedirectRoutes: readonly UiRedirectRouteDescriptor[] = [
+  {
+    // The devices inventory is a tab of configure; straight there, no chaining.
+    path: `${RETIRED_PERSONAL_PATH}/devices`,
+    redirect: {
+      from: `${RETIRED_PERSONAL_PATH}/devices`,
+      to: codingAgentsPath({ page: "configure" }),
+      pinParams: { tab: "devices" },
+    },
+  },
+  {
+    // A device's own address has no page of its own; it still belongs on the Devices tab.
+    path: `${RETIRED_PERSONAL_PATH}/devices/*`,
+    redirect: {
+      from: `${RETIRED_PERSONAL_PATH}/devices`,
+      to: codingAgentsPath({ page: "configure" }),
+      pinParams: { tab: "devices" },
+      mapSegment: {},
+    },
+  },
+  ...codingAgentsPageList
+    .filter((page) => page.includes("/"))
+    .map((page) => ({
+      path: `${RETIRED_PERSONAL_PATH}/${page}`,
+      redirect: { from: RETIRED_PERSONAL_PATH, to: CODING_AGENTS_PATH },
+    })),
+  ...projectSegments(servedPaths).flatMap((segment) => [
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}`, redirect: toCodingAgents },
+    { path: `${RETIRED_PERSONAL_PATH}/${segment}/*`, redirect: toCodingAgents },
+  ]),
+  ...projectPageTwins(servedPaths).map((path) => ({ path, redirect: toCodingAgents })),
+  { path: `${RETIRED_PERSONAL_PATH}/*`, redirect: toCodingAgents },
+  { path: RETIRED_PERSONAL_PATH, redirect: toCodingAgents },
+];
+
+/** What the router mounts: the /me redirect rows at the top level, then `uiRouteTable`. */
+export const uiMountedRouteTable: readonly UiRouteDescriptor[] = [
+  ...uiCodingAgentsRedirectRoutes,
+  ...uiRouteTable,
 ];

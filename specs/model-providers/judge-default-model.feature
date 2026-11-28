@@ -96,3 +96,62 @@ Feature: Judge column in Default models
     Then no decision model is listed
     And the inherit row comes first, then the LLMs
     And every LLM reads as its provider icon and model id, with no description and no provider heading
+
+  # LangWatch Judge (preview): LangWatch's own scenario judge, behind its own flag
+
+  @unit
+  Scenario: LangWatch Judge (preview) may be held by the Judge column and the scenario judge only
+    Given the model langwatch/judge-preview
+    When each Default models column and each feature is asked whether it may hold it
+    Then only the Judge column and the scenario judge may
+    And a feature that reads another column steps over it
+
+  @unit
+  Scenario: The Judge picker lists LangWatch Judge (preview) first where its flag is on
+    Given the judge preview flag is on for my organization
+    When the Judge picker's choices are built
+    Then LangWatch Judge (preview) comes first, with what it is optimized for under its name
+    And the LLMs follow
+
+  @unit
+  Scenario: The Judge picker never lists LangWatch Judge (preview) where its flag is off
+    Given the judge preview flag is off, as on every self-hosted install by default
+    When the Judge picker's choices are built
+    Then only the LLMs are listed
+
+  @integration
+  Scenario: The drawer's Judge row offers LangWatch Judge (preview) where its flag is on
+    Given the judge preview flag is on for my organization
+    When I open the Judge picker in the Default models drawer
+    Then LangWatch Judge (preview) is listed right after the inherit row
+    And no other column lists it
+
+  @integration
+  Scenario: A scenario's judge picker offers LangWatch Judge (preview) where its flag is on
+    Given the judge preview flag is on for my organization
+    When I open a scenario's or a suite's Judge picker
+    Then LangWatch Judge (preview) is listed first
+    And the user simulator picker does not list it
+    And with the flag off neither picker lists it
+    And the flag is asked of the organization alone, as the Default models drawer asks it
+
+  @unit
+  Scenario: Saving LangWatch Judge (preview) as the Judge default stores it as picked
+    Given the judge preview flag is on for my organization
+    When a Default models config picks langwatch/judge-preview for Judge
+    Then the config is stored with langwatch/judge-preview under Judge, never another model's id
+
+  @unit
+  Scenario: Saving LangWatch Judge (preview) is refused where its flag is off
+    Given the judge preview flag is off for my organization
+    When a Default models config newly picks langwatch/judge-preview for Judge
+    Then the save is refused, saying it is not available for this organization yet
+    And a config that already held it saves its other keys
+
+  @unit
+  Scenario: Saving LangWatch Judge (preview) under another column is refused
+    Given the judge preview flag is on for my organization
+    When a Default models config picks langwatch/judge-preview for Default or Fast
+    Then the save is refused, saying it can only be the Judge default
+    And picked for Instant Evals it is refused as not a decision model
+

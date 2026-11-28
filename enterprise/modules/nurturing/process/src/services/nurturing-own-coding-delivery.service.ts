@@ -39,7 +39,7 @@ export class NurturingOwnCodingDeliveryService {
     const { claimKey, seconds } = ownCodingFirstSessionClaim(signal);
     if (!(await claims.claim(claimKey, seconds))) return;
     try {
-      await customerIo.batch(fireOwnCodingFirstSession(signal));
+      await customerIo.batchOrThrow(fireOwnCodingFirstSession(signal));
     } catch (error) {
       const released = await NurturingClaimReleaseService.create(claims).releasedAll([claimKey]);
       nurturingLogger.warn(

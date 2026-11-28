@@ -16,6 +16,7 @@ import { EvaluatorApi } from "@langwatch/evaluator-contract";
 import type { EventingCommands } from "@langwatch/eventing";
 import { FeatureFlagApi } from "@langwatch/feature-flag-contract";
 import { GatewayApi } from "@langwatch/gateway-contract";
+import { InstantEvalJudgeApi } from "@langwatch/instant-eval-judge-contract";
 import { generate } from "@langwatch/ksuid";
 import { DEFAULT_MODEL, ModelProviderApi } from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
@@ -25,6 +26,7 @@ import { ProjectApi } from "@langwatch/project-contract";
 import { PromptApi } from "@langwatch/prompt-contract";
 import {
   DEFAULT_SET_ID,
+  ScenarioEventType,
   type RunConfigurationEntryResponse,
   startScenarioTabPresence,
   ScenarioApi,
@@ -67,6 +69,8 @@ import {
   type ScenarioIdInput,
   type ScenarioMoveInput,
   type ScenarioRunConfig,
+  type JudgePreviewChatCompletion,
+  type JudgePreviewChatInput,
   type ScenarioGenerateRequest,
   type ScenarioGenerateResponse,
   type ScenarioRunExportDownload,
@@ -153,6 +157,8 @@ import {
   type SimulationPipelineSetup,
 } from "../eventing/simulation-processing-runtime.pipeline.ts";
 import type { SimulationProcessingPipelineDefinition } from "../eventing/simulation-processing.pipeline.ts";
+import { JudgePreviewAvailabilityService } from "../features/judge-preview/services/judge-preview-availability.service.ts";
+import { JudgePreviewChatService } from "../features/judge-preview/services/judge-preview-chat.service.ts";
 import { ScenarioExecutionPrefetcherService } from "../features/prefetch/services/scenario-execution-prefetcher.service.ts";
 import { ScenarioRunExportDownloadService } from "../features/run-export/services/scenario-run-export-download.service.ts";
 import { ScenarioRunExportService } from "../features/run-export/services/scenario-run-export.service.ts";
@@ -166,6 +172,7 @@ import { VoiceNonceRegistryService } from "../features/voice/services/voice-nonc
 import { VoicePublicUrlService } from "../features/voice/services/voice-public-url.service.ts";
 import { VoiceSessionService } from "../features/voice/services/voice-session.service.ts";
 import type { ScenarioRepositories } from "../repositories/scenario.repositories.ts";
+import { isCountedScenarioSet } from "../rules/scenario-set-cap.rules.ts";
 import { AgentTestService } from "../services/agent-test.service.ts";
 import { ConnectedTargetService } from "../services/connected-target.service.ts";
 import { HttpAgentTestService } from "../services/http-agent-test.service.ts";
@@ -197,7 +204,7 @@ interface ScenarioAppDependencies {
   /** One HTTP agent call from its editor, run by the workflow engine and traced. */
   httpAgentTesting: HttpAgentTestService;
   scenarios: ScenarioService;
-  /** The cloud Free caps on scenarios and simulations. */
+  /** The cloud Free caps on scenarios and scenario runs. */
   creationCaps: ScenarioCreationCapService;
   simulations: SimulationServiceContract;
   /** Validates a run against its target before anything is queued. */
@@ -217,6 +224,8 @@ interface ScenarioAppDependencies {
   /** The author-assist door's tier-effective generation window. */
   generateBounds: ScenarioGenerateBoundsService;
   generation: ScenarioGenerationService;
+  /** The scenario judge's calls when its model is LangWatch Judge (preview). */
+  judgePreviewChat: JudgePreviewChatService;
   runExportDownloads: ScenarioRunExportDownloadService;
   events: ScenarioEventService;
   connectedTargets: ConnectedTargetService;
@@ -260,6 +269,8 @@ const scenarioAppDependencyTokens = {
   gateway: GatewayApi,
   /** The code-agent run's sandbox key, minted per project as main's prefetcher did. */
   apiKeys: ApiKeyApi,
+  /** LangWatch Judge (preview): the routed judge a scenario judge's calls are answered by. */
+  judges: InstantEvalJudgeApi,
 };
 
 export class ScenarioModule implements ScenarioApi {
@@ -321,7 +332,6 @@ export class ScenarioModule implements ScenarioApi {
       plans: setup.dependencies.plans,
       projects: setup.dependencies.projects,
       scenarios: repositories.scenarios,
-      simulations,
     });
     const generateBounds = ScenarioGenerateBoundsService.create({
       entitlement: setup.dependencies.plans,
@@ -350,6 +360,12 @@ export class ScenarioModule implements ScenarioApi {
     });
 
     const childHost = { voicePublicUrl: voice.acquire, nlpServiceUrl };
+    const judgePreviewAvailability = JudgePreviewAvailabilityService.create({
+      featureFlags: peers.featureFlags,
+      projects: peers.projects,
+      judges: peers.judges,
+      isSaas: config.isSaas,
+    });
 
     return new ScenarioModule({
       agentTesting: AgentTestService.create({
@@ -391,6 +407,7 @@ export class ScenarioModule implements ScenarioApi {
         secrets: peers.secrets,
         traces: peers.traces,
         apiKeys: peers.apiKeys,
+        judgePreviewAvailability,
         voiceTargets: ScenarioVoiceTargetService.create({
           agents: peers.agents,
           modelProviders: peers.modelProviders,
@@ -412,6 +429,12 @@ export class ScenarioModule implements ScenarioApi {
         bounds: generateBounds,
         modelProviders: setup.dependencies.modelProviders,
         timeoutMs: setup.config.generateTimeoutMs,
+      }),
+      judgePreviewChat: JudgePreviewChatService.create({
+        judges: peers.judges,
+        availability: judgePreviewAvailability,
+        ids,
+        clock,
       }),
       runExportDownloads: ScenarioRunExportDownloadService.create({
         auditLog: setup.dependencies.auditLog,
@@ -435,6 +458,7 @@ export class ScenarioModule implements ScenarioApi {
         peers: setup.dependencies,
         scenarios,
         simulations,
+        runCap: creationCaps,
         signingSecret,
         voicePublicBaseUrl: config.voicePublicBaseUrl,
         voiceCallMaxSeconds: config.voiceCallMaxSeconds,
@@ -486,6 +510,7 @@ export class ScenarioModule implements ScenarioApi {
           cancellationSubscriptions: cancellations,
           config: setup.config,
           host: childHost,
+          judgePreviewAvailability,
         }),
       }),
     });
@@ -521,6 +546,10 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.generation.generate(input);
   }
 
+  completeJudgePreviewChat(input: JudgePreviewChatInput): Promise<JudgePreviewChatCompletion> {
+    return this.#dependencies.judgePreviewChat.complete(input);
+  }
+
   mintVoiceSession(input: VoiceSessionMintRequest): Promise<VoiceSessionMintResult> {
     return this.#dependencies.voiceSessions.mint(input);
   }
@@ -546,6 +575,12 @@ export class ScenarioModule implements ScenarioApi {
   async reportScenarioEvent(input: ScenarioEventReportInput): Promise<ScenarioEventReportResult> {
     const reported = await this.#dependencies.events.report(input);
     if (reported.scenarioSetId === null) return { success: true };
+    if (input.event.type === ScenarioEventType.RUN_STARTED) {
+      this.reportSimulationSetCreated({
+        projectId: input.projectId,
+        scenarioSetId: reported.scenarioSetId,
+      });
+    }
 
     return {
       success: true,
@@ -642,8 +677,16 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.scenarios.findTestSuite(input);
   }
 
-  createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
-    return this.#dependencies.scenarios.createTestSuite(input);
+  /** A suite a template apply makes passes the Free suite cap before anything is written. */
+  async createTestSuite(input: ScenarioTestSuiteCreateInput): Promise<ScenarioTestSuite> {
+    const cap = await this.#dependencies.creationCaps.testSuiteCreationCap({
+      projectId: input.projectId,
+      templateId: input.templateId,
+    });
+    return this.#dependencies.scenarios.createTestSuite(
+      input,
+      cap.kind === "capped" ? cap.cap : undefined,
+    );
   }
 
   updateTestSuite(input: ScenarioTestSuiteUpdateInput): Promise<ScenarioTestSuite> {
@@ -693,18 +736,23 @@ export class ScenarioModule implements ScenarioApi {
   async create(
     input: Omit<ScenarioCreateInput, "lastUpdatedById">,
     by: ScenarioCaller,
+    options: { sourceTemplateId?: string } = {},
   ): Promise<Scenario> {
     await this.#dependencies.creationCaps.assertScenarioCreationAllowed({
       projectId: input.projectId,
       operatorId: by.label === "user" ? by.id : undefined,
+      sourceTemplateId: options.sourceTemplateId,
     });
-    const scenario = await this.#dependencies.scenarios.create({
-      ...input,
-      // REST can name an explicit actor when its credential names no person;
-      // `by.id` alone would answer "the key" or "the project", neither a
-      // `User` row. tRPC, always a signed-in person, keeps the old behavior.
-      lastUpdatedById: input.actor ? input.actor.userId : by.id,
-    });
+    const scenario = await this.#dependencies.scenarios.create(
+      {
+        ...input,
+        // REST can name an explicit actor when its credential names no person;
+        // `by.id` alone would answer "the key" or "the project", neither a
+        // `User` row. tRPC, always a signed-in person, keeps the old behavior.
+        lastUpdatedById: input.actor ? input.actor.userId : by.id,
+      },
+      options,
+    );
 
     this.reportScenarioCreated({ scenario, projectId: input.projectId, userId: by.id });
 
@@ -745,6 +793,32 @@ export class ScenarioModule implements ScenarioApi {
       })
       .catch((error: unknown) => {
         lifecycleLogger.error({ error, projectId }, "failed to record a created scenario");
+      });
+  }
+
+  /**
+   * Records that the project ran the set, once per project and set (the event's idempotency key),
+   * without making the run wait for it. Platform-owned sets are left out.
+   */
+  private reportSimulationSetCreated(
+    input: Readonly<{ projectId: string; scenarioSetId: string }>,
+  ): void {
+    const { projectId, scenarioSetId } = input;
+    if (!isCountedScenarioSet(scenarioSetId)) return;
+    Promise.resolve()
+      .then(() => {
+        if (!this.#lifecycleCommands) {
+          throw new Error("scenario_lifecycle pipeline senders are not connected yet");
+        }
+        return this.#lifecycleCommands.recordSimulationSetCreated.send({
+          tenantId: projectId,
+          occurredAt: nowInstant().epochMilliseconds,
+          scenarioSetId,
+          projectId,
+        });
+      })
+      .catch((error: unknown) => {
+        lifecycleLogger.error({ error, projectId }, "failed to record a created simulation set");
       });
   }
 
@@ -889,6 +963,11 @@ export class ScenarioModule implements ScenarioApi {
     return this.#dependencies.generateBounds.assertGenerateWithinBounds(input);
   }
 
+  /** Refuses a new run once the project's organization is past its plan's monthly run cap. */
+  assertSimulationRunAllowed(input: { projectId: string }): Promise<void> {
+    return this.#dependencies.creationCaps.assertRunAllowed({ projectId: input.projectId });
+  }
+
   /**
    * Dispatches the queued command, which is what writes QUEUED state before the execution job is
    * scheduled — the same order the suite execution port uses. The resolved parameters travel on the
@@ -916,6 +995,12 @@ export class ScenarioModule implements ScenarioApi {
         ...withActor(input.actor),
         ...(input.simulatorModel ? { simulatorModel: input.simulatorModel } : {}),
         ...(input.judgeModel ? { judgeModel: input.judgeModel } : {}),
+        ...(input.traceQuietPeriodMs != null
+          ? { traceQuietPeriodMs: input.traceQuietPeriodMs }
+          : {}),
+        ...(input.traceWaitTimeoutMs != null
+          ? { traceWaitTimeoutMs: input.traceWaitTimeoutMs }
+          : {}),
         ...withResolvedModels(input.resolvedModels),
         ...(input.keepData ? { keepData: true } : {}),
       },
@@ -923,6 +1008,12 @@ export class ScenarioModule implements ScenarioApi {
       ...(Object.keys(input.parameters).length > 0 ? { parameters: input.parameters } : {}),
       ...(secretParameterNames.length > 0 ? { secretParameterNames } : {}),
     };
+
+    // Admitting counts the run, so it comes last: a target that fails to resolve keeps no slot.
+    await this.#dependencies.creationCaps.assertRunAllowed({
+      projectId: input.projectId,
+      scenarioRunId: input.scenarioRunId,
+    });
 
     await this.#dependencies.simulations.queueRun({
       tenantId: input.projectId,
@@ -1225,6 +1316,8 @@ export interface ScenarioChildEnvironment {
   callerEnv?: Record<string, string>;
   /** The target declares scenario hooks, which only the Node child calls (ADR-180). */
   callsHooks?: boolean;
+  /** The scenario is a red team attack, which only the Node child plays. */
+  runsRedTeam?: boolean;
 }
 
 export interface ScenarioChildExecutionSession {

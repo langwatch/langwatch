@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { parseReport } from "../lint.mjs";
+import { lintTypesArgs, parseReport, routeFlags, widenedScope } from "../lint.mjs";
 
 void describe("parseReport", () => {
   /** @scenario "A lint run whose every path is ignored has no problems" */
@@ -19,5 +19,61 @@ void describe("parseReport", () => {
   /** @scenario "A lint run whose every path is ignored has no problems" */
   void it("returns undefined when oxlint printed an error instead", () => {
     assert.equal(parseReport("thread panicked"), undefined);
+  });
+});
+void describe("widenedScope", () => {
+  const roots = ["a", "b", "c", "d"];
+
+  /** @scenario "A type-aware scope past half the projects lints every project" */
+  void it("lints every project once a change reaches more than half of them", () => {
+    assert.deepEqual(widenedScope({ roots, reached: ["a", "b", "c"] }), roots);
+  });
+
+  /** @scenario "A type-aware scope past half the projects lints every project" */
+  void it("keeps a scope of half the projects or fewer", () => {
+    assert.deepEqual(widenedScope({ roots, reached: ["a", "c"] }), ["a", "c"]);
+  });
+});
+void describe("lintTypesArgs", () => {
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("lints without the cache after a failed typecheck, so nothing it writes is cached", () => {
+    assert.deepEqual(lintTypesArgs({ typecheck: 0 }), ["run-many", "-t", "lint:types"]);
+    assert.ok(lintTypesArgs({ typecheck: 1 }).includes("--skip-nx-cache"));
+  });
+});
+void describe("routeFlags", () => {
+  /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
+  void it("lints a --changed run directly, never through Nx", () => {
+    assert.deepEqual(routeFlags(["--changed"]), { route: "direct", types: false });
+    assert.deepEqual(routeFlags(["--changed", "--types"]), { route: "direct", types: true });
+  });
+
+  /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
+  void it("sends a full or --base plain run through the tree target", () => {
+    assert.deepEqual(routeFlags([]), { route: "nx", types: false, base: undefined });
+    assert.deepEqual(routeFlags(["--base", "abc123"]), {
+      route: "nx",
+      types: false,
+      base: "abc123",
+    });
+  });
+
+  /** @scenario "Type-aware lint batches the projects Nx did not replay" */
+  void it("sends a full or --base type-aware run to every project's lint:types", () => {
+    assert.deepEqual(routeFlags(["--types"]), { route: "projects", types: true });
+    assert.deepEqual(routeFlags(["--types", "--base", "abc123"]), {
+      route: "projects",
+      types: true,
+    });
+  });
+
+  /** @scenario "Lint runs replay through Nx except a lint of the working tree" */
+  void it("lints the paths Nx hands back, dropping flags and the --base value", () => {
+    const flags = ["--resolved", "--types", "--base", "abc123", "apps/api", "packages/time"];
+    assert.deepEqual(routeFlags(flags), {
+      route: "resolved",
+      types: true,
+      paths: ["apps/api", "packages/time"],
+    });
   });
 });

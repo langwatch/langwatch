@@ -9,6 +9,7 @@ import { Box, chakra } from "@langwatch/design-system/primitives";
 import { useCallback, useState } from "react";
 
 import { useVoiceAgentsEnabled } from "../../../../behavior/use-voice-agents-enabled.ts";
+import { judgeTraceWaitMsOf, judgeTraceWaitProblemOf } from "../../../../model/judge-trace-wait.ts";
 import { isNoteTooLong } from "../../../elements/agent-testing/run/run-note-field.tsx";
 import { OpenListContext } from "../../../elements/agent-testing/shared/open-list-context.ts";
 import { RUN_MISSING_MAPPINGS_TOOLTIP } from "../run-evaluators/run-evaluators.ts";
@@ -133,6 +134,7 @@ function useRunDialogState({
     repeatCount: form.repeatCount,
     simulatorModel: form.simulatorModel,
     judgeModel: form.judgeModel,
+    traceWait: judgeTraceWaitMsOf(form.traceWait),
     note: form.note,
     runParameters: form.runParameters,
     storableRunParameters: form.storableRunParameters,
@@ -155,6 +157,8 @@ function useRunDialogState({
   const isTargetMissing = subject?.kind === "case" && form.runTargets.length === 0;
   const onRun = () => {
     if (offender) return form.openOffender();
+    // The refused input says why under itself; the section is open while it does.
+    if (judgeTraceWaitProblemOf(form.traceWait)) return form.setShowModels(true);
     if (isTargetMissing) return setHasTriedWithoutTarget(true);
     void controller.run();
   };

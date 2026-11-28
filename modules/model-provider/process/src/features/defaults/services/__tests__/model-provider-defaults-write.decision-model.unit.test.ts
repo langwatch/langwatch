@@ -15,6 +15,7 @@ import { describe, expect, it } from "vitest";
 
 import { createModelProviderTestProjects } from "../../../../app/__tests__/model-provider.fixture.ts";
 import { MemoryModelProviderRepositories } from "../../../../repositories/memory/memory.model-provider.repositories.ts";
+import type { ModelProviderRepositories } from "../../../../repositories/model-provider.repositories.ts";
 import { ModelProviderAuthorizationService } from "../../../../services/model-provider-authorization.service.ts";
 import { ModelProviderDecisionModelService } from "../../../../services/model-provider-decision-model.service.ts";
 import { ModelProviderScopeService } from "../../../../services/model-provider-scope.service.ts";
@@ -82,18 +83,23 @@ function unused(member: string) {
 }
 
 async function writerOver({
+  defaults = MemoryModelProviderRepositories.create().defaults,
   stored,
   storedScopes = [SCOPE],
-  isFlagOn,
+  isOwnModelOn,
+  isJudgePreviewOn = false,
   keyedScopes = [SCOPE],
 }: {
   stored?: Record<string, string>;
   storedScopes?: ModelDefaultScope[];
-  isFlagOn: boolean;
+  /** The own decision model flag. */
+  isOwnModelOn: boolean;
+  /** The LangWatch Judge (preview) release flag. */
+  isJudgePreviewOn?: boolean;
   /** The scopes whose own chain holds an enabled Inception key. */
   keyedScopes?: ModelDefaultScope[];
+  defaults?: ModelProviderRepositories["defaults"];
 }) {
-  const { defaults } = MemoryModelProviderRepositories.create();
   if (stored) {
     await defaults.save({
       id: CONFIG_ID,
@@ -125,7 +131,8 @@ async function writerOver({
       Promise.resolve(
         provider === "inception" && keyed.has(scopeKey(scope)) ? inceptionRow() : null,
       ),
-    isOwnModelAllowed: () => Promise.resolve(isFlagOn),
+    isJudgePreviewAllowed: () => Promise.resolve(isJudgePreviewOn),
+    isOwnModelAllowed: () => Promise.resolve(isOwnModelOn),
   });
   return ModelProviderDefaultsWriteService.create({
     decisionModels,
@@ -139,11 +146,75 @@ async function writerOver({
   });
 }
 
+describe("ModelProviderDefaultsWriteService and LangWatch Judge (preview)", () => {
+  describe("when the judge preview flag is on", () => {
+    /** @scenario "Saving LangWatch Judge (preview) under another column is refused" */
+    it.each(["DEFAULT", "FAST"])(
+      "refuses it as the %s default, saying it can only be the Judge default",
+      async (key) => {
+        const writer = await writerOver({ isOwnModelOn: false, isJudgePreviewOn: true });
+
+        await expect(
+          writer.save({
+            config: { [key]: "langwatch/judge-preview" },
+            scopes: [SCOPE],
+            authorId: null,
+          }),
+        ).rejects.toThrow("can only be the Judge default");
+      },
+    );
+
+    /** @scenario "Saving LangWatch Judge (preview) under another column is refused" */
+    it("refuses it as the Instant Evals default, which takes decision models only", async () => {
+      const writer = await writerOver({ isOwnModelOn: false, isJudgePreviewOn: true });
+
+      await expect(
+        writer.save({
+          config: { INSTANT_EVALS: "langwatch/judge-preview" },
+          scopes: [SCOPE],
+          authorId: null,
+        }),
+      ).rejects.toThrow("is not a decision model");
+    });
+
+    /** @scenario "Saving LangWatch Judge (preview) as the Judge default stores it as picked" */
+    it("accepts it as the Judge default and stores it as picked", async () => {
+      const { defaults } = MemoryModelProviderRepositories.create();
+      const writer = await writerOver({ isOwnModelOn: false, isJudgePreviewOn: true, defaults });
+
+      const saved = await writer.save({
+        config: { JUDGE: "langwatch/judge-preview" },
+        scopes: [SCOPE],
+        authorId: null,
+      });
+
+      const [stored] = await defaults.findForOrganization(ORGANIZATION);
+      expect(saved.config).toEqual({ JUDGE: "langwatch/judge-preview" });
+      expect(stored?.config).toEqual({ JUDGE: "langwatch/judge-preview" });
+    });
+  });
+
+  describe("when the judge preview flag is off", () => {
+    /** @scenario "Saving LangWatch Judge (preview) is refused where its flag is off" */
+    it("refuses it as the Judge default", async () => {
+      const writer = await writerOver({ isOwnModelOn: true, isJudgePreviewOn: false });
+
+      await expect(
+        writer.save({
+          config: { JUDGE: "langwatch/judge-preview" },
+          scopes: [SCOPE],
+          authorId: null,
+        }),
+      ).rejects.toThrow("not available for this organization yet");
+    });
+  });
+});
+
 describe("ModelProviderDefaultsWriteService and the Instant Evals column", () => {
   describe("when the flag is off", () => {
     /** @scenario "Picking an own decision model is refused without the flag" */
     it("refuses a newly picked own decision model", async () => {
-      const writer = await writerOver({ isFlagOn: false });
+      const writer = await writerOver({ isOwnModelOn: false });
 
       await expect(
         writer.save({ config: { INSTANT_EVALS: MERCURY }, scopes: [SCOPE], authorId: null }),
@@ -152,7 +223,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
 
     /** @scenario "Keeping an already stored own decision model is not refused" */
     it("accepts a change to another column of a config that already stores one", async () => {
-      const writer = await writerOver({ isFlagOn: false, stored: { INSTANT_EVALS: MERCURY } });
+      const writer = await writerOver({ isOwnModelOn: false, stored: { INSTANT_EVALS: MERCURY } });
 
       const saved = await writer.save({
         id: CONFIG_ID,
@@ -163,22 +234,63 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
       expect(saved.config).toEqual({ INSTANT_EVALS: MERCURY, FAST: "openai/gpt-5.4-mini" });
     });
 
-    it("accepts LangWatch Evals Preview", async () => {
-      const writer = await writerOver({ isFlagOn: false });
+    /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
+    it.each(["langwatch/instant-preview", "langwatch/instant-evals"])(
+      "stores %s as langwatch/instant-evals",
+      async (sent) => {
+        const writer = await writerOver({ isOwnModelOn: false });
 
-      const saved = await writer.save({
-        config: { INSTANT_EVALS: "langwatch/instant-evals" },
-        scopes: [SCOPE],
+        const saved = await writer.save({
+          config: { INSTANT_EVALS: sent },
+          scopes: [SCOPE],
+          authorId: null,
+        });
+
+        expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+      },
+    );
+
+    /** @scenario "Saving a config stores LangWatch's model under the id the previous release reads" */
+    it("stores LangWatch Instant (preview) set as one default under the earlier id", async () => {
+      const { defaults } = MemoryModelProviderRepositories.create();
+      const writer = await writerOver({ isOwnModelOn: false, defaults });
+
+      await writer.set({
+        scope: SCOPE,
+        key: "INSTANT_EVALS",
+        model: "langwatch/instant-preview",
         authorId: null,
       });
 
-      expect(saved.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+      const [stored] = await defaults.findForOrganization(ORGANIZATION);
+      expect(stored?.config).toEqual({ INSTANT_EVALS: "langwatch/instant-evals" });
+    });
+
+    /** @scenario "The Instant Evals column refuses LangWatch Evals (preview)" */
+    it("refuses LangWatch Evals (preview) in the column on a save and on a single set", async () => {
+      const writer = await writerOver({ isOwnModelOn: false });
+
+      await expect(
+        writer.save({
+          config: { INSTANT_EVALS: "langwatch/evals-preview" },
+          scopes: [SCOPE],
+          authorId: null,
+        }),
+      ).rejects.toMatchObject({ code: "validation_error" });
+      await expect(
+        writer.set({
+          scope: SCOPE,
+          key: "INSTANT_EVALS",
+          model: "langwatch/evals-preview",
+          authorId: null,
+        }),
+      ).rejects.toHaveProperty("code");
     });
   });
 
   describe("when the flag is on", () => {
     it("accepts an own decision model", async () => {
-      const writer = await writerOver({ isFlagOn: true });
+      const writer = await writerOver({ isOwnModelOn: true });
 
       const saved = await writer.save({
         config: { INSTANT_EVALS: MERCURY },
@@ -191,7 +303,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
 
     /** @scenario "Picking an own decision model for a scope with no key for it is refused" */
     it("refuses an organization config when only one project holds the key", async () => {
-      const writer = await writerOver({ isFlagOn: true, keyedScopes: [PROJECT_A] });
+      const writer = await writerOver({ isOwnModelOn: true, keyedScopes: [PROJECT_A] });
 
       await expect(
         writer.save({ config: { INSTANT_EVALS: MERCURY }, scopes: [SCOPE], authorId: null }),
@@ -202,7 +314,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
     });
 
     it("accepts a project config whose project holds the key", async () => {
-      const writer = await writerOver({ isFlagOn: true, keyedScopes: [PROJECT_A] });
+      const writer = await writerOver({ isOwnModelOn: true, keyedScopes: [PROJECT_A] });
 
       const saved = await writer.save({
         config: { INSTANT_EVALS: MERCURY },
@@ -216,7 +328,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
     /** @scenario "A kept own decision model is checked only on the scopes it gains" */
     it("refuses adding a scope with no key to a config that keeps its model", async () => {
       const writer = await writerOver({
-        isFlagOn: true,
+        isOwnModelOn: true,
         stored: { INSTANT_EVALS: MERCURY },
         storedScopes: [PROJECT_A],
         keyedScopes: [PROJECT_A],
@@ -229,7 +341,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
 
     it("does not recheck a kept model on the scopes it already had", async () => {
       const writer = await writerOver({
-        isFlagOn: true,
+        isOwnModelOn: true,
         stored: { INSTANT_EVALS: MERCURY },
         storedScopes: [PROJECT_A],
         keyedScopes: [],
@@ -247,7 +359,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
 
   /** @scenario "The column only takes decision models" */
   it("refuses a chat model in the Instant Evals column", async () => {
-    const writer = await writerOver({ isFlagOn: true });
+    const writer = await writerOver({ isOwnModelOn: true });
 
     await expect(
       writer.save({
@@ -260,7 +372,7 @@ describe("ModelProviderDefaultsWriteService and the Instant Evals column", () =>
 
   /** @scenario "A decision model cannot be another role's default" */
   it("refuses a decision model as the Default role", async () => {
-    const writer = await writerOver({ isFlagOn: true });
+    const writer = await writerOver({ isOwnModelOn: true });
 
     await expect(
       writer.save({

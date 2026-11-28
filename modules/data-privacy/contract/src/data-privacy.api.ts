@@ -30,12 +30,22 @@ export type DataPrivacyLogRecord = {
   attributes: Record<string, string>;
   resourceAttributes: Record<string, string>;
   attributeNames?: Record<string, string>;
+  /**
+   * The record this is, which the PII redaction model's priced request id is derived from: a
+   * repeat of the same text in another record is another call (ADR-201).
+   */
+  recordKey?: string;
 };
 
 export type DataPrivacyMetricAttributes = {
   attributes: Record<string, string>;
   resourceAttributes: Record<string, string>;
   attributeNames?: Record<string, string>;
+  /**
+   * The record this is, which the PII redaction model's priced request id is derived from: a
+   * repeat of the same text in another record is another call (ADR-201).
+   */
+  recordKey?: string;
 };
 
 /** What one span's content drop removed: the only record of it, as the span is stored stripped. */
@@ -99,6 +109,14 @@ export interface DataPrivacyApi {
     input: DataPrivacyScopeTarget & { config: DataPrivacyConfig } & DataPrivacyCallerInput,
   ): Promise<DataPrivacyPolicy>;
   removeScopeRule(input: DataPrivacyScopeTarget & DataPrivacyCallerInput): Promise<void>;
+  /**
+   * Records an organization admin's acceptance of the PII Redaction Model's price, which a
+   * priced Cloud organization needs before Strict runs on the model (ADR-201 decision 15). The
+   * door authorizes the organization; a second acceptance keeps the first.
+   */
+  acceptPiiRedactionModel(
+    input: { organizationId: string } & DataPrivacyCallerInput,
+  ): Promise<void>;
 
   /**
    * True when this project's resolved policy drops any span content at

@@ -1,0 +1,140 @@
+---
+title: Cloud agent discovery
+description: List the agents your organisation runs on AWS Bedrock, Bedrock AgentCore, Google Cloud Vertex AI Agent Engine and any ARD registry, and find the shadow and dormant ones.
+sidebarTitle: Cloud agent discovery
+keywords: agent discovery, shadow AI, shadow agents, dormant agents, Bedrock Agents, AgentCore, Vertex AI Agent Engine, ARD, agent inventory, governance
+---
+
+Cloud agent discovery gives a governance team one inventory of the agents running in its cloud accounts. Connect an AWS account, a Google Cloud project or an agent registry, and LangWatch lists their agents on a schedule. It then compares that list with your traces: an agent sending traffic that no source lists is flagged as shadow, and a listed agent with no traffic for a set time is flagged as dormant.
+
+<Warning>
+  **Available on Enterprise plans.** Creating sources and changing the dormancy window needs the
+  `ingestionSources:manage` permission. Reading the inventory needs `governance:view`. See
+  [Open-core licensing](/ai-governance/open-core-licensing).
+</Warning>
+
+## What gets discovered
+
+| Source type | Platform | What it lists |
+|---|---|---|
+| `aws_bedrock_agents` | AWS | Bedrock Agents and Bedrock AgentCore runtimes in each region you choose |
+| `gcp_vertex_agent_engine` | Google Cloud | Vertex AI Agent Engine reasoning engines in each project and location you choose |
+| `ard_registry` | Any ARD registry | The `urn:air:` entries of an [Agentic Resource Discovery (ARD) v0.91](https://github.com/ards-project/ard-spec) registry |
+
+Each listed agent enters the [agent registry](/governance/agent-registry) with a stable id, its platform, model, owner and tags. The owner is read from the `owner` tag or label, then `Owner`, then `team`. These sources only list agents; they send no usage events.
+
+Create a source from `/governance/ingestion-sources` and pick the source type.
+
+## Set up AWS
+
+An AWS source signs its calls with an AWS connection of your organisation. A connection holds either an access key pair or a role to assume with an external id. A role is the better choice: you can revoke it in your own account at any time.
+
+Pick the connection and the regions to list, up to 20. One region that refuses the listing refuses the whole run.
+
+The identity behind the connection needs this policy:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ListBedrockAgents",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock:ListAgents",
+        "bedrock:ListAgentAliases",
+        "bedrock:GetAgent",
+        "bedrock:ListTagsForResource"
+      ],
+      "Resource": "*"
+    },
+    {
+      "Sid": "ListAgentCoreRuntimes",
+      "Effect": "Allow",
+      "Action": [
+        "bedrock-agentcore:ListAgentRuntimes",
+        "bedrock-agentcore:GetAgentRuntime",
+        "bedrock-agentcore:ListTagsForResource"
+      ],
+      "Resource": "*"
+    }
+  ]
+}
+```
+
+Every action above is required. LangWatch reads each agent's and runtime's details and tags, and if AWS refuses any of those reads the whole listing fails, Bedrock agents included.
+
+If the connection assumes a role, the role's trust policy lets the identity LangWatch runs as assume it, and only with your external id. Replace the principal with that identity's ARN and the external id with the one you set on the connection:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Principal": { "AWS": "<langwatch-principal-arn>" },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "StringEquals": { "sts:ExternalId": "<your-external-id>" }
+      }
+    }
+  ]
+}
+```
+
+## Set up Google Cloud
+
+Create a service account in the project that runs your agents. Give it the `aiplatform.reasoningEngines.list` permission, through a custom role that holds only that permission or through `roles/aiplatform.viewer`.
+
+Create a JSON key for the service account and paste it into the source form. LangWatch stores the key sealed and never shows it again; the form only says that a key is set.
+
+Add the project and location pairs to list, such as `my-project` in `europe-west4`, up to 20. A service account in one project can list another project if you grant it the same role there.
+
+## Set up an ARD registry
+
+Enter the registry's domain, such as `registry.example.com`, or an `https` URL. LangWatch reads the manifest at `/.well-known/ard.json` on that origin. The manifest must declare `specVersion` `0.91`; any other version refuses the listing as `malformed_response`.
+
+If the registry has a search endpoint, add its URL so LangWatch reads every page of results, not only the manifest. Add a bearer token if the registry needs one. Addresses inside a private network, such as `169.254.169.254`, are refused when you save.
+
+## Schedules and testing
+
+Each source lists its agents on its own schedule, a cron expression. The default is hourly (`0 * * * *`). The Sync button on the source runs a listing straight away.
+
+Test connection runs a listing without recording it. It answers with the number of agents found, or with the reason the provider refused, such as `unauthorized` or `not_configured`. Use it before you save a source and after you change its permissions.
+
+A listing that the provider refuses records no agents and changes no entries. The source shows the refusal reason on its last run, and the registry keeps what the last good listing found.
+
+When a good listing no longer names an agent, its registry entry is removed with a `governance.agent.removed` event. If a later listing names it again, the entry becomes active again.
+
+## Governed, shadow and dormant
+
+Each agent in the inventory has one posture:
+
+| Posture | Meaning |
+|---|---|
+| `governed` | A source lists the agent, and it is either younger than the dormancy window or its traces show traffic within it |
+| `shadow` | Traces from the last 30 days show the agent, but no source lists it |
+| `dormant` | A source lists the agent, but no trace has named it within the dormancy window |
+
+The dormancy window is 30 days by default. An organisation admin can set it from 1 to 365 days in the agent registry settings. An agent younger than the window is never dormant, and a dormant agent that sends traffic again is governed. Shadow detection always reads the last 30 days of traces: a longer dormancy window does not extend it.
+
+Filter the Agents page by posture and by source to find the shadow and dormant agents. The REST list at `GET /api/governance/registry/agents` takes the same `posture` filter.
+
+## How traces join listed agents
+
+A traced agent matches a listed one when its `gen_ai.agent.id` equals one of the ids below:
+
+| Platform | Registry id | Ids a trace's `gen_ai.agent.id` may carry |
+|---|---|---|
+| Bedrock Agents | Agent ARN | Agent id, any alias id except the shared test alias `TSTALIASID`, any alias ARN, the agent ARN |
+| Bedrock AgentCore | Runtime ARN | Runtime id, the runtime ARN |
+| Vertex AI Agent Engine | Resource name | The full resource name, or the trailing engine id such as `42` |
+| ARD registry | `urn:air:` identifier | The `urn:air:` identifier |
+
+A traced agent also matches when its `gen_ai.agent.name` equals the listed agent's name, ignoring case. A traced agent that only shares its name with a listed one therefore counts as that listed agent and is not flagged as shadow, even when their ids differ. To keep a traced agent apart from a listed one, give it a different `gen_ai.agent.name`, and if it sets a `gen_ai.agent.id`, use one that matches none of the listed agent's ids.
+
+## Alerts
+
+A new shadow agent appends a `governance.agent.flagged_shadow` event. Every webhook endpoint subscribed to `governance.agent.*` receives it; see [receiving events as webhooks](/governance/agent-registry#receiving-events-as-webhooks). Each organisation admin also gets one push alert for it.
+
+The first reconcile of an organisation is a silent baseline. Shadow agents it finds are registered, but they send no webhook or push alert.

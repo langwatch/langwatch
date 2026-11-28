@@ -17,6 +17,8 @@ import {
   pricingModelChangedEventDataSchema,
   seatCheckoutPaidEventDataSchema,
   seatCheckoutsAbandonedEventDataSchema,
+  OVER_PLAN_CHANGED_EVENT_TYPE,
+  overPlanChangedEventDataSchema,
   checkoutCompletedEventDataSchema,
   subscriptionChangedEventDataSchema,
   subscriptionStartedEventDataSchema,
@@ -167,6 +169,19 @@ export const seatCheckoutsAbandonedEventSchema = z.object({
 });
 export type SeatCheckoutsAbandonedEvent = z.infer<typeof seatCheckoutsAbandonedEventSchema>;
 
+export const RECORD_OVER_PLAN_CHANGED_COMMAND_TYPE = "lw.billing.record_over_plan_changed" as const;
+export const recordOverPlanChangedCommandDataSchema = overPlanChangedEventDataSchema;
+export type RecordOverPlanChangedCommandData = z.infer<
+  typeof recordOverPlanChangedCommandDataSchema
+>;
+export const overPlanChangedEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(OVER_PLAN_CHANGED_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: overPlanChangedEventDataSchema,
+});
+export type OverPlanChangedEvent = z.infer<typeof overPlanChangedEventSchema>;
+
 export type BillingLifecycleEvent =
   | SubscriptionChangedEvent
   | SubscriptionStartedEvent
@@ -177,4 +192,5 @@ export type BillingLifecycleEvent =
   | CheckoutCurrencySelectedEvent
   | PricingModelChangedEvent
   | SeatCheckoutPaidEvent
-  | SeatCheckoutsAbandonedEvent;
+  | SeatCheckoutsAbandonedEvent
+  | OverPlanChangedEvent;

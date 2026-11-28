@@ -356,6 +356,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
     organizationId: string;
     role: OrganizationUserRole;
     admission?: { inviteId: string; actorUserId: string | null };
+    billingOnly?: boolean;
   }): Promise<void> {
     if (await this.hasMembership(input)) return;
     const now = nowInstant();
@@ -363,6 +364,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
       userId: input.userId,
       organizationId: input.organizationId,
       role: input.role,
+      ...(input.billingOnly ? { billingOnly: true } : {}),
       disabledAt: null,
       createdAt: now,
       updatedAt: now,
@@ -461,6 +463,7 @@ export class MemoryOrganizationInviteRepository extends OrganizationInviteReposi
       subscriptionId: input.subscriptionId,
       acceptedByUserId: null,
       acceptedViaIdentifierId: null,
+      ...(input.billingOnly ? { billingOnly: true } : {}),
       createdAt: now,
       updatedAt: now,
     };

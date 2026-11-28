@@ -39,7 +39,7 @@
       "path": "../time/tsconfig.build.json"
     }
   ],
-  // The SDK builds before every typecheck (workspace:typecheck dependsOn langwatch:build).
+  // The SDK builds before its dependants' typecheck (langwatch:typecheck dependsOn its build).
   "nx": {
     "sync": {
       "ignoredDependencies": ["langwatch"]

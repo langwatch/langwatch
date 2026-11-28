@@ -1,4 +1,5 @@
 import type { Event } from "../domain/types.ts";
+import { compareEventLogPageOrder } from "../stores/event-log-page-order.ts";
 import type {
   EventStore,
   EventStoreEventReadInput,
@@ -82,7 +83,9 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
       const merged = await this.#merged(request.aggregateType, (aggregateType) =>
         paged({ ...request, aggregateType }),
       );
-      return merged.slice(0, request.limit);
+      // Each type's page is the first `limit` after the cursor in page order, so the merged
+      // page is the first `limit` of their union in that same order, not in log order.
+      return merged.toSorted(compareEventLogPageOrder).slice(0, request.limit);
     };
   }
 
@@ -95,6 +98,23 @@ class UpcastingEventStore<EventType extends Event> implements EventStore<EventTy
       ),
     );
     return counts.reduce((sum, count) => sum + count, 0);
+  }
+
+  /** Across the renamed types too: an aggregate's earlier events may sit under a former type. */
+  get probeEventsBefore(): EventStore<EventType>["probeEventsBefore"] {
+    const probe = this.store.probeEventsBefore?.bind(this.store);
+    if (!probe) return undefined;
+    return async (request) => {
+      const probes = await Promise.all(
+        this.#aggregateTypes(request.aggregateType).map((aggregateType) =>
+          probe({ ...request, aggregateType }),
+        ),
+      );
+      return {
+        hasEvent: probes.some((each) => each.hasEvent),
+        hasEarlierEvents: probes.some((each) => each.hasEarlierEvents),
+      };
+    };
   }
 
   /** The pipeline's own aggregate type and those it renamed; any other aggregate reads as asked. */

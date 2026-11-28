@@ -6,7 +6,7 @@ The server half of [scim](../README.md). SCIM provisioning: directory connection
 
 ## Installation
 
-`defineProcessModule("scim").withRepositories(scimRepositories).withChannels(scimChannels).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).provideMiddlewareContext(…).withDoors(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:33`.
+`defineProcessModule("scim").withRepositories(scimRepositories).withChannels(scimChannels).withApi(ScimModule).withTransports(scimTokenRest, scimTokenTrpcTransport, scimReconciliationTrpcTransport, scimOversightTrpcTransport, scimProtocolRest, scimWebhookRest).provideMiddlewareContext(…).withDoors(…).withEventing(scimEventing).withEventing(scimDirectoryEventing).withEventing(scimSyncEventing).withEventing(scimCostCenterEventing).withEventing(scimMembershipEventing).withEventing(scimSsoConnectionEventing).withMigrations(…)`, `src/scim.module.ts:34`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -785,6 +785,15 @@ Declared at `src/eventing/scim-directory.pipeline.ts:21`. Events: `scimDirectory
 | ------- | ---------------------- | ------- | -------------------------------------------- |
 | command | `requestDirectoryMove` | –       | `src/eventing/scim-directory.pipeline.ts:26` |
 
+### Pipeline `scim_membership` (aggregate `scim_membership`)
+
+Declared at `src/eventing/scim-membership.pipeline.ts:47`. Events: `scimMemberCreatedEventSchema`.
+
+| Kind            | Name                  | Handles                                                                                                                             | Declared at                                   |
+| --------------- | --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | --------------------------------------------- |
+| command         | `recordMemberCreated` | –                                                                                                                                   | `src/eventing/scim-membership.pipeline.ts:52` |
+| process manager | `scimMembership`      | every 1 d (`SCIM_MEMBERSHIP_PRUNE_INTERVAL_MS = 24 * 60 * 60 * 1000`); intents `pruneMemberCreated`, `recordMemberCreated` (outbox) | `src/eventing/scim-membership.pipeline.ts:53` |
+
 ### Pipeline `scim_sso_connections` (aggregate `scim_sso_connection_view`)
 
 Declared at `src/eventing/scim-sso-connection.pipeline.ts:21`.
@@ -824,7 +833,7 @@ Declared at `src/eventing/scim.pipeline.ts:39`.
 | secret | `tokenPepper`                 | `CREDENTIALS_SECRET`          | `../contract/src/scim-token-pepper.ts:10` |
 | secret | `tokenPepperFallback`         | `NEXTAUTH_SECRET`             | `../contract/src/scim-token-pepper.ts:11` |
 | secret | `tokenPepperPrevious`         | `CREDENTIALS_SECRET_PREVIOUS` | `../contract/src/scim-token-pepper.ts:13` |
-| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`       | `src/app/scim.app.ts:244`                 |
+| secret | `internalSlackSignupsWebhook` | `SLACK_CHANNEL_SIGNUPS`       | `src/app/scim.app.ts:253`                 |
 | config | `provenOffboarding`           | `SCIM_V2_GRANTS`              | `../contract/src/scim.config.ts:19`       |
 | config | `publicBaseUrl`               | `BASE_HOST`                   | `../contract/src/scim.config.ts:20`       |
 

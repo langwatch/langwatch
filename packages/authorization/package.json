@@ -27,6 +27,7 @@
   },
   "dependencies": {
     "@langwatch/handled-error": "workspace:*",
+    "@noble/hashes": "catalog:",
     "zod": "catalog:"
   },
   "devDependencies": {

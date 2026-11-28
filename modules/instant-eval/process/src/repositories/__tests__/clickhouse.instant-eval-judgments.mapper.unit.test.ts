@@ -124,10 +124,10 @@ describe("given a narrowed page of judgements", () => {
       expect(matched.where).toEqual([]);
       expect(matched.having).toEqual([
         "Status = {status:String}",
-        "(Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))",
+        "(ifNull(Passed = 1, 0) OR (Kind != 'boolean' AND Status = 'judged'))",
       ]);
       expect(unmatched.having).toEqual([
-        "NOT (Passed = 1 OR (Kind != 'boolean' AND Status = 'judged'))",
+        "NOT (ifNull(Passed = 1, 0) OR (Kind != 'boolean' AND Status = 'judged'))",
       ]);
     });
 

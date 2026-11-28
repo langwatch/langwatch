@@ -5,8 +5,11 @@
  */
 import { OrganizationUserRole } from "@langwatch/authorization";
 
-/** Full and Lite are metered by the plan; a Developer (ADR-171) is counted and never capped. */
-export type MemberType = "FullMember" | "LiteMember" | "Developer";
+/**
+ * Full and Lite are metered by the plan; a Developer (ADR-171) is counted and never capped; a
+ * Billing-only member (ADR-205) is in no pool at all.
+ */
+export type MemberType = "FullMember" | "LiteMember" | "Developer" | "BillingOnly";
 /** Named after the pool the change ENTERS; "to-developer" enters one no plan meters. */
 export type RoleChangeType = "no-change" | "lite-to-full" | "full-to-lite" | "to-developer";
 
@@ -21,7 +24,11 @@ export function isViewOnlyCustomRole(permissions: string[]): boolean {
 export function classifyMemberType(
   role: OrganizationUserRole,
   permissions: string[] | undefined,
+  { billingOnly = false }: { billingOnly?: boolean } = {},
 ): MemberType {
+  // Billing only is an EXTERNAL row with no team; a team role it somehow holds is still metered.
+  if (billingOnly && role === OrganizationUserRole.EXTERNAL && !permissions?.length)
+    return "BillingOnly";
   if (role === OrganizationUserRole.ADMIN || role === OrganizationUserRole.MEMBER)
     return "FullMember";
   if (role === OrganizationUserRole.DEVELOPER) return "Developer";
@@ -33,37 +40,43 @@ export function classifyMemberType(
 export function isFullMember(
   role: OrganizationUserRole,
   permissions: string[] | undefined,
+  options: { billingOnly?: boolean } = {},
 ): boolean {
-  return classifyMemberType(role, permissions) === "FullMember";
+  return classifyMemberType(role, permissions, options) === "FullMember";
 }
 
 export function isLiteMember(
   role: OrganizationUserRole,
   permissions: string[] | undefined,
+  options: { billingOnly?: boolean } = {},
 ): boolean {
-  return classifyMemberType(role, permissions) === "LiteMember";
+  return classifyMemberType(role, permissions, options) === "LiteMember";
 }
 
 /** A Developer seat (ADR-171); permissions never move it. */
 export function isDeveloper(
   role: OrganizationUserRole,
   permissions: string[] | undefined,
+  options: { billingOnly?: boolean } = {},
 ): boolean {
-  return classifyMemberType(role, permissions) === "Developer";
+  return classifyMemberType(role, permissions, options) === "Developer";
 }
 
 export function getRoleChangeType({
   oldRole,
   oldPermissions,
+  oldBillingOnly = false,
   newRole,
   newPermissions,
 }: {
   oldRole: OrganizationUserRole;
   oldPermissions: string[] | undefined;
+  /** A role change ends Billing only (ADR-205), so only the old side can be one. */
+  oldBillingOnly?: boolean;
   newRole: OrganizationUserRole;
   newPermissions: string[] | undefined;
 }): RoleChangeType {
-  const was = classifyMemberType(oldRole, oldPermissions);
+  const was = classifyMemberType(oldRole, oldPermissions, { billingOnly: oldBillingOnly });
   const willBe = classifyMemberType(newRole, newPermissions);
   if (was === willBe) return "no-change";
   if (willBe === "Developer") return "to-developer";
@@ -81,6 +94,7 @@ export function countMemberSeats(
     permissions: string[] | undefined;
     userId?: string;
     email?: string | null;
+    billingOnly?: boolean;
   }>[],
   holds: readonly Readonly<{ userId: string; email?: string | null }>[] = [],
 ): Readonly<{
@@ -89,7 +103,37 @@ export function countMemberSeats(
   developers: number;
 }> {
   const count = (type: MemberType) =>
-    holders.filter((holder) => classifyMemberType(holder.role, holder.permissions) === type).length;
+    holders.filter(
+      (holder) =>
+        classifyMemberType(holder.role, holder.permissions, {
+          billingOnly: holder.billingOnly ?? false,
+        }) === type,
+    ).length;
+  const heldFullMembers = new Set(countedSeatHolds({ holders, holds }).map((hold) => hold.userId))
+    .size;
+  return {
+    fullMembers: count("FullMember") + heldFullMembers,
+    liteMembers: count("LiteMember"),
+    developers: count("Developer"),
+  };
+}
+
+/**
+ * The live seat holds that count as a full seat: those whose person holds no full seat again, as
+ * a member (by user id) or through a live full invitation (by address). seat-rotation.feature.
+ */
+export function countedSeatHolds<Hold extends Readonly<{ userId: string; email?: string | null }>>({
+  holders,
+  holds,
+}: {
+  holders: readonly Readonly<{
+    role: OrganizationUserRole;
+    permissions: string[] | undefined;
+    userId?: string;
+    email?: string | null;
+  }>[];
+  holds: readonly Hold[];
+}): Hold[] {
   const fullHolders = holders.filter(
     (holder) => classifyMemberType(holder.role, holder.permissions) === "FullMember",
   );
@@ -97,18 +141,8 @@ export function countMemberSeats(
   const fullEmails = new Set(
     fullHolders.flatMap((holder) => (holder.email ? [holder.email.toLowerCase()] : [])),
   );
-  const heldFullMembers = new Set(
-    holds
-      .filter(
-        (hold) =>
-          !fullUserIds.has(hold.userId) &&
-          !(hold.email && fullEmails.has(hold.email.toLowerCase())),
-      )
-      .map((hold) => hold.userId),
-  ).size;
-  return {
-    fullMembers: count("FullMember") + heldFullMembers,
-    liteMembers: count("LiteMember"),
-    developers: count("Developer"),
-  };
+  return holds.filter(
+    (hold) =>
+      !fullUserIds.has(hold.userId) && !(hold.email && fullEmails.has(hold.email.toLowerCase())),
+  );
 }

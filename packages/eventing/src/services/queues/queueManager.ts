@@ -1,6 +1,6 @@
 import { type ExhaustedOutcome, sendPreparedInOrder } from "@langwatch/group-queue";
 import { createLogger, type Logger } from "@langwatch/observability";
-import { nowInstant } from "@langwatch/time";
+import { nowEpochMs } from "@langwatch/time";
 import { z } from "zod";
 
 import type { Command, CommandHandler } from "../../commands/command.ts";
@@ -53,9 +53,7 @@ const logger = createLogger("langwatch:event-sourcing:queue-manager");
  */
 function occurredAtScore(payload: { occurredAt?: unknown }): number {
   const occurredAt = payload.occurredAt;
-  return occurredAt === undefined || occurredAt === null
-    ? nowInstant().epochMilliseconds
-    : (occurredAt as number);
+  return occurredAt === undefined || occurredAt === null ? nowEpochMs() : (occurredAt as number);
 }
 
 export type { JobRegistryEntry } from "./jobLane.ts";
@@ -780,7 +778,7 @@ export class QueueManager<EventType extends Event = Event> {
       getTenantId: jobLane.getTenantId,
       preflightGroupKey: jobLane.preflightGroupKey,
       // Behind whatever the lane already holds: the rebuild reads the log when it runs.
-      scoreFn: () => nowInstant().epochMilliseconds,
+      scoreFn: () => nowEpochMs(),
       process: async (missed: EventType, delivery?: JobDelivery) => {
         await onRebuild(projectionName, missed, {
           tenantId: missed.tenantId,
@@ -961,7 +959,7 @@ export class QueueManager<EventType extends Event = Event> {
             )
           : undefined,
       scoreFn: cmdEntry.options.serializeByAggregate
-        ? () => nowInstant().epochMilliseconds
+        ? () => nowEpochMs()
         : (payload: Payload) => occurredAtScore(toRecord(payload)),
       process: async (payload: Payload, delivery?: JobDelivery) => {
         await processCommand({ ...commandProcessParams, payload, jobId: delivery?.jobId });

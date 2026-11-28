@@ -26,6 +26,10 @@ class InMemoryLicenseStorage implements LicenseStorage {
   async storeLicense(_organizationId: string, license: StoredLicense): Promise<void> {
     this.stored = license;
   }
+  async replaceLicense({ license }: { license: StoredLicense }): Promise<boolean> {
+    this.stored = license;
+    return true;
+  }
   async removeLicense(): Promise<void> {
     this.stored = null;
   }
@@ -33,6 +37,10 @@ class InMemoryLicenseStorage implements LicenseStorage {
     return this.memberCount;
   }
   async getMembersLiteCount(): Promise<number> {
+    return 0;
+  }
+
+  async getMembersDeveloperCount(): Promise<number> {
     return 0;
   }
 }

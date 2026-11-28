@@ -1,10 +1,13 @@
 import {
+  auditLogExportEntrySchema,
   auditLogHistoryEntrySchema,
   auditLogTargetEntrySchema,
   type AuditLogEntry,
+  type AuditLogExportEntry,
   type AuditLogHistoryEntry,
   type AuditLogTargetEntry,
   type FindAuditLogByTargetKindInput,
+  type FindAuditLogForOrganizationInput,
   type AuditLogJsonValue,
   type ListAuditLogEntityHistoryInput,
   type RecordedAuditLogEntry,
@@ -20,6 +23,12 @@ type MemoryAuditLogRow = AuditLogEntry & {
   createdAt: Instant;
   idempotencyKey?: string;
 };
+
+/** Code-unit order, the same order the `id >` watermark uses. */
+function compareIds(left: string, right: string): number {
+  if (left === right) return 0;
+  return left < right ? -1 : 1;
+}
 
 /** The rows both memory twins share: an entry recorded through one is a touch the other reads. */
 export class MemoryAuditLogStore {
@@ -63,14 +72,16 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
   }
 
   async hasRecordedSince(input: RecordedSinceInput): Promise<boolean> {
-    return this.store.rows.some(
-      (row) =>
+    return this.store.rows.some((row) => {
+      if (input.organizationId && row.organizationId !== input.organizationId) return false;
+      return (
         row.userId === input.userId &&
         row.action === input.action &&
         row.targetKind === input.targetKind &&
         row.targetId === input.targetId &&
-        row.createdAt.epochMilliseconds >= input.sinceMs,
-    );
+        row.createdAt.epochMilliseconds >= input.sinceMs
+      );
+    });
   }
 
   async findEntityHistory(input: ListAuditLogEntityHistoryInput): Promise<AuditLogHistoryEntry[]> {
@@ -106,6 +117,45 @@ export class MemoryAuditLogRepository implements AuditLogRepository {
           projectId: row.projectId ?? null,
           userId: row.userId ?? null,
           metadata: row.metadata ?? null,
+        }),
+      );
+  }
+
+  async findForOrganization(
+    input: FindAuditLogForOrganizationInput,
+  ): Promise<AuditLogExportEntry[]> {
+    const projects = new Set(input.projectIds);
+    return this.store.rows
+      .filter(
+        (row) =>
+          row.organizationId === input.organizationId ||
+          (row.projectId !== undefined && projects.has(row.projectId)),
+      )
+      .filter((row) => {
+        const at = row.createdAt.epochMilliseconds;
+        if (input.untilMs !== undefined && at >= input.untilMs) return false;
+        return at > input.afterMs || (at === input.afterMs && row.id > input.afterId);
+      })
+      .toSorted(
+        (left, right) =>
+          Temporal.Instant.compare(left.createdAt, right.createdAt) ||
+          compareIds(left.id, right.id),
+      )
+      .slice(0, input.limit)
+      .map((row) =>
+        auditLogExportEntrySchema.parse({
+          id: row.id,
+          createdAt: toDate(row.createdAt),
+          userId: row.userId ?? null,
+          actorUserId: row.actorUserId ?? null,
+          organizationId: row.organizationId ?? null,
+          projectId: row.projectId ?? null,
+          action: row.action,
+          error: row.error ?? null,
+          ipAddress: row.ipAddress ?? null,
+          userAgent: row.userAgent ?? null,
+          targetKind: row.targetKind ?? null,
+          targetId: row.targetId ?? null,
         }),
       );
   }

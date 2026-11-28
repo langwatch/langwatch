@@ -34,16 +34,21 @@ function permittingRuntime() {
 }
 
 function harness(session: typeof SESSION | null) {
-  const findSessionForTrace = vi.fn<CodingAgentApi["findSessionForTrace"]>(async () => session);
+  const findSessionForTraceForViewer = vi.fn<CodingAgentApi["findSessionForTraceForViewer"]>(
+    async () => session,
+  );
   const readTranscriptForViewer = vi.fn<CodingAgentApi["readTranscriptForViewer"]>(
     async () => TRANSCRIPT,
   );
-  const app = createApiFixture<CodingAgentApi>({ findSessionForTrace, readTranscriptForViewer });
+  const app = createApiFixture<CodingAgentApi>({
+    findSessionForTraceForViewer,
+    readTranscriptForViewer,
+  });
   const router = permittingRuntime().mount(codingAgentTrpcTransport, () => app);
 
   return {
     caller: router.createCaller({ actor: { id: "viewer-1" } }),
-    findSessionForTrace,
+    findSessionForTraceForViewer,
     readTranscriptForViewer,
   };
 }
@@ -51,16 +56,20 @@ function harness(session: typeof SESSION | null) {
 describe("codingAgents.session", () => {
   describe("given a trace that belongs to a coding-agent session", () => {
     /** @scenario "The drawer reads the coding-agent session a trace belongs to" */
-    it("answers the session coding-agent holds for the trace, unchanged", async () => {
-      const { caller, findSessionForTrace } = harness(SESSION);
+    it("reads the session for the signed-in viewer and their authorization, and answers it unchanged", async () => {
+      const { caller, findSessionForTraceForViewer } = harness(SESSION);
 
       const answer = await caller.session({ projectId: PROJECT_ID, traceId: TRACE_ID });
 
       expect(answer).toEqual(SESSION);
-      expect(findSessionForTrace).toHaveBeenCalledWith({
-        projectId: PROJECT_ID,
-        traceId: TRACE_ID,
-      });
+      expect(findSessionForTraceForViewer).toHaveBeenCalledWith(
+        {
+          projectId: PROJECT_ID,
+          traceId: TRACE_ID,
+          authorization: expect.objectContaining({ principal: { id: "viewer-1", type: "user" } }),
+        },
+        expect.objectContaining({ id: "viewer-1" }),
+      );
     });
   });
 

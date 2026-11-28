@@ -17,6 +17,13 @@ export const onboardingVariantSchema = z.enum(["guided", "classic"]);
 export type OnboardingVariant = z.infer<typeof onboardingVariantSchema>;
 
 /**
+ * The start a person picked on Langy's governance opener: their own coding agent now, or the
+ * company setup on a call. "call" records the choice only; nothing books the call.
+ */
+export const langyStartSchema = z.enum(["coding", "call"]);
+export type LangyStart = z.infer<typeof langyStartSchema>;
+
+/**
  * `paths` keeps the picks in the order they were made: the first pick is the
  * one set up now. `currentPath` is the path being guided, `donePaths` the
  * ones whose setup completed.
@@ -42,6 +49,7 @@ const guidedOnboardingStateSchemaDefinition = z.object({
   virtualKeyName: z.string().optional(),
   virtualKeyPreview: z.string().optional(),
   virtualKeyRevealId: z.string().optional(),
+  langyStart: langyStartSchema.optional(),
 });
 export interface GuidedOnboardingStateSchema extends Named<
   typeof guidedOnboardingStateSchemaDefinition
@@ -139,6 +147,23 @@ export interface GuidedPathCompleteRestInputSchema extends Named<
 > {}
 export const guidedPathCompleteRestInputSchema: GuidedPathCompleteRestInputSchema =
   guidedPathCompleteRestInputSchemaDefinition;
+
+const guidedStartRestParamsSchemaDefinition = z.object({
+  start: langyStartSchema.describe("The start the person picked: coding or call."),
+});
+export interface GuidedStartRestParamsSchema extends Named<
+  typeof guidedStartRestParamsSchemaDefinition
+> {}
+export const guidedStartRestParamsSchema: GuidedStartRestParamsSchema =
+  guidedStartRestParamsSchemaDefinition;
+
+/** Recording the start takes no body; an absent one is read as this. */
+const guidedStartRestInputSchemaDefinition = z.object({});
+export interface GuidedStartRestInputSchema extends Named<
+  typeof guidedStartRestInputSchemaDefinition
+> {}
+export const guidedStartRestInputSchema: GuidedStartRestInputSchema =
+  guidedStartRestInputSchemaDefinition;
 
 /** The resolved credential the door reads: an organization, and its user when one is bound. */
 const onboardingRestCredentialSchemaDefinition = z.object({

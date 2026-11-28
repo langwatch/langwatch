@@ -35,6 +35,8 @@ type ScenarioDefinition struct {
 	Labels    []string `json:"labels"`
 	MaxTurns  *int     `json:"maxTurns,omitempty"`
 	MinTurns  *int     `json:"minTurns,omitempty"`
+	// Kind is "standard" or "red_team"; only the Node child plays a red team attacker.
+	Kind string `json:"kind,omitempty"`
 }
 
 // TargetConfig names what the run tests against.
@@ -137,6 +139,9 @@ func parseSimulation(data []byte, top map[string]json.RawMessage) (*SimulationJo
 
 func (j *SimulationJob) validate() error {
 	var issues []string
+	if j.Scenario.Kind == "red_team" {
+		issues = append(issues, "scenario.kind: red team scenarios run only on the Node scenario child")
+	}
 	if j.Script != nil && (j.Script.Kind != "agent_test" || j.Script.UserMessage == "") {
 		issues = append(issues, "script: expected an agent_test script with a user message")
 	}

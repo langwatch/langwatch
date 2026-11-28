@@ -15,6 +15,21 @@ export function gateSessionListTitles<T extends { title: string | null }>({
 }
 
 /**
+ * A session read for one viewer, its name blanked for a viewer who may not read captured
+ * content. Blank is the row's own "no name yet" value, which the replay never shows.
+ */
+export function gateSessionTitle<T extends { title: string; titleSource: string }>({
+  session,
+  canReadCapturedContent,
+}: {
+  session: T;
+  canReadCapturedContent: boolean;
+}): T {
+  if (canReadCapturedContent) return session;
+  return { ...session, title: "", titleSource: "" };
+}
+
+/**
  * Strip session spend for a viewer without cost:view. Nulled rather than
  * zeroed: cost is nullable already, since a session in a project the reader
  * may not price reports tokens with no cost — zero would read as "free".

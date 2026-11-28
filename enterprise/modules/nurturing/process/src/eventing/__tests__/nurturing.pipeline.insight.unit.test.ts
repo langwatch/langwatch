@@ -11,6 +11,8 @@ import type { UserApi } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryPostHogChannel } from "../../channels/memory/memory.posthog.channel.ts";
+import { MemoryNurturingErasedUserRepository } from "../../repositories/memory/memory.nurturing-erased-user.repository.ts";
+import { MemoryNurturingOrganizationMemberRepository } from "../../repositories/memory/memory.nurturing-organization-member.repository.ts";
 import { MemoryNurturingClaimRepository } from "../../repositories/memory/memory.nurturing.repositories.ts";
 import { NurturingDeliveryService } from "../../services/nurturing-delivery.service.ts";
 import { buildNurturingPipeline } from "../nurturing.pipeline.ts";
@@ -23,21 +25,30 @@ function nurturing() {
   const delivered: NurturingSignal[] = [];
   const posthog = MemoryPostHogChannel.create();
   const delivery = NurturingDeliveryService.create({
+    erasedUsers: MemoryNurturingErasedUserRepository.create(),
     claims: MemoryNurturingClaimRepository.create(),
     users: createApiFixture<UserApi>({}),
+    members: MemoryNurturingOrganizationMemberRepository.create(),
     posthog,
   });
   const pipeline = buildNurturingPipeline({
+    organizationMembers: async () => ["user-1"],
     deliver: async (input) => {
       delivered.push(input.signal);
       await delivery.deliver(input);
     },
-    projectCreated: async () => undefined,
     guidedTurnFailed: async () => undefined,
     usageReportReceived: async () => undefined,
     evaluationsCompleted: async () => undefined,
     simulationRunsFinished: async () => undefined,
     codingSessionsStored: async () => undefined,
+    forgetErasedUser: async () => undefined,
+    virtualKeyCreated: async () => undefined,
+    keyBudgetCrossed: async () => undefined,
+    keyFirstRequested: async () => undefined,
+    unbudgetedSpendRecorded: async () => undefined,
+    governanceSourceConnected: async () => undefined,
+    governanceSourceLive: async () => undefined,
   });
   const subscribers: EventSubscriberDefinition<Event>[] = [];
   const registry = createApiFixture<

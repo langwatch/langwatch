@@ -16,7 +16,9 @@ import { LuCopy, LuExternalLink, LuPencil } from "react-icons/lu";
 
 import { useSpanPlaygroundHref } from "../../../../behavior/prompts/use-span-playground-href.ts";
 import { usePromptByHandle } from "../../../../features/trace-drawer/behavior/use-prompt-by-handle.ts";
+import { BRAIDED_ACTION_DISABLED_REASON } from "../../../../model/braids/braided-span.ts";
 import { extractPromptReference, hasPromptMetadata } from "../../../../model/prompt-attributes.ts";
+import { UnavailableActionButton } from "./io-toolbar-buttons.tsx";
 
 export { hasPromptMetadata };
 
@@ -34,11 +36,13 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
   const ref = useMemo(() => extractPromptReference(span.params), [span]);
   const playgroundHrefFor = useSpanPlaygroundHref();
   const playgroundHref = playgroundHrefFor(span.spanId);
+  // A braided span's prompt is its owner's: never looked up among the reader's.
+  const owner = span.braid?.ownerName ?? null;
   // SDK sometimes emits the opaque slug-id (`prompt_xxx`) instead of the
   // human handle (`pizza-prompt`) on `langwatch.prompt.id`. Resolve to the
   // friendlier handle for display while keeping the raw value for the
   // playground deep-link.
-  const { resolvedHandle } = usePromptByHandle(ref?.handle ?? null);
+  const { resolvedHandle } = usePromptByHandle(owner ? null : (ref?.handle ?? null));
 
   const variableEntries = ref?.variables
     ? Object.entries(ref.variables).toSorted(([a], [b]) => a.localeCompare(b))
@@ -88,6 +92,11 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
             unsaved edits
           </Badge>
         )}
+        {owner ? (
+          <Badge size="sm" variant="outline">
+            from {owner}
+          </Badge>
+        ) : null}
       </HStack>
 
       {/* Variables */}
@@ -160,7 +169,21 @@ export function PromptAccordion({ span }: PromptAccordionProps) {
       )}
 
       {/* Actions */}
-      {rawHandle && (
+      {rawHandle && owner ? (
+        <HStack gap={1} paddingX={2}>
+          <UnavailableActionButton
+            icon={LuPencil}
+            label="Open prompt"
+            reason={BRAIDED_ACTION_DISABLED_REASON}
+          />
+          <UnavailableActionButton
+            icon={LuExternalLink}
+            label="Open in Playground"
+            reason={BRAIDED_ACTION_DISABLED_REASON}
+          />
+        </HStack>
+      ) : null}
+      {rawHandle && !owner && (
         <HStack gap={1} paddingX={2}>
           <Button
             size="xs"

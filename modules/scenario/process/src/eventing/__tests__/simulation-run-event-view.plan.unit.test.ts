@@ -41,4 +41,21 @@ describe("buildSimulationRunEventView", () => {
       expect(view.target).toEqual({ type: "http", referenceId: "agent_1" });
     });
   });
+
+  describe("given a run a plan queued with its judge trace wait", () => {
+    /** @scenario "A run plan's trace wait settings travel with each run it queues" */
+    it("reads both settings back as the plan's, and drops a value outside its bounds", () => {
+      const view = queued({
+        target: { type: "http", referenceId: "agent_1" },
+        metadata: { langwatch: { traceQuietPeriodMs: 12_000, traceWaitTimeoutMs: 90_000 } },
+      });
+      const outOfBounds = queued({
+        target: { type: "http", referenceId: "agent_1" },
+        metadata: { langwatch: { traceQuietPeriodMs: 61_000, traceWaitTimeoutMs: "90000" } },
+      });
+
+      expect(view.plan).toEqual({ traceQuietPeriodMs: 12_000, traceWaitTimeoutMs: 90_000 });
+      expect(outOfBounds.plan).toEqual({});
+    });
+  });
 });

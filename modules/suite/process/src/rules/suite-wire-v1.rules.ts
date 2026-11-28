@@ -11,6 +11,8 @@ import {
   runNoteSchema,
   runParameterValuesSchema,
   suiteFieldDefinitionSchema,
+  traceQuietPeriodMsSchema,
+  traceWaitTimeoutMsSchema,
 } from "@langwatch/scenario-contract";
 import {
   evaluatorAttachmentsWireSchema,
@@ -49,6 +51,20 @@ const suiteFieldsWireSchema = z
     `The fields the test suite declares, in the order the platform shows them. Up to ${MAX_SUITE_FIELDS}. An identifier is lowercase letters, digits and underscores, starting with a letter; the type is text, number or boolean.`,
   );
 
+/** The judge's trace wait, as every run request may set it for the whole run. */
+const runTraceWaitWireShape = {
+  traceQuietPeriodMs: traceQuietPeriodMsSchema
+    .nullish()
+    .describe(
+      "Milliseconds (0 to 60000) the agent's trace must stay unchanged before the judge reads it, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.",
+    ),
+  traceWaitTimeoutMs: traceWaitTimeoutMsSchema
+    .nullish()
+    .describe(
+      "Milliseconds (1000 to 300000) the judge waits for the agent's trace before a verdict, for every scenario in the run. Overrides each scenario's own setting. Leave it out for the scenario setting or the project's recommendation.",
+    ),
+};
+
 /** The configuration a run plan holds, as a caller sends it. */
 const runPlanConfigWireSchema = z.object({
   scope: runPlanScopeSchema,
@@ -76,6 +92,7 @@ const runPlanConfigWireSchema = z.object({
     .describe(
       "The model that judges every scenario in the run. Overrides each scenario's own choice. Leave it out for the scenario or project default.",
     ),
+  ...runTraceWaitWireShape,
   scenarioIds: z
     .array(z.string())
     .optional()
@@ -164,6 +181,7 @@ export const testSuiteRunInputSchema = z.object({
     .describe(
       "The model that judges every scenario in this run. Leave it out for the scenario or project default.",
     ),
+  ...runTraceWaitWireShape,
   ...runValuesShape,
 });
 
@@ -317,6 +335,8 @@ export function toRunPlanWire({
     repeatCount: suite.repeatCount,
     simulatorModel: suite.simulatorModel,
     judgeModel: suite.judgeModel,
+    traceQuietPeriodMs: suite.traceQuietPeriodMs ?? null,
+    traceWaitTimeoutMs: suite.traceWaitTimeoutMs ?? null,
     labels: suite.labels,
     evaluators,
     archivedAt: suite.archivedAt?.toISOString() ?? null,

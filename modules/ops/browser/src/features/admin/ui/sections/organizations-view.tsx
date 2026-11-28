@@ -6,7 +6,6 @@ import { NoDataInfoBlock } from "@langwatch/design-system/no-data-info-block";
 import {
   Box,
   Field,
-  Heading,
   HStack,
   Input,
   NativeSelect,
@@ -32,9 +31,10 @@ import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { Currency, PRICING_MODEL_LABELS, PricingModel } from "../../model/admin-enums.ts";
-import { AdminDate, EmptyCell, formatDate } from "../elements/admin-cells.tsx";
+import { AdminDate, EmptyCell, formatDate, SectionHeading } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 import { LegacySsoDomainNotice } from "./legacy-sso-domain-notice.tsx";
+import { SeatPeakSummary } from "./seat-peak-summary.tsx";
 /**
  * Read-facing Organization shape - excludes the s3 credential fields. The
  * admin Hono route strips them from every list/getOne response; the edit
@@ -377,6 +377,7 @@ export function OrganizationEditDrawer({
           <IdentityFields form={form} setField={setField} />
           <BillingFields form={form} setField={setField} />
           <LimitFields form={form} setField={setField} error={fieldErrors.datasetAttachmentMaxMb} />
+          <SeatPeakSummary organizationId={organization.id} />
           <AuthenticationSection organization={organization} />
           <LicenseFields form={form} setField={setField} />
           <CustomS3Fields form={form} setField={setField} />
@@ -607,14 +608,6 @@ function CustomS3Fields({ form, setField }: SectionProps) {
         />
       </Field.Root>
     </>
-  );
-}
-
-function SectionHeading({ children }: { children: React.ReactNode }) {
-  return (
-    <Heading as="h3" size="xs" color="fg.muted" textTransform="none" letterSpacing="wider" pt={2}>
-      {children}
-    </Heading>
   );
 }
 

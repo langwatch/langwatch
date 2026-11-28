@@ -17,6 +17,7 @@ import {
   Wrap,
 } from "@langwatch/design-system/primitives";
 import { Switch } from "@langwatch/design-system/switch";
+import type { AdminUserSortField } from "@langwatch/ops-contract";
 import { nowInstant, toDate } from "@langwatch/time";
 import { MoreVertical, Pencil, SearchX, UserCheck } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -27,6 +28,7 @@ import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useOpsHost } from "../../../../model/ops-host.ts";
 import { impersonateUser } from "../../behavior/admin-client.ts";
 import { useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
+import { nextUserSort, readUserSort, userSortParams, withUserSort } from "../../model/user-sort.ts";
 import { AdminDate, EmptyCell, formatDateTime } from "../elements/admin-cells.tsx";
 import { AdminTable } from "./admin-table-shell.tsx";
 interface OrgRef {
@@ -81,11 +83,29 @@ export default function UsersView() {
   const menuTriggers = useRef(new Map<string, HTMLElement>());
   const returnFocusTo = useRef<HTMLElement | null>(null);
 
+  const sort = readUserSort(router.query);
   const list = useAdminList<AdminUser>("user", {
     pagination: { page, perPage: PAGE_SIZE },
-    sort: { field: "createdAt", order: "DESC" },
+    sort: userSortParams(sort),
     filter: debouncedSearch ? { query: debouncedSearch } : {},
   });
+  const sortBy = (field: AdminUserSortField) => {
+    setPage(1);
+    router.replace(
+      {
+        query: withUserSort({ query: router.query, sort: nextUserSort({ current: sort, field }) }),
+      },
+      { shallow: true },
+    );
+  };
+  const header = (field: AdminUserSortField, label: string) => (
+    <ListTable.SortHeader
+      sorted={sort?.field === field ? sort.direction : false}
+      onSort={() => sortBy(field)}
+    >
+      {label}
+    </ListTable.SortHeader>
+  );
 
   return (
     <>
@@ -110,14 +130,14 @@ export default function UsersView() {
         <ListTable density="compact" scroll="x" scrollLabel="Users table">
           <ListTable.Header>
             <ListTable.Row>
-              <ListTable.ColumnHeader>ID</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Name</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Email</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Organizations</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Projects</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Created</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Last login</ListTable.ColumnHeader>
-              <ListTable.ColumnHeader>Status</ListTable.ColumnHeader>
+              {header("id", "ID")}
+              {header("name", "Name")}
+              {header("email", "Email")}
+              {header("organizations", "Organizations")}
+              {header("projects", "Projects")}
+              {header("createdAt", "Created")}
+              {header("lastLoginAt", "Last login")}
+              {header("status", "Status")}
               <ListTable.ColumnHeader width={60} align="end" label="Actions" />
             </ListTable.Row>
           </ListTable.Header>
