@@ -11,6 +11,8 @@ import {
   PrismaConnectionService,
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { Temporal, type Instant } from "@langwatch/time";
 import { afterAll, describe, expect, it } from "vitest";
 
@@ -78,6 +80,43 @@ describe.skipIf(!DB_URL)("PrismaLicenseRenewalClaimRepository", () => {
       await claims.release({ stripeInvoiceId: invoiceId, token });
 
       expect((await claim(invoiceId, later(LEASE_MS * 2))).outcome).toBe("delivered");
+    });
+  });
+
+  describe("given two retries after the claim lease passed", () => {
+    /** @scenario "Only one retry takes over an expired renewal claim" */
+    it("lets only one retry take over the stale claim", async () => {
+      const invoiceId = `${run}_stale_race`;
+      const stale = tokenOf(await claim(invoiceId, now));
+      const takeoverAt = later(LEASE_MS + 1);
+      const takeOver = (tx: Prisma.TransactionClient) =>
+        PrismaLicenseRenewalClaimRepository.create(tx).claim({
+          stripeInvoiceId: invoiceId,
+          stripeSubscriptionId: "sub_license",
+          now: takeoverAt,
+          leaseMs: LEASE_MS,
+        });
+
+      const answers = await raceOnOneRow({
+        prisma: connection.client,
+        table: "LicenseRenewalClaim",
+        first: takeOver,
+        second: takeOver,
+      });
+
+      expect(answers.first.outcome === "claimed" && answers.second.outcome === "claimed").toBe(
+        false,
+      );
+      expect(answers.first.outcome !== answers.second.outcome).toBe(true);
+      const claimed = [answers.first, answers.second].find(
+        (answer) => answer.outcome === "claimed",
+      );
+      const row = await prisma.licenseRenewalClaim.findUniqueOrThrow({
+        where: { stripeInvoiceId: invoiceId },
+      });
+      expect(row.claimToken).toBe(tokenOf(claimed ?? answers.first));
+      expect(row.claimedAt.getTime()).toBe(takeoverAt.epochMilliseconds);
+      expect(row.claimToken).not.toBe(stale);
     });
   });
 
