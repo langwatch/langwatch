@@ -1,6 +1,9 @@
 import { ApiKeyPermissionDeniedError } from "@langwatch/api-key-contract";
 import { HandledError } from "@langwatch/handled-error";
-import { ModelNotConfiguredError } from "@langwatch/model-provider-contract";
+import {
+  ModelNotConfiguredError,
+  ModelRestrictedForFeatureError,
+} from "@langwatch/model-provider-contract";
 import { createLogger } from "@langwatch/observability";
 import { resolveRunModels, resolveRunTraceWait } from "@langwatch/scenario-contract";
 import type {
@@ -396,7 +399,8 @@ export class ScenarioPrefetchCompletionService {
             error instanceof HandledError
               ? error.message
               : "The models this run needs could not be resolved",
-          ...(error instanceof ModelNotConfiguredError
+          ...(error instanceof ModelNotConfiguredError ||
+          error instanceof ModelRestrictedForFeatureError
             ? { reason: "model_not_configured" as const }
             : {}),
         },

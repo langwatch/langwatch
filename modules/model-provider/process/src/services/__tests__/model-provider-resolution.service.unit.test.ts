@@ -192,6 +192,21 @@ describe("ModelProviderResolutionService.resolve", () => {
     });
   });
 
+  describe("given a scenarios feature and nothing configured anywhere", () => {
+    it("says the model is not configured, naming the feature from the catalogue", async () => {
+      const failure = await resolve(resolverWith({ configs: [] }), "scenarios.judge").catch(
+        (error: unknown) => error,
+      );
+
+      expect(failure).toBeInstanceOf(ModelNotConfiguredError);
+      expect(failure).toMatchObject({
+        featureKey: "scenarios.judge",
+        role: "JUDGE",
+        projectId: "project-1",
+      });
+    });
+  });
+
   describe("given a configuration belonging to another project", () => {
     it("does not consult it", async () => {
       const resolver = resolverWith({
