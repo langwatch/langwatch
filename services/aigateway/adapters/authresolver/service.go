@@ -740,6 +740,7 @@ func New(opts Options) (*Service, error) {
 // and bumps soft expiry. On auth-class failure evicts and rejects.
 func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain.Bundle, error) {
 	h := hashKey(key)
+	readAt := s.fetchGeneration() // before the answer is read, so a refusal after it is seen
 	answer, err := s.resolveUngated(ctx, key, h)
 	if err != nil {
 		if classifyRefreshError(err) == classTransportFailure {
@@ -752,7 +753,7 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 	bundle, err := s.admit(ctx, h, answer)
 	if errors.Is(err, errKeyRecheckDue) {
 		// Admit again after the wait: a denial or expiry may have landed in it.
-		if answer, err = s.recheckKey(ctx, presentedKey{key: key, h: h}, answer); err == nil {
+		if answer, err = s.recheckKey(ctx, presentedKey{key: key, h: h, readAt: readAt}, answer); err == nil {
 			if bundle, err = s.admit(ctx, h, answer); errors.Is(err, errKeyRecheckDue) {
 				err = nil // the re-check had its say
 			}

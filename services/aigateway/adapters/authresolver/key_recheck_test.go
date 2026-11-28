@@ -271,3 +271,21 @@ func (r *blockingResolver) FetchConfig(context.Context, string, string) (domain.
 	r.hook()
 	return domain.ConfigFetchResult{}, errControlPlaneDown
 }
+
+// @scenario "a refusal recorded after a request read its cached key is refused"
+func TestKeyRecheck_RefusalRecordedAfterTheCachedReadIsRefused(t *testing.T) {
+	svc, _ := newService(t, Options{Resolver: &hookResolver{}, ConfigFetcher: &hookResolver{}})
+	key := domain.PresentedKey{Token: "vk-lw-read-then-refused"}
+	h := hashKey(key)
+	staleKeyCheck(t, svc, key, "vk_read_then_refused")
+	readAt := svc.fetchGeneration()
+	e, _ := svc.l1.Peek(h)
+	cached := served{bundle: e.bundle, authStart: e.authStart()}
+
+	// Another request's check refuses the key and evicts it: none is left to join.
+	svc.dropRejected(h, herr.New(context.Background(), domain.ErrKeyRevoked, nil))
+
+	if _, err := svc.recheckKey(context.Background(), presentedKey{key: key, h: h, readAt: readAt}, cached); !errors.Is(err, domain.ErrInvalidAPIKey) {
+		t.Fatalf("a refusal recorded after the cached answer was read must refuse it, got %v", err)
+	}
+}

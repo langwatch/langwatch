@@ -20,9 +20,12 @@ import socket
 import threading
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+import httpcore
 import httpx
 import litellm
 import pytest
+from litellm.llms.custom_httpx.aiohttp_transport import LiteLLMAiohttpTransport
+from litellm.llms.custom_httpx.http_handler import AsyncHTTPHandler
 
 from langevals_core import egress, litellm_patch
 from langevals_core.litellm_patch import patch_litellm
@@ -380,6 +383,21 @@ class TestADestinationThePolicyAdmits:
         assert response.choices[0].message.content == "yes"
         assert provider.hits == ["/chat/completions"]
 
+    def test_an_allow_listed_unicode_name_is_admitted_in_the_form_the_client_sends(
+        self, block_local, monkeypatch, fake_dns
+    ):
+        """ALLOWED_PROXY_HOSTS may spell a name in Unicode; the client sends its ASCII form."""
+        monkeypatch.setenv("ALLOWED_PROXY_HOSTS", "M\u00fcller.Provider.test")
+        fake_dns("xn--mller-kva.provider.test", ["10.20.30.40"])
+        fence = egress.Fence(egress.server_egress_policy())
+
+        with fence.active(), egress._guarded(httpx.URL("http://m\u00fcller.provider.test/v1")):
+            pass
+
+        assert fence.judge_host("xn--mller-kva.provider.test").addresses == (
+            "10.20.30.40",
+        )
+
     def test_a_request_endpoint_cannot_redirect_onto_another_server_endpoint(
         self, block_local, monkeypatch
     ):
@@ -489,6 +507,114 @@ class TestTheConnectionItself:
 
         assert raised.value.code == "private_address"
         assert target.hits == ["/chat/completions"]
+
+    def test_a_request_is_judged_on_its_connection_before_anything_is_written(
+        self, block_local, fake_dns
+    ):
+        """A connection opened elsewhere (an HTTP/2 stream shared before its first answer)
+        is judged by the peer it reached, not by what the name answers now."""
+        target = _Provider(keep_alive=True)
+        fake_dns("shared.provider.test", [PUBLIC_IP])
+        url = f"http://shared.provider.test:{target.port}/chat/completions"
+        stream = httpcore.SyncBackend().connect_tcp("127.0.0.1", target.port)
+        connection = httpcore.HTTP11Connection(
+            origin=httpcore.URL(url).origin, stream=stream
+        )
+        try:
+            with (
+                egress.Fence(egress.server_egress_policy()).active(),
+                egress._guarded(httpx.URL(url)),
+                pytest.raises(egress.EgressDestinationRefusedError) as raised,
+            ):
+                connection.handle_request(
+                    httpcore.Request("POST", url, headers=[(b"host", b"shared")])
+                )
+        finally:
+            connection.close()
+            target.close()
+
+        assert raised.value.code == "private_address"
+        assert target.hits == []
+
+    @pytest.mark.anyio
+    async def test_an_awaited_request_is_judged_on_its_connection_before_anything_is_written(
+        self, block_local, fake_dns
+    ):
+        target = _Provider(keep_alive=True)
+        fake_dns("shared.provider.test", [PUBLIC_IP])
+        url = f"http://shared.provider.test:{target.port}/chat/completions"
+        stream = await httpcore.AnyIOBackend().connect_tcp("127.0.0.1", target.port)
+        connection = httpcore.AsyncHTTP11Connection(
+            origin=httpcore.URL(url).origin, stream=stream
+        )
+        try:
+            with (
+                egress.Fence(egress.server_egress_policy()).active(),
+                egress._guarded(httpx.URL(url)),
+                pytest.raises(egress.EgressDestinationRefusedError) as raised,
+            ):
+                await connection.handle_async_request(
+                    httpcore.Request("POST", url, headers=[(b"host", b"shared")])
+                )
+        finally:
+            await connection.aclose()
+            target.close()
+
+        assert raised.value.code == "private_address"
+        assert target.hits == []
+
+    def test_an_outbound_proxy_is_not_judged_as_the_destination(
+        self, block_local, fake_dns
+    ):
+        """Through an operator's proxy the peer is the proxy, which resolves the name itself."""
+        proxy = _Provider(keep_alive=True)
+        fake_dns("public.provider.test", [PUBLIC_IP])
+        try:
+            with (
+                httpx.Client(proxy=f"http://127.0.0.1:{proxy.port}") as client,
+                egress.Fence(egress.server_egress_policy()).active(),
+            ):
+                response = client.post(
+                    "http://public.provider.test/chat/completions", json={}
+                )
+        finally:
+            proxy.close()
+
+        assert response.status_code == 200
+        assert proxy.hits == ["http://public.provider.test/chat/completions"]
+
+    def test_a_tunnel_through_an_outbound_proxy_is_not_judged_as_the_destination(
+        self, block_local, fake_dns
+    ):
+        """An https tunnel's socket reaches the proxy, so its peer is the proxy's address."""
+        proxy = _Provider(keep_alive=True)
+        fake_dns("public.provider.test", [PUBLIC_IP])
+        url = f"http://public.provider.test:{proxy.port}/chat/completions"
+        tunnel = httpcore.HTTP11Connection(
+            origin=httpcore.URL(url).origin,
+            stream=httpcore.SyncBackend().connect_tcp("127.0.0.1", proxy.port),
+        )
+        try:
+            assert egress._proxied(httpx.HTTPTransport(proxy="http://127.0.0.1:3128"))
+            with (
+                egress.Fence(egress.server_egress_policy()).active(),
+                egress._guarded(httpx.URL(url), proxied=True),
+            ):
+                response = tunnel.handle_request(
+                    httpcore.Request("POST", url, headers=[(b"host", b"public")])
+                )
+        finally:
+            tunnel.close()
+            proxy.close()
+
+        assert response.status == 200
+        assert proxy.hits == ["/chat/completions"]
+
+    def test_async_model_calls_use_the_fenced_http_client(self):
+        """litellm's aiohttp client keeps its own DNS cache and pool, out of the fence's reach."""
+        transport = AsyncHTTPHandler._create_async_transport()
+
+        assert not isinstance(transport, LiteLLMAiohttpTransport)
 
     def test_a_redirect_onto_the_local_network_is_refused(
         self, block_local, monkeypatch

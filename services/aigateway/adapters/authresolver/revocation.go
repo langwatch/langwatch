@@ -341,10 +341,12 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 	return b, nil
 }
 
-// presentedKey is a credential as presented and the hash it is cached under.
+// presentedKey is a credential as presented, the hash it is cached under, and
+// the invalidation generation when its request read the cached answer.
 type presentedKey struct {
-	key domain.PresentedKey
-	h   [64]byte
+	key    domain.PresentedKey
+	h      [64]byte
+	readAt uint64
 }
 
 // errKeyRecheckDue is admit's answer for a key neither the control plane nor
@@ -353,14 +355,19 @@ type presentedKey struct {
 var errKeyRecheckDue = errors.New("key re-check due")
 
 // recheckKey checks a key the change feed has not vouched for lately. A
-// refusal stands, also one ready or recorded as the wait ends. A check that
-// cannot reach the control plane, or runs past keyRecheckWait, hands back the
-// cached answer for Resolve to admit again.
+// refusal stands, also one ready as the wait ends or recorded since the cached
+// answer was read (k.readAt). A check that cannot reach the control plane, or runs
+// past keyRecheckWait, hands back the cached answer for Resolve to admit again.
 func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served) (served, error) {
-	since := s.fetchGeneration()
+	keepCached := func() (served, error) {
+		if s.rejectedSince(k.h, k.readAt) {
+			return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+		}
+		return cached, nil
+	}
 	call := s.joinReconfirm(k.key, k.h)
 	if call == nil {
-		return cached, nil
+		return keepCached()
 	}
 	timer := time.NewTimer(keyRecheckWait)
 	defer timer.Stop()
@@ -372,16 +379,13 @@ func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served)
 	select {
 	case <-call.done:
 	default:
-		if s.rejectedSince(k.h, since) {
-			return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
-		}
-		return cached, nil
+		return keepCached()
 	}
 	switch {
 	case call.err == nil:
 		return call.answer, nil
 	case classifyRefreshError(call.err) == classTransportFailure:
-		return cached, nil
+		return keepCached()
 	default:
 		return served{}, call.err
 	}

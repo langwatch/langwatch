@@ -652,6 +652,13 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       When the key check refuses the key just as the request stops waiting
       Then the request is refused, not served from the cache
 
+    @unit
+    Scenario: a refusal recorded after a request read its cached key is refused
+      Given a cached key last confirmed 2 minutes ago under a silent change feed
+      And a request has read the key from the cache
+      When another request's key check refuses the key and evicts it, leaving no check to wait on
+      Then the first request is refused, not served from the cache
+
   Rule: A change-feed backlog refuses a key locally only for the state it ends in
 
     # A gateway that starts reads its organization's whole change history from

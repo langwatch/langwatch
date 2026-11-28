@@ -9,7 +9,6 @@ import warnings
 import langevals_core.offline_defaults  # noqa: F401  (before litellm, see module)
 import litellm
 import litellm.cost_calculator
-from litellm.llms.custom_httpx.aiohttp_transport import LiteLLMAiohttpTransport
 from openai import OpenAI, AzureOpenAI
 import json
 
@@ -18,7 +17,6 @@ from langevals_core.egress import (
     Fence,
     bare_host,
     egress_refusal,
-    fence_async_transport,
     install_egress_fence,
     server_egress_policy,
 )
@@ -834,7 +832,9 @@ def patch_litellm():
     if originals:
         return
     install_egress_fence()
-    fence_async_transport(LiteLLMAiohttpTransport)
+    # aiohttp keeps its own DNS cache and connection pool, which the fence cannot
+    # judge; httpx connections are pinned and judged before every write.
+    litellm.disable_aiohttp_transport = True
     register_langwatch_model_pricing()
     originals["completion"] = litellm.completion
     originals["acompletion"] = litellm.acompletion
