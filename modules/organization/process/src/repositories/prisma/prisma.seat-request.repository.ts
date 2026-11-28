@@ -17,7 +17,10 @@ type PrismaSeatRequestDatabase = Pick<PrismaClient, "seatRequest" | "$transactio
 
 type StoredSeatRequest = Prisma.SeatRequestGetPayload<Record<string, never>>;
 
-/** Reopening, resolving and the sales claim read then write, so each runs SERIALIZABLE. */
+/**
+ * Reopening reads then writes, so it runs SERIALIZABLE and runs again when it lost a race.
+ * Resolving and the sales claim are single conditional writes, which never lose one.
+ */
 export class PrismaSeatRequestRepository
   extends PrismaRepository.transactionalFor("SeatRequest")
   implements SeatRequestRepository
@@ -51,6 +54,7 @@ export class PrismaSeatRequestRepository
             source: input.source,
             idpRefused: input.idpRefused,
             idpKind: input.idpKind,
+            reason: input.reason ?? null,
             openedAt: new Date(input.at),
           },
         });
@@ -69,17 +73,16 @@ export class PrismaSeatRequestRepository
       if (current.status === "OPEN") {
         const updated = await transaction.seatRequest.update({
           where,
-          data: {
-            userId: current.userId ?? input.userId,
-            name: current.name ?? input.name,
-            idpRefused: current.idpRefused || input.idpRefused,
-            idpKind: input.idpKind ?? current.idpKind,
-          },
+          data: mergedIntoOpen({ current, input }),
         });
         return { request: rowOf(updated), outcome: "already_open" as const };
       }
-      if (current.resolvedAt?.getTime() !== existing.resolvedAt?.getTime()) {
-        // Answered after this arrival was read: that answer covers it, so nothing reopens.
+      if (
+        current.resolvedAt?.getTime() !== existing.resolvedAt?.getTime() ||
+        current.seatPendingSince !== null
+      ) {
+        // Answered after this arrival was read, or an approval is still giving its seat (a
+        // stranded one is reopened by reopenStranded): that answer covers it, nothing reopens.
         return { request: rowOf(current), outcome: "resolved_meanwhile" as const };
       }
       const reopened = await transaction.seatRequest.update({
@@ -91,6 +94,7 @@ export class PrismaSeatRequestRepository
           source: input.source,
           idpRefused: input.idpRefused,
           idpKind: input.idpKind,
+          reason: input.reason ?? null,
           openedAt: new Date(input.at),
           resolvedAt: null,
           resolvedByUserId: null,
@@ -125,23 +129,23 @@ export class PrismaSeatRequestRepository
   }
 
   async resolve(input: Parameters<SeatRequestRepository["resolve"]>[0]): Promise<boolean> {
-    return this.serializableTransaction(async (transaction) => {
-      const open = await transaction.seatRequest.findFirst({
-        where: { id: input.id, organizationId: input.organizationId, status: "OPEN" },
-        select: { id: true },
-      });
-      if (!open) return false;
-      await transaction.seatRequest.update({
-        where: { id: input.id },
+    // One conditional write: of two racing answers the second matches no OPEN row.
+    return claimed(
+      this.prisma.seatRequest.update({
+        where: {
+          id: input.id,
+          organizationId: input.organizationId,
+          status: "OPEN",
+          ...(input.openedAt === undefined ? {} : { openedAt: new Date(input.openedAt) }),
+        },
         data: {
           status: input.status,
           resolvedAt: new Date(input.at),
           resolvedByUserId: input.resolvedByUserId,
           seatPendingSince: input.status === "APPROVED" ? new Date(input.at) : null,
         },
-      });
-      return true;
-    });
+      }),
+    );
   }
 
   async release(input: Parameters<SeatRequestRepository["release"]>[0]): Promise<void> {
@@ -183,23 +187,37 @@ export class PrismaSeatRequestRepository
   }
 
   async claimSalesNotice({ id, at }: { id: string; at: number }): Promise<boolean> {
-    return this.serializableTransaction(async (transaction) => {
-      const unclaimed = await transaction.seatRequest.findFirst({
+    return claimed(
+      this.prisma.seatRequest.update({
         where: { id, status: "OPEN", salesNotifiedAt: null },
-        select: { id: true },
-      });
-      if (!unclaimed) return false;
-      await transaction.seatRequest.update({
-        where: { id },
         data: { salesNotifiedAt: new Date(at) },
-      });
-      return true;
+      }),
+    );
+  }
+
+  async releaseSalesNotice({ id, at }: { id: string; at: number }): Promise<void> {
+    await this.prisma.seatRequest.updateMany({
+      where: { id, salesNotifiedAt: new Date(at) },
+      data: { salesNotifiedAt: null },
     });
   }
 
   async findForUser({ userId }: { userId: string }): Promise<SeatRequestRow[]> {
     const rows = await this.prisma.seatRequest.findMany({ where: { userId } });
     return rows.map(rowOf);
+  }
+}
+
+/** True when the one conditional write matched its row; false when nothing matched (P2025). */
+async function claimed(write: Promise<unknown>): Promise<boolean> {
+  try {
+    await write;
+    return true;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return false;
+    }
+    throw error;
   }
 }
 
@@ -214,9 +232,28 @@ function rowOf(row: StoredSeatRequest): SeatRequestRow {
     source: row.source as SeatRequestSource,
     idpRefused: row.idpRefused,
     idpKind: parseSignInIdpKind(row.idpKind) ?? null,
+    reason: row.reason,
     salesNotifiedAt: row.salesNotifiedAt?.getTime() ?? null,
     openedAt: row.openedAt.getTime(),
     resolvedAt: row.resolvedAt?.getTime() ?? null,
     resolvedByUserId: row.resolvedByUserId,
+  };
+}
+
+/** What an open request gains from another opening; a member's own ask makes it `requested`. */
+function mergedIntoOpen({
+  current,
+  input,
+}: {
+  current: StoredSeatRequest;
+  input: Parameters<SeatRequestRepository["open"]>[0];
+}) {
+  return {
+    userId: current.userId ?? input.userId,
+    name: current.name ?? input.name,
+    idpRefused: current.idpRefused || input.idpRefused,
+    idpKind: input.idpKind ?? current.idpKind,
+    reason: input.reason ?? current.reason,
+    source: input.source === "requested" ? "requested" : current.source,
   };
 }

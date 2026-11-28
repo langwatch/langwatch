@@ -35,6 +35,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
         source: input.source,
         idpRefused: input.idpRefused,
         idpKind: input.idpKind,
+        reason: input.reason ?? null,
         salesNotifiedAt: null,
         openedAt: input.at,
         resolvedAt: null,
@@ -50,10 +51,15 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
         name: existing.name ?? input.name,
         idpRefused: existing.idpRefused || input.idpRefused,
         idpKind: input.idpKind ?? existing.idpKind,
+        reason: input.reason ?? existing.reason,
+        source: input.source === "requested" ? "requested" : existing.source,
       };
       this.rows[index] = request;
       return { request, outcome: "already_open" };
     }
+    // An approval still giving its seat keeps the row; reopenStranded reopens a stranded one.
+    if (this.seatPendingSince.has(existing.id))
+      return { request: existing, outcome: "resolved_meanwhile" };
     const request: SeatRequestRow = {
       ...existing,
       userId: input.userId ?? existing.userId,
@@ -62,6 +68,7 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
       source: input.source,
       idpRefused: input.idpRefused,
       idpKind: input.idpKind,
+      reason: input.reason ?? null,
       openedAt: input.at,
       resolvedAt: null,
       resolvedByUserId: null,
@@ -98,7 +105,10 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
   async resolve(input: Parameters<SeatRequestRepository["resolve"]>[0]): Promise<boolean> {
     const index = this.rows.findIndex(
       (row) =>
-        row.id === input.id && row.organizationId === input.organizationId && row.status === "OPEN",
+        row.id === input.id &&
+        row.organizationId === input.organizationId &&
+        row.status === "OPEN" &&
+        (input.openedAt === undefined || row.openedAt === input.openedAt),
     );
     const row = this.rows[index];
     if (!row) return false;
@@ -164,6 +174,12 @@ export class MemorySeatRequestRepository implements SeatRequestRepository {
     if (!row) return false;
     this.rows[index] = { ...row, salesNotifiedAt: at };
     return true;
+  }
+
+  async releaseSalesNotice({ id, at }: { id: string; at: number }): Promise<void> {
+    const index = this.rows.findIndex((row) => row.id === id && row.salesNotifiedAt === at);
+    const row = this.rows[index];
+    if (row) this.rows[index] = { ...row, salesNotifiedAt: null };
   }
 
   async findForUser({ userId }: { userId: string }): Promise<SeatRequestRow[]> {

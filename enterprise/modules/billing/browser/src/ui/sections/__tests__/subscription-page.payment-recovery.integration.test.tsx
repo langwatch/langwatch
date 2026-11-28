@@ -176,6 +176,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationPendingInvites: {
           useQuery: () => ({ ...setup.mockGetPendingInvites(), refetch: vi.fn() }),
         },
+        checkInvites: { useMutation: () => setup.mockCheckInvites() },
         createInvites: { useMutation: () => setup.mockCreateInvites() },
       },
       currency: {

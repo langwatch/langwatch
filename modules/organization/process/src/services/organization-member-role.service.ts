@@ -229,10 +229,78 @@ export class OrganizationMemberRoleService {
     /** Whose holdings bound the grants the change writes. */
     caller: AuthzGrantCaller;
     planUser?: OrganizationPlanUser;
+    /** Writes only while the member's role version still reads this (role-change-seat.feature). */
+    expectedRoleVersion?: number;
+    roleChangeId?: string;
   }): Promise<UpdateMemberRoleResult> {
     const { organizationId, userId, role, teamRoleUpdates, currentUserId, caller } = params;
 
     const currentMember = await this.repo.getMembership({ organizationId, userId });
+    const { organizationTeamIds, currentMemberships, userPermissions } = await this.teamStandingOf({
+      organizationId,
+      userId,
+      teamRoleUpdates,
+    });
+    const effectiveTeamRoleUpdates = this.effectiveTeamRoleUpdatesOf({
+      userId,
+      role,
+      teamRoleUpdates,
+      currentMemberships,
+      organizationTeamIds,
+    });
+
+    // Asked before anything is written, seat corrections included: the seat commits first.
+    await this.dependencies.ceiling.assertWithinCaller({
+      organizationId,
+      caller,
+      grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
+    });
+
+    const result = await this.dependencies.seats.withSeat({
+      organizationId,
+      work: (lease) =>
+        this.writeRoleChange({
+          change: {
+            organizationId,
+            userId,
+            role,
+            effectiveTeamRoleUpdates,
+            currentUserId,
+            caller,
+            expectedRoleVersion: params.expectedRoleVersion,
+            roleChangeId: params.roleChangeId,
+          },
+          currentMember,
+          oldPermissions: userPermissions,
+          planUser: params.planUser,
+          lease,
+        }),
+    });
+    if (role !== currentMember.role) {
+      this.dependencies.seatNotices.memberRoleChanged({
+        organizationId,
+        userId,
+        role,
+        previousRole: currentMember.role,
+        changedByUserId: currentUserId,
+      });
+    }
+    return result;
+  }
+
+  /**
+   * The member's standing on the organization's shared teams before the change: a personal
+   * workspace named outright is refused, and custom-role grants are read for the seat decision.
+   */
+  private async teamStandingOf({
+    organizationId,
+    userId,
+    teamRoleUpdates,
+  }: {
+    organizationId: string;
+    userId: string;
+    teamRoleUpdates: { teamId: string }[] | undefined;
+  }) {
     // A caller who names a personal workspace outright is told so. Without
     // this the shared-teams-only set below would answer "that team is not in
     // the organization", which is both wrong and no help.
@@ -270,42 +338,7 @@ export class OrganizationMemberRoleService {
       currentTeamBindings,
     });
     const userPermissions = grantedPermissions.length > 0 ? grantedPermissions : undefined;
-    const effectiveTeamRoleUpdates = this.effectiveTeamRoleUpdatesOf({
-      userId,
-      role,
-      teamRoleUpdates,
-      currentMemberships,
-      organizationTeamIds,
-    });
-
-    // Asked before anything is written, seat corrections included: the seat commits first.
-    await this.dependencies.ceiling.assertWithinCaller({
-      organizationId,
-      caller,
-      grants: intendedRoleChangeGrants({ organizationId, role, effectiveTeamRoleUpdates }),
-    });
-
-    const result = await this.dependencies.seats.withSeat({
-      organizationId,
-      work: (lease) =>
-        this.writeRoleChange({
-          change: { organizationId, userId, role, effectiveTeamRoleUpdates, currentUserId, caller },
-          currentMember,
-          oldPermissions: userPermissions,
-          planUser: params.planUser,
-          lease,
-        }),
-    });
-    if (role !== currentMember.role) {
-      this.dependencies.seatNotices.memberRoleChanged({
-        organizationId,
-        userId,
-        role,
-        previousRole: currentMember.role,
-        changedByUserId: currentUserId,
-      });
-    }
-    return result;
+    return { organizationTeamIds, currentMemberships, userPermissions };
   }
 
   /** The role change's seat and its write, under the seat lease the caller holds. */

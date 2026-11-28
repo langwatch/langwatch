@@ -13,6 +13,7 @@ import {
   PendingJoinRequestsToken,
   PersonDrawerToken,
   ProjectDepartmentFieldToken,
+  RequestAccessToken,
 } from "@langwatch/organization-client";
 import { describe, expect, it } from "vitest";
 
@@ -43,6 +44,7 @@ describe("the organization browser declaration", () => {
       JoinInsteadToken,
       PendingJoinRequestsToken,
       ProjectDepartmentFieldToken,
+      RequestAccessToken,
     ])("loads the lent component for $key", async (token) => {
       const lend = lendOf(token);
       const loaded = lend && "load" in lend ? await lend.load() : undefined;

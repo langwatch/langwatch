@@ -9,6 +9,7 @@ import type {
 import {
   accountPaymentFailedNotice,
   billingThresholdFailureNotice,
+  duplicateActiveSubscriptionsNotice,
   licensePurchaseNotice,
   planLimitReachedNotice,
   resourceLimitReachedNotice,
@@ -117,6 +118,11 @@ export class NotificationService {
     return `${this.config.baseHost ?? DEFAULT_APP_URL}/admin#/organizations/${organizationId}`;
   }
 
+  private getOpsSubscriptionsLink(organizationId: string): string {
+    const base = this.config.baseHost ?? DEFAULT_APP_URL;
+    return `${base}/ops/cloud/subscriptions?q=${encodeURIComponent(organizationId)}`;
+  }
+
   /** Where and when a notice was sent, for its footer. */
   private origin(): NoticeOrigin {
     return {
@@ -125,7 +131,7 @@ export class NotificationService {
     };
   }
 
-  /** The notice is built inside the try: a refused prop is reported like a failed send. */
+  /** Built inside the try, so a refused prop is reported like a failed send. True once sent. */
   private async sendSlackMessage({
     channelUrl,
     message,
@@ -136,20 +142,22 @@ export class NotificationService {
     message: (origin: NoticeOrigin) => BillingAlertMessage;
     missingConfigLog?: string;
     errorLog: string;
-  }): Promise<void> {
+  }): Promise<boolean> {
     if (!channelUrl) {
       if (missingConfigLog) {
         logger.warn(missingConfigLog);
       }
 
-      return;
+      return false;
     }
 
     try {
       await this.slack.send({ webhookUrl: channelUrl, message: message(this.origin()) });
+      return true;
     } catch (error) {
       logger.error({ error }, errorLog);
       this.errorReporter.capture(error instanceof Error ? error : new Error(String(error)));
+      return false;
     }
   }
 
@@ -258,18 +266,36 @@ export class NotificationService {
     });
   }
 
-  /**
-   * Sends a Slack notification for subscription events (prospective, confirmed or cancelled).
-   */
-  /** Sales hear that a person waits for a seat only they can sell. */
+  /** Ops hear an organization holds more than one active subscription; false when not sent. */
+  async sendSlackDuplicateActiveSubscriptions(input: {
+    organizationId: string;
+    organizationName: string;
+    adminName?: string;
+    adminEmail?: string;
+    planName: string;
+    subscriptionIds: string[];
+  }): Promise<boolean> {
+    const { organizationId, ...props } = input;
+    return this.sendSlackMessage({
+      channelUrl: this.config.slackPlanLimitChannel,
+      message: (origin) =>
+        duplicateActiveSubscriptionsNotice.render({
+          props: { ...props, adminUrl: this.getOpsSubscriptionsLink(organizationId) },
+          origin,
+        }),
+      errorLog: "Failed to send Slack duplicate subscription notification",
+    });
+  }
+
+  /** Sales hear that a person waits for a seat only they can sell. True once it went out. */
   async sendSlackSeatRequest(payload: {
     organizationId: string;
     organizationName: string;
     plan: string;
     seats: number;
     requestedSeats: number;
-  }): Promise<void> {
-    await this.sendSlackMessage({
+  }): Promise<boolean> {
+    return this.sendSlackMessage({
       channelUrl: this.config.slackSubscriptionsChannel,
       message: (origin) =>
         seatRequestedNotice.render({

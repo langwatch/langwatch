@@ -68,10 +68,12 @@ vi.mock("@langwatch/browser-host/use-organization-team-project", () => ({
   }),
 }));
 
+const toastCreate = vi.hoisted(() => vi.fn());
+
 // Mock toaster
 vi.mock("@langwatch/browser-host/toaster", () => ({
   toaster: {
-    create: vi.fn(),
+    create: toastCreate,
   },
 }));
 
@@ -81,12 +83,14 @@ vi.mock("../../../model/posthog-error-capture.ts", () => ({
   toError: vi.fn((e) => (e instanceof Error ? e : new Error(String(e)))),
 }));
 
+import { markHandledGlobally } from "@langwatch/browser-host/errors";
 import { extractPersistedState } from "@langwatch/experiment-contract";
 // Import hook after mocks
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
 import { captureException } from "../../../model/posthog-error-capture.ts";
 import { useAutosaveEvaluationsV3 } from "../use-autosave-evaluations-v3.ts";
+import { useWorkbenchAccessRefusal } from "../use-workbench-access.ts";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -234,6 +238,88 @@ describe("Autosave evaluation state", () => {
 
     // Should show error status
     expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("error");
+  });
+
+  describe("when the licence reader already answered the refused save", () => {
+    afterEach(() => {
+      useWorkbenchAccessRefusal.getState().reset();
+    });
+
+    /** @scenario "A refused workbench save on a Lite Member seat shows only the restriction modal" */
+    it("shows no second error toast, reports nothing and turns the workbench view only", async () => {
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+      // The tRPC failure a Lite Member's save gets: the handled payload under `data.error`.
+      const refusal = Object.assign(new Error("lite_member_restricted"), {
+        data: {
+          code: "UNAUTHORIZED",
+          error: {
+            code: "lite_member_restricted",
+            httpStatus: 401,
+            meta: { resource: "experiments" },
+          },
+        },
+      });
+      markHandledGlobally(refusal);
+      mockMutateAsync.mockRejectedValueOnce(refusal);
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue({ datasetId: "test-data", row: 0, columnId: "input", value: "refused" });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      expect(useWorkbenchAccessRefusal.getState().refused).toBe(true);
+      expect(useEvaluationsV3Store.getState().ui.autosaveStatus.evaluation).toBe("idle");
+      expect(toastCreate).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A workbench save refused at a plan limit names the limit in the save status" */
+    it("names the plan limit in the status line, shows no toast and keeps the workbench editable", async () => {
+      renderWithDesignSystem(
+        <Wrapper>
+          <TestAutosaveComponent />
+        </Wrapper>,
+      );
+      await act(async () => {
+        vi.advanceTimersByTime(50);
+      });
+      // The tRPC failure a save gets at a plan limit: FORBIDDEN with the limit on `data.cause`.
+      const refusal = Object.assign(new Error("limit reached"), {
+        data: {
+          code: "FORBIDDEN",
+          cause: { limitType: "experiments", current: 3, max: 3 },
+        },
+      });
+      markHandledGlobally(refusal);
+      mockMutateAsync.mockRejectedValueOnce(refusal);
+
+      act(() => {
+        useEvaluationsV3Store
+          .getState()
+          .setCellValue({ datasetId: "test-data", row: 0, columnId: "input", value: "over limit" });
+      });
+      await act(async () => {
+        vi.advanceTimersByTime(AUTOSAVE_DEBOUNCE_MS + 100);
+      });
+
+      const status = useEvaluationsV3Store.getState().ui.autosaveStatus;
+      expect(status.evaluation).toBe("error");
+      expect(status.evaluationError).toBe("Not saved: your plan's limit refused this save");
+      expect(useWorkbenchAccessRefusal.getState().refused).toBe(false);
+      expect(toastCreate).not.toHaveBeenCalled();
+      expect(captureException).not.toHaveBeenCalled();
+    });
   });
 
   // Dataset records, prompt text and run results are customer content. The

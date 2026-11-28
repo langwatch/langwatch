@@ -17,6 +17,7 @@ import {
   PendingJoinRequestsToken,
   PersonDrawerToken,
   ProjectDepartmentFieldToken,
+  RequestAccessToken,
 } from "@langwatch/organization-client";
 import { organizationTrpc } from "@langwatch/organization-contract";
 
@@ -113,6 +114,10 @@ export const organizationWeb = defineBrowserModule("organization")
   /** Onboarding's welcome, held back for somebody whose only memberships give no access. */
   .lends(HeldMembershipGateToken, {
     load: () => import("./ui/sections/held-membership-gate.tsx"),
+  })
+  /** Request access, lent to the refusals a full seat would lift (seat-requests.feature). */
+  .lends(RequestAccessToken, {
+    load: () => import("./ui/sections/request-access.tsx"),
   })
   /** People waiting at the door, lent to project's home for those who can answer (§10.1). */
   .lends(PendingJoinRequestsToken, {

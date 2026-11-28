@@ -329,6 +329,11 @@ const ORG_SCOPED_MODELS: Record<string, OrgScopedModelConfig> = {
   SystemMigrationEnrollment: {
     platformScopeActions: ["findMany", "groupBy"],
   },
+  // Billing's sweep lists the refused seat changes still waiting across organizations; the
+  // writes name the organization.
+  BlockedSeatChange: {
+    platformScopeActions: ["findMany"],
+  },
   AiToolEntry: {},
   GatewayBudget: {},
   GatewayConnectUpstream: {},

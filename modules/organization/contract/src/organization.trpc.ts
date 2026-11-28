@@ -48,6 +48,15 @@ import {
 } from "./organization.trpc-schemas.ts";
 import { docsPlaygroundPolicySchema, organizationIntentSchema } from "./organization.ts";
 import { organizationApiScopeGraphInputSchema, scopeGraphSchema } from "./scope-graph.ts";
+import {
+  changeMemberRoleWithSeatInputSchema,
+  completeSeatRoleChangeInputSchema,
+  memberRoleWithSeatResultSchema,
+  pendingSeatRoleChangeSchema,
+  recordBlockedRoleChangeInputSchema,
+  recordBlockedRoleChangeResultSchema,
+  seatRoleChangeOutcomeSchema,
+} from "./seat-role-change.ts";
 
 /** The first organization a person creates, and the name they gave it. */
 const organizationApiCreateAndAssignInputSchemaDefinition = z.object({
@@ -173,6 +182,25 @@ export const organizationTrpc = defineTrpcContract("organization")
   .mutation("updateMemberRole")
   .withInput(organizationApiUpdateMemberRoleInputSchema)
   .withOutput(organizationMemberRoleChangedSchema)
+
+  /** A role change that needs one more full seat: the seat is bought, then the role written. */
+  .mutation("changeMemberRoleWithSeat")
+  .withInput(changeMemberRoleWithSeatInputSchema)
+  .withOutput(memberRoleWithSeatResultSchema)
+
+  /** Applies a role change once its seat payment is paid; a second call changes nothing. */
+  .mutation("completeSeatRoleChange")
+  .withInput(completeSeatRoleChangeInputSchema)
+  .withOutput(seatRoleChangeOutcomeSchema)
+
+  .query("pendingSeatRoleChange")
+  .withInput(organizationApiMemberScopeSchema)
+  .withOutput(pendingSeatRoleChangeSchema)
+
+  /** Keeps a seat role change the offer refused for two live subscriptions, once per admin. */
+  .mutation("recordBlockedRoleChange")
+  .withInput(recordBlockedRoleChangeInputSchema)
+  .withOutput(recordBlockedRoleChangeResultSchema)
 
   /** Whether members may connect the docs playground to their own access (ADR-185). */
   .query("getDocsPlaygroundPolicy")

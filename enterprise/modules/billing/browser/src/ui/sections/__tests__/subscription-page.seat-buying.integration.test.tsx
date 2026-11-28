@@ -21,6 +21,7 @@ import { SubscriptionPage } from "../subscription-page.tsx";
 import {
   createMockPlan,
   mockAddTeamMemberOrEvents,
+  mockCheckInvitesMutateAsync,
   mockCreateInvitesMutateAsync,
   mockCreateSubscription,
   mockDeveloperSeats,
@@ -94,7 +95,10 @@ class TestBillingHost extends BillingHostApi {
     return true;
   }
 
-  navigate(): void {}
+  readonly navigations: string[] = [];
+  navigate(to: string): void {
+    this.navigations.push(to);
+  }
 
   replace(): void {
     this.query = {};
@@ -137,6 +141,10 @@ vi.mock("@langwatch/browser-host/lent", async (importOriginal) => {
   };
 });
 
+const { mockRecordBlockedSeatPurchase } = vi.hoisted(() => ({
+  mockRecordBlockedSeatPurchase: vi.fn(),
+}));
+
 vi.mock("../../../behavior/billing-api.ts", async () => {
   const setup = await import("./subscription-test-setup.ts");
   return {
@@ -161,6 +169,7 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         getOrganizationPendingInvites: {
           useQuery: () => ({ ...setup.mockGetPendingInvites(), refetch: vi.fn() }),
         },
+        checkInvites: { useMutation: () => setup.mockCheckInvites() },
         createInvites: { useMutation: () => setup.mockCreateInvites() },
       },
       currency: {
@@ -192,6 +201,9 @@ vi.mock("../../../behavior/billing-api.ts", async () => {
         },
         setDeveloperSeats: {
           useMutation: () => ({ mutateAsync: setup.mockSetDeveloperSeats, isPending: false }),
+        },
+        recordBlockedSeatPurchase: {
+          useMutation: () => ({ mutate: mockRecordBlockedSeatPurchase, isPending: false }),
         },
         previewProration: {
           useQuery: (input: { newTotalSeats: number }, opts: { enabled: boolean }) =>
@@ -343,12 +355,14 @@ const openSeatDialog = async () => {
 
 const openManageSeats = async () => {
   fireEvent.click(await screen.findByTestId("user-count-link"));
-  await screen.findByTestId("add-invite-row");
+  await screen.findByTestId(/^(add-invite-row|seat-email-0)$/);
 };
 
+/** Free adds a row per person; Growth has one address row of its own. */
 const addPerson = (email: string) => {
-  const index = screen.queryAllByTestId(/^seat-email-\d+$/).length;
-  fireEvent.click(screen.getByTestId("add-invite-row"));
+  const addRow = screen.queryByTestId("add-invite-row");
+  const index = addRow ? screen.queryAllByTestId(/^seat-email-\d+$/).length : 0;
+  if (addRow) fireEvent.click(addRow);
   fireEvent.change(screen.getByTestId(`seat-email-${index}`), { target: { value: email } });
 };
 
@@ -727,7 +741,42 @@ describe("<SubscriptionPage/> buying seats", () => {
         "You pay for 3. 3 in use.",
       );
       expect(screen.getByTestId("drawer-seats-stepper-value")).toHaveTextContent("3");
+      expect(screen.getByTestId("seat-drawer-hint")).toHaveTextContent(
+        "Lite members are free and unlimited on Growth. Seats are added now and lowered from the next period.",
+      );
+      expect(screen.getAllByTestId(/^seat-email-\d+$/)).toHaveLength(1);
+      expect(screen.queryByTestId("seat-change-summary")).toBeNull();
+      expect(screen.queryByTestId("seat-drawer-free")).toBeNull();
       expect(lastButton("No changes")).toBeDisabled();
+    });
+
+    /** @scenario "Manage seats on Growth names the seats paid for that nobody uses" */
+    it("names the free seats beside the seats in use", async () => {
+      givenGrowth({ paid: 3, inUse: 2 });
+      renderPage();
+      await openManageSeats();
+
+      expect(screen.getByTestId("seat-drawer-heading")).toHaveTextContent(
+        "You pay for 3. 2 in use.",
+      );
+      expect(screen.getByTestId("seat-drawer-free")).toHaveTextContent("1 free");
+    });
+
+    /** @scenario "Raising the seats prices them under the stepper before anything is paid" */
+    it("prices a raised seat count under the stepper", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      renderPage();
+      await openManageSeats();
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
+
+      expect(summary().getByText("1 more full seat")).toBeInTheDocument();
+      expect(summary().getByText("€29/mo")).toBeInTheDocument();
+      expect(summary().getByText("Today, prorated to 1 Dec")).toBeInTheDocument();
+      expect(summary().getByText("€24.17")).toBeInTheDocument();
+      expect(summary().getByText("€116/mo for 4 seats")).toBeInTheDocument();
+      expect(screen.getByTestId("seat-change-summary")).not.toHaveTextContent(/card/i);
+      expect(lastButton("Add 1 seat · €24.17 today")).toBeEnabled();
     });
 
     /** @scenario "Inviting past the seats paid for raises the count" */
@@ -739,14 +788,11 @@ describe("<SubscriptionPage/> buying seats", () => {
       addPerson("qux@acme.example");
 
       expect(screen.getByTestId("drawer-seats-stepper-value")).toHaveTextContent("4");
-      expect(screen.getByTestId("invite-chip-0")).toHaveTextContent("Invited when you confirm");
-      expect(lastButton("Add 1 seat · €29/mo")).toBeEnabled();
-      expect(summary().getByText("3 → 4")).toBeInTheDocument();
+      expect(screen.getByTestId("invite-chip-0")).toHaveTextContent("Invited after you pay");
+      expect(lastButton("Add 1 seat · €24.17 today")).toBeEnabled();
+      expect(summary().getByText("1 more full seat")).toBeInTheDocument();
       expect(summary().getByText("€24.17")).toBeInTheDocument();
-      expect(summary().getByText("€116/mo")).toBeInTheDocument();
-      expect(screen.getByTestId("seat-drawer-note")).toHaveTextContent(
-        "Added to your subscription now, prorated to 1 Dec. No new checkout.",
-      );
+      expect(summary().getByText("€116/mo for 4 seats")).toBeInTheDocument();
     });
 
     /** @scenario "The quote tells the drawer when the next period starts" */
@@ -767,18 +813,21 @@ describe("<SubscriptionPage/> buying seats", () => {
       await openManageSeats();
 
       addPerson("qux@acme.example");
-      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
 
       const confirm = within(await screen.findByTestId("seat-confirm-dialog"));
-      expect(confirm.getByText("Add 1 seat to your organization?")).toBeInTheDocument();
-      expect(
-        confirm.getByText(/Charged today to the card on file, for .* to 1 Dec\./),
-      ).toBeInTheDocument();
+      expect(confirm.getByText("Add 1 full seat?")).toBeInTheDocument();
+      expect(confirm.getByTestId("seat-confirm-lead")).toHaveTextContent(
+        "You go from 3 to 4 full seats. The new seat is free to use at once.",
+      );
+      expect(confirm.getByText("Today, prorated to 1 Dec")).toBeInTheDocument();
+      expect(confirm.getByText("€24.17")).toBeInTheDocument();
       expect(confirm.getByText("4 seats × €29")).toBeInTheDocument();
+      expect(screen.getByTestId("seat-confirm-dialog")).not.toHaveTextContent(/card/i);
       expect(confirm.getByTestId("seat-confirm-body")).toHaveTextContent(
         "qux@acme.example gets the invite as soon as the seat is added.",
       );
-      expect(confirm.getByRole("button", { name: "Pay €24.17 and add" })).toBeEnabled();
+      expect(confirm.getByRole("button", { name: "Pay €24.17" })).toBeEnabled();
     });
 
     /** @scenario "The seat change confirm splits VAT out of the charge today" */
@@ -800,14 +849,14 @@ describe("<SubscriptionPage/> buying seats", () => {
       await openManageSeats();
 
       addPerson("qux@acme.example");
-      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
+      fireEvent.click(lastButton("Add 1 seat · €29.24 today"));
 
       const confirm = within(await screen.findByTestId("seat-confirm-dialog"));
       expect(confirm.getByText("€29.24")).toBeInTheDocument();
       expect(confirm.getByText("€24.17 + €5.07 VAT")).toBeInTheDocument();
       expect(confirm.getByText("€116/mo")).toBeInTheDocument();
       expect(confirm.getByText("excl. VAT")).toBeInTheDocument();
-      expect(confirm.getByRole("button", { name: "Pay €29.24 and add" })).toBeEnabled();
+      expect(confirm.getByRole("button", { name: "Pay €29.24" })).toBeEnabled();
     });
 
     /** @scenario "Confirming the added seat changes the subscription and sends the invite" */
@@ -817,8 +866,8 @@ describe("<SubscriptionPage/> buying seats", () => {
       await openManageSeats();
 
       addPerson("qux@acme.example");
-      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
-      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17 and add" }));
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17" }));
 
       await waitFor(() =>
         expect(seatChange).toHaveBeenCalledWith(
@@ -832,15 +881,33 @@ describe("<SubscriptionPage/> buying seats", () => {
           }),
         ),
       );
-      await waitFor(() =>
-        expect(host.successes).toContainEqual(
-          expect.objectContaining({
-            title: "Seat added. You now pay for 4 seats. Invite sent to qux@acme.example.",
-          }),
-        ),
+      const banner = await screen.findByTestId("seats-added-banner");
+      expect(banner).toHaveTextContent("1 seat added");
+      expect(banner).toHaveTextContent(
+        "Paid €24.17. You have 4 full seats. Invite sent to qux@acme.example.",
       );
-      await waitFor(() => expect(screen.queryByTestId("add-invite-row")).toBeNull());
-      expect(screen.queryByTestId("update-seats-block")).toBeNull();
+      await waitFor(() => expect(screen.queryByTestId("seat-confirm-dialog")).toBeNull());
+      expect(host.successes).toEqual([]);
+      fireEvent.click(lastButton("Done"));
+      await waitFor(() => expect(screen.queryByTestId("seats-added-banner")).toBeNull());
+    });
+
+    /** @scenario "Paying for a seat with nobody to invite leaves it free" */
+    it("adds a seat with nobody to invite and names it free", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      renderPage();
+      await openManageSeats();
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-plus"));
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17" }));
+
+      await waitFor(() =>
+        expect(seatChange).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 4 })),
+      );
+      const banner = await screen.findByTestId("seats-added-banner");
+      expect(banner).toHaveTextContent("Paid €24.17. You have 4 full seats, 1 free.");
+      expect(mockCreateInvitesMutateAsync).not.toHaveBeenCalled();
     });
 
     /** @scenario "Back from the confirm returns to the drawer unchanged" */
@@ -850,13 +917,11 @@ describe("<SubscriptionPage/> buying seats", () => {
       await openManageSeats();
 
       addPerson("qux@acme.example");
-      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
       const confirm = within(await screen.findByTestId("seat-confirm-dialog"));
       fireEvent.click(confirm.getByRole("button", { name: "Back" }));
 
-      await waitFor(() =>
-        expect(screen.queryByRole("button", { name: "Pay €24.17 and add" })).toBeNull(),
-      );
+      await waitFor(() => expect(screen.queryByRole("button", { name: "Pay €24.17" })).toBeNull());
       expect(screen.getByTestId("drawer-seats-stepper-value")).toHaveTextContent("4");
       expect(screen.getByTestId("seat-email-0")).toHaveValue("qux@acme.example");
       expect(seatChange).not.toHaveBeenCalled();
@@ -871,7 +936,9 @@ describe("<SubscriptionPage/> buying seats", () => {
       addPerson("qux@acme.example");
 
       expect(screen.getByTestId("drawer-seats-stepper-value")).toHaveTextContent("5");
-      fireEvent.click(lastButton("Invite 1 person"));
+      expect(screen.getByTestId("invite-chip-0")).toHaveTextContent("Uses your free seat");
+      expect(screen.queryByTestId("seat-change-summary")).toBeNull();
+      fireEvent.click(screen.getByTestId("invite-now-0"));
 
       await waitFor(() =>
         expect(mockCreateInvitesMutateAsync).toHaveBeenCalledWith(
@@ -881,6 +948,7 @@ describe("<SubscriptionPage/> buying seats", () => {
         ),
       );
       expect(seatChange).not.toHaveBeenCalled();
+      await waitFor(() => expect(screen.getByTestId("seat-email-0")).toHaveValue(""));
     });
 
     /** @scenario "Lowering seats stops at the people who use them" */
@@ -997,12 +1065,162 @@ describe("<SubscriptionPage/> buying seats", () => {
       await openManageSeats();
 
       addPerson("qux@acme.example");
-      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
-      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17 and add" }));
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17" }));
 
       await waitFor(() => expect(host.failures).toHaveLength(1));
       expect(mockCreateInvitesMutateAsync).not.toHaveBeenCalled();
-      expect(screen.getByRole("button", { name: "Pay €24.17 and add" })).toBeEnabled();
+      expect(screen.getByRole("button", { name: "Pay €24.17" })).toBeEnabled();
+    });
+
+    /** @scenario "An address already on the team is refused in Manage seats before any price" */
+    it("marks a member's address and prices no seat for it", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      const host = renderPage();
+      await openManageSeats();
+
+      addPerson("Member1@acme.example");
+
+      const refusal = await screen.findByTestId("invite-member-refusal");
+      expect(refusal).toHaveTextContent(
+        "Member 1 is already on your team as a Member. Change their role instead.",
+      );
+      expect(screen.getByTestId("drawer-seats-stepper-value")).toHaveTextContent("3");
+      expect(mockPreviewProration).not.toHaveBeenCalledWith(
+        expect.objectContaining({ newTotalSeats: 4 }),
+        expect.anything(),
+      );
+      expect(lastButton("No changes")).toBeDisabled();
+      expect(seatChange).not.toHaveBeenCalled();
+
+      fireEvent.click(within(refusal).getByRole("button", { name: "Change their role instead" }));
+      expect(host.navigations).toEqual([
+        "/settings/directory?tab=people&drawer.open=person&drawer.userId=user-1",
+      ]);
+    });
+
+    /** @scenario "An existing member is refused by the role they hold" */
+    it("names an Admin's own role in the refusal", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      renderPage();
+      await openManageSeats();
+
+      addPerson("member0@acme.example");
+
+      expect(await screen.findByTestId("invite-member-refusal")).toHaveTextContent(
+        "Member 0 is already on your team as an Admin. Change their role instead.",
+      );
+    });
+
+    /** @scenario "Manage seats asks the server about the invite before it charges" */
+    it("charges nothing when the server refuses the address", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      mockCheckInvitesMutateAsync.mockRejectedValueOnce(new Error("already_organization_member"));
+      const host = renderPage();
+      await openManageSeats();
+
+      addPerson("qux@acme.example");
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17" }));
+
+      await waitFor(() =>
+        expect(host.failures).toContainEqual(
+          expect.objectContaining({ fallbackTitle: "Couldn't add these people" }),
+        ),
+      );
+      expect(mockCheckInvitesMutateAsync).toHaveBeenCalledWith(
+        expect.objectContaining({
+          invites: [expect.objectContaining({ email: "qux@acme.example" })],
+        }),
+      );
+      expect(seatChange).not.toHaveBeenCalled();
+      expect(mockCreateInvitesMutateAsync).not.toHaveBeenCalled();
+      expect(screen.getByTestId("seat-confirm-dialog")).toBeInTheDocument();
+    });
+
+    /** @scenario "Manage seats stops calmly while two live subscriptions hold the billing" */
+    it("shows the calm stop, no seat numbers, and keeps the attempt once", async () => {
+      mockRecordBlockedSeatPurchase.mockClear();
+      mockPreviewProration.mockImplementation(() => ({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { data: { error: { code: "subscription_ambiguous", httpStatus: 409 } } },
+      }));
+      givenGrowth({ paid: 1, inUse: 5 });
+      renderPage();
+      fireEvent.click(await screen.findByTestId("user-count-link"));
+
+      const stuck = await screen.findByTestId("seat-drawer-stuck");
+      expect(stuck).toHaveTextContent("We couldn't add seats yet");
+      expect(stuck).toHaveTextContent(
+        "Something on our side is holding Test Org's billing. We were alerted automatically and are fixing it.",
+      );
+      expect(stuck).toHaveTextContent("Nothing was charged.");
+      expect(stuck).toHaveTextContent(
+        "We'll email you when it's done, usually the same working day.",
+      );
+      expect(within(stuck).getByRole("link", { name: "Contact support" })).toHaveAttribute(
+        "href",
+        expect.stringMatching(/^mailto:support@langwatch\.ai/),
+      );
+      expect(screen.queryByTestId("seat-drawer-heading")).toBeNull();
+      expect(screen.queryByTestId("drawer-seats-stepper")).toBeNull();
+      expect(screen.queryByTestId("seat-email-0")).toBeNull();
+      await waitFor(() => expect(mockRecordBlockedSeatPurchase).toHaveBeenCalledTimes(1));
+      expect(mockRecordBlockedSeatPurchase).toHaveBeenCalledWith({
+        organizationId: "test-org-id",
+        seats: 4,
+      });
+      expect(seatChange).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "Manage seats stops calmly while two live subscriptions hold the billing" */
+    it("keeps no seat purchase when the held change lowers seats", async () => {
+      mockRecordBlockedSeatPurchase.mockClear();
+      givenGrowth({ paid: 5, inUse: 3 });
+      renderPage();
+      await openManageSeats();
+      mockPreviewProration.mockImplementation(() => ({
+        data: undefined,
+        isLoading: false,
+        isError: true,
+        error: { data: { error: { code: "subscription_ambiguous", httpStatus: 409 } } },
+      }));
+
+      fireEvent.click(screen.getByTestId("drawer-seats-stepper-minus"));
+
+      const stuck = await screen.findByTestId("seat-drawer-stuck");
+      expect(stuck).toHaveTextContent("We couldn't change seats yet");
+      expect(stuck).not.toHaveTextContent("We'll email you when it's done");
+      expect(mockRecordBlockedSeatPurchase).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "The confirm keeps its question while the invite after a payment is sent" */
+    it("keeps asking to add the seat after the plan is re-read", async () => {
+      givenGrowth({ paid: 3, inUse: 3 });
+      let finishInvites: (value: unknown) => void = () => {};
+      mockCreateInvitesMutateAsync.mockImplementationOnce(
+        () => new Promise((resolve) => (finishInvites = resolve)),
+      );
+      seatChange.mockImplementationOnce(async () => {
+        givenGrowth({ paid: 4, inUse: 3 });
+        return { success: true };
+      });
+      renderPage();
+      await openManageSeats();
+
+      addPerson("qux@acme.example");
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17" }));
+
+      await waitFor(() => expect(mockCreateInvitesMutateAsync).toHaveBeenCalled());
+      const confirm = within(screen.getByTestId("seat-confirm-dialog"));
+      expect(confirm.getByText("Add 1 full seat?")).toBeInTheDocument();
+      expect(screen.queryByText("Change your developer seats?")).toBeNull();
+
+      finishInvites([{ id: "invite-1" }]);
+      await waitFor(() => expect(screen.queryByTestId("seat-confirm-dialog")).toBeNull());
     });
 
     /** @scenario "An invite refused after the seats changed keeps Manage seats open" */
@@ -1013,8 +1231,8 @@ describe("<SubscriptionPage/> buying seats", () => {
       await openManageSeats();
 
       addPerson("qux@acme.example");
-      fireEvent.click(lastButton("Add 1 seat · €29/mo"));
-      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17 and add" }));
+      fireEvent.click(lastButton("Add 1 seat · €24.17 today"));
+      fireEvent.click(await screen.findByRole("button", { name: "Pay €24.17" }));
 
       await waitFor(() =>
         expect(seatChange).toHaveBeenCalledWith(expect.objectContaining({ totalMembers: 4 })),
@@ -1026,7 +1244,8 @@ describe("<SubscriptionPage/> buying seats", () => {
       );
       expect(host.successes).toEqual([]);
       await waitFor(() => expect(screen.queryByTestId("seat-confirm-dialog")).toBeNull());
-      expect(screen.getByTestId("add-invite-row")).toBeInTheDocument();
+      expect(screen.getByTestId("seat-email-0")).toBeInTheDocument();
+      expect(screen.queryByTestId("seats-added-banner")).toBeNull();
     });
   });
 
@@ -1157,7 +1376,7 @@ describe("<SubscriptionPage/> buying seats", () => {
       fireEvent.click(await screen.findByTestId("developer-seats-stepper-plus"));
       fireEvent.click(screen.getByTestId("developer-seats-stepper-plus"));
 
-      expect(lastButton("Add 2 developer seats · €10/mo")).toBeEnabled();
+      expect(lastButton("Add 2 developer seats · €8.33 today")).toBeEnabled();
       expect(summary().getByText("Developer seats")).toBeInTheDocument();
       expect(summary().getByText("2 × €5")).toBeInTheDocument();
     });
@@ -1172,7 +1391,7 @@ describe("<SubscriptionPage/> buying seats", () => {
       unfold();
       fireEvent.click(await screen.findByTestId("developer-seats-stepper-plus"));
       fireEvent.click(screen.getByTestId("developer-seats-stepper-plus"));
-      fireEvent.click(lastButton("Add 2 developer seats · €10/mo"));
+      fireEvent.click(lastButton("Add 2 developer seats · €8.33 today"));
       const confirm = within(await screen.findByTestId("seat-confirm-dialog"));
       fireEvent.click(
         confirm.getAllByRole("button").find((b) => /Pay|Confirm|Add/.test(b.textContent ?? ""))!,

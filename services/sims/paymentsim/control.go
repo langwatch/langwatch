@@ -20,6 +20,7 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /_sim/api/subscriptions", s.handleSubscriptions)
 	mux.HandleFunc("GET /_sim/api/checkout", s.handleSessions)
 	mux.HandleFunc("GET /_sim/api/invoices", s.handleInvoices)
+	mux.HandleFunc("GET /_sim/api/refunds", s.handleRefunds)
 	mux.HandleFunc("POST /_sim/api/catalog", s.handleCatalog)
 	mux.HandleFunc("POST /_sim/api/prices", s.handleSeedPrice)
 	mux.HandleFunc("POST /_sim/api/meters", s.handleSeedMeter)
@@ -36,6 +37,8 @@ func (s *Server) controlRoutes(mux *http.ServeMux) {
 	mux.HandleFunc("GET /checkout/{id}", s.handleCheckoutPage)
 	mux.HandleFunc("POST /checkout/{id}", s.handleCheckoutPay)
 	mux.HandleFunc("GET /portal/{id}", s.handlePortalPage)
+	mux.HandleFunc("GET /invoice/{id}", s.handleInvoicePage)
+	mux.HandleFunc("POST /invoice/{id}", s.handleInvoicePay)
 }
 
 func controlError(w http.ResponseWriter, status int, format string, args ...any) {
@@ -59,6 +62,7 @@ func (s *Server) handleStatus(w http.ResponseWriter, _ *http.Request) {
 		"webhookUrl": s.cfg.WebhookURL, "held": held, "pending": len(pending),
 		"prices": len(s.st.prices), "meters": len(s.st.meters), "customers": len(s.st.customers),
 		"subscriptions": len(s.st.subscriptions), "invoices": len(s.st.invoices), "meterEvents": len(s.st.meterEvents),
+		"refunds": len(s.st.refunds),
 	})
 }
 
@@ -135,11 +139,13 @@ func (s *Server) handleAdvance(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]int64{"now": s.now().Unix()})
 }
 
-// handleArmFailure declines the customer's next {"times"} charges (default 1; -1 is every charge).
+// handleArmFailure fails the customer's next {"times"} charges (default 1; -1 is every
+// charge) as {"kind"}: decline (default) or requires_action.
 func (s *Server) handleArmFailure(w http.ResponseWriter, r *http.Request) {
 	var in struct {
 		Customer string `json:"customer"`
 		Times    int    `json:"times"`
+		Kind     string `json:"kind"`
 	}
 	if !decode(w, r, &in) {
 		return
@@ -148,19 +154,26 @@ func (s *Server) handleArmFailure(w http.ResponseWriter, r *http.Request) {
 		controlError(w, http.StatusBadRequest, "name the customer whose charges should fail")
 		return
 	}
+	if in.Kind == "" {
+		in.Kind = faultDecline
+	}
+	if in.Kind != faultDecline && in.Kind != faultRequiresAction {
+		controlError(w, http.StatusBadRequest, "kind is %q or %q, not %q", faultDecline, faultRequiresAction, in.Kind)
+		return
+	}
 	if in.Times == 0 {
 		in.Times = 1
 	}
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.st.failPayments[in.Customer] = in.Times
+	s.st.failPayments[in.Customer], s.st.failKinds[in.Customer] = in.Times, in.Kind
 	writeJSON(w, http.StatusOK, s.st.failPayments)
 }
 
 func (s *Server) handleClearFailures(w http.ResponseWriter, _ *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	s.st.failPayments = map[string]int{}
+	s.st.failPayments, s.st.failKinds = map[string]int{}, map[string]string{}
 	writeJSON(w, http.StatusOK, s.st.failPayments)
 }
 
@@ -197,6 +210,7 @@ func (s *Server) handleComplete(w http.ResponseWriter, r *http.Request) {
 func (s *Server) handleRetry(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	s.expirePending(s.now().Unix())
 	inv := s.st.invoice(r.PathValue("id"))
 	if inv == nil || deref(inv.Status) != "open" {
 		controlError(w, http.StatusBadRequest, "no open invoice %s", r.PathValue("id"))
@@ -350,6 +364,56 @@ func (s *Server) handleCheckoutPay(w http.ResponseWriter, r *http.Request) {
 	http.Redirect(w, r, strings.ReplaceAll(sess.SuccessURL, "{CHECKOUT_SESSION_ID}", sess.ID), http.StatusSeeOther)
 }
 
+// invoicePage is the hosted invoice page: the amount, a Pay button while it is open.
+func invoicePage(inv *Invoice, errMsg string) pageData {
+	data := pageData{Title: "invoice " + deref(inv.Number), Error: errMsg, Lines: []string{
+		fmt.Sprintf("Amount due: %.2f %s", float64(inv.AmountDue)/100, strings.ToUpper(inv.Currency)),
+	}}
+	switch deref(inv.Status) {
+	case "open":
+		data.Action = "/invoice/" + inv.ID
+	case "paid":
+		data.Lines = append(data.Lines, "Paid")
+	default:
+		data.Lines = append(data.Lines, "Status: "+deref(inv.Status))
+	}
+	return data
+}
+
+func (s *Server) handleInvoicePage(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	inv := s.st.invoice(r.PathValue("id"))
+	if inv == nil || deref(inv.Status) == "draft" {
+		http.NotFound(w, r)
+		return
+	}
+	_ = pageTemplate.Execute(w, invoicePage(inv, ""))
+}
+
+// handleInvoicePay charges the invoice from its hosted page; it pays unless a fault is armed.
+func (s *Server) handleInvoicePay(w http.ResponseWriter, r *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	s.expirePending(s.now().Unix())
+	inv := s.st.invoice(r.PathValue("id"))
+	if inv == nil || deref(inv.Status) == "draft" {
+		http.NotFound(w, r)
+		return
+	}
+	if err := notOpen(inv); err != nil {
+		w.WriteHeader(err.status)
+		_ = pageTemplate.Execute(w, invoicePage(inv, err.message))
+		return
+	}
+	if err := chargeError(s.charge(inv)); err != nil {
+		w.WriteHeader(err.status)
+		_ = pageTemplate.Execute(w, invoicePage(inv, err.message))
+		return
+	}
+	http.Redirect(w, r, "/invoice/"+inv.ID, http.StatusSeeOther)
+}
+
 func (s *Server) handlePortalPage(w http.ResponseWriter, r *http.Request) {
 	s.mu.Lock()
 	portal := s.st.portals[r.PathValue("id")]
@@ -421,4 +485,20 @@ func (s *Server) handleInvoices(w http.ResponseWriter, _ *http.Request) {
 	}
 	out = newestFirst(out, func(x Invoice) int64 { return x.Created }, func(x Invoice) string { return x.ID })
 	writeJSON(w, http.StatusOK, map[string]any{"invoices": out})
+}
+
+// handleRefunds lists every refund given, newest first, with the invoice it gave back.
+func (s *Server) handleRefunds(w http.ResponseWriter, _ *http.Request) {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	type listed struct {
+		Refund
+		Invoice string `json:"invoice"`
+	}
+	out := make([]listed, 0, len(s.st.refunds))
+	for _, each := range s.st.refunds {
+		out = append(out, listed{Refund: *each, Invoice: deref(each.Invoice)})
+	}
+	out = newestFirst(out, func(x listed) int64 { return x.Created }, func(x listed) string { return x.ID })
+	writeJSON(w, http.StatusOK, map[string]any{"refunds": out})
 }

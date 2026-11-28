@@ -223,6 +223,7 @@ export const prismaTableCatalogue = {
   "ConnectedSeatChange": "ConnectedSeatChange",
   "ConnectedStatement": "ConnectedStatement",
   "LicenseRenewalClaim": "LicenseRenewalClaim",
+  "BlockedSeatChange": "BlockedSeatChange",
   "InstanceIdentity": "InstanceIdentity",
   "SelfHostedInstance": "SelfHostedInstance",
   "SelfHostedInstanceDiagnostic": "SelfHostedInstanceDiagnostic",
@@ -628,6 +629,8 @@ export const prismaModelFieldCatalogue = {
     "departmentId",
     "billingOnly",
     "disabledAt",
+    "roleVersion",
+    "lastRoleChangeId",
     "pendingSsoGrantId",
     "membershipStamp",
     "fullSeatSince",
@@ -652,6 +655,7 @@ export const prismaModelFieldCatalogue = {
     "name",
     "status",
     "source",
+    "reason",
     "idpRefused",
     "idpKind",
     "salesNotifiedAt",
@@ -3523,6 +3527,15 @@ export const prismaModelFieldCatalogue = {
     "deliveredAt",
     "licenseId"
   ],
+  "BlockedSeatChange": [
+    "id",
+    "organizationId",
+    "userId",
+    "attempt",
+    "seats",
+    "createdAt",
+    "notifiedAt"
+  ],
   "InstanceIdentity": [
     "id",
     "instanceId",
@@ -4396,6 +4409,7 @@ export const prismaRelationCatalogue = {
   "ConnectedSeatChange": {},
   "ConnectedStatement": {},
   "LicenseRenewalClaim": {},
+  "BlockedSeatChange": {},
   "InstanceIdentity": {},
   "SelfHostedInstance": {},
   "SelfHostedInstanceDiagnostic": {},

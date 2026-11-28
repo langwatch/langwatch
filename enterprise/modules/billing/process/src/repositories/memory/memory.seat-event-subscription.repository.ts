@@ -5,6 +5,7 @@ import {
 import { generate } from "@langwatch/ksuid";
 import { type Instant, nowInstant, Temporal } from "@langwatch/time";
 
+import { refuseSecondLivePlan } from "../../rules/one-live-plan.rules.ts";
 import type { KeptSeats } from "../../rules/seat-kept.rules.ts";
 import {
   SeatEventSubscriptionRepository,
@@ -16,6 +17,7 @@ import {
   type SeatRepairRecord,
   type SeatRepairRow,
   type SeatSubscriptionRow,
+  type ActivePlanRow,
 } from "../seat-event-subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
 
@@ -40,14 +42,42 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
           (subscription.status === "ACTIVE" || subscription.status === "CANCELLED"),
       )
       .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
-      .map(({ id, status, stripeSubscriptionId, maxMembers, seatsKept, seatsKeptUntil }) => ({
+      .map(({ id, status, stripeSubscriptionId, maxMembers, seatsKept, seatsKeptUntil, plan }) => ({
         id,
         status,
         stripeSubscriptionId,
         maxMembers,
         seatsKept,
         seatsKeptUntil,
+        plan,
+        customLimits: this.store.customLimitSubscriptions.has(id),
       }));
+  }
+
+  async findActivePlans({ organizationId }: { organizationId: string }): Promise<ActivePlanRow[]> {
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === organizationId && subscription.status === "ACTIVE",
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
+      .map(({ id, plan, stripeSubscriptionId }) => ({
+        id,
+        plan,
+        stripeSubscriptionId,
+        customLimits: this.store.customLimitSubscriptions.has(id),
+      }));
+  }
+
+  async supersedeStrayRows({ ids }: { ids: string[] }): Promise<void> {
+    this.store.subscriptions.forEach((subscription, index) => {
+      if (!ids.includes(subscription.id) || subscription.status !== "ACTIVE") return;
+      this.store.subscriptions[index] = {
+        ...subscription,
+        status: "CANCELLED",
+        endDate: nowInstant(),
+      };
+    });
   }
 
   async cancelPendingSeatCheckouts({
@@ -127,7 +157,7 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
     const index = this.store.subscriptions.findIndex((subscription) => subscription.id === id);
     const current = this.store.subscriptions[index];
     if (!current) throw new Error(`No subscription "${id}" exists.`);
-    this.store.subscriptions[index] = {
+    const reactivated = {
       ...current,
       status: "ACTIVE",
       maxMembers,
@@ -135,6 +165,8 @@ export class MemorySeatEventSubscriptionRepository extends SeatEventSubscription
       seatsKept: kept?.seats ?? null,
       seatsKeptUntil: kept?.until ?? null,
     };
+    refuseSecondLivePlan({ rows: this.store.subscriptions, written: reactivated });
+    this.store.subscriptions[index] = reactivated;
     this.store.seatLineTargets.set(id, { quantity: maxMembers, at: nowInstant() });
     const pending = this.store.seatRepairs.get(id);
     if (pending && Temporal.Instant.compare(pending.since, repairsUpTo) <= 0) {

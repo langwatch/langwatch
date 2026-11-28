@@ -375,6 +375,7 @@ export class PaymentRecoveryService {
         pdfUrl: null,
         hostedUrl: null,
         card: null,
+        seatPurchase: null,
       };
     }
   }

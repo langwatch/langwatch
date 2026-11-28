@@ -14,7 +14,8 @@ export type SeatCommit = {
   quotedAt: number | undefined;
   developer: { quantity: number; quotedAt: number | undefined } | undefined;
   emails: string[];
-  successTitle: string;
+  /** The toast once done; none when the drawer says so itself. */
+  successTitle: string | undefined;
 };
 
 /** How a commit ended: all done, refused before anything changed, or changed but not invited. */
@@ -27,6 +28,11 @@ type CreateInvites = (input: {
     role: OrganizationUserRole;
     teams?: { teamId: string; role: TeamUserRole }[];
   }[];
+}) => Promise<unknown>;
+
+type CheckInvites = (input: {
+  organizationId: string;
+  invites: { email: string; role: OrganizationUserRole }[];
 }) => Promise<unknown>;
 
 type SetDeveloperSeats = (input: {
@@ -75,6 +81,37 @@ async function sendInvites({
   }
 }
 
+/**
+ * Asks the server whether these addresses can be invited before a seat is bought for them: an
+ * address that already belongs to a member is refused here, so nothing is charged for it.
+ */
+async function invitesAccepted({
+  host,
+  checkInvites,
+  organizationId,
+  emails,
+}: {
+  host: BillingHostApi;
+  checkInvites: CheckInvites;
+  organizationId: string;
+  emails: string[];
+}): Promise<boolean> {
+  if (emails.length === 0) return true;
+  try {
+    await checkInvites({
+      organizationId,
+      invites: emails.map((email) => ({
+        email: email.toLowerCase(),
+        role: OrganizationUserRole.MEMBER,
+      })),
+    });
+    return true;
+  } catch (error) {
+    host.failed({ error, fallbackTitle: "Couldn't add these people" });
+    return false;
+  }
+}
+
 /** Changes the Developer seats; a refusal is reported and answers false. */
 async function changeDeveloperSeats({
   host,
@@ -100,10 +137,14 @@ async function changeDeveloperSeats({
   }
 }
 
-/** The full seats first, then Developer seats, then the invites; stops at the first refusal. */
+/**
+ * The invitations are asked first, then the full seats, then Developer seats, then the invites
+ * are sent; stops at the first refusal, so a refused invitation buys no seat.
+ */
 async function commitChange({
   host,
   change,
+  check,
   commitSeats,
   setDeveloperSeats,
   send,
@@ -112,12 +153,14 @@ async function commitChange({
 }: {
   host: BillingHostApi;
   change: SeatCommit;
+  check: (emails: string[]) => Promise<boolean>;
   commitSeats: (input: { newSeats: number; quotedAt: number | undefined }) => Promise<boolean>;
   setDeveloperSeats: SetDeveloperSeats;
   send: (emails: string[]) => Promise<boolean>;
   organizationId: string;
   onChanged: () => void;
 }): Promise<SeatCommitOutcome> {
+  if (!(await check(change.emails))) return "refused";
   const seatsChanged =
     change.seats === undefined ||
     (await commitSeats({ newSeats: change.seats, quotedAt: change.quotedAt }));
@@ -137,7 +180,7 @@ async function commitChange({
   const invited = await send(change.emails);
   onChanged();
   if (!invited) return "notInvited";
-  host.succeeded({ title: change.successTitle });
+  if (change.successTitle) host.succeeded({ title: change.successTitle });
   return "committed";
 }
 
@@ -155,6 +198,7 @@ export function useSeatPurchase({
 }) {
   const host = useBillingHost();
   const createInvites = billingApi.invite.createInvites.useMutation();
+  const checkInvites = billingApi.invite.checkInvites.useMutation();
   const setDeveloperSeats = billingApi.subscription.setDeveloperSeats.useMutation();
 
   const send = (orgId: string, emails: string[]) =>
@@ -181,6 +225,13 @@ export function useSeatPurchase({
       ? commitChange({
           host,
           change,
+          check: (emails) =>
+            invitesAccepted({
+              host,
+              checkInvites: checkInvites.mutateAsync,
+              organizationId,
+              emails,
+            }),
           commitSeats,
           setDeveloperSeats: setDeveloperSeats.mutateAsync,
           send: (emails) => send(organizationId, emails),
@@ -192,6 +243,6 @@ export function useSeatPurchase({
   return {
     invite,
     commit,
-    isWorking: createInvites.isPending || setDeveloperSeats.isPending,
+    isWorking: createInvites.isPending || checkInvites.isPending || setDeveloperSeats.isPending,
   };
 }

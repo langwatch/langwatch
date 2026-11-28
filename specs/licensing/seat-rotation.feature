@@ -559,7 +559,7 @@ Feature: Seat rotation
     Scenario: During a lowered period the seat drawer starts from the billed seats
       Given an organization lowered its seats from 5 to 3 and keeps 5 until 1 Dec
       When an administrator adds one seat in the seat drawer
-      Then the summary reads "Seats 3 → 4" with nothing due today
+      Then the summary reads "1 more full seat" with nothing due today
       And the button reads "Add 1 seat"
 
     @integration

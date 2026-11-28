@@ -111,6 +111,10 @@ export interface MemoryOrganizationUserRow {
   seatPendingSince?: Instant | null;
   /** A Billing-only member (ADR-205). */
   billingOnly?: boolean;
+  /** Moved by one on every role write; absent reads as 0. */
+  roleVersion?: number;
+  /** The paid role change the newest role write applied; null or absent for a direct write. */
+  lastRoleChangeId?: string | null;
 }
 
 /** One person, the fields the membership repository joins against. */

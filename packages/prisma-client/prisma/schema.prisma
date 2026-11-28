@@ -1105,6 +1105,16 @@ model OrganizationUser {
   /// seat-reconciliation.feature.
   disabledAt DateTime?
 
+  /// Moved by one on every role write. A role change waiting on a seat payment keeps the
+  /// version it was asked at and applies only while it still holds, so a later role
+  /// write always wins. See role-change-seat.feature.
+  roleVersion Int @default(0)
+
+  /// The paid role change the newest role write applied, written with the version bump; null
+  /// after a direct role write. A retry that finds the version moved by its own change
+  /// settles it applied. See role-change-seat.feature.
+  lastRoleChangeId String?
+
   /// Stable grant intent for an unfinished automatic SSO admission.
   /// Cleared after the authoritative grant is observed; never inferred from missing access.
   pendingSsoGrantId String?
@@ -1162,8 +1172,11 @@ model SeatRequest {
   name             String?
   /// OPEN | APPROVED | DECLINED
   status           String
-  /// pending | lite | idp_refused: how the person was left when the request opened.
+  /// pending | lite | idp_refused | requested: how the person was left when the request opened,
+  /// or `requested` when a Lite Member pressed Request access.
   source           String
+  /// What a member who pressed Request access was trying to do; null for arrivals.
+  reason           String?
   /// The identity provider also refused this person's sign-in.
   idpRefused       Boolean   @default(false)
   /// okta | entra | google | onelogin | jumpcloud | ping | auth0 | oidc | saml
@@ -4900,6 +4913,9 @@ model Subscription {
   organization Organization @relation(fields: [organizationId], references: [id])
   invoices     Invoice[]
 
+  // One live Stripe-backed plan per organization, raw SQL in
+  // 20261127180500_subscription_one_live_stripe_plan because Prisma cannot
+  // express a partial unique index: "Subscription_one_live_stripe_plan_key".
   @@index([organizationId])
 }
 
@@ -8037,6 +8053,23 @@ model LicenseRenewalClaim {
   deliveredAt          DateTime?
   /// The `licenseId` inside the delivered licence.
   licenseId            String?
+}
+
+/// A seat change billing refused because the organization held two live subscriptions,
+/// kept until the admin who tried is told once that billing works again.
+model BlockedSeatChange {
+  id             String    @id @default(nanoid())
+  organizationId String
+  userId         String
+  /// What was tried: { kind: "role_change", memberName, role } or { kind: "seat_purchase", seats }.
+  attempt        Json
+  /// The seats the change needs beyond the plan's current ones.
+  seats          Int
+  createdAt      DateTime  @default(now())
+  /// When the admin was emailed; null while the change still waits.
+  notifiedAt     DateTime?
+
+  @@index([organizationId])
 }
 
 /// The identity this install presents to LangWatch (ADR-139, section 2).

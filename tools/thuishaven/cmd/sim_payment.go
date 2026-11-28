@@ -10,7 +10,7 @@ import (
 	"strings"
 )
 
-const paymentUsage = "usage: haven sim payment <status|customers|subscriptions|checkouts|invoices|list|usage|complete <checkout id>|retry <invoice id>|advance --seconds <n>|fault --customer <id> [--times <n>]|fault off|deliver --ids <a,b> [--secret <s>]|hold|release|clear> [--json]"
+const paymentUsage = "usage: haven sim payment <status|customers|subscriptions|checkouts|invoices|refunds|list|usage|complete <checkout id>|retry <invoice id>|advance --seconds <n>|fault --customer <id> [--times <n>] [--kind decline|requires_action]|fault off|deliver --ids <a,b> [--secret <s>]|hold|release|clear> [--json]"
 
 // runPayment is `haven sim payment <verb>`: paymentsim's control API from a terminal.
 func runPayment(_ context.Context, d deps, inv invocation) error {
@@ -38,7 +38,7 @@ func runPayment(_ context.Context, d deps, inv invocation) error {
 	switch inv.args[0] {
 	case "status":
 		return simGet(api, "/_sim/api/status", nil, asJSON, printOutboundDoc)
-	case "customers", "subscriptions", "invoices":
+	case "customers", "subscriptions", "invoices", "refunds":
 		return simGet(api, "/_sim/api/"+inv.args[0], nil, asJSON, printOutboundDoc)
 	case "checkouts":
 		return simGet(api, "/_sim/api/checkout", nil, asJSON, printOutboundDoc)
@@ -71,7 +71,7 @@ func runPayment(_ context.Context, d deps, inv invocation) error {
 		return post("/_sim/api/clock/advance", map[string]int64{"seconds": seconds})
 	case "fail":
 		times, _ := strconv.Atoi(inv.value("--times"))
-		return post("/_sim/api/payment-failures", map[string]any{"customer": inv.value("--customer"), "times": times})
+		return post("/_sim/api/payment-failures", map[string]any{"customer": inv.value("--customer"), "times": times, "kind": inv.value("--kind")})
 	case "deliver":
 		return post("/_sim/api/events/deliver", map[string]any{"ids": strings.Split(inv.value("--ids"), ","), "signingSecret": inv.value("--secret")})
 	case "hold", "release":

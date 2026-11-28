@@ -2347,6 +2347,16 @@ const presentations = {
     title: "You can't remove yourself from the organization",
     describe: () => "Ask another organization admin to make this change.",
   },
+  seat_request_full_member: {
+    title: "You already have a full seat",
+    describe: () =>
+      "Nothing to request. If something is still refused, reload the page, or ask an organization admin which role you need.",
+  },
+  seat_request_no_email: {
+    title: "Your account has no email address",
+    describe: () =>
+      "A seat request is answered by email. Ask an organization admin to give you a full seat directly.",
+  },
   seat_request_not_found: {
     title: "This seat request is no longer open",
     describe: () =>
@@ -2355,6 +2365,25 @@ const presentations = {
   seat_change_busy: {
     title: "Another seat change is in progress",
     describe: () => "Try again in a moment.",
+  },
+  seat_change_needs_support: {
+    title: "Contact support to change seats",
+    describe: () =>
+      "Your plan was set up with our team, so seats change through us. Contact support and we'll update it; nothing was charged.",
+  },
+  seat_checkout_required: {
+    title: "Finish adding seats in checkout",
+    describe: () =>
+      "Your plan isn't connected to card payments yet. Continue to checkout to pay for the seats; your plan stays as it is.",
+  },
+  seat_payment_unavailable: {
+    title: "We couldn't open the seat payment",
+    describe: () => "Nothing was charged and no role changed. Try again in a few minutes.",
+  },
+  seat_payment_waiting: {
+    title: "A seat payment is already waiting",
+    describe: () =>
+      "Another seat is waiting on its payment. Finish or cancel that one first, then try again.",
   },
   member_seat_limit_reached: {
     title: "All member seats are in use",
@@ -3020,6 +3049,11 @@ const presentations = {
     title: "Enter something to search for",
     describe: () => "Type a search query or pick a tenant, then search the event log again.",
   },
+  ops_subscription_already_active: {
+    // An organization holds one active plan; a second leaves seat changes unable to pick one.
+    title: "This organization already has an active subscription",
+    describe: () => "Nothing was saved. Edit that one, or cancel it first.",
+  },
   ops_impersonated_operator_refused: {
     // The audit trail would name the account being impersonated, not the
     // person doing the work, which is why this is refused rather than allowed.
@@ -3601,7 +3635,7 @@ const presentations = {
     // and that is the first thing the customer wants to know on a money path.
     title: "Seat changes need a hand from us",
     describe: () =>
-      "This account has more than one active plan, so we didn't change anything or charge you. Contact support and we'll sort it out.",
+      "Nothing was charged and nothing changed. Our team has to sort out your plan first. Contact support if it can't wait.",
   },
   subscription_not_linked: {
     // fault: platform. The plan is active but our record of it was never

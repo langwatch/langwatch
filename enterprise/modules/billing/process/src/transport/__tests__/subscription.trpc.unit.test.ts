@@ -31,6 +31,8 @@ const listInvoices = vi.fn<BillingSubscriptionApi["listInvoices"]>();
 const developerSeats = vi.fn<BillingSubscriptionApi["developerSeats"]>();
 const previewDeveloperSeats = vi.fn<BillingSubscriptionApi["previewDeveloperSeats"]>();
 const setDeveloperSeats = vi.fn<BillingSubscriptionApi["setDeveloperSeats"]>();
+const seatOffer = vi.fn<BillingSubscriptionApi["seatOffer"]>();
+const recordBlockedSeatPurchase = vi.fn<BillingSubscriptionApi["recordBlockedSeatPurchase"]>();
 const paymentRecovery = vi.fn<BillingSubscriptionApi["paymentRecovery"]>();
 const paymentRecoveryDetails = vi.fn<BillingSubscriptionApi["paymentRecoveryDetails"]>();
 const paymentRecoveryPayLink = vi.fn<BillingSubscriptionApi["paymentRecoveryPayLink"]>();
@@ -50,6 +52,8 @@ const billing: BillingSubscriptionApi = {
   developerSeats,
   previewDeveloperSeats,
   setDeveloperSeats,
+  seatOffer,
+  recordBlockedSeatPurchase,
 };
 
 const trpc = initTRPC.context<BillingTrpcTestContext>().create();
@@ -97,6 +101,8 @@ describe("given the mounted subscription router", () => {
         "previewDeveloperSeats",
         "previewProration",
         "prospective",
+        "recordBlockedSeatPurchase",
+        "seatOffer",
         "setDeveloperSeats",
       ]);
     });
@@ -122,6 +128,8 @@ describe("given the mounted subscription router", () => {
         previewDeveloperSeats: "query",
         previewProration: "query",
         prospective: "mutation",
+        recordBlockedSeatPurchase: "mutation",
+        seatOffer: "query",
         setDeveloperSeats: "mutation",
       });
     });
@@ -220,6 +228,13 @@ describe("given a member who may upgrade but not manage the organization", () =>
     expect(updateSubscriptionItems).not.toHaveBeenCalled();
   });
 
+  it("is refused recording a blocked seat purchase", async () => {
+    await expect(
+      member.recordBlockedSeatPurchase({ organizationId: ORGANIZATION, seats: 1 }),
+    ).rejects.toMatchObject({ cause: { code: "permission_denied" } });
+    expect(recordBlockedSeatPurchase).not.toHaveBeenCalled();
+  });
+
   it("is refused a Developer seat change", async () => {
     await expect(
       member.setDeveloperSeats({ organizationId: ORGANIZATION, quantity: 2 }),
@@ -300,9 +315,27 @@ describe("when the seat and volume lines are raised on a live subscription", () 
       totalMembers: 9,
       totalTraces: 0,
       quotedAt: 1_700_000_000,
+      requestedBy: { userId: "user_ana" },
     });
     // No customer is resolved for a subscription that already exists.
     expect(getOrCreateCustomerId).not.toHaveBeenCalled();
+  });
+});
+
+describe("when Manage seats is held by two live subscriptions", () => {
+  /** @scenario "A seat purchase held by two live subscriptions is kept for the admin who tried" */
+  it("keeps the attempt for the signed-in admin", async () => {
+    recordBlockedSeatPurchase.mockResolvedValue({ recorded: true });
+
+    await expect(
+      caller.recordBlockedSeatPurchase({ organizationId: ORGANIZATION, seats: 2 }),
+    ).resolves.toEqual({ recorded: true });
+
+    expect(recordBlockedSeatPurchase).toHaveBeenCalledWith({
+      organizationId: ORGANIZATION,
+      seats: 2,
+      userId: "user_ana",
+    });
   });
 });
 

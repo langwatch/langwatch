@@ -48,6 +48,23 @@ export abstract class StripeSubscriptionsChannel {
     subscriptionId: string;
   }): Promise<BillingSubscriptionCheckout[]>;
 
+  /**
+   * Expires the customer's open checkout sessions whose client reference is one of
+   * `clientReferenceIds`, so they can no longer be paid. Answers the expired session ids.
+   */
+  abstract expireOpenCheckouts(input: {
+    customerId: string;
+    clientReferenceIds: string[];
+  }): Promise<string[]>;
+
+  /**
+   * Gives back what the subscription's latest invoice took: voids it while open, refunds its
+   * payment once paid. Answers which, or `nothing` when there was nothing to give back.
+   */
+  abstract refundLatestInvoice(input: {
+    subscriptionId: string;
+  }): Promise<"voided" | "refunded" | "nothing">;
+
   abstract createBillingPortalSession(input: {
     customerId: string;
     returnUrl: string;

@@ -95,6 +95,8 @@ function overTheProvider(): StripeSubscriptionsChannel {
     if (!subscription) throw missing(`No such subscription: '${id}'`);
     return subscription;
   };
+  const sessions: { id: string; customer: string; client_reference_id: string; status: string }[] =
+    [];
   const stripe = stripeDouble({
     subscriptions: {
       retrieve: async (id: string) => find(id),
@@ -107,7 +109,26 @@ function overTheProvider(): StripeSubscriptionsChannel {
     },
     checkout: {
       sessions: {
-        create: async () => ({ url: "https://checkout.stripe.com/c/pay/cs_1" }),
+        create: async (raw?: unknown) => {
+          const params = raw as { customer: string; client_reference_id: string };
+          const id = `cs_open_${sessions.length + 1}`;
+          sessions.push({ id, ...params, status: "open" });
+          return { id, url: `https://checkout.stripe.com/c/pay/${id}` };
+        },
+        list: async (raw?: unknown) => {
+          const { customer, status } = raw as { customer: string; status: string };
+          return {
+            object: "list",
+            has_more: false,
+            data: sessions.filter((s) => s.customer === customer && s.status === status),
+          };
+        },
+        expire: async (id: string) => {
+          const session = sessions.find((s) => s.id === id && s.status === "open");
+          if (!session) throw missing(`No open checkout.session: '${id}'`);
+          session.status = "expired";
+          return session;
+        },
         listLineItems: async (id: string) => {
           if (id !== "cs_1") throw missing(`No such checkout.session: '${id}'`);
           return { object: "list", data: LINE_ITEMS, has_more: false };
@@ -192,6 +213,25 @@ describe.each(tiers)("Stripe subscriptions over $tier", ({ compose }) => {
 
       expect(checkout.url).toMatch(/^https:\/\//);
       expect(portal.url).toMatch(/^https:\/\//);
+    });
+  });
+
+  describe("given two open checkouts and one of them abandoned", () => {
+    /** @scenario "An abandoned seat checkout can no longer be paid" */
+    it("expires only the abandoned one, once", async () => {
+      const subscriptions = compose();
+      await subscriptions.createCheckoutSession(CHECKOUT);
+      await subscriptions.createCheckoutSession({
+        ...CHECKOUT,
+        clientReferenceId: "subscription_setup_sub_2",
+      });
+      const abandoned = { customerId: "cus_1", clientReferenceIds: ["subscription_setup_sub_1"] };
+
+      await expect(subscriptions.expireOpenCheckouts(abandoned)).resolves.toHaveLength(1);
+      await expect(subscriptions.expireOpenCheckouts(abandoned)).resolves.toEqual([]);
+      await expect(
+        subscriptions.expireOpenCheckouts({ ...abandoned, customerId: "cus_other" }),
+      ).resolves.toEqual([]);
     });
   });
 
@@ -502,8 +542,14 @@ describe("Billing's subscription shapes over the provider", () => {
       },
     });
 
-    // The tax is what the invoice adds on top of its pre-tax total.
-    expect(preview).toEqual({ total: 1500, amountDue: 1500, tax: 260, currency: "usd" });
+    // The tax is what the invoice adds on top of its pre-tax total; prorations sum the proration lines.
+    expect(preview).toEqual({
+      total: 1500,
+      amountDue: 1500,
+      tax: 260,
+      prorations: 100,
+      currency: "usd",
+    });
     expect(calls).toEqual([
       {
         operation: "invoices.createPreview",
@@ -574,6 +620,43 @@ describe("Billing's subscription shapes over the provider", () => {
       { priceId: null, quantity: null },
     ]);
   });
+
+  /** @scenario "Two paid seat checkouts keep one plan" */
+  it.each([
+    {
+      invoice: { id: "in_1", status: "paid", amount_paid: 2500, payment_intent: "pi_1" },
+      outcome: "refunded",
+      call: { operation: "refunds.create", args: [{ payment_intent: "pi_1" }] },
+    },
+    {
+      invoice: { id: "in_1", status: "open", amount_paid: 0, payment_intent: "pi_1" },
+      outcome: "voided",
+      call: { operation: "invoices.voidInvoice", args: ["in_1"] },
+    },
+  ])(
+    "gives back a $invoice.status latest invoice as $outcome",
+    async ({ invoice, outcome, call }) => {
+      const calls: { operation: string; args: unknown[] }[] = [];
+      const record =
+        (operation: string) =>
+        async (...args: unknown[]) => {
+          calls.push({ operation, args });
+          return {};
+        };
+      const stripe = stripeDouble({
+        subscriptions: { retrieve: async () => ({ ...ACTIVE, latest_invoice: invoice }) },
+        invoices: { voidInvoice: record("invoices.voidInvoice") },
+        refunds: { create: record("refunds.create") },
+      });
+
+      await expect(
+        HttpStripeSubscriptionsChannel.create({ stripe }).refundLatestInvoice({
+          subscriptionId: "sub_1",
+        }),
+      ).resolves.toBe(outcome);
+      expect(calls).toEqual([call]);
+    },
+  );
 
   /** @scenario "The line's creation and the subscription's end are read off Stripe" */
   it("reads when each line was created and when the subscription ended", async () => {

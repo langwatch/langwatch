@@ -317,6 +317,7 @@ export class BillingSubscriptionService {
     currency,
     billingInterval,
     retentionDays,
+    successPath,
   }: {
     organizationId: string;
     baseUrl: string;
@@ -325,6 +326,7 @@ export class BillingSubscriptionService {
     currency?: Currency;
     billingInterval?: BillingInterval;
     retentionDays?: number;
+    successPath?: string;
   }): Promise<{ url: string | null; subscriptionId: string }> {
     if (!this.seatEventService) {
       throw new SeatBillingUnavailableError();
@@ -341,6 +343,7 @@ export class BillingSubscriptionService {
       membersToAdd,
       isUpgradeFromTiered: pricingModel === "TIERED",
       ...(retentionDays === undefined ? {} : { retentionDays }),
+      ...(successPath ? { successPath } : {}),
     });
   }
 

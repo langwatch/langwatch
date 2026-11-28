@@ -2,6 +2,7 @@
 
 import { GrantScopeTier } from "@langwatch/authz-contract";
 import { Link } from "@langwatch/browser-host/link";
+import { Banner, BannerAction } from "@langwatch/design-system/banner";
 import {
   Badge,
   Box,
@@ -13,16 +14,20 @@ import {
 } from "@langwatch/design-system/primitives";
 import { SettingsSectionRow } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
+import { withArticle } from "@langwatch/enterprise-billing-contract";
 import { X } from "lucide-react";
-import { type ReactNode, useEffect, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
+import { SeatRoleOffer } from "../../behavior/lent-seat-role-offer.tsx";
 import {
   api,
   type OrganizationApiMap,
   type RouterOutputs,
 } from "../../behavior/organization-api.ts";
 import { useOrganizationToaster, useShowErrorToast } from "../../behavior/organization-feedback.ts";
+import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
+import { type SeatRoleChanged, useSeatRoleChange } from "../../behavior/use-seat-role-change.ts";
 import { directoryOwnershipCopy } from "../../model/group-source.ts";
 import { BILLING_ONLY_SEAT, type InviteSeat } from "../../model/member-invite-form.ts";
 import { OrganizationUserRole, TeamUserRole } from "../../model/prisma-types.ts";
@@ -30,6 +35,7 @@ import { IdentityChip } from "../elements/identity-row.tsx";
 import {
   OrganizationUserRoleField,
   orgRoleOptions,
+  seatLabel,
 } from "../elements/organization-user-role-field.tsx";
 import {
   GrantInputRow,
@@ -187,12 +193,14 @@ export function MemberAccessEditor({
   canManage: boolean;
   isCurrentUser: boolean;
 }) {
+  const { organization } = useOrganizationTeamProject();
   const editor = useMemberAccessEditor({
     organizationId,
     userId,
     memberRole,
     memberBillingOnly,
     canManage,
+    canChangeRole: canManage && !isCurrentUser,
   });
 
   return (
@@ -209,9 +217,19 @@ export function MemberAccessEditor({
           ) : (
             <OrganizationUserRoleField<InviteSeat>
               value={editor.pendingSeat}
-              onChange={editor.setPendingSeat}
+              onChange={editor.pickSeat}
+              disabled={editor.seatChangeInFlight}
               roles={seatsOffered({ memberBillingOnly })}
             />
+          )}
+          {editor.showSeatPanel && (
+            <Box marginTop={3}>
+              <SeatRolePanel
+                organizationId={organizationId}
+                organizationName={organization?.name ?? "Your organization"}
+                editor={editor}
+              />
+            </Box>
           )}
         </Box>
       )}
@@ -226,6 +244,7 @@ export function MemberAccessEditor({
             staged={editor.pendingGrantAdditions}
             removals={editor.pendingGrantRemovals}
             seat={memberRole}
+            locked={editor.seatChangeInFlight}
             onToggle={(id) => editor.setPendingGrantRemovals((prev) => toggled({ set: prev, id }))}
             onUndo={(index) =>
               editor.setPendingGrantAdditions((prev) => prev.filter((_, j) => j !== index))
@@ -239,6 +258,7 @@ export function MemberAccessEditor({
               onReadyChange={editor.setHasDraftGrant}
               organizationRole={editor.pendingRole}
               buttonLabel="Assign role"
+              disabled={editor.seatChangeInFlight}
             />
           </NoAccessNote>
         </Box>
@@ -253,17 +273,23 @@ export function MemberAccessEditor({
 
       {canManage && (
         <HStack justifyContent="flex-end" gap={2}>
-          <Button variant="outline" disabled={!editor.hasChanges} onClick={editor.reset}>
+          <Button
+            variant="outline"
+            disabled={!editor.hasChanges || editor.seatChangeInFlight}
+            onClick={editor.reset}
+          >
             Cancel
           </Button>
-          <Button
-            colorPalette="accent"
-            disabled={!editor.hasChanges}
-            loading={editor.isSaving}
-            onClick={() => void editor.handleSave()}
-          >
-            Save
-          </Button>
+          {editor.seatPurchaseOffered ? null : (
+            <Button
+              colorPalette="accent"
+              disabled={!editor.hasChanges || editor.isSaving}
+              loading={editor.isSaving}
+              onClick={() => void editor.handleSave()}
+            >
+              Save
+            </Button>
+          )}
         </HStack>
       )}
     </VStack>
@@ -310,6 +336,7 @@ function DirectAssignments({
   staged,
   removals,
   seat,
+  locked,
   onToggle,
   onUndo,
 }: {
@@ -317,6 +344,8 @@ function DirectAssignments({
   staged: PendingGrant[];
   removals: ReadonlySet<string>;
   seat: OrganizationUserRole;
+  /** A paid seat change in flight saves these rows as they stand. */
+  locked: boolean;
   onToggle: (grantId: string) => void;
   onUndo: (index: number) => void;
 }) {
@@ -363,6 +392,7 @@ function DirectAssignments({
                 variant="ghost"
                 color={marked ? "accent.fg" : "fg.muted"}
                 aria-label={marked ? "Undo removal" : "Remove assignment"}
+                disabled={locked}
                 onClick={() => onToggle(b.id)}
               >
                 <X size={14} />
@@ -389,6 +419,7 @@ function DirectAssignments({
             variant="ghost"
             color="fg.muted"
             aria-label="Undo add"
+            disabled={locked}
             onClick={() => onUndo(i)}
           >
             <X size={14} />
@@ -494,18 +525,150 @@ function seatsOffered({ memberBillingOnly }: { memberBillingOnly: boolean }): In
     .filter((seat) => memberBillingOnly || seat !== BILLING_ONLY_SEAT);
 }
 
+/**
+ * After a paid role change: the staged rows go as one batch (a refused role keeps them unsaved,
+ * since they were staged against the new role), then what it touched is read back. Save stays
+ * busy throughout.
+ */
+async function saveAfterPaidRole({
+  roleChanged,
+  setIsSaving,
+  applyStagedGrants,
+  refresh,
+  onBatchFailed,
+}: {
+  roleChanged: boolean;
+  setIsSaving: (saving: boolean) => void;
+  applyStagedGrants: () => Promise<void>;
+  refresh: () => Promise<unknown>;
+  onBatchFailed: (error: unknown) => void;
+}): Promise<void> {
+  setIsSaving(true);
+  try {
+    if (roleChanged) await applyStagedGrants().catch(onBatchFailed);
+    await refresh();
+  } finally {
+    setIsSaving(false);
+  }
+}
+
+/**
+ * One staged batch: a sent batch leaves the staging, a failed one stages its flushed draft again
+ * for the retry. Only the member still open has its staging changed.
+ */
+async function sendStagedBatch({
+  send,
+  stillOpen,
+  uncommitted,
+  removed,
+  added,
+  setPendingGrantRemovals,
+  setPendingGrantAdditions,
+}: {
+  send: () => Promise<unknown>;
+  stillOpen: () => boolean;
+  uncommitted: PendingGrant | null;
+  removed: Set<string>;
+  added: PendingGrant[];
+  setPendingGrantRemovals: (update: (staged: Set<string>) => Set<string>) => void;
+  setPendingGrantAdditions: (update: (staged: PendingGrant[]) => PendingGrant[]) => void;
+}): Promise<void> {
+  try {
+    await send();
+  } catch (error) {
+    if (uncommitted && stillOpen()) {
+      setPendingGrantAdditions((prev) => withStaged({ staged: prev, grant: uncommitted }));
+    }
+    throw error;
+  }
+  if (!stillOpen()) return;
+  setPendingGrantRemovals((prev) => new Set([...prev].filter((id) => !removed.has(id))));
+  setPendingGrantAdditions((prev) => prev.filter((grant) => !added.includes(grant)));
+}
+
+/** The staged rows follow the picked seat. */
+function useStagedFollowsSeat({
+  pendingSeat,
+  setPendingGrantAdditions,
+  setHasDraftGrant,
+}: {
+  pendingSeat: InviteSeat;
+  setPendingGrantAdditions: (update: (staged: PendingGrant[]) => PendingGrant[]) => void;
+  setHasDraftGrant: (hasDraft: boolean) => void;
+}) {
+  useEffect(() => {
+    // Developer (ADR-171) and Billing only (ADR-205) hold nothing shared: every
+    // staged row and draft goes, the way the save deletes every stored one.
+    if (pendingSeat === OrganizationUserRole.DEVELOPER || pendingSeat === BILLING_ONLY_SEAT) {
+      setPendingGrantAdditions(() => []);
+      setHasDraftGrant(false);
+      return;
+    }
+    if (pendingSeat !== OrganizationUserRole.EXTERNAL) return;
+    setPendingGrantAdditions(stagedRowsForLiteSeat);
+  }, [pendingSeat, setPendingGrantAdditions, setHasDraftGrant]);
+}
+
+/** One staged row as the access batch creates it. */
+function bindingToCreate(b: PendingGrant) {
+  return { role: b.role, customRoleId: b.customRoleId, scopeType: b.scopeType, scopeId: b.scopeId };
+}
+
+/**
+ * Staged rows belong to the member they were staged for, never the next one opened. The ref it
+ * returns is set when a paid role change landed but its access batch failed: the refreshed role
+ * then keeps the staged rows, so Save retries them.
+ */
+function useResetStaged({
+  organizationId,
+  userId,
+  memberSeat,
+  reset,
+  setPendingSeat,
+}: {
+  organizationId: string;
+  userId: string;
+  memberSeat: InviteSeat;
+  reset: () => void;
+  setPendingSeat: (seat: InviteSeat) => void;
+}) {
+  const keepStagedOnRoleRefresh = useRef(false);
+  const member = memberKey({ organizationId, userId });
+  const stagedFor = useRef(member);
+  const latestReset = useRef(reset);
+  useEffect(() => {
+    latestReset.current = reset;
+  });
+  useEffect(() => {
+    const sameMember = stagedFor.current === member;
+    stagedFor.current = member;
+    const keep = sameMember && keepStagedOnRoleRefresh.current;
+    keepStagedOnRoleRefresh.current = false;
+    if (keep) setPendingSeat(memberSeat);
+    else latestReset.current();
+  }, [member, memberSeat, setPendingSeat]);
+  return keepStagedOnRoleRefresh;
+}
+
+/** One member in one organization: staging and late answers belong to this pair only. */
+function memberKey({ organizationId, userId }: { organizationId: string; userId: string }): string {
+  return `${organizationId}:${userId}`;
+}
+
 function useMemberAccessEditor({
   organizationId,
   userId,
   memberRole,
   memberBillingOnly,
   canManage,
+  canChangeRole,
 }: {
   organizationId: string;
   userId: string;
   memberRole: OrganizationUserRole;
   memberBillingOnly: boolean;
   canManage: boolean;
+  canChangeRole: boolean;
 }) {
   const toaster = useOrganizationToaster();
   const showErrorToast = useShowErrorToast();
@@ -529,8 +692,21 @@ function useMemberAccessEditor({
     setPendingGrantAdditions([]);
     setHasDraftGrant(false);
   };
-  // Staged rows belong to the member they were staged for, never the next one opened.
-  useEffect(reset, [userId, memberSeat]);
+  const keepStagedOnRoleRefresh = useResetStaged({
+    organizationId,
+    userId,
+    memberSeat,
+    reset,
+    setPendingSeat,
+  });
+  // One visit per opening of a member, so reopening the same member is a new visit: an answer
+  // for a visit since closed leaves the editor alone.
+  const thisMember = memberKey({ organizationId, userId });
+  const thisVisit = useMemo(() => ({ member: thisMember }), [thisMember]);
+  const openVisit = useRef(thisVisit);
+  useEffect(() => {
+    openVisit.current = thisVisit;
+  }, [thisVisit]);
 
   const directGrants = api.authz.listMemberGrants.useQuery(
     { organizationId, userId },
@@ -557,19 +733,9 @@ function useMemberAccessEditor({
     setPendingGrantAdditions((prev) => withStaged({ staged: prev, grant: addition }));
   };
 
-  useEffect(() => {
-    // Developer (ADR-171) and Billing only (ADR-205) hold nothing shared: every
-    // staged row and draft goes, the way the save deletes every stored one.
-    if (pendingSeat === OrganizationUserRole.DEVELOPER || pendingSeat === BILLING_ONLY_SEAT) {
-      setPendingGrantAdditions([]);
-      setHasDraftGrant(false);
-      return;
-    }
-    if (pendingSeat !== OrganizationUserRole.EXTERNAL) return;
-    setPendingGrantAdditions(stagedRowsForLiteSeat);
-  }, [pendingSeat]);
+  useStagedFollowsSeat({ pendingSeat, setPendingGrantAdditions, setHasDraftGrant });
 
-  // A role change moves the member between full and Lite seats, so seat usage is re-read too.
+  // A role change moves the member between seats and may add one: usage and caps are re-read.
   const refreshAccessQueries = () =>
     Promise.all([
       queryClient.authz.listMemberGrants.invalidate(),
@@ -579,9 +745,15 @@ function useMemberAccessEditor({
       queryClient.organization.getAll.invalidate(),
       queryClient.organization.getScopeGraph.invalidate(),
       queryClient.limits.getUsage.invalidate(),
+      queryClient.plan.getActivePlan.invalidate(),
+      queryClient.licenseEnforcement.checkLimit.invalidate(),
+      queryClient.licenseEnforcement.checkAllLimits.invalidate(),
+      queryClient.organization.listHeldSeats.invalidate(),
+      queryClient.organization.pendingSeatRoleChange.invalidate(),
     ]);
 
-  const handleSave = async () => {
+  /** The staged assignment rows as one batch, after the role they were staged against. */
+  const applyStagedGrants = async () => {
     const uncommitted =
       pendingSeat === BILLING_ONLY_SEAT ? null : (grantInputRef.current?.flush() ?? null);
     const additions = newGrantAdditions({
@@ -589,7 +761,50 @@ function useMemberAccessEditor({
       held: directGrants.data ?? [],
       removals: pendingGrantRemovals,
     });
+    if (pendingGrantRemovals.size === 0 && additions.length === 0) return;
+    await sendStagedBatch({
+      send: () =>
+        applyMemberGrants.mutateAsync({
+          organizationId,
+          userId,
+          bindingIdsToDelete: [...pendingGrantRemovals],
+          bindingsToCreate: additions.map(bindingToCreate),
+        }),
+      stillOpen: () => openVisit.current === thisVisit,
+      uncommitted,
+      removed: pendingGrantRemovals,
+      added: pendingGrantAdditions,
+      setPendingGrantRemovals,
+      setPendingGrantAdditions,
+    });
+  };
 
+  const seatPanel = useSeatRolePanel({
+    organizationId,
+    userId,
+    canChangeRole,
+    pendingSeat,
+    setPendingSeat,
+    memberSeat,
+    onChanged: async ({ teamsLeftWithoutAdmin, roleChanged }) => {
+      await saveAfterPaidRole({
+        roleChanged,
+        setIsSaving,
+        applyStagedGrants,
+        refresh: refreshAccessQueries,
+        onBatchFailed: (error) => {
+          if (openVisit.current === thisVisit) keepStagedOnRoleRefresh.current = true;
+          showErrorToast({
+            error,
+            fallbackTitle: "The role changed, but the access rows did not save",
+          });
+        },
+      });
+      return teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
+    },
+  });
+
+  const handleSave = async () => {
     setIsSaving(true);
     try {
       let teamsLeftWithoutAdmin: { name: string }[] = [];
@@ -602,19 +817,7 @@ function useMemberAccessEditor({
         // Defaulted: an older server answers without the field, after the save succeeded.
         teamsLeftWithoutAdmin = roleResult?.teamsLeftWithoutAdmin ?? [];
       }
-      if (pendingGrantRemovals.size > 0 || additions.length > 0) {
-        await applyMemberGrants.mutateAsync({
-          organizationId,
-          userId,
-          bindingIdsToDelete: [...pendingGrantRemovals],
-          bindingsToCreate: additions.map((b) => ({
-            role: b.role,
-            customRoleId: b.customRoleId,
-            scopeType: b.scopeType,
-            scopeId: b.scopeId,
-          })),
-        });
-      }
+      await applyStagedGrants();
 
       await refreshAccessQueries();
       const withoutAdmin = teamsLeftWithoutAdminLine(teamsLeftWithoutAdmin);
@@ -649,5 +852,176 @@ function useMemberAccessEditor({
     isSaving,
     stageAddition,
     handleSave,
+    memberSeat,
+    ...seatPanel,
   };
+}
+
+/** Whether the picked role needs a full seat none is free for, and the purchase that adds one. */
+function useSeatRolePanel({
+  organizationId,
+  userId,
+  canChangeRole,
+  pendingSeat,
+  setPendingSeat,
+  memberSeat,
+  onChanged,
+}: {
+  organizationId: string;
+  userId: string;
+  canChangeRole: boolean;
+  pendingSeat: InviteSeat;
+  setPendingSeat: (seat: InviteSeat) => void;
+  memberSeat: InviteSeat;
+  onChanged: (change: SeatRoleChanged) => Promise<string | undefined>;
+}) {
+  const member = api.organization.getMemberById.useQuery(
+    { organizationId, userId },
+    { enabled: canChangeRole },
+  );
+  const memberName = member.data?.user.name ?? member.data?.user.email ?? "This member";
+  const usage = api.limits.getUsage.useQuery({ organizationId }, { enabled: canChangeRole });
+  const fullSeats = usage.data?.seatLimitInfo?.members;
+  const fullSeatsTaken = fullSeats !== undefined && fullSeats.current >= fullSeats.max;
+  const needsFullSeat = takesFullSeat(pendingSeat) && !takesFullSeat(memberSeat);
+  const seat = useSeatRoleChange({
+    organizationId,
+    userId,
+    memberName,
+    enabled: canChangeRole,
+    describeRole: (role) => seatLabel({ role }),
+    onChanged,
+  });
+  const step = seat.flow.step;
+  // A refused or replaced seat change leaves the role as it is, so the picker shows the role held.
+  useEffect(() => {
+    if (step === "stuck" || step === "superseded") setPendingSeat(memberSeat);
+  }, [step, memberSeat, setPendingSeat]);
+
+  // An offer refused for two live subscriptions shows the calm state before any click.
+  const blockedOffer =
+    seat.offerKind === "blocked" && step === "idle" && needsFullSeat && fullSeatsTaken;
+  const blockedRole =
+    pendingSeat === OrganizationUserRole.ADMIN
+      ? OrganizationUserRole.ADMIN
+      : OrganizationUserRole.MEMBER;
+  useEffect(() => {
+    if (blockedOffer) seat.block({ role: blockedRole });
+  }, [blockedOffer, blockedRole, seat]);
+
+  const showSeatPanel = canChangeRole && ((needsFullSeat && fullSeatsTaken) || step !== "idle");
+  const offersPurchase =
+    seat.offerKind === "charge" ||
+    seat.offerKind === "checkout" ||
+    seat.offerKind === "blocked" ||
+    seat.offerKind === "support";
+  return {
+    memberName,
+    seat,
+    showSeatPanel,
+    // A change waiting on its payment, or still being sent, drops Save until it settles.
+    seatPurchaseOffered:
+      showSeatPanel && step !== "done" && (offersPurchase || step === "waiting" || step === "busy"),
+    // The staged batch goes as it stood when the change started, so nothing is edited meanwhile.
+    seatChangeInFlight: step === "waiting" || step === "busy",
+    pickSeat: (next: InviteSeat) => {
+      setPendingSeat(next);
+      if (step !== "waiting" && step !== "busy") seat.clear();
+    },
+  };
+}
+
+/** A refusal read mid-sentence: lower-cased first letter, no closing full stop. */
+function reasonClause(reason: string): string {
+  const trimmed = reason.trim().replace(/\.$/, "");
+  return trimmed.charAt(0).toLowerCase() + trimmed.slice(1);
+}
+
+/** Admin and Member take a full seat; Lite, Developer and Billing only do not. */
+function takesFullSeat(seat: InviteSeat): boolean {
+  return seat === OrganizationUserRole.ADMIN || seat === OrganizationUserRole.MEMBER;
+}
+
+type MemberAccessEditorState = ReturnType<typeof useMemberAccessEditor>;
+
+/** The seat a role change needs: billing's offer, the payment it waits on, or what happened. */
+function SeatRolePanel({
+  organizationId,
+  organizationName,
+  editor,
+}: {
+  organizationId: string;
+  organizationName: string;
+  editor: MemberAccessEditorState;
+}) {
+  const { flow } = editor.seat;
+  const role = flow.step === "idle" ? editor.pendingRole : flow.role;
+  const roleLabel = seatLabel({ role });
+  const currentRoleLabel = seatLabel({
+    role:
+      editor.memberSeat === BILLING_ONLY_SEAT ? OrganizationUserRole.EXTERNAL : editor.memberSeat,
+    billingOnly: editor.memberSeat === BILLING_ONLY_SEAT,
+  });
+  if (flow.step === "seat_only") {
+    return (
+      <Banner
+        status="warning"
+        title={`1 seat added and paid, but ${editor.memberName}'s role could not be changed: ${reasonClause(flow.reason)}.`}
+        data-testid="seat-role-seat-only"
+      >
+        The seat is free for anyone.
+      </Banner>
+    );
+  }
+  if (flow.step === "superseded") {
+    return (
+      <Banner
+        status="info"
+        title={`A later role change for ${editor.memberName} replaced this one, so it was not applied.`}
+        data-testid="seat-role-superseded"
+      />
+    );
+  }
+  if (flow.step === "waiting") {
+    return (
+      <Banner
+        status="info"
+        title="Waiting for the seat payment."
+        data-testid="seat-role-waiting"
+        action={
+          <BannerAction asChild>
+            <a href={flow.url} target="_blank" rel="noopener">
+              Finish paying on Stripe
+            </a>
+          </BannerAction>
+        }
+      >
+        {`${editor.memberName} becomes ${roleLabel} as soon as it is paid.`}
+      </Banner>
+    );
+  }
+  const offerState =
+    flow.step === "busy" || flow.step === "done" || flow.step === "stuck" ? flow.step : "offer";
+  return (
+    <VStack align="stretch" gap={3}>
+      {flow.step === "failed" && (
+        <Banner
+          status="error"
+          title={`The payment didn't go through, so nothing changed. ${editor.memberName} is still ${withArticle(currentRoleLabel)}.`}
+          data-testid="seat-role-failed"
+        />
+      )}
+      <SeatRoleOffer
+        organizationId={organizationId}
+        organizationName={organizationName}
+        memberName={editor.memberName}
+        roleLabel={roleLabel}
+        currentRoleLabel={currentRoleLabel}
+        state={offerState}
+        onConfirm={(quotedAt) => void editor.seat.start({ role, quotedAt })}
+        onKind={editor.seat.setOfferKind}
+        onAmountDue={editor.seat.setAmountDue}
+      />
+    </VStack>
+  );
 }

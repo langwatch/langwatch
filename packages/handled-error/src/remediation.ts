@@ -1183,6 +1183,53 @@ const registry = {
     tips: ["An update interrupted this reply; resend the message"],
   },
 
+  // ---- billing ----
+  seat_payment_unavailable: {
+    tips: [
+      "Stripe held the seat change for payment but answered no hosted invoice page; the invoice was voided",
+    ],
+  },
+  seat_payment_waiting: {
+    tips: [
+      "One seat payment waits per organization: pay or let the waiting seat invoice lapse first",
+    ],
+  },
+  seat_request_full_member: {
+    tips: [
+      "A seat request is for Lite Members: a full member refused an action is missing a permission instead",
+    ],
+  },
+  seat_request_no_email: {
+    tips: [
+      "A seat request is filed and answered by email: the account needs an email address, or an admin changes the role directly",
+    ],
+  },
+  seat_change_needs_support: {
+    tips: [
+      "The organization's active subscription is ENTERPRISE or carries limits an operator set, so no card checkout is offered",
+      "Change the seats in Ops on that subscription; billing does not adopt or close such a row on its own",
+    ],
+  },
+  seat_checkout_required: {
+    tips: [
+      "Open a seat checkout with subscription.createSeatCheckout; its completion links the existing row",
+      "The organization's only active subscription has no Stripe subscription id, usually an Ops-added row",
+    ],
+  },
+  subscription_ambiguous: {
+    tips: [
+      "Ops are alerted with the organization and both subscription ids; nothing was charged",
+      "In Ops, cancel the subscription that is not the live Stripe one, then retry the seat change",
+    ],
+  },
+
+  // ---- ops Cloud admin ----
+  ops_subscription_already_active: {
+    tips: [
+      "Keep the row linked to the live Stripe subscription; seat changes refuse while two are active",
+    ],
+  },
+
   // ---- licensing ----
   license_in_use: {
     tips: [

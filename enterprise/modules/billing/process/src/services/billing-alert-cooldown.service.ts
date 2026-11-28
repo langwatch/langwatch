@@ -62,6 +62,9 @@ export class BillingAlertCooldownService implements BillingCooldownCache {
 
 export const resourceLimitCooldown = BillingAlertCooldownService.create({ ttlMs: DAY_MS });
 
+/** A retrying seat screen alerts ops about one organization's duplicate plans once a day. */
+export const duplicateSubscriptionCooldown = BillingAlertCooldownService.create({ ttlMs: DAY_MS });
+
 /**
  * The plan-limit alert is guarded in two layers: `planLimitInFlight` is
  * synchronous and stops callers interleaving within one tick;

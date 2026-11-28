@@ -16,6 +16,7 @@ import type { CodingAgentApi } from "@langwatch/coding-agent-contract";
 import type { DashboardApi } from "@langwatch/dashboard-contract";
 import type { DataRetentionApi } from "@langwatch/data-retention-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
+import type { BillingApi } from "@langwatch/enterprise-billing-contract";
 import type { LicensingApi } from "@langwatch/enterprise-licensing-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
 import { EventSourcing, InMemoryProcessStore } from "@langwatch/eventing";
@@ -143,6 +144,7 @@ function process(
       notification: createApiFixture<NotificationApi>(),
       "stored-object": createApiFixture<StoredObjectApi>(),
       analytics: createApiFixture<AnalyticsApi>(),
+      billing: createApiFixture<BillingApi>(),
     });
 }
 

@@ -352,9 +352,12 @@ export class BillingSubscriptionLifecycleService {
   async syncInvoicePaymentSuccess({
     subscriptionId,
     throwOnMissing = false,
+    startsPlan = false,
   }: {
     subscriptionId: string;
     throwOnMissing?: boolean;
+    /** The provider subscription was just linked: the plan starts even on a row already ACTIVE. */
+    startsPlan?: boolean;
   }): Promise<void> {
     await waitForStripeConsistency();
 
@@ -388,7 +391,7 @@ export class BillingSubscriptionLifecycleService {
     const updatedSubscription = activationResult.subscription;
     const firstActivation = previousSubscription.status !== SubscriptionStatus.ACTIVE;
 
-    if (firstActivation) {
+    if (startsPlan || firstActivation) {
       await this.clearTrialLicenseIfPresent(updatedSubscription, "subscription activated");
       await this.announceSubscriptionStarted(updatedSubscription);
     }

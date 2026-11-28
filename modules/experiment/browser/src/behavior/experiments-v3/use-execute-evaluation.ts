@@ -1,7 +1,9 @@
 import { describeError, showErrorToast } from "@langwatch/browser-host/errors";
 import { fetchSSE } from "@langwatch/browser-host/fetch-sse";
+import { useLentHooks } from "@langwatch/browser-host/lent";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
+import { UpgradeModalToken } from "@langwatch/enterprise-licensing-client";
 import {
   type CellId,
   type EvaluationV3Event,
@@ -11,6 +13,7 @@ import {
   createExecutionCellSet,
 } from "@langwatch/experiment-contract";
 import type { SerializedHandledError } from "@langwatch/handled-error";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { useCallback, useMemo, useState } from "react";
 import { useShallow } from "zustand/react/shallow";
 
@@ -371,6 +374,30 @@ const requestAbort = async ({
   }
 };
 
+/** Opens licensing's restriction modal for a refused Lite Member seat, naming the resource. */
+type OpenLiteMemberRestriction = (request: { resource?: string; permission?: string }) => void;
+
+/**
+ * A run refused because the reader holds a Lite Member seat: licensing's restriction modal
+ * offers Request access, so no red toast follows. Answers whether it was that refusal.
+ */
+const reportLiteMemberRestriction = ({
+  err,
+  openLiteMemberRestriction,
+}: {
+  err: unknown;
+  openLiteMemberRestriction: OpenLiteMemberRestriction | undefined;
+}): boolean => {
+  const handled = readHandledError(err);
+  if (handled?.code !== "lite_member_restricted" || !openLiteMemberRestriction) return false;
+  const { resource, permission } = handled.meta;
+  openLiteMemberRestriction({
+    ...(typeof resource === "string" ? { resource } : {}),
+    ...(typeof permission === "string" ? { permission } : {}),
+  });
+  return true;
+};
+
 /**
  * Stream one execution's events into the hook and store, then release only
  * this execution's cells, so concurrent executions keep theirs.
@@ -380,11 +407,13 @@ const streamExecution = async ({
   executingCells,
   sink,
   onRunStarted,
+  openLiteMemberRestriction,
 }: {
   request: NonNullable<ReturnType<typeof buildExecutionRequest>>["request"];
   executingCells: Set<string>;
   sink: ExecutionSink;
   onRunStarted?: (runId: string) => void;
+  openLiteMemberRestriction?: OpenLiteMemberRestriction;
 }): Promise<void> => {
   const release = () => {
     useEvaluationsV3Store.setState((state) => ({
@@ -406,6 +435,7 @@ const streamExecution = async ({
       onError: (err) => {
         failExecution({ err, sink });
         release();
+        if (reportLiteMemberRestriction({ err, openLiteMemberRestriction })) return;
         showErrorToast({ error: err, fallbackTitle: "Couldn't run the evaluation" });
       },
     });
@@ -414,6 +444,25 @@ const streamExecution = async ({
     failExecution({ err, sink });
     release();
   }
+};
+
+/** The project a run starts in, or undefined after toasting why it cannot start. */
+const startableProjectId = ({
+  projectId,
+  hasDataset,
+}: {
+  projectId: string | undefined;
+  hasDataset: boolean;
+}): string | undefined => {
+  if (!projectId || !hasDataset) {
+    toastCannotExecute();
+    return undefined;
+  }
+  if (!readWorkbenchAccess().mayRun) {
+    toastRunNotAllowed();
+    return undefined;
+  }
+  return projectId;
 };
 
 // ============================================================================
@@ -426,6 +475,7 @@ const streamExecution = async ({
  */
 export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
   const { project } = useOrganizationTeamProject();
+  const upgradeModal = useLentHooks(UpgradeModalToken);
   const [status, setStatus] = useState<ExecutionStatus>("idle");
   const [runId, setRunId] = useState<string | null>(null);
   const [progress, setProgress] = useState({ completed: 0, total: 0 });
@@ -485,14 +535,11 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
       scope: ExecutionScope = { type: "full" },
       options?: { onRunStarted?: (runId: string) => void },
     ) => {
-      if (!project?.id || !activeDataset) {
-        toastCannotExecute();
-        return;
-      }
-      if (!readWorkbenchAccess().mayRun) {
-        toastRunNotAllowed();
-        return;
-      }
+      const projectId = startableProjectId({
+        projectId: project?.id,
+        hasDataset: Boolean(activeDataset),
+      });
+      if (projectId === undefined) return;
 
       // Reset state
       setStatus("running");
@@ -514,7 +561,7 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
           experimentSlug: experimentSlug ?? undefined,
           results: useEvaluationsV3Store.getState().results,
         },
-        projectId: project.id,
+        projectId,
         scope,
         concurrency,
       });
@@ -535,9 +582,13 @@ export const useExecuteEvaluation = (): UseExecuteEvaluationReturn => {
         executingCells: executingCellsSet,
         sink,
         onRunStarted: options?.onRunStarted,
+        openLiteMemberRestriction: upgradeModal
+          ? (request) => upgradeModal.openLiteMemberRestriction(request)
+          : undefined,
       });
     },
     [
+      upgradeModal,
       project?.id,
       activeDataset,
       datasets,

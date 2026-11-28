@@ -19,10 +19,14 @@ import {
   organizationApiAcceptInviteInputSchema,
   organizationApiCreateInvitesInputSchema,
   organizationApiInviteScopeSchema,
+  organizationApiMemberRoleSchema,
   organizationApiScopeSchema,
   organizationApiSeatCheckoutInputSchema,
   organizationSeatCheckoutRedirectSchema,
 } from "./organization.trpc-schemas.ts";
+
+/** The most invitations one seat check takes; a members page invites a handful at a time. */
+const MAX_CHECKED_INVITES = 50;
 
 export const inviteTrpc = defineTrpcContract("invite")
   .mutation("createInvites")
@@ -31,6 +35,23 @@ export const inviteTrpc = defineTrpcContract("invite")
 
   .mutation("deleteInvite")
   .withInput(organizationApiInviteScopeSchema)
+
+  /** Refuses, writing nothing, invitations a seat is about to be bought for. */
+  .mutation("checkInvites")
+  .withInput(
+    z.object({
+      organizationId: z.string().min(1),
+      invites: z
+        .array(
+          z.object({
+            email: z.string().email(),
+            role: organizationApiMemberRoleSchema,
+          }),
+        )
+        .min(1)
+        .max(MAX_CHECKED_INVITES),
+    }),
+  )
 
   .mutation("resendInvite")
   .withInput(organizationApiInviteScopeSchema)

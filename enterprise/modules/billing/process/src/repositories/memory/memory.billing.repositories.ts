@@ -13,6 +13,7 @@ import { MemoryBillingReportOrganizationRepository } from "./memory.billing-repo
 import { MemoryBillingWebhookOrganizationRepository } from "./memory.billing-webhook-organization.repository.ts";
 import { MemoryBillingWebhookSubscriptionRepository } from "./memory.billing-webhook-subscription.repository.ts";
 import { MemoryBillingStore } from "./memory.billing.store.ts";
+import { MemoryBlockedSeatChangeRepository } from "./memory.blocked-seat-change.repository.ts";
 import { MemoryConnectedBillingRepository } from "./memory.connected-billing.repository.ts";
 import { MemoryDuplicateSubscriptionsReportRepository } from "./memory.duplicate-subscriptions-report.repository.ts";
 import { MemoryLicenseRenewalClaimRepository } from "./memory.license-renewal-claim.repository.ts";
@@ -70,6 +71,7 @@ export class MemoryBillingRepositories {
     const subscriptions = MemoryBillingSubscriptionRepository.create(store);
 
     return {
+      blockedSeatChanges: MemoryBlockedSeatChangeRepository.create(),
       checkpoints: MemoryBillingCheckpointRepository.create(store),
       connectedBilling: MemoryConnectedBillingRepository.create(store),
       contractBudgets: MemoryBillingContractBudgetRepository.create(store),

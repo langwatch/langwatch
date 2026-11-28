@@ -12,8 +12,10 @@ import type { OrganizationSeatPeakRepository } from "./organization-seat-peak.re
 import type { OrganizationSeatRepository } from "./organization-seat.repository.ts";
 import type { OrganizationUserDirectoryRepository } from "./organization-user-directory.repository.ts";
 import type { OrganizationRepository } from "./organization.repository.ts";
+import type { PendingSeatRoleChangeRepository } from "./pending-seat-role-change.repository.ts";
 import type { PrivateClickHouseRoutesRepository } from "./private-clickhouse-routes.repository.ts";
 import type { PrivateS3AccountsRepository } from "./private-s3-accounts.repository.ts";
+import type { SeatApprovalPaymentRepository } from "./seat-approval-payment.repository.ts";
 import type { SeatHoldRepository } from "./seat-hold.repository.ts";
 import type { SeatRequestRepository } from "./seat-request.repository.ts";
 import type { SignUpPolicyRepository } from "./sign-up-policy.repository.ts";
@@ -36,6 +38,10 @@ export interface OrganizationRepositories {
   readonly signUpPolicy: SignUpPolicyRepository;
   /** The fixed-window counter both invitation throttles spend. */
   readonly inviteRateLimit: OrganizationInviteRateLimitRepository;
+  /** Role changes waiting on a seat payment (role-change-seat.feature). */
+  readonly pendingSeatRoleChanges: PendingSeatRoleChangeRepository;
+  /** The seat payment each approval with a seat waits on (seat-requests.feature). */
+  readonly seatApprovalPayments: SeatApprovalPaymentRepository;
   /** The invitations and what an invitation is validated and settled against. */
   readonly invite: OrganizationInviteRepository;
   /** The full, lite and Developer seats an organization holds, as licence and plan count them. */

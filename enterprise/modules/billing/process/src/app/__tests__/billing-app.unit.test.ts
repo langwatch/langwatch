@@ -7,7 +7,10 @@ import { describe, expect, it } from "vitest";
 import { billingProcessModule } from "../../billing.module.ts";
 import type { BillingSubscriptionNotifier } from "../../channels/billing-subscription-notifier.channel.ts";
 import { MemoryBillingWebhookHostChannel } from "../../channels/memory/memory.billing-webhook-host.channel.ts";
-import { MemoryPaymentRecoveryEmailChannel } from "../../channels/memory/memory.billing.channels.ts";
+import {
+  MemoryBillingFixedEmailChannel,
+  MemoryPaymentRecoveryEmailChannel,
+} from "../../channels/memory/memory.billing.channels.ts";
 import { MemoryConnectedInvoicingChannel } from "../../channels/memory/memory.connected-invoicing.channel.ts";
 import { MemoryStripeCustomersChannel } from "../../channels/memory/memory.stripe-customers.channel.ts";
 import { MemoryStripeInvoicesChannel } from "../../channels/memory/memory.stripe-invoices.channel.ts";
@@ -20,6 +23,7 @@ import { MemoryBillingOrganizationRepository } from "../../repositories/memory/m
 import { MemoryBillingRepositories } from "../../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../../repositories/memory/memory.billing.store.ts";
 import { MemoryPaymentRecoveryRepository } from "../../repositories/memory/memory.payment-recovery.repository.ts";
+import { MemorySeatEventSubscriptionRepository } from "../../repositories/memory/memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "../../repositories/memory/memory.subscription.repository.ts";
 import { BillingLifecycleAnnouncerService } from "../../services/billing-lifecycle-announcer.service.ts";
 import type { ResourceLimitAlertService } from "../../services/resource-limit-alert.service.ts";
@@ -56,6 +60,7 @@ function licensedAt(commitUsdCents: number) {
         lastSyncAt: "2026-11-02T00:00:00Z",
         managedVirtualKeyId: null,
       }),
+      countFullSeatsInUse: async () => 0,
       findSeatChanges: async () => [
         {
           licenseRowId: "license-2",
@@ -110,6 +115,7 @@ function lifecycleRecording() {
     recordSeatCheckoutPaid: ignored(),
     recordSeatCheckoutsAbandoned: ignored(),
     recordOverPlanChanged: ignored(),
+    recordSeatInvoicePaid: ignored(),
   });
   return { lifecycle, audited };
 }
@@ -160,6 +166,7 @@ function billingApp({
     organizations: MemoryBillingOrganizationRepository.create(store),
     subscriptions: MemoryBillingSubscriptionRepository.create(store),
     paymentRecovery: MemoryPaymentRecoveryRepository.create(store),
+    seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),
   };
   const stripe = withStripe ? stripeTwins({ webhookSecret }) : void 0;
   const { lifecycle, audited } = lifecycleRecording();
@@ -182,6 +189,10 @@ function billingApp({
           subscription: {
             notifier: createApiFixture<BillingSubscriptionNotifier>({}),
             facts: lifecycle,
+            fixedMail: {
+              emails: MemoryBillingFixedEmailChannel.create(),
+              publicBaseUrl: "https://app.langwatch.example",
+            },
           },
         }
       : {}),
@@ -194,7 +205,7 @@ function billingApp({
       },
     },
   });
-  return { app, asked: registry.asked, audited, repositories, stripe };
+  return { app, asked: registry.asked, audited, repositories, stripe, store };
 }
 
 const renewal = (commitUsdCents: number) => ({
@@ -227,6 +238,20 @@ describe("the installed billing application", () => {
       ).rejects.toMatchObject({ code: "connected_billing_unavailable" });
       expect(asked).toEqual([]);
       expect(audited).toEqual([]);
+    });
+
+    /** @scenario "Seat billing off Cloud refuses the purchase by name" */
+    it("refuses a seat bought with a role change by its handled code", async () => {
+      const { app } = billingApp({ isSaas: false, withStripe: false });
+
+      await expect(
+        app.addFullSeat({
+          organizationId: ACME,
+          baseUrl: "https://app.example",
+          successPath: "/back",
+          customerEmail: null,
+        }),
+      ).rejects.toMatchObject({ code: "seat_billing_unavailable" });
     });
 
     it("runs no billing tick and no seat invoicing pass at all", async () => {
@@ -525,6 +550,24 @@ describe("the subscription door BillingModule serves", () => {
         httpStatus: 404,
       });
     });
+
+    it("says a blocked seat purchase was not kept", async () => {
+      const { app } = billingApp({ isSaas: false, withStripe: false });
+
+      await expect(
+        app.recordBlockedSeatPurchase({ organizationId: ACME, seats: 1, userId: "user_admin" }),
+      ).resolves.toEqual({ recorded: false });
+    });
+  });
+
+  describe("given a deployment that sells plans", () => {
+    it("says a blocked seat purchase was kept", async () => {
+      const { app } = billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+
+      await expect(
+        app.recordBlockedSeatPurchase({ organizationId: ACME, seats: 1, userId: "user_admin" }),
+      ).resolves.toEqual({ recorded: true });
+    });
   });
 });
 
@@ -583,6 +626,105 @@ describe("the seat price BillingModule quotes", () => {
 
       expect(await save(6)).toMatchObject({ code: "seats_held_for_payment" });
       expect(await save(4)).not.toMatchObject({ code: "seats_held_for_payment" });
+    });
+  });
+});
+
+describe("a seat change refused for two live subscriptions", () => {
+  describe("given a seat-billed organization with two live subscriptions of 5 seats", () => {
+    async function twoLive() {
+      const world = billingApp({ isSaas: true, withStripe: true, withSubscriptions: true });
+      const { subscriptions } = world.repositories;
+      const acme = world.store.organizations.get(ACME);
+      if (acme) world.store.organizations.set(ACME, { ...acme, pricingModel: "SEAT_EVENT" });
+      const row = await subscriptions.createPending({
+        organizationId: ACME,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+      });
+      await subscriptions.updateStatus({ id: row.id, status: "ACTIVE" });
+      await subscriptions.updateQuantities({
+        id: row.id,
+        maxMembers: 5,
+        maxMessagesPerMonth: null,
+      });
+      await subscriptions.linkStripeId({ id: row.id, stripeSubscriptionId: "sub_live_1" });
+      const live = await subscriptions.findByStripeId("sub_live_1");
+      // A pair from before the one-live-plan index: the migration leaves the older one outside it.
+      if (live) {
+        world.store.subscriptions.push({
+          ...live,
+          id: "sub_db_older",
+          stripeSubscriptionId: "sub_live_2",
+        });
+      }
+      const save = (change: { upgradeMembers: boolean; totalMembers: number }) =>
+        world.app
+          .updateSubscriptionItems({
+            organizationId: ACME,
+            plan: "GROWTH_SEAT_EUR_MONTHLY",
+            upgradeTraces: !change.upgradeMembers,
+            totalTraces: 0,
+            requestedBy: { userId: "user_admin" },
+            ...change,
+          })
+          .catch((error: unknown) => error);
+      return { ...world, save };
+    }
+
+    /** @scenario "A refused seat change that buys no seat is not kept" */
+    it("keeps the seats added, and nothing for fewer seats or the same seats", async () => {
+      const { repositories, save } = await twoLive();
+
+      expect(await save({ upgradeMembers: true, totalMembers: 4 })).toMatchObject({
+        code: "subscription_ambiguous",
+      });
+      expect(await save({ upgradeMembers: true, totalMembers: 5 })).toMatchObject({
+        code: "subscription_ambiguous",
+      });
+      expect(await repositories.blockedSeatChanges.findWaiting()).toEqual([]);
+
+      await save({ upgradeMembers: true, totalMembers: 7 });
+      expect(await repositories.blockedSeatChanges.findWaiting()).toEqual([
+        expect.objectContaining({
+          userId: "user_admin",
+          seats: 2,
+          attempt: { kind: "seat_purchase", seats: 2 },
+        }),
+      ]);
+    });
+  });
+});
+
+describe("given a deployment off LangWatch Cloud whose organization holds a live linked plan", () => {
+  describe("when another module asks to activate a second linked plan for it", () => {
+    /** @scenario "Billing refuses another module's write that would start a second live plan" */
+    it("refuses with subscription_already_active naming the live plan, as the index does", async () => {
+      const { app, repositories } = billingApp({ isSaas: false, withStripe: false });
+      const live = await repositories.subscriptions.createPending({
+        organizationId: ACME,
+        plan: "GROWTH_SEAT_EUR_MONTHLY",
+      });
+      await repositories.subscriptions.linkStripeId({ id: live.id, stripeSubscriptionId: "s_1" });
+      await repositories.subscriptions.updateStatus({ id: live.id, status: "ACTIVE" });
+
+      await expect(
+        app.assertSubscriptionWriteAllowed({
+          writes: [
+            {
+              organizationId: ACME,
+              status: "ACTIVE",
+              plan: "ENTERPRISE",
+              stripeSubscriptionId: "s_2",
+            },
+          ],
+        }),
+      ).rejects.toMatchObject({
+        code: "subscription_already_active",
+        meta: { organizationId: ACME, liveSubscriptionIds: [live.id] },
+      });
+      await expect(
+        app.assertSubscriptionWriteAllowed({ writes: [{ id: live.id, status: "ACTIVE" }] }),
+      ).resolves.toBeUndefined();
     });
   });
 });

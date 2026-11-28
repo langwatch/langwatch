@@ -43,8 +43,8 @@ type OrganizationMemberSeatDependencies = {
   seatHolds: SeatHoldService;
   admission: Pick<OrganizationMemberAdmissionService, "deleteMember">;
   admissions: OrganizationAdmissions;
-  /** The person's seat request, closed once they hold the seat (seat-requests.feature). */
-  seatRequests: Pick<SeatRequestRepository, "findForUser" | "resolve">;
+  /** The person's seat request, closed once they hold the seat or leave (seat-requests.feature). */
+  seatRequests: Pick<SeatRequestRepository, "findForUser" | "resolve" | "settleSeat">;
 };
 
 const logger = createLogger("langwatch:organization:member-seats");
@@ -192,7 +192,7 @@ export class OrganizationMemberSeatService {
     caller: AuthzGrantCaller;
   }): Promise<{ seatGivenToUserId: string | null; seatHandoverFailed: boolean }> {
     const { organizationId, userId, actingUserId, giveSeatToUserId, caller } = params;
-    await this.dependencies.admission.deleteMember({ organizationId, userId, actingUserId });
+    await this.deleteMember({ organizationId, userId, actingUserId });
     if (!giveSeatToUserId) return { seatGivenToUserId: null, seatHandoverFailed: false };
     try {
       const admitted = await this.dependencies.seats.withSeat({
@@ -264,7 +264,7 @@ export class OrganizationMemberSeatService {
     await Promise.all([
       seatNotices.memberEnabled({ organizationId, userId, enabledByUserId: actingUserId }),
       grantCache.invalidateOrganization({ organizationId }),
-      this.closeSeatRequest({ organizationId, userId, actingUserId }),
+      this.closeSeatRequests({ organizationId, userId, actingUserId, status: "APPROVED" }),
     ]).catch((error: unknown) => {
       logger.error(
         { error, organizationId },
@@ -274,15 +274,52 @@ export class OrganizationMemberSeatService {
     return true;
   }
 
-  /** Approves the person's open seat request in this organization, if they have one. */
-  private async closeSeatRequest({
+  /**
+   * Removes a member; their open seat request closes with them, so an approval never invites
+   * the address back. The removal stands even when the close fails.
+   */
+  async deleteMember(params: {
+    organizationId: string;
+    userId: string;
+    actingUserId: string | null;
+  }): Promise<void> {
+    await this.dependencies.admission.deleteMember(params);
+    await this.closeSeatRequests({ ...params, status: "DECLINED" }).catch((error: unknown) => {
+      logger.error({ error, organizationId: params.organizationId }, "seat request close failed");
+    });
+  }
+
+  /** A role change onto a full seat answers the person's open seat request; the role stands. */
+  async closeOnFullSeat(input: {
+    organizationId: string;
+    userId: string;
+    role: OrganizationUserRole;
+    /** Who changed the role: the acting user, or the current user id a direct change names. */
+    actingUser?: { id: string } | null;
+    currentUserId?: string | null;
+  }): Promise<void> {
+    if (input.role !== "MEMBER" && input.role !== "ADMIN") return;
+    const actingUserId = input.currentUserId ?? input.actingUser?.id ?? null;
+    const close = { ...input, actingUserId, status: "APPROVED" as const };
+    await this.closeSeatRequests(close).catch((error: unknown) => {
+      logger.error({ error, organizationId: input.organizationId }, "seat request close failed");
+    });
+  }
+
+  /**
+   * Closes the person's open seat request in this organization, if they have one: approved once
+   * they hold a full seat, its seat marked given, or declined once they left.
+   */
+  async closeSeatRequests({
     organizationId,
     userId,
     actingUserId,
+    status,
   }: {
     organizationId: string;
     userId: string;
     actingUserId: string | null;
+    status: "APPROVED" | "DECLINED";
   }): Promise<void> {
     const { seatRequests, seatHolds } = this.dependencies;
     const open = (await seatRequests.findForUser({ userId })).filter(
@@ -290,13 +327,13 @@ export class OrganizationMemberSeatService {
     );
     const at = seatHolds.now().epochMilliseconds;
     for (const request of open) {
-      await seatRequests.resolve({
-        organizationId,
-        id: request.id,
-        status: "APPROVED",
+      const closed = { organizationId, id: request.id, at };
+      const resolved = await seatRequests.resolve({
+        ...closed,
+        status,
         resolvedByUserId: actingUserId,
-        at,
       });
+      if (resolved && status === "APPROVED") await seatRequests.settleSeat(closed);
     }
   }
 

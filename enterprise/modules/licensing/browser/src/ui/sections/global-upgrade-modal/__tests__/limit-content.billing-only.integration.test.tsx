@@ -92,4 +92,20 @@ describe("the seat limit message", () => {
       expect(screen.queryByTestId("limit-invite-billing-only")).not.toBeInTheDocument();
     });
   });
+
+  describe("given an admin on Free who reaches the Lite member limit", () => {
+    /** @scenario "An admin at the Free Lite limit is pointed to Billing only and Growth" */
+    it("points them to Billing only and Growth, without asking for an admin", async () => {
+      renderModal({ isAdmin: true });
+      act(() => {
+        useUpgradeModalStore.getState().open("membersLite", 0, 0);
+      });
+
+      expect(await screen.findByText("Free has no Lite seats")).toBeInTheDocument();
+      expect(screen.getByText(/invite them as Billing only/)).toBeInTheDocument();
+      expect(screen.getByText(/Growth has unlimited Lite members/)).toBeInTheDocument();
+      expect(screen.getByTestId("limit-invite-billing-only")).toBeInTheDocument();
+      expect(screen.queryByText(/ask an organization admin/i)).not.toBeInTheDocument();
+    });
+  });
 });

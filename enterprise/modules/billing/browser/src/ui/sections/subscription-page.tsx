@@ -30,7 +30,7 @@ import {
 import { shouldShowPlanLimits } from "../../model/plan-management-url.ts";
 import type { RetentionEstimateState } from "../../model/retention-choice.ts";
 import { billedSeatsWhileKept } from "../../model/seat-change-summary.ts";
-import type { SeatPrice } from "../../model/seat-purchase.ts";
+import { memberAddress, type SeatPrice } from "../../model/seat-purchase.ts";
 import {
   billingSeatCounts,
   type FixedSeats,
@@ -627,6 +627,7 @@ export function SubscriptionPage() {
       </VStack>
 
       <UserManagementDrawer
+        organizationName={organization.name}
         open={isDrawerOpen}
         onClose={() => setIsDrawerOpen(false)}
         users={users}
@@ -640,6 +641,7 @@ export function SubscriptionPage() {
         onInvite={seatPurchase.invite}
         onUpgrade={handleUpgrade}
         onCommit={seatPurchase.commit}
+        onOpenMember={(userId) => host.navigate(memberAddress(userId))}
         isUpgradeLoading={isUpgradeLoading}
       />
 

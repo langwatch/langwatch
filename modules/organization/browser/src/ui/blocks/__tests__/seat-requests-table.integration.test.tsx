@@ -20,6 +20,7 @@ const lateRequest: SeatRequest = {
   source: "pending",
   idpRefused: false,
   idpKind: null,
+  reason: null,
   openedAt: Date.UTC(2026, 10, 6, 9),
 };
 
@@ -69,7 +70,7 @@ describe("given an open seat request", () => {
       expect(screen.getByText("Late Arrival")).toBeInTheDocument();
       expect(screen.getByText("No access")).toBeInTheDocument();
 
-      await userEvent.click(screen.getByRole("button", { name: "Approve" }));
+      await userEvent.click(screen.getByRole("button", { name: "Approve and add a seat" }));
       await userEvent.click(screen.getByRole("button", { name: "Decline" }));
       expect(onApprove).toHaveBeenCalledWith(lateRequest);
       expect(onDecline).toHaveBeenCalledWith(lateRequest);
@@ -108,6 +109,28 @@ describe("given an open seat request", () => {
       });
 
       expect(screen.getByText("Refused by your identity provider")).toBeInTheDocument();
+    });
+  });
+
+  describe("when a member asked for access from a refusal", () => {
+    /** @scenario "A requested seat shows what the member was trying to do" */
+    it("reads Asked for access and what they were trying to do", () => {
+      renderTable({
+        approvalPath: stripeSeats,
+        requests: [{ ...lateRequest, source: "requested", reason: "run the workbench" }],
+      });
+
+      expect(screen.getByText("Asked for access")).toBeInTheDocument();
+      expect(screen.getByTestId("seat-request-reason")).toHaveTextContent("run the workbench");
+    });
+  });
+
+  describe("when no seat is free on a live Stripe seat subscription", () => {
+    it("offers to approve and add a seat, naming the seat price", () => {
+      renderTable({ approvalPath: stripeSeats });
+
+      const approve = screen.getByRole("button", { name: "Approve and add a seat" });
+      expect(approve.getAttribute("title")).toContain("€29 to your subscription");
     });
   });
 });

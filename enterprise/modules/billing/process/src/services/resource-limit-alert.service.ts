@@ -85,10 +85,10 @@ export class ResourceLimitAlertService {
     plan: string;
     seats: number;
     requestedSeats: number;
-  }): Promise<void> {
-    if (!this.dependencies.isSaas) return;
+  }): Promise<{ sent: boolean }> {
+    if (!this.dependencies.isSaas) return { sent: false };
     try {
-      await this.dependencies.notices.sendSlackSeatRequest(input);
+      return { sent: await this.dependencies.notices.sendSlackSeatRequest(input) };
     } catch (error) {
       logger.error(
         { error, organizationId: input.organizationId },
@@ -97,6 +97,7 @@ export class ResourceLimitAlertService {
       this.dependencies.errors.capture(error instanceof Error ? error : new Error(String(error)), {
         organizationId: input.organizationId,
       });
+      return { sent: false };
     }
   }
 }

@@ -1,4 +1,4 @@
-import type { SeatRequestProps } from "@langwatch/mail";
+import type { SeatRequestAnsweredProps, SeatRequestProps } from "@langwatch/mail";
 
 type Envelope = Readonly<{ idempotencyKey: string }>;
 
@@ -12,11 +12,13 @@ export type IdpRefusedMail = Readonly<{
 }>;
 
 /**
- * The seat request and refused sign-in mails to administrators and Billing members. Who
- * is told is the access notice service's decision; the envelope and template are the mail
- * composition's. The memory tier records and sends nothing.
+ * The seat request and refused sign-in mails to administrators and Billing members, and the
+ * answer to the person who asked. Who is told is the access notice service's decision; the
+ * envelope and template are the mail composition's. The memory tier records and sends nothing.
  */
 export abstract class AccessNoticeMailChannel {
   abstract sendSeatRequest(input: SeatRequestProps & Envelope): Promise<void>;
   abstract sendIdpRefused(input: IdpRefusedMail & Envelope): Promise<void>;
+  /** The answer to the person who asked for the seat. */
+  abstract sendSeatRequestAnswered(input: SeatRequestAnsweredProps & Envelope): Promise<void>;
 }

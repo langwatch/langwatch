@@ -6,7 +6,7 @@ The server half of [billing](../README.md). Billing: subscriptions, invoices and
 
 ## Installation
 
-`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withEventing(paymentRecoveryEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:46`.
+`defineProcessModule("billing").withRepositories(billingRepositories).withChannels(billingChannels).withApi(BillingModule).withTransports(connectedBillingTrpcTransport, billingStripeWebhookRest, currencyTrpcTransport, subscriptionTrpcTransport).withEventing(connectedBillingEventing).withEventing(billingReportingEventing).withEventing(billingLifecycleEventing).withEventing(seatLineRepairEventing).withEventing(billingFixedNoticeEventing).withEventing(paymentRecoveryEventing).withMigrations(…).withTasks(…)`, `src/billing.module.ts:47`.
 
 Installed by api, worker, tasks, from each app's generated module list (`pnpm generate:modules`).
 
@@ -14,7 +14,7 @@ Installed by api, worker, tasks, from each app's generated module list (`pnpm ge
 
 What the billing module answers other modules: invoice billing for a connected self-hosted customer (ADR-156 section 7). Every operation refuses off LangWatch Cloud, and where no payment provider is configured. The admin console operations trust the platform door (Q43): staff only, writes need ops:manage.
 
-Peers call these through the token, declared at `../contract/src/billing.api.ts:36`; nothing else in this package is public.
+Peers call these through the token, declared at `../contract/src/billing.api.ts:39`; nothing else in this package is public.
 
 #### `getConnectedBillingOverview`
 
@@ -94,10 +94,10 @@ notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
 
 #### `notifySalesOfSeatRequest`
 
-Tells sales that a person waits for a seat in an organization whose plan only sales can grow, on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws.
+Tells sales that a person waits for a seat in an organization whose plan only sales can grow, on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws: `sent` is false when it did not go out, so the caller can let a later ask retry it.
 
 ```typescript
-notifySalesOfSeatRequest(input: { organizationId: string; organizationName: string; plan: string; seats: number; requestedSeats: number; }): Promise<void>;
+notifySalesOfSeatRequest(input: { organizationId: string; organizationName: string; plan: string; seats: number; requestedSeats: number; }): Promise<{ sent: boolean }>;
 ```
 
 #### `getPricingModel`
@@ -116,12 +116,44 @@ Opens a seat checkout for `membersToAdd`, the customer resolved from `customerEm
 createSeatCheckout(input: { organizationId: string; baseUrl: string; membersToAdd: number; currency?: Currency; billingInterval?: SubscriptionBillingInterval; customerEmail: string | null; retentionDays?: number; }): Promise<{ url: string | null; subscriptionId: string }>;
 ```
 
+#### `recordBlockedSeatChange`
+
+Keeps a seat change refused with `subscription_ambiguous` for the admin who tried; once the organization is back on one subscription that admin gets one email to finish it. `seats`: the seats the change needs beyond today's. `recorded` is false where nothing keeps it (off Cloud). Never throws.
+
+```typescript
+recordBlockedSeatChange(input: { organizationId: string; userId: string; attempt: BlockedSeatChangeAttempt; seats: number; }): Promise<{ recorded: boolean }>;
+```
+
 #### `recordRetentionStorage`
 
 Bills the storage an organization keeps beyond the 90 days Growth includes: the metered line follows the longest retention, and a measurement goes to the meter as that day's share of a GB-month. Answers what it did; an organization with no Growth seat subscription is skipped.
 
 ```typescript
 recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome>;
+```
+
+#### `addFullSeat`
+
+Adds one full seat for a role change: charged to the subscription's payment method, or a payment page (the seat invoice, or a seat checkout) when the customer must act first. `successPath` is where a checkout returns. Refuses `subscription_ambiguous` untouched.
+
+```typescript
+addFullSeat(input: { organizationId: string; quotedAt?: number; baseUrl: string; successPath: string; customerEmail: string | null; }): Promise<SeatPurchase>;
+```
+
+#### `assertSubscriptionWriteAllowed`
+
+Refuses, with subscription_already_active naming the organization and its live rows, writes that would leave an organization a second live Stripe-backed plan; the tiered plan a seat plan replaces never counts. Holds on and off Cloud, as the database index does.
+
+```typescript
+assertSubscriptionWriteAllowed(input: { writes: readonly SubscriptionWrite[] }): Promise<void>;
+```
+
+#### `settleSeatPayment`
+
+Whether a seat payment is paid, still open, or over; a paid one has its seat recorded.
+
+```typescript
+settleSeatPayment(input: { organizationId: string; payment: SeatPayment; }): Promise<{ status: SeatPaymentStatus }>;
 ```
 
 ## REST transport
@@ -241,41 +273,43 @@ interface Output {
 
 ### `subscription`
 
-Contract `../contract/src/subscription.trpc.ts:42`, router `src/transport/subscription.trpc.ts:111`.
+Contract `../contract/src/subscription.trpc.ts:44`, router `src/transport/subscription.trpc.ts:121`.
 
-| Procedure                             | Kind     | Gate                              | Input                     | Output                           |
-| ------------------------------------- | -------- | --------------------------------- | ------------------------- | -------------------------------- |
-| `subscription.addTeamMemberOrEvents`  | mutation | Permission `subscription:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
-| `subscription.create`                 | mutation | Permission `subscription:upgrade` | inline                    | `billingRedirectSchema`          |
-| `subscription.manage`                 | mutation | Permission `subscription:manage`  | inline                    | `billingPortalSessionSchema`     |
-| `subscription.previewProration`       | query    | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
-| `subscription.getLastSubscription`    | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
-| `subscription.prospective`            | mutation | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
-| `subscription.developerSeats`         | query    | Permission `organization:view`    | `organizationScopeSchema` | `developerSeatsSchema`           |
-| `subscription.previewDeveloperSeats`  | query    | Permission `organization:manage`  | inline                    | `developerSeatQuoteSchema`       |
-| `subscription.setDeveloperSeats`      | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
-| `subscription.listInvoices`           | query    | Permission `subscription:manage`  | `organizationScopeSchema` | inline                           |
-| `subscription.paymentRecovery`        | query    | Permission `organization:view`    | `organizationScopeSchema` | `paymentRecoverySummarySchema`   |
-| `subscription.paymentRecoveryDetails` | query    | Permission `subscription:manage`  | `organizationScopeSchema` | `paymentRecoveryDetailsSchema`   |
-| `subscription.paymentRecoveryPayLink` | mutation | Permission `subscription:manage`  | `organizationScopeSchema` | `paymentRecoveryPayLinkSchema`   |
+| Procedure                                | Kind     | Gate                              | Input                     | Output                           |
+| ---------------------------------------- | -------- | --------------------------------- | ------------------------- | -------------------------------- |
+| `subscription.addTeamMemberOrEvents`     | mutation | Permission `subscription:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
+| `subscription.create`                    | mutation | Permission `subscription:upgrade` | inline                    | `billingRedirectSchema`          |
+| `subscription.manage`                    | mutation | Permission `subscription:manage`  | inline                    | `billingPortalSessionSchema`     |
+| `subscription.previewProration`          | query    | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.getLastSubscription`       | query    | Permission `organization:view`    | `organizationScopeSchema` | `providerOwnedSchema`            |
+| `subscription.prospective`               | mutation | Permission `subscription:manage`  | inline                    | `providerOwnedSchema`            |
+| `subscription.developerSeats`            | query    | Permission `organization:view`    | `organizationScopeSchema` | `developerSeatsSchema`           |
+| `subscription.previewDeveloperSeats`     | query    | Permission `organization:manage`  | inline                    | `developerSeatQuoteSchema`       |
+| `subscription.setDeveloperSeats`         | mutation | Permission `organization:manage`  | inline                    | `subscriptionItemsUpdatedSchema` |
+| `subscription.seatOffer`                 | query    | Permission `subscription:manage`  | `organizationScopeSchema` | `seatOfferSchema`                |
+| `subscription.recordBlockedSeatPurchase` | mutation | Permission `subscription:manage`  | inline                    | inline                           |
+| `subscription.listInvoices`              | query    | Permission `subscription:manage`  | `organizationScopeSchema` | inline                           |
+| `subscription.paymentRecovery`           | query    | Permission `organization:view`    | `organizationScopeSchema` | `paymentRecoverySummarySchema`   |
+| `subscription.paymentRecoveryDetails`    | query    | Permission `subscription:manage`  | `organizationScopeSchema` | `paymentRecoveryDetailsSchema`   |
+| `subscription.paymentRecoveryPayLink`    | mutation | Permission `subscription:manage`  | `organizationScopeSchema` | `paymentRecoveryPayLinkSchema`   |
 
 ```typescript
 // subscription.addTeamMemberOrEvents
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:45)
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, upgradeMembers… (inline, ../contract/src/subscription.trpc.ts:47)
 // Output: subscriptionItemsUpdatedSchema, ../contract/src/billing-types.ts:234
 interface Output {
   success: boolean;
 }
 
 // subscription.create
-// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:62)
+// Input: z.object({ ...organizationScopeSchema.shape, baseUrl: z.string(), plan: subscribablePlanS… (inline, ../contract/src/subscription.trpc.ts:66)
 // Output: billingRedirectSchema, ../contract/src/billing-types.ts:218
 interface Output {
   url: string | null;
 }
 
 // subscription.manage
-// Input: inline, ../contract/src/subscription.trpc.ts:77
+// Input: inline, ../contract/src/subscription.trpc.ts:81
 interface Input {
   organizationId: string;
   baseUrl: string;
@@ -286,27 +320,27 @@ interface Output {
 }
 
 // subscription.previewProration
-// Input: inline, ../contract/src/subscription.trpc.ts:81
+// Input: inline, ../contract/src/subscription.trpc.ts:85
 interface Input {
   organizationId: string;
   newTotalSeats: number;
 }
-// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:40
+// Output: providerOwnedSchema, ../contract/src/subscription.trpc.ts:42
 type Output = unknown;
 
 // subscription.getLastSubscription
-// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:26
+// Input: organizationScopeSchema, ../contract/src/subscription.trpc.ts:28
 interface Input {
   organizationId: string;
 }
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:40
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:42
 
 // subscription.prospective
-// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:90)
-type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:40
+// Input: z.object({ ...organizationScopeSchema.shape, plan: subscribablePlanSchema, customerName: … (inline, ../contract/src/subscription.trpc.ts:94)
+type Output = z.infer<typeof providerOwnedSchema>; // ../contract/src/subscription.trpc.ts:42
 
 // subscription.developerSeats
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:28
 // Output: developerSeatsSchema, ../contract/src/billing-types.ts:294
 interface Output {
   available: boolean;
@@ -318,7 +352,7 @@ interface Output {
 }
 
 // subscription.previewDeveloperSeats
-// Input: inline, ../contract/src/subscription.trpc.ts:107
+// Input: inline, ../contract/src/subscription.trpc.ts:111
 interface Input {
   organizationId: string;
   quantity: number;
@@ -334,7 +368,7 @@ interface Output {
 }
 
 // subscription.setDeveloperSeats
-// Input: inline, ../contract/src/subscription.trpc.ts:112
+// Input: inline, ../contract/src/subscription.trpc.ts:116
 interface Input {
   organizationId: string;
   quantity: number;
@@ -342,9 +376,24 @@ interface Input {
 }
 type Output = z.infer<typeof subscriptionItemsUpdatedSchema>; // ../contract/src/billing-types.ts:234
 
+// subscription.seatOffer
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:28
+type Output = z.infer<typeof seatOfferSchema>; // ../contract/src/seat-purchase.ts:61
+
+// subscription.recordBlockedSeatPurchase
+// Input: inline, ../contract/src/subscription.trpc.ts:132
+interface Input {
+  organizationId: string;
+  seats: number;
+}
+// Output: inline, ../contract/src/subscription.trpc.ts:133
+interface Output {
+  recorded: boolean;
+}
+
 // subscription.listInvoices
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
-// Output: inline, ../contract/src/subscription.trpc.ts:122
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:28
+// Output: inline, ../contract/src/subscription.trpc.ts:137
 type Output = {
   id: string;
   number: string | null;
@@ -357,14 +406,14 @@ type Output = {
 }[];
 
 // subscription.paymentRecovery
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:28
 // Output: paymentRecoverySummarySchema, ../contract/src/payment-recovery.ts:18
 interface Output {
   state: "none" | "failing" | "paused";
 }
 
 // subscription.paymentRecoveryDetails
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:28
 // Output: paymentRecoveryDetailsSchema, ../contract/src/payment-recovery.ts:39
 interface Output {
   state: "none" | "failing" | "paused";
@@ -380,7 +429,7 @@ interface Output {
 }
 
 // subscription.paymentRecoveryPayLink
-type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:26
+type Input = z.infer<typeof organizationScopeSchema>; // ../contract/src/subscription.trpc.ts:28
 // Output: paymentRecoveryPayLinkSchema, ../contract/src/payment-recovery.ts:52
 interface Output {
   url: string;
@@ -394,25 +443,34 @@ None: this module declares no websocket, rawsocket or rawhttp door.
 
 ## Workers
 
+### Pipeline `billing_fixed_notice` (aggregate `global`)
+
+Declared at `src/eventing/billing-fixed-notice.pipeline.ts:43`.
+
+| Kind            | Name                 | Handles                                                                                       | Declared at                                        |
+| --------------- | -------------------- | --------------------------------------------------------------------------------------------- | -------------------------------------------------- |
+| process manager | `billingFixedNotice` | every 15 min (`BILLING_FIXED_NOTICE_INTERVAL_MS = 15 * 60 * 1000`); intents `notice` (outbox) | `src/eventing/billing-fixed-notice.pipeline.ts:49` |
+
 ### Pipeline `billing_lifecycle` (aggregate `billing_lifecycle`)
 
-Declared at `src/eventing/billing-lifecycle.pipeline.ts:89`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`, `usageBillingChangedEventSchema`, `billingAuditRecordedEventSchema`, `planLimitAlertSentEventSchema`, `checkoutCurrencySelectedEventSchema`, `pricingModelChangedEventSchema`, `seatCheckoutPaidEventSchema`, `seatCheckoutsAbandonedEventSchema`, `overPlanChangedEventSchema`.
+Declared at `src/eventing/billing-lifecycle.pipeline.ts:93`. Events: `subscriptionChangedEventSchema`, `subscriptionStartedEventSchema`, `checkoutCompletedEventSchema`, `usageBillingChangedEventSchema`, `billingAuditRecordedEventSchema`, `planLimitAlertSentEventSchema`, `checkoutCurrencySelectedEventSchema`, `pricingModelChangedEventSchema`, `seatCheckoutPaidEventSchema`, `seatCheckoutsAbandonedEventSchema`, `seatInvoicePaidEventSchema`, `overPlanChangedEventSchema`.
 
 | Kind            | Name                             | Handles               | Declared at                                      |
 | --------------- | -------------------------------- | --------------------- | ------------------------------------------------ |
-| command         | `recordSubscriptionChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:106` |
-| command         | `recordSubscriptionStarted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:107` |
-| command         | `recordCheckoutCompleted`        | –                     | `src/eventing/billing-lifecycle.pipeline.ts:108` |
-| command         | `recordUsageBillingChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:109` |
-| command         | `recordAudit`                    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:110` |
-| command         | `recordPlanLimitAlertSent`       | –                     | `src/eventing/billing-lifecycle.pipeline.ts:111` |
-| command         | `recordCheckoutCurrencySelected` | –                     | `src/eventing/billing-lifecycle.pipeline.ts:112` |
-| command         | `recordPricingModelChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:113` |
-| command         | `recordSeatCheckoutPaid`         | –                     | `src/eventing/billing-lifecycle.pipeline.ts:114` |
-| command         | `recordSeatCheckoutsAbandoned`   | –                     | `src/eventing/billing-lifecycle.pipeline.ts:115` |
-| command         | `recordOverPlanChanged`          | –                     | `src/eventing/billing-lifecycle.pipeline.ts:116` |
-| peer subscriber | `organizationSeatLimitReached`   | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:117` |
-| peer subscriber | `usageLimitReached`              | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:121` |
+| command         | `recordSubscriptionChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:111` |
+| command         | `recordSubscriptionStarted`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:112` |
+| command         | `recordCheckoutCompleted`        | –                     | `src/eventing/billing-lifecycle.pipeline.ts:113` |
+| command         | `recordUsageBillingChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:114` |
+| command         | `recordAudit`                    | –                     | `src/eventing/billing-lifecycle.pipeline.ts:115` |
+| command         | `recordPlanLimitAlertSent`       | –                     | `src/eventing/billing-lifecycle.pipeline.ts:116` |
+| command         | `recordCheckoutCurrencySelected` | –                     | `src/eventing/billing-lifecycle.pipeline.ts:117` |
+| command         | `recordPricingModelChanged`      | –                     | `src/eventing/billing-lifecycle.pipeline.ts:118` |
+| command         | `recordSeatCheckoutPaid`         | –                     | `src/eventing/billing-lifecycle.pipeline.ts:119` |
+| command         | `recordSeatCheckoutsAbandoned`   | –                     | `src/eventing/billing-lifecycle.pipeline.ts:120` |
+| command         | `recordSeatInvoicePaid`          | –                     | `src/eventing/billing-lifecycle.pipeline.ts:121` |
+| command         | `recordOverPlanChanged`          | –                     | `src/eventing/billing-lifecycle.pipeline.ts:122` |
+| peer subscriber | `organizationSeatLimitReached`   | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:123` |
+| peer subscriber | `usageLimitReached`              | ≈ event type not read | `src/eventing/billing-lifecycle.pipeline.ts:127` |
 
 ### Pipeline `billing_reporting` (aggregate `billing_report`)
 
@@ -466,12 +524,12 @@ Run by the tasks process, before serve.
 
 | Kind   | Leaf                                | Environment variable                           | Declared at                            |
 | ------ | ----------------------------------- | ---------------------------------------------- | -------------------------------------- |
-| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:222`           |
-| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:223`           |
-| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:224`           |
-| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:225`           |
-| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:226`           |
-| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:227`           |
+| secret | `stripeSecretKey`                   | `STRIPE_SECRET_KEY`                            | `src/app/billing.app.ts:250`           |
+| secret | `stripeWebhookSecret`               | `STRIPE_WEBHOOK_SECRET`                        | `src/app/billing.app.ts:251`           |
+| secret | `internalSlackPlanLimitWebhook`     | `SLACK_PLAN_LIMIT_CHANNEL`                     | `src/app/billing.app.ts:252`           |
+| secret | `internalSlackSubscriptionsWebhook` | `SLACK_CHANNEL_SUBSCRIPTIONS`                  | `src/app/billing.app.ts:253`           |
+| secret | `internalSlackSelfHostedWebhook`    | `SLACK_CHANNEL_SELF_HOSTED`                    | `src/app/billing.app.ts:254`           |
+| secret | `internalSlackSignupsWebhook`       | ≈ `billingSecrets.internalSlackSignupsWebhook` | `src/app/billing.app.ts:255`           |
 | config | `licensePaymentLinkId`              | `STRIPE_LICENSE_PAYMENT_LINK_ID`               | `../contract/src/billing.config.ts:13` |
 | config | `licensePaymentUrl`                 | `STRIPE_LICENSE_PAYMENT_LINK_URL`              | `../contract/src/billing.config.ts:15` |
 | config | `hubspotPortalId`                   | `HUBSPOT_PORTAL_ID`                            | `../contract/src/billing.config.ts:23` |

@@ -10,7 +10,16 @@ import { SettingsSection } from "@langwatch/design-system/settings-section";
 import { SkeletonRows } from "@langwatch/design-system/skeletons";
 import { Switch } from "@langwatch/design-system/switch";
 import type { UiPersonDrawerProps } from "@langwatch/organization-contract";
-import { Ban, CreditCard, KeyRound, ShieldCheck, Trash2, Undo2, UserCog } from "lucide-react";
+import {
+  Armchair,
+  Ban,
+  CreditCard,
+  KeyRound,
+  ShieldCheck,
+  Trash2,
+  Undo2,
+  UserCog,
+} from "lucide-react";
 import { type ReactNode, useEffect, useState } from "react";
 
 import { HandledErrorAlert } from "../../behavior/handled-error-form.tsx";
@@ -21,8 +30,10 @@ import { useMemberDisableAction } from "../../behavior/use-member-disable-action
 import { useMemberProvenance } from "../../behavior/use-member-provenance.ts";
 import { useOrganizationTeamProject } from "../../behavior/use-organization-team-project.ts";
 import { useRequiredSession } from "../../behavior/use-required-session.ts";
+import { useSeatRequests } from "../../behavior/use-seat-requests.ts";
 import { useTwoStepRequirement } from "../../behavior/use-two-step-requirement.ts";
 import { useOrganizationHost } from "../../model/organization-host.ts";
+import { SeatRequestsTable } from "../blocks/seat-requests-table.tsx";
 import { IdentityChip } from "../elements/identity-row.tsx";
 import { ProvenanceChip, ProvenanceExplanation } from "../elements/member-provenance.tsx";
 import { SecondFactorCell } from "../elements/second-factor-cell.tsx";
@@ -130,6 +141,8 @@ function PersonDetail({
         }
       />
 
+      <PersonSeatRequest organizationId={organizationId} userId={person.userId} />
+
       <SettingsSection title="How they sign in" icon={<KeyRound size={18} />} divided={false}>
         <VStack align="start" gap={4} width="full">
           <Fact label="Address">
@@ -198,6 +211,40 @@ function PersonDetail({
         />
       )}
     </VStack>
+  );
+}
+
+/** The person's open request for a full seat, answered here as on the Users page. */
+function PersonSeatRequest({ organizationId, userId }: { organizationId: string; userId: string }) {
+  const host = useOrganizationHost();
+  const canView = host.hasOrganizationPermission("seatRequests:view");
+  const seats = useSeatRequests({
+    organizationId,
+    canView,
+    canManage: host.hasOrganizationPermission("seatRequests:manage"),
+  });
+  const theirs = seats.requests.filter((request) => request.userId === userId);
+  if (!canView || theirs.length === 0) return null;
+
+  return (
+    <SettingsSection
+      title="Waiting for a seat"
+      icon={<Armchair size={18} />}
+      divided={false}
+      data-testid="person-seat-request"
+    >
+      <SeatRequestsTable
+        requests={theirs}
+        seatFree={seats.seatFree}
+        approvalPath={seats.approvalPath}
+        canManage={seats.canManage}
+        answeringId={seats.answeringId}
+        waitingId={seats.waitingId}
+        waitingUrl={seats.waitingUrl}
+        onApprove={seats.approve}
+        onDecline={seats.decline}
+      />
+    </SettingsSection>
   );
 }
 

@@ -1,4 +1,4 @@
-import { HandledError, NotFoundError } from "@langwatch/handled-error";
+import { HandledError, NotFoundError, remediation } from "@langwatch/handled-error";
 
 export class CannotImpersonateDeactivatedUserError extends HandledError {
   constructor(userId: string) {
@@ -83,6 +83,45 @@ export class AdminSessionExpiredError extends HandledError {
       fault: "customer",
     });
     this.name = "AdminSessionExpiredError";
+  }
+}
+
+/**
+ * A Cloud admin write would leave an organization a second live Stripe-backed plan, which billing
+ * refuses. The operator cancels or edits the live one first.
+ */
+export class AdminSubscriptionAlreadyActiveError extends HandledError {
+  declare readonly code: "ops_subscription_already_active";
+
+  constructor(input: { organizationId: string; activeSubscriptionIds: string[] }) {
+    super(
+      "ops_subscription_already_active",
+      "This organization already has an active subscription. Edit that one, or cancel it first.",
+      {
+        httpStatus: 409,
+        fault: "customer",
+        meta: { ...input },
+        ...remediation("ops_subscription_already_active"),
+      },
+    );
+    this.name = "AdminSubscriptionAlreadyActiveError";
+  }
+}
+
+/**
+ * A subscription bulk edit named no rows. The one-live-plan check reads the rows a write touches,
+ * so a bulk edit must list its ids.
+ */
+export class AdminSubscriptionIdsRequiredError extends HandledError {
+  declare readonly code: "malformed_request";
+
+  constructor() {
+    super("malformed_request", "A bulk subscription edit must list the subscription ids", {
+      httpStatus: 400,
+      fault: "customer",
+      meta: { field: "ids" },
+    });
+    this.name = "AdminSubscriptionIdsRequiredError";
   }
 }
 

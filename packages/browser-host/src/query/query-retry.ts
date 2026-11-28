@@ -8,6 +8,10 @@ const PERMANENT_ERROR_CODES = new Set<AppErrorCode>([
   // "Contact support and we'll finish the setup." Only an operator can link
   // the subscription.
   "subscription_not_linked",
+  // "Continue to checkout to pay for the seats." The plan never reached the
+  // billing provider, so the seats are bought through checkout, not a retry.
+  "seat_checkout_required",
+  "seat_change_needs_support",
   // "Contact support and we'll get you onto the right plan." The account is
   // locked to a currency we do not sell in.
   "billing_currency_unsupported",

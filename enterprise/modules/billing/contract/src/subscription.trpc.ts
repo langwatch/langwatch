@@ -14,6 +14,7 @@ import {
   developerSeatsSchema,
   subscriptionItemsUpdatedSchema,
 } from "./billing-types.ts";
+import { blockedSeatChangeAttemptSchema } from "./blocked-seat-change.ts";
 import {
   paymentRecoveryDetailsSchema,
   paymentRecoveryPayLinkSchema,
@@ -21,6 +22,7 @@ import {
 } from "./payment-recovery.ts";
 import { SUBSCRIBABLE_PLANS } from "./plan-types.ts";
 import { currencySchema } from "./pricing.ts";
+import { seatOfferSchema } from "./seat-purchase.ts";
 
 /** The organization whose subscription is being read or changed. */
 const organizationScopeSchema = z.object({ organizationId: z.string() });
@@ -53,6 +55,8 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
       // instant the customer was quoted. Optional: a caller that never showed
       // a quote is priced at the moment they run.
       quotedAt: z.number().int().positive().optional(),
+      /** What the admin was doing, kept if the change is refused for two live subscriptions. */
+      attempt: blockedSeatChangeAttemptSchema.optional(),
     }),
   )
   .withOutput(subscriptionItemsUpdatedSchema)
@@ -116,6 +120,17 @@ export const subscriptionTrpc = defineTrpcContract("subscription")
     }),
   )
   .withOutput(subscriptionItemsUpdatedSchema)
+
+  // What one more full seat costs, for the role change that needs it.
+  .query("seatOffer")
+  .withInput(organizationScopeSchema)
+  .withOutput(seatOfferSchema)
+
+  // Manage seats could not price added seats for two live subscriptions: keep the attempt so
+  // the admin who tried gets one email once billing is fixed.
+  .mutation("recordBlockedSeatPurchase")
+  .withInput(z.object({ ...organizationScopeSchema.shape, seats: z.number().int().positive() }))
+  .withOutput(z.object({ recorded: z.boolean() }))
 
   .query("listInvoices")
   .withInput(organizationScopeSchema)

@@ -19,22 +19,34 @@ const CREATION_LIMIT_TYPES = new Set(["scenarios", "evaluators"]);
 
 /**
  * What the license holds: a self-hosted install meets its license's limit, never a plan's. An
- * admin at a cloud seat limit is the one who decides, so they get a way to let someone pay.
+ * admin at a cloud seat limit is the one who decides, so they get a way to let someone pay. Free
+ * has no Lite seats at all, so an admin there is pointed to Billing only and to Growth.
  */
 function limitWords({
   isSaaS,
   isSeatLimit,
   isAdmin,
+  limitType,
 }: {
   isSaaS: boolean;
   isSeatLimit: boolean;
   isAdmin: boolean;
+  limitType?: string;
 }): {
   dialogTitle: string;
   title: string;
   description: string;
   holder: string;
 } {
+  if (isSaaS && isSeatLimit && isAdmin && limitType === "membersLite") {
+    return {
+      dialogTitle: "Upgrade required",
+      title: "Free has no Lite seats",
+      description:
+        "If the person you are inviting pays for LangWatch, invite them as Billing only. It takes no seat, shows the plan and invoices, and lets them upgrade. Growth has unlimited Lite members.",
+      holder: "your current plan",
+    };
+  }
   if (isSaaS && isSeatLimit && isAdmin) {
     return {
       dialogTitle: "Upgrade required",
@@ -109,7 +121,7 @@ function LimitDialog({
   const buttonLabel = primaryLabel({ isSaaS, offersBillingOnly: inviteSomeoneToPay !== undefined });
   const href = planManagementUrl(isSaaS);
   const navigation = useOptionalUiHostServices()?.navigation;
-  const words = limitWords({ isSaaS, isSeatLimit, isAdmin });
+  const words = limitWords({ isSaaS, isSeatLimit, isAdmin, limitType: variant.limitType });
 
   return (
     <Dialog

@@ -58,6 +58,22 @@ Feature: paymentsim, a local stand-in for Stripe
       And checkout.session.completed, customer.subscription.created, invoice.finalized, invoice.paid and invoice.payment_succeeded fire in that order
 
     @unit
+    Scenario: An open checkout session is listed and expired as Stripe does
+      Given a customer with two open checkout sessions
+      When the customer's open sessions are listed and one is expired
+      Then the list answers both, newest first, and the expired one no longer shows as open
+      And the expiry is announced as checkout.session.expired
+      And expiring it again is refused, as is completing it
+
+    @unit
+    Scenario: A paid invoice's payment is refunded as Stripe refunds it
+      Given a subscription whose first invoice was paid
+      When its payment is refunded by payment intent or by charge
+      Then the refund succeeds for the amount paid and fires refund.created
+      And the control API and haven sim payment refunds list it against the invoice
+      And refunding it again is refused with charge_already_refunded
+
+    @unit
     Scenario: A payment-link checkout carries the link and the buyer's details
       Given a checkout session created with a payment link and the buyer's email
       When the session is completed through the control API with the buyer's name
@@ -125,6 +141,85 @@ Feature: paymentsim, a local stand-in for Stripe
       Given a subscription set to cancel at period end
       When the clock moves past the period end
       Then the subscription is canceled and customer.subscription.deleted fires
+
+  Rule: Pending updates hold a seat change until it is paid
+
+    @unit
+    Scenario: A pending_if_incomplete seat change that pays applies at once
+      Given a subscription with two seats
+      When billing asks for three seats with proration_behavior always_invoice, payment_behavior pending_if_incomplete and latest_invoice expanded
+      Then the subscription has three seats and no pending_update
+      And latest_invoice is the paid proration invoice with its hosted_invoice_url, and the id when not expanded
+
+    @unit
+    Scenario: The default payment_behavior applies a declined seat change as before
+      Given a subscription with two seats and the customer's next charge set to fail
+      When billing asks for three seats with proration_behavior always_invoice and no payment_behavior
+      Then the subscription has three seats and is past_due
+
+    @unit
+    Scenario: A declined pending_if_incomplete change keeps the items and holds a pending update
+      Given a subscription with two seats and the customer's next charge set to fail
+      When billing asks for three seats with payment_behavior pending_if_incomplete
+      Then the subscription keeps two seats, stays active and holds a pending_update for three seats expiring in 23 hours
+      And latest_invoice is open, attempted and carries its hosted_invoice_url
+      And invoice.finalized, invoice.payment_failed and customer.subscription.updated fire in that order
+
+    @unit
+    Scenario: A charge needing customer action fires invoice.payment_action_required
+      Given the customer's next charge is set to need customer action
+      When billing asks for three seats with payment_behavior pending_if_incomplete
+      Then invoice.payment_failed and invoice.payment_action_required fire and the pending_update is held
+
+    @unit
+    Scenario: Paying the held invoice applies the pending update once
+      Given a held pending update for three seats
+      When billing pays its invoice
+      Then the subscription has three seats and no pending_update
+      And customer.subscription.updated, invoice.paid and invoice.payment_succeeded fire in that order
+      And paying it again answers invoice_already_paid and fires nothing
+
+    @unit
+    Scenario: The hosted invoice page pays an open invoice
+      Given a held pending update whose invoice needs customer action
+      When the customer opens its hosted_invoice_url and presses Pay
+      Then the page shows Paid and the subscription has the new seats
+
+    @unit
+    Scenario: A control retry of the held invoice applies the pending update
+      Given a held pending update for four seats
+      When the invoice is retried through the control API
+      Then the invoice is paid and the subscription has four seats
+
+    @unit
+    Scenario: An expired pending update is discarded and its invoice voided
+      Given a held pending update
+      When the clock moves 24 hours on
+      Then customer.subscription.updated and invoice.voided fire, the seats are unchanged and the invoice is void
+      And paying the void invoice is refused
+
+    @unit
+    Scenario: Voiding the held invoice discards its pending update
+      Given a held pending update for three seats
+      When billing voids its invoice
+      Then the subscription keeps two seats with no pending_update and the invoice is void
+      And paying the void invoice is refused
+
+    @unit
+    Scenario: A pending update that expires unpaid takes the usage it billed with it
+      Given a subscription with two seats and 1500 metered events this period
+      And the customer's next charge needs their action
+      When a pending_if_incomplete change to three seats is held
+      Then the pending update invoice bills the events used so far
+      And after it expires unpaid the renewal bills the seats and no events
+
+    @unit
+    Scenario: An invoice of its own with auto_advance off waits for pay and keeps the cycle's usage
+      Given a subscription with two seats and 1500 metered events this period
+      And the customer's next charge needs their action
+      When an invoice with auto_advance off and one invoice item is finalized
+      Then it stays open with no charge attempted, and pay answers that the customer must act
+      And after it is voided the renewal still bills the seats and the events
 
   Rule: Usage metering
 

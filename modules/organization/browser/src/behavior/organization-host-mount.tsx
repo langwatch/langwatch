@@ -48,6 +48,7 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
       activeProject: OrganizationProjectReading | undefined;
       isEnterprise: boolean;
       isPlanLoading: boolean;
+      isLiteMember: boolean;
       /** Whether this deployment can send the invitation rather than only mint a link. */
       hasEmailProvider: boolean;
       flags: UiFlags;
@@ -101,6 +102,10 @@ class CapabilityOrganizationHost extends OrganizationHostApi {
 
   isPlanLoading(): boolean {
     return this.deps.isPlanLoading;
+  }
+
+  isLiteMember(): boolean {
+    return this.deps.isLiteMember;
   }
 
   hasEmailProvider(): boolean {
@@ -208,6 +213,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
         activeProject: graph.activeProject?.project,
         isEnterprise: facts.isEnterprise,
         isPlanLoading: facts.isPlanLoading,
+        isLiteMember: facts.isLiteMember,
         hasEmailProvider: deployment.hasEmailProvider,
         flags,
         openOverlay: (drawer, props) => openDrawer(drawer, props),
@@ -231,6 +237,7 @@ export default function OrganizationHostMount({ children }: { children?: ReactNo
       flags,
       facts.isEnterprise,
       facts.isPlanLoading,
+      facts.isLiteMember,
       deployment.hasEmailProvider,
       openDrawer,
       closeDrawer,

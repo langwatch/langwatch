@@ -12,7 +12,7 @@ import {
   PrismaTenancyGuardService,
 } from "@langwatch/prisma-client";
 import { Temporal } from "@langwatch/time";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, describe, expect, it } from "vitest";
 
 import type { SeatLineClaim } from "../../seat-event-subscription.repository.ts";
 import { PrismaSeatEventSubscriptionRepository } from "../prisma.seat-event-subscription.repository.ts";
@@ -27,17 +27,15 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
   }).connect(PrismaConfigService.create().resolve({ databaseUrl: DB_URL ?? "", log: ["error"] }));
   const prisma = connection.client;
   const subscriptions = PrismaSeatEventSubscriptionRepository.create(prisma);
-  let organizationId = "";
-
-  beforeAll(async () => {
-    const organization = await prisma.organization.create({
-      data: { name: "ACME", slug: `--${run}` },
-    });
-    organizationId = organization.id;
-  });
+  // One organization per seeded row: an organization holds one live Stripe-backed plan.
+  const organizationOf = new Map<string, string>();
 
   const seed = async (suffix: string) => {
     const id = `${run}_${suffix}`;
+    const { id: organizationId } = await prisma.organization.create({
+      data: { name: "ACME", slug: `--${run}-${suffix}` },
+    });
+    organizationOf.set(id, organizationId);
     await prisma.subscription.create({
       data: {
         id,
@@ -59,8 +57,9 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
     ).filter((row) => row.id.startsWith(run));
 
   afterAll(async () => {
-    await prisma.subscription.deleteMany({ where: { organizationId } });
-    await prisma.organization.delete({ where: { id: organizationId } });
+    const organizationIds = [...organizationOf.values()];
+    await prisma.subscription.deleteMany({ where: { organizationId: { in: organizationIds } } });
+    await prisma.organization.deleteMany({ where: { id: { in: organizationIds } } });
     await prisma.$disconnect();
   });
 
@@ -72,7 +71,7 @@ describe.skipIf(!DB_URL)("PrismaSeatEventSubscriptionRepository seat line repair
     expect(await pendingOfRun()).toEqual([
       {
         id,
-        organizationId,
+        organizationId: organizationOf.get(id),
         stripeSubscriptionId: `${id}_stripe`,
         quantity: 3,
         liftedQuantity: 5,

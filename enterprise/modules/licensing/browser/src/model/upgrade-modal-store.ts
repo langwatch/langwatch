@@ -17,6 +17,7 @@ export type UpgradeModalSeatsVariant = { mode: "seats" } & UpgradeModalSeatsRequ
 type LiteMemberRestrictionVariant = {
   mode: "liteMemberRestriction";
   resource?: string;
+  permission?: string;
 };
 
 export type UpgradeModalVariant =
@@ -35,7 +36,7 @@ interface UpgradeModalState {
   openSeats: (params: UpgradeModalSeatsRequest) => void;
 
   /** Open the modal in lite member restriction mode. */
-  openLiteMemberRestriction: (params: { resource?: string }) => void;
+  openLiteMemberRestriction: (params: { resource?: string; permission?: string }) => void;
 
   /** Close the modal and reset all state. */
   close: () => void;
@@ -65,10 +66,10 @@ export const useUpgradeModalStore = defineSlice<UpgradeModalState>({
         },
       }),
 
-    openLiteMemberRestriction: ({ resource }) =>
+    openLiteMemberRestriction: ({ resource, permission }) =>
       set({
         isOpen: true,
-        variant: { mode: "liteMemberRestriction", resource },
+        variant: { mode: "liteMemberRestriction", resource, permission },
       }),
 
     close: () =>

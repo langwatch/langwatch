@@ -63,6 +63,8 @@ function subscriptionStore() {
     },
     cancelTrialSubscriptions: async () => {},
     findSupersededBySeatEvent: async () => [],
+    findLiveUnlinkedBeside: async () => [],
+    findLiveLinkedBeside: async () => [],
   });
   return { repository, current: () => row };
 }

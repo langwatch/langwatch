@@ -33,7 +33,7 @@ export function reportLicenseFailure(error: unknown): boolean {
   const restriction = extractLiteMemberRestrictionInfo(error);
   if (restriction) {
     if (error instanceof Error) markAsHandledByLiteMemberHandler(error);
-    useUpgradeModalStore.getState().openLiteMemberRestriction({ resource: restriction.resource });
+    useUpgradeModalStore.getState().openLiteMemberRestriction(restriction);
     reported = true;
   }
 

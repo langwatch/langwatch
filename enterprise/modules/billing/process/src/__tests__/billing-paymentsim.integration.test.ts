@@ -4,6 +4,7 @@
  * @vitest-environment node
  * @see specs/setup/payment-simulator.feature
  * @see enterprise/modules/billing/specs/euro-usage-prices.feature
+ * @see specs/licensing/role-change-seat.feature
  */
 import { type ChildProcess, spawn, spawnSync } from "node:child_process";
 import { createServer, type Server } from "node:http";
@@ -47,6 +48,7 @@ import { MemoryBillingWebhookOrganizationRepository } from "../repositories/memo
 import { MemoryBillingWebhookSubscriptionRepository } from "../repositories/memory/memory.billing-webhook-subscription.repository.ts";
 import { MemoryBillingRepositories } from "../repositories/memory/memory.billing.repositories.ts";
 import { MemoryBillingStore } from "../repositories/memory/memory.billing.store.ts";
+import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/memory.seat-event-subscription.repository.ts";
 import { MemoryBillingSubscriptionRepository } from "../repositories/memory/memory.subscription.repository.ts";
 import { priceLineOf } from "../rules/price-line.rules.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
@@ -59,6 +61,7 @@ const SECRET_KEY = "sk_test_paymentsim";
 const WEBHOOK_SECRET = "whsec_paymentsim";
 const LAUNCH_PRICE = "price_1R9LHnIMsTw08cudoc9eO4L8";
 const GROWTH_SEAT_USD_MONTHLY = "price_1SzP11IMsTw08cudRhGETYNa";
+const GROWTH_EVENTS_USD_MONTHLY = "price_1T8nfzIMsTw08cudahMR8H7U";
 const GROWTH_PII_REDACTION_USD = "price_1Uat9tIMsTw08cudpWWrZG4a";
 const GROWTH_SEAT_EUR_MONTHLY = "price_1SyxCwIMsTw08cudPPOqniRl";
 const GROWTH_INSTANT_EVAL_USD = "price_instant_eval_usd_sim";
@@ -149,6 +152,7 @@ describe.skipIf(!goPresent)(
     let sim: ChildProcess;
     let receiver: Server;
     let simBase = "";
+    let app: BillingModule;
     const store = MemoryBillingStore.create();
     const subscriptions = MemoryBillingSubscriptionRepository.create(store);
 
@@ -231,10 +235,11 @@ describe.skipIf(!goPresent)(
           store,
         }),
         webhookOrganizations: MemoryBillingWebhookOrganizationRepository.create(store),
+        seatEventSubscriptions: MemorySeatEventSubscriptionRepository.create(store),
       };
       const simPort = await freePort();
       simBase = `http://127.0.0.1:${simPort}`;
-      const app = BillingModule.assemble({
+      app = BillingModule.assemble({
         repositories,
         config: {
           bankDetails: undefined,
@@ -255,6 +260,11 @@ describe.skipIf(!goPresent)(
               apiBase: simBase,
             }),
           },
+        },
+        // Composed so seat purchases run; nothing here reads its notices or facts.
+        subscription: {
+          notifier: { send: async () => {} },
+          facts: { seatCheckoutsAbandoned: async () => {}, audited: async () => {} },
         },
         usageReporting: () =>
           createStripeUsageReporting({
@@ -906,6 +916,184 @@ describe.skipIf(!goPresent)(
       expect(await instantUsage(disagreeing)).toEqual([
         expect.objectContaining({ value: 0.3, events: 1 }),
       ]);
+    }, 30_000);
+
+    /** @scenario "Two paid seat checkouts keep one plan" */
+    it("cancels and refunds a second paid seat checkout at the provider, keeping the first plan", async () => {
+      const organizationId = "org-second-checkout";
+      const customer = (await stripe("/customers", { name: organizationId })).id;
+      store.organizations.set(organizationId, {
+        id: organizationId,
+        name: organizationId,
+        stripeCustomerId: customer,
+        pricingModel: "SEAT_EVENT",
+        currency: "USD",
+        selfHostedCustomer: false,
+        teamIds: [],
+        signupData: {},
+      });
+      const live = await subscriptions.createPending({
+        organizationId,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+      });
+      await subscriptions.updateStatus({ id: live.id, status: "ACTIVE" });
+      await subscriptions.linkStripeId({ id: live.id, stripeSubscriptionId: "sub_first_plan" });
+      const second = await subscriptions.createPending({
+        organizationId,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+      });
+      const session = await stripe("/checkout/sessions", {
+        mode: "subscription",
+        customer,
+        success_url: "http://langwatch.test/settings/subscription",
+        client_reference_id: `subscription_setup_${second.id}`,
+        "line_items[0][price]": GROWTH_SEAT_USD_MONTHLY,
+        "line_items[0][quantity]": "1",
+      });
+      const paid = z
+        .looseObject({ subscription: z.string() })
+        .parse(await control(`/checkout/${session.id}/complete`, { body: {} }));
+
+      expect(await deliver([await checkoutCompleted(customer)])).toEqual([200]);
+
+      const atProvider = z.looseObject({ status: z.string() }).parse(
+        await fetch(`${simBase}/v1/subscriptions/${paid.subscription}`, {
+          headers: { authorization: `Bearer ${SECRET_KEY}` },
+        }).then((answer) => answer.json()),
+      );
+      expect(atProvider.status).toBe("canceled");
+      const { refunds } = z
+        .object({ refunds: z.array(z.looseObject({ status: z.string(), amount: z.number() })) })
+        .parse(await control("/refunds"));
+      expect(refunds).toEqual([expect.objectContaining({ status: "succeeded" })]);
+      expect(refunds[0]?.amount).toBeGreaterThan(0);
+      const rows = store.subscriptions.filter((row) => row.organizationId === organizationId);
+      expect(rows.filter((row) => row.status === "ACTIVE").map((row) => row.id)).toEqual([live.id]);
+      expect(rows.find((row) => row.id === second.id)).toMatchObject({
+        status: "CANCELLED",
+        stripeSubscriptionId: paid.subscription,
+      });
+    }, 30_000);
+
+    /** @scenario "An unpaid seat invoice never takes the period's usage" */
+    it("bills a seat on its own invoice and leaves the period's usage to the renewal", async () => {
+      const organizationId = "org-seat-unpaid";
+      const customer = (await stripe("/customers", { name: organizationId })).id;
+      store.organizations.set(organizationId, {
+        id: organizationId,
+        name: organizationId,
+        stripeCustomerId: customer,
+        pricingModel: "SEAT_EVENT",
+        currency: "USD",
+        selfHostedCustomer: false,
+        teamIds: [],
+        signupData: {},
+      });
+      const session = await stripe("/checkout/sessions", {
+        mode: "subscription",
+        customer,
+        success_url: "http://langwatch.test/settings/subscription",
+        "line_items[0][price]": GROWTH_SEAT_USD_MONTHLY,
+        "line_items[0][quantity]": "2",
+        "line_items[1][price]": GROWTH_EVENTS_USD_MONTHLY,
+      });
+      const paid = z
+        .looseObject({ subscription: z.string() })
+        .parse(await control(`/checkout/${session.id}/complete`, { body: {} }));
+      const row = await subscriptions.createPending({
+        organizationId,
+        plan: "GROWTH_SEAT_USD_MONTHLY",
+      });
+      await subscriptions.linkStripeId({ id: row.id, stripeSubscriptionId: paid.subscription });
+      await subscriptions.updateStatus({ id: row.id, status: "ACTIVE" });
+      const stored = store.subscriptions.find((each) => each.id === row.id);
+      if (stored) Object.assign(stored, { maxMembers: 2 });
+      const metered = await fetch(`${simBase}/v1/billing/meter_events`, {
+        method: "POST",
+        headers: { authorization: `Bearer ${SECRET_KEY}` },
+        body: new URLSearchParams({
+          event_name: "langwatch_billable_events",
+          "payload[stripe_customer_id]": customer,
+          "payload[value]": "1500",
+          identifier: "seat-unpaid-usage",
+        }),
+      });
+      expect(metered.ok).toBe(true);
+      await control("/payment-failures", { body: { customer, kind: "requires_action" } });
+
+      const purchase = await app.addFullSeat({
+        organizationId,
+        baseUrl: "http://langwatch.test",
+        successPath: "/settings/members",
+        customerEmail: null,
+      });
+
+      expect(purchase).toMatchObject({ status: "payment_required", payment: { kind: "invoice" } });
+      const invoiceId =
+        purchase.status === "payment_required" && purchase.payment.kind === "invoice"
+          ? purchase.payment.invoiceId
+          : "";
+      const read = async (path: string) =>
+        fetch(`${simBase}/v1${path}`, { headers: { authorization: `Bearer ${SECRET_KEY}` } }).then(
+          (answer) => answer.json(),
+        );
+      const seatInvoice = z
+        .looseObject({
+          status: z.string(),
+          lines: z.object({ data: z.array(z.looseObject({ type: z.string() })) }),
+        })
+        .parse(await read(`/invoices/${invoiceId}`));
+      expect(seatInvoice.status).toBe("open");
+      expect(seatInvoice.lines.data.map((line) => line.type)).toEqual(["invoiceitem"]);
+      const lineQuantity = z.object({
+        pending_update: z.unknown(),
+        items: z.object({
+          data: z.array(
+            z.object({ price: z.object({ id: z.string() }), quantity: z.number().nullish() }),
+          ),
+        }),
+      });
+      const seatLine = async () => {
+        const sub = lineQuantity.parse(await read(`/subscriptions/${paid.subscription}`));
+        return {
+          pending: sub.pending_update ?? null,
+          seats: sub.items.data.find((item) => item.price.id === GROWTH_SEAT_USD_MONTHLY)?.quantity,
+        };
+      };
+      expect(await seatLine()).toEqual({ pending: null, seats: 2 });
+
+      // Left unpaid past Stripe's 23h pending lifetime, then voided as billing voids a lapsed one.
+      await control("/clock/advance", { body: { seconds: 24 * 60 * 60 } });
+      await stripe(`/invoices/${invoiceId}/void`, {});
+      expect(
+        await app.settleSeatPayment({
+          organizationId,
+          payment: { kind: "invoice", invoiceId, seats: 3 },
+        }),
+      ).toEqual({ status: "failed" });
+      expect(await seatLine()).toEqual({ pending: null, seats: 2 });
+
+      await control("/clock/advance", { body: { seconds: 31 * 24 * 60 * 60 } });
+      const renewals = z
+        .object({
+          data: z.array(
+            z.looseObject({
+              billing_reason: z.string(),
+              lines: z.object({
+                data: z.array(
+                  z.looseObject({ price: z.object({ id: z.string() }), quantity: z.number() }),
+                ),
+              }),
+            }),
+          ),
+        })
+        .parse(await read(`/invoices?subscription=${paid.subscription}&limit=10`));
+      const renewal = renewals.data.find(
+        (invoice) => invoice.billing_reason === "subscription_cycle",
+      );
+      expect(
+        renewal?.lines.data.find((line) => line.price.id === GROWTH_EVENTS_USD_MONTHLY)?.quantity,
+      ).toBe(1500);
     }, 30_000);
 
     /** @scenario "A failed renewal payment is recorded" */

@@ -201,6 +201,7 @@ const LET_THROUGH_PERMISSIONS: AuthzPermission[] = [
   "evaluations:view",
   "governance:view",
   "langy:view",
+  "members:view",
   "organization:manage",
   "organization:view",
   "project:delete",

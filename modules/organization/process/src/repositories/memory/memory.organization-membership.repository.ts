@@ -57,6 +57,7 @@ import type {
   UnfinishedSeatAdmission,
   WaitingMember,
 } from "../organization-membership.repository.ts";
+import { RoleVersionMovedError } from "../organization-membership.repository.ts";
 import type { SeatHold, SeatTransition } from "../seat-hold.repository.ts";
 import { MemoryOrganizationSeatRepository } from "./memory.organization-seat.repository.ts";
 import {
@@ -503,6 +504,20 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
       .map((row) => row.teamId);
   }
 
+  async getRoleVersion(params: { organizationId: string; userId: string }): Promise<number> {
+    const row = this.membershipRow(params);
+    if (!row) throw new MemberNotFoundError(params.userId);
+    return row.roleVersion ?? 0;
+  }
+
+  async isRoleChangeApplied(params: {
+    organizationId: string;
+    userId: string;
+    changeId: string;
+  }): Promise<boolean> {
+    return this.membershipRow(params)?.lastRoleChangeId === params.changeId;
+  }
+
   async getMembership(params: {
     organizationId: string;
     userId: string;
@@ -816,6 +831,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     row.disabledAt = null;
     row.seatPendingSince = null;
     row.pendingSsoGrantId = input.pendingAdmissionId;
+    row.roleVersion = (row.roleVersion ?? 0) + 1;
+    row.lastRoleChangeId = null;
     this.applySeatTransition({ row, seat: input.seat });
     row.updatedAt = nowInstant();
     return true;
@@ -921,6 +938,10 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     if (!row) throw new MemberNotFoundError(userId);
     // As the ledger does: a role's grants land only on a live membership.
     if (row.disabledAt) throw new BindingMissingError();
+    const roleVersion = row.roleVersion ?? 0;
+    if (input.expectedRoleVersion !== undefined && input.expectedRoleVersion !== roleVersion) {
+      throw new RoleVersionMovedError(userId, row.lastRoleChangeId ?? null);
+    }
 
     if (isAdminDemotion({ currentRole: row.role, role })) {
       if (
@@ -934,6 +955,8 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     this.assertCustomRolesAssignable({ organizationId, updates: effectiveTeamRoleUpdates });
     row.role = role;
     row.billingOnly = false;
+    row.roleVersion = roleVersion + 1;
+    row.lastRoleChangeId = input.roleChangeId ?? null;
     row.updatedAt = nowInstant();
     this.applySeatTransition({ row, seat: input.seat });
     this.applyDeveloperSeat({ organizationId, userId, role });

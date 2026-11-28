@@ -4,7 +4,11 @@
  * @vitest-environment jsdom
  * @see modules/experiment/specs/workbench-view-only-access.feature
  */
+import { UiHostServicesContextProvider } from "@langwatch/browser-host/capabilities";
+import { uiDeclarations } from "@langwatch/browser-host/declarations";
+import { createUiHostServicesFromHost } from "@langwatch/browser-host/testing";
 import { renderWithDesignSystem } from "@langwatch/design-system/testing";
+import { RequestAccessToken, type RequestAccessProps } from "@langwatch/organization-client";
 import { cleanup, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -59,6 +63,45 @@ describe("the workbench for a role that cannot change it", () => {
       expect(notice).toHaveTextContent("You can view this experiment, but not change it");
       expect(notice).toHaveTextContent("Ask an organization admin for access");
       expect(screen.getByTestId("autosave-view-only")).toHaveTextContent("View only");
+    });
+  });
+
+  describe("given a Lite Member seat, where organization lends Request access", () => {
+    /** Organization's button as its declaration lends it, naming only the reason it was handed. */
+    function LentRequestAccess({ reason }: RequestAccessProps) {
+      return <button type="button">Request access to {reason}</button>;
+    }
+
+    const organizationLendsRequestAccess = {
+      ...createUiHostServicesFromHost({
+        route: () => ({ params: {}, query: {} }),
+        navigate: () => {},
+      }),
+      declarations: uiDeclarations([
+        {
+          name: "organization",
+          installation: {
+            capabilities: {},
+            lends: [
+              { token: RequestAccessToken, load: async () => ({ default: LentRequestAccess }) },
+            ],
+          },
+        },
+      ]),
+    };
+
+    /** @scenario "A Lite Member can request access from the view-only notice" */
+    it("offers Request access inside the view-only notice", async () => {
+      renderWithDesignSystem(
+        <UiHostServicesContextProvider value={organizationLendsRequestAccess}>
+          <WorkbenchViewOnlyBanner access={{ maySave: false, mayRun: false }} />
+        </UiHostServicesContextProvider>,
+      );
+
+      const request = await screen.findByRole("button", {
+        name: "Request access to run_experiments",
+      });
+      expect(screen.getByTestId("workbench-view-only-banner")).toContainElement(request);
     });
   });
 

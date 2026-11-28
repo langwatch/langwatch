@@ -21,7 +21,11 @@ function door(options: { beyondCaller?: string[] }) {
     invites: [],
   }));
   const createPaymentPending = vi.fn(async () => undefined);
-  const invitations = createApiFixture<OrganizationInvitations>({ create, createPaymentPending });
+  const invitations = createApiFixture<OrganizationInvitations>({
+    create,
+    createPaymentPending,
+    assertNotAlreadyMembers: vi.fn(async () => undefined),
+  });
   const signals = createApiFixture<OrganizationSignals>({ trackServerEvent: vi.fn() });
 
   const assertWithinCaller = vi.fn(async () => {

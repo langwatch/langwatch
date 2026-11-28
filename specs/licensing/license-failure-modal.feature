@@ -30,6 +30,21 @@ Feature: Upgrade modal when a call is refused by the licence
     And the refusal does not surface as a generic red error toast
 
   @integration
+  Scenario: A refused workbench save on a Lite Member seat shows only the restriction modal
+    Given I am on a Lite Member seat in the experiment workbench
+    When an autosave is refused as restricted for that seat and the restriction modal opened
+    Then no second error toast says the save failed
+    And the workbench turns view only for the rest of the visit
+
+  @integration
+  Scenario: A workbench save refused at a plan limit names the limit in the save status
+    Given I am in the experiment workbench on a plan at one of its limits
+    When an autosave is refused for that limit and the upgrade modal opened
+    Then the save status says the plan's limit refused the save
+    And no second error toast says the save failed
+    And the workbench stays editable
+
+  @integration
   Scenario: A refusal the licence does not explain is left to the screen
     Given a call fails for a reason unrelated to the licence
     When the licensing reader reads it

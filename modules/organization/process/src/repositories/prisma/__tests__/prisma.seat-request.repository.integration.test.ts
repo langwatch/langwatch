@@ -49,6 +49,31 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
       at,
     });
 
+  describe("when a claimed sales notice did not go out", () => {
+    it("frees only the claim taken at that moment, so the next ask can claim it", async () => {
+      const opened = await requests.open({
+        id: `${namespace}-sales-row`,
+        organizationId,
+        email: "sales@acme.example",
+        userId: null,
+        name: null,
+        source: "idp_refused",
+        idpRefused: true,
+        idpKind: "okta",
+        at: 600,
+      });
+      const row = opened.request;
+      expect(await requests.claimSalesNotice({ id: row.id, at: 700 })).toBe(true);
+
+      await requests.releaseSalesNotice({ id: row.id, at: 699 });
+      expect(await requests.claimSalesNotice({ id: row.id, at: 710 })).toBe(false);
+
+      await requests.releaseSalesNotice({ id: row.id, at: 700 });
+      expect(await requests.claimSalesNotice({ id: row.id, at: 720 })).toBe(true);
+      await prisma.seatRequest.deleteMany({ where: { organizationId, id: row.id } });
+    });
+  });
+
   describe("when the same address opens, repeats, is declined and opens again", () => {
     it("keeps one row: opened, already open, then reopened with a fresh sales claim", async () => {
       const first = await open(`${namespace}-a`, 1_000);
@@ -83,6 +108,49 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
       expect((await requests.findOpen({ organizationId })).map((row) => row.id)).toEqual([
         first.request.id,
       ]);
+    });
+  });
+
+  describe("when a Lite Member asks, asks again, is declined and asks once more", () => {
+    /** @scenario "Asking again while a request is open answers the same request" */
+    it("keeps what she was trying to do, and takes the new reason when it reopens", async () => {
+      const ask = (id: string, at: number, reason?: string) =>
+        requests.open({
+          id,
+          organizationId,
+          email: "lena@acme.example",
+          userId: "user-lena",
+          name: "Lena Lite",
+          source: "requested",
+          idpRefused: false,
+          idpKind: null,
+          reason,
+          at,
+        });
+
+      const first = await ask(`${namespace}-lena-a`, 1_000, "run the workbench");
+      const again = await ask(`${namespace}-lena-b`, 2_000);
+
+      expect(first.request).toMatchObject({ source: "requested", reason: "run the workbench" });
+      expect(again).toMatchObject({
+        outcome: "already_open",
+        request: { id: first.request.id, reason: "run the workbench" },
+      });
+      await requests.resolve({
+        organizationId,
+        id: first.request.id,
+        status: "DECLINED",
+        resolvedByUserId: "user-ada",
+        at: 3_000,
+      });
+
+      const reopened = await ask(`${namespace}-lena-c`, 4_000, "save a prompt");
+
+      expect(reopened).toMatchObject({ outcome: "reopened", request: { reason: "save a prompt" } });
+      const [mine] = (await requests.findForUser({ userId: "user-lena" })).filter(
+        (row) => row.organizationId === organizationId,
+      );
+      expect(mine).toMatchObject({ status: "OPEN", reason: "save a prompt" });
     });
   });
 
@@ -325,6 +393,85 @@ describe.skipIf(!DB_URL)("Prisma seat requests and access notices", () => {
       expect((await record(`${namespace}-n4`)).map((row) => row.id)).toEqual([stored!.id]);
       expect(await notices.countRefusedForDay({ organizationId, dayKey: "2026-11-06" })).toBe(1);
       expect(await notices.countRefusedForDay({ organizationId, dayKey: "2026-11-07" })).toBe(0);
+    });
+  });
+
+  describe("when a request is approved and asked again while its seat is being given", () => {
+    /** @scenario "Asking again while an approval is giving its seat reopens nothing" */
+    it("leaves the approval in place, and reopens only once the seat is settled", async () => {
+      const ask = (id: string, at: number) =>
+        requests.open({
+          id,
+          organizationId,
+          email: "mia@acme.example",
+          userId: "user-mia",
+          name: "Mia",
+          source: "requested",
+          idpRefused: false,
+          idpKind: null,
+          at,
+        });
+      const first = await ask(`${namespace}-mia-a`, 1_000);
+      await requests.resolve({
+        organizationId,
+        id: first.request.id,
+        status: "APPROVED",
+        resolvedByUserId: "user-ada",
+        at: 2_000,
+      });
+
+      const during = await ask(`${namespace}-mia-b`, 2_500);
+      await requests.settleSeat({ organizationId, id: first.request.id, at: 2_000 });
+      const after = await ask(`${namespace}-mia-c`, 3_000);
+
+      expect(during).toMatchObject({
+        outcome: "resolved_meanwhile",
+        request: { status: "APPROVED" },
+      });
+      expect(after).toMatchObject({ outcome: "reopened", request: { status: "OPEN" } });
+    });
+  });
+
+  describe("when an approval names an opening the request no longer has", () => {
+    /** @scenario "A Stripe page from before a decline never approves the request opened again" */
+    it("leaves the reopened request open, and approves only its own opening", async () => {
+      const ask = (id: string, at: number) =>
+        requests.open({
+          id,
+          organizationId,
+          email: "noa@acme.example",
+          userId: "user-noa",
+          name: "Noa",
+          source: "requested",
+          idpRefused: false,
+          idpKind: null,
+          at,
+        });
+      const first = await ask(`${namespace}-noa-a`, 1_000);
+      await requests.resolve({
+        organizationId,
+        id: first.request.id,
+        status: "DECLINED",
+        resolvedByUserId: "user-ada",
+        at: 2_000,
+      });
+      await ask(`${namespace}-noa-b`, 3_000);
+      const approve = (openedAt: number) =>
+        requests.resolve({
+          organizationId,
+          id: first.request.id,
+          status: "APPROVED",
+          resolvedByUserId: "user-ada",
+          at: 4_000,
+          openedAt,
+        });
+
+      expect(await approve(1_000)).toBe(false);
+      expect(await requests.getOpen({ organizationId, id: first.request.id })).toMatchObject({
+        status: "OPEN",
+        openedAt: 3_000,
+      });
+      expect(await approve(3_000)).toBe(true);
     });
   });
 });

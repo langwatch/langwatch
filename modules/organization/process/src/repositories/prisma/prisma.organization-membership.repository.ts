@@ -109,6 +109,7 @@ import type {
   UnfinishedSeatAdmission,
   WaitingMember,
 } from "../organization-membership.repository.ts";
+import { RoleVersionMovedError } from "../organization-membership.repository.ts";
 import type { OrganizationSettingsCipher } from "../organization.repository.ts";
 import type { SeatHold, SeatTransition } from "../seat-hold.repository.ts";
 
@@ -992,6 +993,69 @@ function auditLogFilterConditions({
   return conditions;
 }
 
+/**
+ * Writes the member's role and moves its role version. With an expected version the update
+ * matches only while the version holds, re-read under the row lock, so a role write committed
+ * meanwhile refuses this one with `RoleVersionMovedError`, naming the paid change it applied.
+ */
+async function writeMembershipRole({
+  tx,
+  input,
+  columns,
+}: {
+  tx: Prisma.TransactionClient;
+  input: UpdateMemberRoleInput;
+  columns: { fullSeatSince?: Date | null };
+}): Promise<{ updatedAt: Date; departmentId: string | null }> {
+  const { organizationId, userId, role, expectedRoleVersion } = input;
+  // Any role change ends Billing only; the new role is metered (ADR-205).
+  const data = {
+    role,
+    billingOnly: false,
+    ...columns,
+    roleVersion: { increment: 1 },
+    lastRoleChangeId: input.roleChangeId ?? null,
+  };
+  const where = { userId_organizationId: { userId, organizationId } };
+  const select = { updatedAt: true, departmentId: true } as const;
+  if (expectedRoleVersion === undefined) {
+    return tx.organizationUser.update({ where, data, select });
+  }
+  // One conditional update: updateMany reads the ids first and drops the version predicate.
+  try {
+    return await tx.organizationUser.update({
+      where: {
+        userId_organizationId: { userId, organizationId },
+        roleVersion: expectedRoleVersion,
+      },
+      data,
+      select,
+    });
+  } catch (error) {
+    if (!(error instanceof Prisma.PrismaClientKnownRequestError) || error.code !== "P2025") {
+      throw error;
+    }
+    const current = await tx.organizationUser.findUnique({
+      where,
+      select: { lastRoleChangeId: true },
+    });
+    throw new RoleVersionMovedError(userId, current?.lastRoleChangeId ?? null);
+  }
+}
+
+/** True when the conditional update matched its row; false when nothing matched (P2025). */
+async function admittingUpdate(write: Promise<unknown>): Promise<boolean> {
+  try {
+    await write;
+    return true;
+  } catch (error) {
+    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === "P2025") {
+      return false;
+    }
+    throw error;
+  }
+}
+
 export class PrismaOrganizationMembershipRepository implements OrganizationMembershipRepository {
   static create(options: {
     database: PrismaClient;
@@ -1789,6 +1853,29 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return memberSummaryFromRecord(membership);
   }
 
+  async getRoleVersion(params: { organizationId: string; userId: string }): Promise<number> {
+    const { organizationId, userId } = params;
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { roleVersion: true },
+    });
+    if (!membership) throw new MemberNotFoundError(userId);
+    return membership.roleVersion;
+  }
+
+  async isRoleChangeApplied(params: {
+    organizationId: string;
+    userId: string;
+    changeId: string;
+  }): Promise<boolean> {
+    const { organizationId, userId, changeId } = params;
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { lastRoleChangeId: true },
+    });
+    return membership?.lastRoleChangeId === changeId;
+  }
+
   async findActiveAdministratorIds(params: { organizationId: string }): Promise<string[]> {
     const rows = await this.prisma.organizationUser.findMany({
       where: {
@@ -2238,22 +2325,28 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
         cause: "enabled",
         actorUserId: input.actorUserId ?? null,
         write: async () => {
-          const admitted = await tx.organizationUser.updateMany({
-            where: {
-              organizationId,
-              userId,
-              disabledAt: { not: null },
-              seatPendingSince: { not: null },
-            },
-            data: {
-              role: OrganizationUserRole.MEMBER,
-              billingOnly: false,
-              disabledAt: null,
-              seatPendingSince: null,
-              pendingSsoGrantId: pendingAdmissionId,
-            },
-          });
-          if (admitted.count === 0) return false;
+          // A role write like any other: it moves the role version, so a paid change asked
+          // before it is replaced. One conditional update, so of two admissions one admits.
+          const admitted = await admittingUpdate(
+            tx.organizationUser.update({
+              where: {
+                userId_organizationId: { userId, organizationId },
+                disabledAt: { not: null },
+                seatPendingSince: { not: null },
+              },
+              data: {
+                role: OrganizationUserRole.MEMBER,
+                billingOnly: false,
+                disabledAt: null,
+                seatPendingSince: null,
+                pendingSsoGrantId: pendingAdmissionId,
+                roleVersion: { increment: 1 },
+                lastRoleChangeId: null,
+              },
+              select: { userId: true },
+            }),
+          );
+          if (!admitted) return false;
           const seatColumns = await applySeatTransition({ tx, organizationId, userId, seat });
           if ("fullSeatSince" in seatColumns) {
             await tx.organizationUser.update({
@@ -2350,12 +2443,7 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
             userId,
             seat: input.seat,
           });
-          const row = await tx.organizationUser.update({
-            where: { userId_organizationId: { userId, organizationId } },
-            // Any role change ends Billing only; the new role is metered (ADR-205).
-            data: { role, billingOnly: false, ...columns },
-            select: { updatedAt: true, departmentId: true },
-          });
+          const row = await writeMembershipRole({ tx, input, columns });
           written = { at: row.updatedAt, departmentId: row.departmentId };
           return columns;
         },

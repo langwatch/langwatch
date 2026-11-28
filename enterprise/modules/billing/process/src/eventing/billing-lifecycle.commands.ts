@@ -9,6 +9,7 @@ import {
   PRICING_MODEL_CHANGED_EVENT_TYPE,
   SEAT_CHECKOUT_PAID_EVENT_TYPE,
   SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
+  SEAT_INVOICE_PAID_EVENT_TYPE,
   OVER_PLAN_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_CHANGED_EVENT_TYPE,
   SUBSCRIPTION_STARTED_EVENT_TYPE,
@@ -58,6 +59,10 @@ import {
   type SeatCheckoutsAbandonedEvent,
   type RecordSeatCheckoutsAbandonedCommandData,
   recordSeatCheckoutsAbandonedCommandDataSchema,
+  RECORD_SEAT_INVOICE_PAID_COMMAND_TYPE,
+  type SeatInvoicePaidEvent,
+  type RecordSeatInvoicePaidCommandData,
+  recordSeatInvoicePaidCommandDataSchema,
   RECORD_OVER_PLAN_CHANGED_COMMAND_TYPE,
   type OverPlanChangedEvent,
   type RecordOverPlanChangedCommandData,
@@ -385,6 +390,39 @@ export class RecordSeatCheckoutPaidCommand implements CommandHandler<
   }
 
   static getAggregateId(payload: RecordSeatCheckoutPaidCommandData): string {
+    return payload.organizationId;
+  }
+}
+
+/** Records that a seat invoice was paid; one event per invoice, however often it is sent. */
+export class RecordSeatInvoicePaidCommand implements CommandHandler<
+  Command<RecordSeatInvoicePaidCommandData>,
+  SeatInvoicePaidEvent
+> {
+  static readonly schema = defineCommandSchema(
+    RECORD_SEAT_INVOICE_PAID_COMMAND_TYPE,
+    recordSeatInvoicePaidCommandDataSchema,
+    "Record that a seat invoice was paid",
+  );
+
+  handle(command: Command<RecordSeatInvoicePaidCommandData>): SeatInvoicePaidEvent[] {
+    const data = command.data;
+    return [
+      EventUtils.createEvent<SeatInvoicePaidEvent>({
+        aggregateType: BILLING_LIFECYCLE_AGGREGATE_TYPE,
+        aggregateId: data.organizationId,
+        tenantId: createTenantId(command.tenantId),
+        type: SEAT_INVOICE_PAID_EVENT_TYPE,
+        version: BILLING_LIFECYCLE_EVENT_VERSION,
+        data,
+        metadata: {},
+        occurredAt: data.occurredAt,
+        idempotencyKey: `${data.organizationId}:seat_invoice_paid:${data.invoiceId}`,
+      }),
+    ];
+  }
+
+  static getAggregateId(payload: RecordSeatInvoicePaidCommandData): string {
     return payload.organizationId;
   }
 }

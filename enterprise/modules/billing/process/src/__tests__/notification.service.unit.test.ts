@@ -22,14 +22,19 @@ vi.mock("@langwatch/observability", () => ({
   createWarnThrottle: () => ({ claim: () => 0, reset: () => {} }),
 }));
 
+import type { BillingUsageLimitOrganization } from "@langwatch/enterprise-billing-contract";
+import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { Temporal } from "@langwatch/time";
 
 import { HttpHubspotFormChannel } from "../channels/http/http.billing.channels.ts";
 import { MemoryUsageLimitEmailChannel } from "../channels/memory/memory.billing.channels.ts";
 import { SlackBillingAlertChannel } from "../channels/slack/slack.billing-alert.channel.ts";
 import { UsageLimitEmailChannel, type UsageLimitEmailData } from "../index.ts";
+import { BillingAlertCooldownService } from "../services/billing-alert-cooldown.service.ts";
 import { BillingErrorReporter } from "../services/billing-error-reporter.service.ts";
 import { NotificationService } from "../services/billing-usage-notice.service.ts";
+import type { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
+import { ResourceLimitAlertService } from "../services/resource-limit-alert.service.ts";
 
 /**
  * The live Slack and HubSpot channels over the suite's mocks; usage-limit mail
@@ -399,6 +404,49 @@ describe("NotificationService", () => {
         ).resolves.toBeUndefined();
         expect(errorReporter.capture).toHaveBeenCalledWith(error);
       });
+    });
+  });
+
+  describe("sendSlackSeatRequest()", () => {
+    const request = {
+      organizationId: "org_acme",
+      organizationName: "Acme",
+      plan: "ENTERPRISE",
+      seats: 5,
+      requestedSeats: 6,
+    };
+
+    it("answers true once the notice went out", async () => {
+      config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+
+      await expect(service.sendSlackSeatRequest(request)).resolves.toBe(true);
+      expect(mockSlackSend).toHaveBeenCalledTimes(1);
+    });
+
+    it("answers sales unsent through the alert service, then sent on the retry", async () => {
+      config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+      const alerts = ResourceLimitAlertService.create({
+        isSaas: true,
+        cooldown: BillingAlertCooldownService.create({ ttlMs: 60_000 }),
+        organizations: createApiFixture<BillingUsageLimitOrganization>({}),
+        plans: createApiFixture<SaaSPlanProviderService>({}),
+        notices: service,
+        errors: errorReporter,
+      });
+      mockSlackSend.mockRejectedValueOnce(new Error("webhook error"));
+
+      await expect(alerts.notifySalesOfSeatRequest(request)).resolves.toEqual({ sent: false });
+      await expect(alerts.notifySalesOfSeatRequest(request)).resolves.toEqual({ sent: true });
+      expect(mockSlackSend).toHaveBeenCalledTimes(2);
+    });
+
+    it("answers false when Slack refused it or no channel is set, so a later ask retries", async () => {
+      config.slackSubscriptionsChannel = "https://hooks.slack.com/subs";
+      mockSlackSend.mockRejectedValueOnce(new Error("webhook error"));
+      await expect(service.sendSlackSeatRequest(request)).resolves.toBe(false);
+
+      config.slackSubscriptionsChannel = undefined;
+      await expect(service.sendSlackSeatRequest(request)).resolves.toBe(false);
     });
   });
 

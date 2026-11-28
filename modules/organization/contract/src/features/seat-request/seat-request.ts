@@ -6,8 +6,8 @@ import type { Named } from "@langwatch/module";
  */
 import { z } from "zod";
 
-/** How the person was left when the request opened. */
-export type SeatRequestSource = "pending" | "lite" | "idp_refused";
+/** How the person was left when the request opened; `requested`: a member asked from a refusal. */
+export type SeatRequestSource = "pending" | "lite" | "idp_refused" | "requested";
 export type SeatRequestStatus = "OPEN" | "APPROVED" | "DECLINED";
 
 const seatRequestSchemaDefinition = z.object({
@@ -15,9 +15,11 @@ const seatRequestSchemaDefinition = z.object({
   email: z.string(),
   name: z.string().nullable(),
   userId: z.string().nullable(),
-  source: z.enum(["pending", "lite", "idp_refused"]),
+  source: z.enum(["pending", "lite", "idp_refused", "requested"]),
   idpRefused: z.boolean(),
   idpKind: signInIdpKindSchema.nullable(),
+  /** What a member who asked was trying to do, in the server's words; null for arrivals. */
+  reason: z.string().nullable(),
   /** Epoch milliseconds. */
   openedAt: z.number(),
 });
@@ -72,6 +74,98 @@ export interface SeatRequestResolvedSchema extends Named<
 export const seatRequestResolvedSchema: SeatRequestResolvedSchema =
   seatRequestResolvedSchemaDefinition;
 export type SeatRequestResolved = z.infer<typeof seatRequestResolvedSchema>;
+
+/**
+ * What a member was trying to do when refused, one of the refusals' fixed reasons. The server
+ * renders each one's words for admins, so a member never puts their own text in a mail.
+ */
+export const seatRequestReasonSchema = z.enum([
+  "run_experiments",
+  "save_prompts",
+  "edit_datasets",
+  "build_workflows",
+  "run_scenarios",
+  "annotate_traces",
+  "set_up_automations",
+  "change_project_settings",
+  "edit_dashboards",
+  "add_to_workspace",
+  "use_feature",
+]);
+export type SeatRequestReason = z.infer<typeof seatRequestReasonSchema>;
+
+/** A member refused for want of a full seat asks for one (seat-requests.feature, member asks). */
+const requestSeatAccessInputSchemaDefinition = z.object({
+  organizationId: z.string().min(1),
+  reason: seatRequestReasonSchema.optional(),
+});
+export interface RequestSeatAccessInputSchema extends Named<
+  typeof requestSeatAccessInputSchemaDefinition
+> {}
+export const requestSeatAccessInputSchema: RequestSeatAccessInputSchema =
+  requestSeatAccessInputSchemaDefinition;
+export type RequestSeatAccessInput = z.infer<typeof requestSeatAccessInputSchema>;
+
+/** The caller's own latest seat request in one organization, as Request access reads it. */
+const myAccessRequestSchemaDefinition = z.object({
+  status: z.enum(["none", "open", "approved", "declined"]),
+  /** Epoch milliseconds; null when there is no request. */
+  openedAt: z.number().nullable(),
+  resolvedAt: z.number().nullable(),
+});
+export interface MyAccessRequestSchema extends Named<typeof myAccessRequestSchemaDefinition> {}
+export const myAccessRequestSchema: MyAccessRequestSchema = myAccessRequestSchemaDefinition;
+export type MyAccessRequest = z.infer<typeof myAccessRequestSchema>;
+
+/**
+ * Approve that buys the full seat it needs in one click: approved at once, or a Stripe page the
+ * customer finishes first. `paymentRef` is handed back to `completeSeatApproval` as it is.
+ */
+const seatApprovalWithSeatSchemaDefinition = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("approved"),
+    outcome: seatRequestResolvedSchemaDefinition.shape.outcome,
+    seatAdded: z.boolean(),
+  }),
+  z.object({
+    status: z.literal("payment_required"),
+    url: z.string().url(),
+    paymentRef: z.string().min(1),
+  }),
+]);
+export interface SeatApprovalWithSeatSchema extends Named<
+  typeof seatApprovalWithSeatSchemaDefinition
+> {}
+export const seatApprovalWithSeatSchema: SeatApprovalWithSeatSchema =
+  seatApprovalWithSeatSchemaDefinition;
+export type SeatApprovalWithSeat = z.infer<typeof seatApprovalWithSeatSchema>;
+
+const completeSeatApprovalInputSchemaDefinition = z.object({
+  ...seatRequestScopeSchemaDefinition.shape,
+  paymentRef: z.string().min(1).max(2000),
+});
+export interface CompleteSeatApprovalInputSchema extends Named<
+  typeof completeSeatApprovalInputSchemaDefinition
+> {}
+export const completeSeatApprovalInputSchema: CompleteSeatApprovalInputSchema =
+  completeSeatApprovalInputSchemaDefinition;
+export type CompleteSeatApprovalInput = z.infer<typeof completeSeatApprovalInputSchema>;
+
+/** A seat payment settled: the request approved, the page still open, or over unpaid. */
+const seatApprovalCompletionSchemaDefinition = z.discriminatedUnion("status", [
+  z.object({
+    status: z.literal("approved"),
+    outcome: seatRequestResolvedSchemaDefinition.shape.outcome,
+  }),
+  z.object({ status: z.literal("waiting") }),
+  z.object({ status: z.literal("failed") }),
+]);
+export interface SeatApprovalCompletionSchema extends Named<
+  typeof seatApprovalCompletionSchemaDefinition
+> {}
+export const seatApprovalCompletionSchema: SeatApprovalCompletionSchema =
+  seatApprovalCompletionSchemaDefinition;
+export type SeatApprovalCompletion = z.infer<typeof seatApprovalCompletionSchema>;
 
 /**
  * A membership the signed-in person holds but cannot use: held for want of a seat, or turned off

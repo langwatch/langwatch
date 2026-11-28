@@ -122,6 +122,9 @@ export abstract class OrganizationHostApi {
 
   abstract isPlanLoading(): boolean;
 
+  /** Whether the reader holds a Lite Member seat (role `EXTERNAL`) in this organization. */
+  abstract isLiteMember(): boolean;
+
   /**
    * Whether this deployment can send email. Without it, the members page
    * offers a copyable link rather than pretending a message went out.
@@ -180,6 +183,11 @@ const OrganizationHostContext = createContext<OrganizationHostApi | undefined>(v
 
 /** Publishes the host to the screen and everything it renders. */
 export const OrganizationHostProvider = OrganizationHostContext.Provider;
+
+/** Whether an organization host is mounted above: a lent piece drawn outside it mounts its own. */
+export function useHasOrganizationHost(): boolean {
+  return useContext(OrganizationHostContext) !== void 0;
+}
 
 /**
  * The host this screen is mounted in. Missing means the screen was rendered

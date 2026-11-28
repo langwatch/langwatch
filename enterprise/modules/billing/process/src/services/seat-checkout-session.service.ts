@@ -31,6 +31,7 @@ export class SeatCheckoutSessionService {
     isUpgradeFromTiered,
     subscriptionId,
     startedByUserId,
+    successPath,
   }: {
     customerId: string;
     baseUrl: string;
@@ -40,6 +41,8 @@ export class SeatCheckoutSessionService {
     isUpgradeFromTiered: boolean;
     subscriptionId: string;
     startedByUserId?: string;
+    /** Where the checkout returns, paid or not, instead of the subscription page. */
+    successPath?: string;
   }): Promise<{ url: string | null }> {
     const selectedOptionsMetadata = {
       selectedCurrency: checkoutCurrency,
@@ -69,8 +72,10 @@ export class SeatCheckoutSessionService {
         billingCycleAnchor: Math.floor(billingCycleAnchor.epochMilliseconds / 1000),
         prorationBehavior: "create_prorations",
       },
-      successUrl: `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
-      cancelUrl: `${baseUrl}/settings/subscription`,
+      successUrl: successPath
+        ? `${baseUrl}${successPath}`
+        : `${baseUrl}/settings/subscription?success${isUpgradeFromTiered ? "&upgraded_from=tiered" : ""}`,
+      cancelUrl: successPath ? `${baseUrl}${successPath}` : `${baseUrl}/settings/subscription`,
       clientReferenceId: `subscription_setup_${subscriptionId}`,
       allowPromotionCodes: true,
     });

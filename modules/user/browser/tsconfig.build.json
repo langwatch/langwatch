@@ -30,6 +30,9 @@
       "path": "../../onboarding/client/tsconfig.build.json"
     },
     {
+      "path": "../../organization/client/tsconfig.build.json"
+    },
+    {
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {

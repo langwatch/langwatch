@@ -329,6 +329,8 @@ export interface LwqlPrismaRows {
     readonly departmentId: "String?";
     readonly billingOnly: "Boolean";
     readonly disabledAt: "DateTime?";
+    readonly roleVersion: "Int";
+    readonly lastRoleChangeId: "String?";
     readonly pendingSsoGrantId: "String?";
     readonly membershipStamp: "String";
     readonly fullSeatSince: "DateTime?";
@@ -353,6 +355,7 @@ export interface LwqlPrismaRows {
     readonly name: "String?";
     readonly status: "String";
     readonly source: "String";
+    readonly reason: "String?";
     readonly idpRefused: "Boolean";
     readonly idpKind: "String?";
     readonly salesNotifiedAt: "DateTime?";
@@ -2959,6 +2962,15 @@ export interface LwqlPrismaRows {
     readonly issuedLicense: "Json?";
     readonly deliveredAt: "DateTime?";
     readonly licenseId: "String?";
+  };
+  readonly BlockedSeatChange: {
+    readonly id: "String";
+    readonly organizationId: "String";
+    readonly userId: "String";
+    readonly attempt: "Json";
+    readonly seats: "Int";
+    readonly createdAt: "DateTime";
+    readonly notifiedAt: "DateTime?";
   };
   readonly InstanceIdentity: {
     readonly id: "String";

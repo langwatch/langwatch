@@ -18,8 +18,10 @@ import {
   type PaymentRecoveryDetails,
   type PaymentRecoveryPayLink,
   type PaymentRecoverySummary,
+  type SeatOffer,
   type SubscribablePlan,
   type SubscriptionBillingInterval,
+  type BlockedSeatChangeAttempt,
 } from "@langwatch/enterprise-billing-contract";
 import { moduleApi } from "@langwatch/module";
 
@@ -44,6 +46,7 @@ export interface BillingSubscriptionApi {
     totalMembers: number;
     totalTraces: number;
     quotedAt?: number;
+    requestedBy?: { userId: string; attempt?: BlockedSeatChangeAttempt };
   }): Promise<{ success: boolean }>;
   createOrUpdateSubscription(input: {
     organizationId: string;
@@ -66,6 +69,8 @@ export interface BillingSubscriptionApi {
   /** The most recent subscription that has not been cancelled, or none. */
   findLastNonCancelledSubscription(input: { organizationId: string }): Promise<unknown>;
   previewProration(input: { organizationId: string; newTotalSeats: number }): Promise<unknown>;
+  /** What one more full seat costs, for a role change that needs it. */
+  seatOffer(input: { organizationId: string }): Promise<SeatOffer>;
   notifyProspective(input: {
     organizationId: string;
     plan: SubscribablePlan;
@@ -82,6 +87,11 @@ export interface BillingSubscriptionApi {
     organizationId: string;
     quantity: number;
   }): Promise<DeveloperSeatQuote>;
+  recordBlockedSeatPurchase(input: {
+    organizationId: string;
+    seats: number;
+    userId: string | undefined;
+  }): Promise<{ recorded: boolean }>;
   setDeveloperSeats(input: {
     organizationId: string;
     quantity: number;
@@ -113,7 +123,7 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   .withPermission("subscription:manage")
   // Raises the seat and volume lines on a live subscription, priced at the
   // instant the customer was quoted.
-  .handle(({ app, input }) =>
+  .handle(({ app, input, actor }) =>
     app.updateSubscriptionItems({
       organizationId: input.organizationId,
       plan: input.plan,
@@ -122,6 +132,14 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
       totalMembers: input.totalMembers,
       totalTraces: input.totalTraces,
       ...(input.quotedAt === undefined ? {} : { quotedAt: input.quotedAt }),
+      ...(actor.type === "user"
+        ? {
+            requestedBy: {
+              userId: actor.id,
+              ...(input.attempt ? { attempt: input.attempt } : {}),
+            },
+          }
+        : {}),
     }),
   )
 
@@ -166,6 +184,10 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
     });
   })
 
+  .procedure("seatOffer")
+  .withPermission("subscription:manage")
+  .handle(({ app, input }) => app.seatOffer({ organizationId: input.organizationId }))
+
   .procedure("previewProration")
   .withPermission("subscription:manage")
   // What a seat change costs, before it is confirmed.
@@ -208,6 +230,17 @@ export const subscriptionTrpcTransport: TrpcRouterDeclaration<
   // What a Developer seat change costs, before it is confirmed.
   .handle(({ app, input }) =>
     app.previewDeveloperSeats({ organizationId: input.organizationId, quantity: input.quantity }),
+  )
+
+  .procedure("recordBlockedSeatPurchase")
+  .withPermission("subscription:manage")
+  // Keeps a seat purchase refused for two live subscriptions for the admin who tried.
+  .handle(({ app, input, actor }) =>
+    app.recordBlockedSeatPurchase({
+      organizationId: input.organizationId,
+      seats: input.seats,
+      userId: actor.type === "user" ? actor.id : undefined,
+    }),
   )
 
   .procedure("setDeveloperSeats")

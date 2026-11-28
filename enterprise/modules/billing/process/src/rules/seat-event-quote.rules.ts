@@ -176,6 +176,8 @@ export type SeatEventProrationQuote = {
   formattedTax: string | null;
   /** Seats times the seat price, before any tax. */
   formattedRecurringTotal: string;
+  /** One seat's price per billing period, before any tax. */
+  formattedSeatPrice: string;
   billingInterval: string;
   /** The instant this quote priced, in epoch seconds, sent back on confirm. */
   quotedAt: number;
@@ -185,4 +187,6 @@ export type SeatEventProrationQuote = {
   keptSeats: number | null;
   /** What the kept seats cost per period, shown until `appliesAt`. */
   formattedKeptRecurringTotal: string | null;
+  /** Epoch milliseconds of the next renewal; null when the provider names none. */
+  renewsAt?: number | null;
 };

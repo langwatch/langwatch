@@ -20,6 +20,7 @@ import { useEffect, useId, useRef, useState, type FormEvent } from "react";
 import { useDebounce } from "use-debounce";
 
 import { useOpsToaster, useShowErrorToast } from "../../../../behavior/ops-feedback.ts";
+import { useOpsRouter as useRouter } from "../../../../behavior/ops-router.ts";
 import { useAdminCreate, useAdminList, useAdminUpdate } from "../../behavior/use-admin-resource.ts";
 import { PlanTypes, SubscriptionStatus } from "../../model/admin-enums.ts";
 import { AdminDate, EmptyCell, dateInputToISO, formatDate } from "../elements/admin-cells.tsx";
@@ -121,8 +122,11 @@ const LIMIT_FIELDS: {
 ];
 
 export default function SubscriptionsView() {
+  const router = useRouter();
+  // `q` deep-links here, e.g. from the duplicate-subscription Slack alert with ?q=<orgId>.
+  const initialQueryRef = useRef<string>(typeof router.query.q === "string" ? router.query.q : "");
   const [page, setPage] = useState(1);
-  const [search, setSearch] = useState("");
+  const [search, setSearch] = useState(initialQueryRef.current);
   const [debouncedSearch] = useDebounce(search, 300);
   const [editing, setEditing] = useState<AdminSubscription | null>(null);
   const [creating, setCreating] = useState(false);

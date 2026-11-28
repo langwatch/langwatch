@@ -3,6 +3,7 @@
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionWithOrganization,
+  LiveUnlinkedSubscription,
   SupersededSubscription,
 } from "./subscription.repository.ts";
 
@@ -59,6 +60,21 @@ export abstract class BillingWebhookSubscriptionRepository {
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<SupersededSubscription[]>;
+
+  abstract findLiveUnlinkedBeside(input: {
+    pendingId: string;
+  }): Promise<LiveUnlinkedSubscription[]>;
+
+  abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
+
+  abstract adoptCheckout(input: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void>;
+
+  /** Cancels the row only while its checkout is still PENDING; answers the rows it cancelled. */
+  abstract cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]>;
 
   abstract updateQuantities(input: {
     id: string;

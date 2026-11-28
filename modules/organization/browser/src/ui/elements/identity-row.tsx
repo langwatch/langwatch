@@ -45,6 +45,8 @@ export function IdentityRow({
     <HStack
       width="full"
       gap={3}
+      // A narrow place (the person drawer) moves chips and actions under the name.
+      flexWrap="wrap"
       paddingX={4}
       paddingY={3}
       align="center"
@@ -61,7 +63,7 @@ export function IdentityRow({
       data-testid={testId}
     >
       <RandomColorAvatar size="xs" name={label} image={image} />
-      <VStack align="start" gap={0} flex={1} minWidth={0}>
+      <VStack align="start" gap={0} flex={1} minWidth="10rem">
         <HStack gap={2} minWidth={0} width="full">
           <Text fontSize="sm" fontWeight="medium" truncate>
             {label}
@@ -75,7 +77,7 @@ export function IdentityRow({
         ) : null}
       </VStack>
       {chips ? (
-        <HStack gap={2} flexShrink={0}>
+        <HStack gap={2} flexWrap="wrap" minWidth={0}>
           {chips}
         </HStack>
       ) : null}

@@ -33,9 +33,14 @@ import type {
 } from "./features/group/group.ts";
 import type {
   HeldMemberships,
+  MyAccessRequest,
   OpenSeatRequests,
   RecordRefusedSignInInput,
   RefusedSignInOutcome,
+  CompleteSeatApprovalInput,
+  RequestSeatAccessInput,
+  SeatApprovalCompletion,
+  SeatApprovalWithSeat,
   SeatRequestResolved,
   SeatRequestScope,
 } from "./features/seat-request/seat-request.ts";
@@ -123,6 +128,12 @@ import type {
 } from "./personal-workspace.ts";
 import type { ScopeGraphOrganization } from "./scope-graph.ts";
 import type { OrganizationSeatPeak } from "./seat-peak.ts";
+import type {
+  ChangeMemberRoleWithSeatInput,
+  MemberRoleWithSeatResult,
+  PendingSeatRoleChange,
+  SeatRoleChangeOutcome,
+} from "./seat-role-change.ts";
 
 export interface OrganizationCaller {
   readonly id: string;
@@ -553,6 +564,33 @@ export interface OrganizationApi {
   listOpenSeatRequests(input: Readonly<{ organizationId: string }>): Promise<OpenSeatRequests>;
   /** Gives the person the full seat they asked for; refuses `member_seat_limit_reached`. */
   approveSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
+  /**
+   * Approve, buying the one full seat it needs where the organization pays per seat in Stripe;
+   * answers the Stripe page when Stripe needs the customer first.
+   */
+  approveSeatRequestWithSeat(
+    input: SeatRequestScope,
+    by: OrganizationCaller,
+  ): Promise<SeatApprovalWithSeat>;
+  /** After the Stripe page: approves once the seat is paid; `waiting` while it is still open. */
+  completeSeatApproval(
+    input: CompleteSeatApprovalInput,
+    by: OrganizationCaller,
+  ): Promise<SeatApprovalCompletion>;
+  /**
+   * A member refused for want of a full seat asks for one; an open request answers as it is.
+   * Refuses `seat_request_full_member` when the caller holds a full seat already, and
+   * `seat_request_no_email` when their account has no email address.
+   */
+  requestSeatAccess(
+    input: RequestSeatAccessInput,
+    by: OrganizationCaller,
+  ): Promise<MyAccessRequest>;
+  /** The caller's own latest seat request in the organization. */
+  getMyAccessRequest(
+    input: Readonly<{ organizationId: string }>,
+    by: OrganizationCaller,
+  ): Promise<MyAccessRequest>;
   /** Closes the request; the membership stays as it is. */
   declineSeatRequest(input: SeatRequestScope, by: OrganizationCaller): Promise<SeatRequestResolved>;
   /** Whether this person holds an open seat request in the organization. */
@@ -670,6 +708,28 @@ export interface OrganizationApi {
     }>,
     by: OrganizationCaller | null,
   ): Promise<{ teamsLeftWithoutAdmin: { id: string; name: string }[] }>;
+  /**
+   * A role change that needs one more full seat: refused by name before any charge when the
+   * change itself is refused, then the seat is bought and the role written
+   * (role-change-seat.feature).
+   */
+  changeMemberRoleWithSeat(
+    input: Readonly<ChangeMemberRoleWithSeatInput>,
+    by: OrganizationCaller,
+  ): Promise<MemberRoleWithSeatResult>;
+  /** Applies a change waiting on its seat payment once that is paid; idempotent. */
+  completeSeatRoleChange(
+    input: Readonly<{ organizationId: string; changeId: string }>,
+  ): Promise<SeatRoleChangeOutcome>;
+  /** The member's latest change waiting on a seat payment, or null. */
+  pendingSeatRoleChange(
+    input: Readonly<{ organizationId: string; userId: string }>,
+  ): Promise<PendingSeatRoleChange>;
+  /** Keeps a seat role change the offer refused for two live subscriptions, for its admin. */
+  recordBlockedRoleChange(
+    input: Readonly<{ organizationId: string; userId: string; role: OrganizationUserRole }>,
+    by: OrganizationCaller,
+  ): Promise<{ recorded: boolean }>;
   getAuditLogs(
     input: Readonly<{
       organizationId: string;
@@ -829,7 +889,8 @@ export interface OrganizationApi {
     input: Readonly<{ userId: string; organizationId: string; email: string }>,
   ): Promise<OrganizationPendingInviteApplied>;
   /**
-   * Refuses, writing nothing, invitations that would confer more than `by` holds: the check
+   * Refuses, writing nothing, invitations to an address that is already a member
+   * (`already_organization_member`) or that would confer more than `by` holds: the check
    * {@link createPaymentPendingInvites} makes, for a caller that must ask before its own write.
    */
   checkInvitesWithinCaller(

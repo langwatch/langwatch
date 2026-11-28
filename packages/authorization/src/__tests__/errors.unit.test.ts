@@ -47,6 +47,11 @@ describe("LiteMemberRestrictedError", () => {
       expect(error.meta).toEqual({ resource: "datasets" });
     });
 
+    it("names the refused permission in meta when given one", () => {
+      const error = new LiteMemberRestrictedError("project", "project:manage");
+      expect(error.meta).toEqual({ resource: "project", permission: "project:manage" });
+    });
+
     it("is an instance of HandledError", () => {
       const error = new LiteMemberRestrictedError("prompts");
       expect(error).toBeInstanceOf(HandledError);

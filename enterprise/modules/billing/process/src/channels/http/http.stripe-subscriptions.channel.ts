@@ -13,6 +13,9 @@ import type {
 } from "../../rules/billing-stripe-shapes.rules.ts";
 import { StripeSubscriptionsChannel } from "../stripe-subscriptions.channel.ts";
 
+/** A customer holds a handful of open checkouts; this many pages of 100 is far past any real one. */
+const MAX_OPEN_SESSION_PAGES = 10;
+
 /** Stripe's subscriptions, checkout and its line items, and billing portal over billing's one client. */
 export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
   private constructor(private readonly stripe: Stripe) {
@@ -139,6 +142,58 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
     });
   }
 
+  async expireOpenCheckouts({
+    customerId,
+    clientReferenceIds,
+  }: {
+    customerId: string;
+    clientReferenceIds: string[];
+  }): Promise<string[]> {
+    if (clientReferenceIds.length === 0) return [];
+    const wanted = new Set(clientReferenceIds);
+    const open: string[] = [];
+    let startingAfter: string | undefined;
+    for (let page = 0; page < MAX_OPEN_SESSION_PAGES; page++) {
+      const listed = await this.stripe.checkout.sessions.list({
+        customer: customerId,
+        status: "open",
+        limit: 100,
+        ...(startingAfter ? { starting_after: startingAfter } : {}),
+      });
+      for (const session of listed.data) {
+        if (session.client_reference_id && wanted.has(session.client_reference_id)) {
+          open.push(session.id);
+        }
+      }
+      startingAfter = listed.data.at(-1)?.id;
+      if (!listed.has_more || !startingAfter) break;
+    }
+    for (const id of open) await this.stripe.checkout.sessions.expire(id);
+    return open;
+  }
+
+  async refundLatestInvoice({
+    subscriptionId,
+  }: {
+    subscriptionId: string;
+  }): Promise<"voided" | "refunded" | "nothing"> {
+    const subscription = await this.stripe.subscriptions.retrieve(subscriptionId, {
+      expand: ["latest_invoice"],
+    });
+    const invoice = subscription.latest_invoice;
+    if (!invoice || typeof invoice === "string") return "nothing";
+    if (invoice.status === "open") {
+      await this.stripe.invoices.voidInvoice(invoice.id);
+      return "voided";
+    }
+    const intent = invoice.payment_intent;
+    if (invoice.status !== "paid" || invoice.amount_paid <= 0 || !intent) return "nothing";
+    await this.stripe.refunds.create({
+      payment_intent: typeof intent === "string" ? intent : intent.id,
+    });
+    return "refunded";
+  }
+
   async createBillingPortalSession({
     customerId,
     returnUrl,
@@ -168,6 +223,13 @@ export class HttpStripeSubscriptionsChannel extends StripeSubscriptionsChannel {
       total: invoice.total,
       amountDue: invoice.amount_due,
       tax: invoice.total - (invoice.total_excluding_tax ?? invoice.total),
+      ...(invoice.lines?.data
+        ? {
+            prorations: invoice.lines.data
+              .filter((line) => line.proration)
+              .reduce((sum, line) => sum + line.amount, 0),
+          }
+        : {}),
       currency: invoice.currency ?? null,
     };
   }
@@ -200,6 +262,29 @@ function subscriptionOf(subscription: Stripe.Subscription): BillingSubscription 
     currentPeriodEnd: subscription.current_period_end,
     currency: subscription.currency,
     ...customerOf(subscription),
+    ...pendingOf(subscription),
+  };
+}
+
+/** A change held for payment and the invoice it waits on, when the answer expanded it. */
+function pendingOf(
+  subscription: Stripe.Subscription,
+): Pick<BillingSubscription, "pendingUpdate" | "latestInvoice"> {
+  const invoice = subscription.latest_invoice;
+  return {
+    ...(subscription.pending_update == null ? {} : { pendingUpdate: true }),
+    ...(invoice && typeof invoice === "object"
+      ? {
+          latestInvoice: {
+            id: invoice.id,
+            status: invoice.status ?? null,
+            hostedUrl: invoice.hosted_invoice_url ?? null,
+          },
+        }
+      : {}),
+    ...(typeof invoice === "string"
+      ? { latestInvoice: { id: invoice, status: null, hostedUrl: null } }
+      : {}),
   };
 }
 
@@ -228,6 +313,10 @@ function updateParamsOf(change: BillingSubscriptionChange): Stripe.SubscriptionU
   if (change.items) params.items = change.items;
   if (change.prorationBehavior) params.proration_behavior = change.prorationBehavior;
   if (change.prorationDate !== undefined) params.proration_date = change.prorationDate;
+  if (change.paymentBehavior) {
+    params.payment_behavior = change.paymentBehavior;
+    params.expand = ["latest_invoice"];
+  }
   if (change.cancelAtPeriodEnd !== undefined) {
     params.cancel_at_period_end = change.cancelAtPeriodEnd;
   }

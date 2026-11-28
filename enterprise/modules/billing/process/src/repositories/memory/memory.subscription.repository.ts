@@ -1,12 +1,20 @@
 // SPDX-License-Identifier: LicenseRef-LangWatch-Enterprise
 
+import {
+  holdsLivePlanSlot,
+  isTieredPlan,
+  type PlanSlotRow,
+  SubscriptionAlreadyActiveError,
+} from "@langwatch/enterprise-billing-contract";
 import { generate } from "@langwatch/ksuid";
 import { nowInstant } from "@langwatch/time";
 
+import { refuseSecondLivePlan } from "../../rules/one-live-plan.rules.ts";
 import {
   type BillingSubscriptionRecord,
   type BillingSubscriptionWithOrganization,
   BillingSubscriptionRepository,
+  type LiveUnlinkedSubscription,
   type SupersededSubscription,
 } from "../subscription.repository.ts";
 import type { MemoryBillingOrganization, MemoryBillingStore } from "./memory.billing.store.ts";
@@ -16,16 +24,6 @@ const ACTIVE = "ACTIVE";
 const CANCELLED = "CANCELLED";
 const FAILED = "FAILED";
 const PENDING = "PENDING";
-
-/** The tiered plans a seat-event migration cancels, as the Prisma twin lists them. */
-const TIERED_PLANS: readonly string[] = [
-  "LAUNCH",
-  "ACCELERATE",
-  "LAUNCH_ANNUAL",
-  "ACCELERATE_ANNUAL",
-  "PRO",
-  "GROWTH",
-];
 
 /**
  * The subscription aggregate, held in the shared store. Ordering matches the
@@ -112,10 +110,15 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
 
     const subscription = this.store.subscriptions[index];
     if (!subscription) return { count: 0 };
-    this.store.subscriptions[index] = {
-      ...subscription,
-      stripeSubscriptionId: input.stripeSubscriptionId,
-    };
+    if (
+      subscription.stripeSubscriptionId !== null &&
+      subscription.stripeSubscriptionId !== input.stripeSubscriptionId
+    ) {
+      throw new SubscriptionAlreadyActiveError();
+    }
+    const linked = { ...subscription, stripeSubscriptionId: input.stripeSubscriptionId };
+    refuseSecondLivePlan({ rows: this.store.subscriptions, written: linked });
+    this.store.subscriptions[index] = linked;
     return { count: 1 };
   }
 
@@ -168,10 +171,96 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
       ({ id, organizationId, status, plan, stripeSubscriptionId }) => {
         if (organizationId !== input.organizationId || id === input.excludeSubscriptionId)
           return [];
-        if (!TIERED_PLANS.includes(plan) || stripeSubscriptionId === null) return [];
+        if (!isTieredPlan(plan) || stripeSubscriptionId === null) return [];
         return [{ id, stripeSubscriptionId, cancelledInRecords: status === CANCELLED }];
       },
     );
+  }
+
+  async findLiveUnlinkedBeside({
+    pendingId,
+  }: {
+    pendingId: string;
+  }): Promise<LiveUnlinkedSubscription[]> {
+    const pending = this.store.subscriptions.find((subscription) => subscription.id === pendingId);
+    if (!pending) return [];
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === pending.organizationId &&
+          subscription.id !== pendingId &&
+          subscription.status === ACTIVE &&
+          subscription.stripeSubscriptionId === null,
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds)
+      .map((subscription) => ({
+        ...subscription,
+        customLimits: this.store.customLimitSubscriptions.has(subscription.id),
+      }));
+  }
+
+  async findLiveLinkedBeside({
+    pendingId,
+  }: {
+    pendingId: string;
+  }): Promise<BillingSubscriptionRecord[]> {
+    const pending = this.store.subscriptions.find((subscription) => subscription.id === pendingId);
+    if (!pending) return [];
+    return this.store.subscriptions
+      .filter(
+        (subscription) =>
+          subscription.organizationId === pending.organizationId &&
+          subscription.id !== pendingId &&
+          holdsLivePlanSlot(subscription),
+      )
+      .toSorted((a, b) => b.createdAt.epochMilliseconds - a.createdAt.epochMilliseconds);
+  }
+
+  async findPlanSlots({ ids }: { ids: readonly string[] }): Promise<PlanSlotRow[]> {
+    return this.store.subscriptions.filter((subscription) => ids.includes(subscription.id));
+  }
+
+  async findLivePlanHolders({
+    organizationIds,
+  }: {
+    organizationIds: readonly string[];
+  }): Promise<PlanSlotRow[]> {
+    return this.store.subscriptions.filter(
+      (subscription) =>
+        organizationIds.includes(subscription.organizationId) && holdsLivePlanSlot(subscription),
+    );
+  }
+
+  async adoptCheckout({
+    pendingId,
+    liveId,
+    stripeSubscriptionId,
+  }: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void> {
+    const pending = this.store.subscriptions.find((subscription) => subscription.id === pendingId);
+    if (!pending) throw new Error(`No checkout subscription ${pendingId}`);
+    const live = this.store.subscriptions.find((subscription) => subscription.id === liveId);
+    if (
+      live?.stripeSubscriptionId !== null &&
+      live?.stripeSubscriptionId !== stripeSubscriptionId
+    ) {
+      throw new SubscriptionAlreadyActiveError();
+    }
+    this.update(liveId, (subscription) => ({
+      ...subscription,
+      plan: pending.plan,
+      maxMembers: pending.maxMembers,
+      maxRetentionDays: pending.maxRetentionDays ?? subscription.maxRetentionDays ?? null,
+      stripeSubscriptionId,
+    }));
+    this.update(pendingId, (subscription) => ({
+      ...subscription,
+      status: CANCELLED,
+      endDate: nowInstant(),
+    }));
   }
 
   async updateQuantities(input: {
@@ -204,6 +293,14 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     return found[0] ?? null;
   }
 
+  async cancelPendingCheckout({ id }: { id: string }): Promise<BillingSubscriptionRecord[]> {
+    const row = this.store.subscriptions.find((subscription) => subscription.id === id);
+    if (row?.status !== PENDING) return [];
+    return [
+      this.update(id, (current) => ({ ...current, status: CANCELLED, endDate: nowInstant() })),
+    ];
+  }
+
   private update(
     id: string,
     change: (subscription: BillingSubscriptionRecord) => BillingSubscriptionRecord,
@@ -213,6 +310,7 @@ export class MemoryBillingSubscriptionRepository extends BillingSubscriptionRepo
     if (!current) throw new Error(`No subscription "${id}" exists.`);
 
     const updated = change(current);
+    refuseSecondLivePlan({ rows: this.store.subscriptions, written: updated });
     this.store.subscriptions[index] = updated;
     return updated;
   }

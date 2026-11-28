@@ -58,7 +58,9 @@ export {
 } from "./templates/connected-statement-email.tsx";
 export {
   sendIdpRefusedSignInEmail,
+  sendSeatRequestAnsweredEmail,
   sendSeatRequestEmail,
+  type SeatRequestAnsweredProps,
   type SeatRequestProps,
 } from "./templates/seat-request-emails.tsx";
 export { sendLicenseEmail } from "./templates/license-email.tsx";
@@ -75,3 +77,8 @@ export {
   sendPaymentRecoveryEmail,
   type PaymentRecoveryEmailProps,
 } from "./templates/payment-recovery-email.tsx";
+export {
+  billingFixedEmailProps,
+  sendBillingFixedEmail,
+  type BillingFixedEmailProps,
+} from "./templates/billing-fixed-email.tsx";

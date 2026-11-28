@@ -20,6 +20,7 @@ import { cleanupTestRows } from "@langwatch/test-harness/prisma";
 import { nanoid } from "nanoid";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
+import { MemorySeatApprovalPaymentRepository } from "../../repositories/memory/memory.seat-approval-payment.repository.ts";
 import {
   type CountedSeatHold,
   type OrganizationSeatHolding,
@@ -255,8 +256,9 @@ describe.skipIf(!DB_URL)("two seat-taking writes for the last free full seat", (
           findAdministrators: async () => [],
         },
         seats,
-        notices: createApiFixture<OrganizationAccessNoticeService>({}),
+        notices: createApiFixture<OrganizationAccessNoticeService>({ mailAnswer: async () => {} }),
         peers: createApiFixture<SeatRequestPeers>({}),
+        payments: MemorySeatApprovalPaymentRepository.create(),
         isSaas: true,
         now: () => Date.now(),
         newId: () => nanoid(),

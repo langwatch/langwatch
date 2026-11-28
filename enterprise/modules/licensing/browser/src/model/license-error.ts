@@ -11,7 +11,7 @@ import type { LimitType } from "@langwatch/enterprise-licensing-contract";
 type SerializedFailure = {
   code?: string;
   cause?: { limitType?: string; current?: number; max?: number };
-  error?: { code?: string; kind?: string; meta?: { resource?: string } };
+  error?: { code?: string; kind?: string; meta?: { resource?: string; permission?: unknown } };
 };
 
 function failureOf(error: unknown): SerializedFailure | undefined {
@@ -72,6 +72,8 @@ export function isHandledByLiteMemberHandler(error: unknown): boolean {
 
 export interface LiteMemberRestrictionInfo {
   resource?: string;
+  /** The permission refused, when the server named it. */
+  permission?: string;
 }
 
 /** The payload of the authz `lite_member_restricted` refusal. */
@@ -89,5 +91,9 @@ export function extractLiteMemberRestrictionInfo(error: unknown): LiteMemberRest
   // to upgrade into, so it stays on the generic path and shows its registry copy.
   if (handledCode !== "lite_member_restricted") return null;
 
-  return { resource: handledError?.meta?.resource };
+  const permission = handledError?.meta?.permission;
+  return {
+    resource: handledError?.meta?.resource,
+    ...(typeof permission === "string" ? { permission } : {}),
+  };
 }

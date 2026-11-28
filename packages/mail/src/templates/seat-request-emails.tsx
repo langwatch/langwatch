@@ -84,13 +84,28 @@ export const seatRequestProps = z.object({
   approval: approvalSchema,
   /** The Users page link, or null when the deployment has no public origin to link from. */
   requestsUrl: z.url().nullable(),
+  /** Set when a Lite Member pressed Request access; `reason` is what they were trying to do. */
+  askedFor: z.object({ reason: z.string().nullable() }).nullable().optional(),
 });
 
 export type SeatRequestProps = z.infer<typeof seatRequestProps>;
 
 /** "Gus Growth is waiting for a seat", or the address when no name is known. */
-const seatRequestHeading = ({ personName, personEmail }: SeatRequestProps) =>
-  `${personName ?? personEmail} is waiting for a seat`;
+const seatRequestHeading = ({ personName, personEmail, askedFor }: SeatRequestProps) =>
+  askedFor
+    ? `${personName ?? personEmail} asked for a full seat`
+    : `${personName ?? personEmail} is waiting for a seat`;
+
+/** Why the person is asking, as the first paragraph says it. */
+function situationSentence({ props, person }: { props: SeatRequestProps; person: string }): string {
+  if (props.askedFor) {
+    const wanted = props.askedFor.reason ? ` to ${props.askedFor.reason}` : "";
+    return `${person} is a Lite Member of ${props.organizationName} and asked for a full seat${wanted}.`;
+  }
+  return props.heldWithoutAccess
+    ? `${person} joined ${props.organizationName}, but every seat is taken, so they have no access yet.`
+    : `${person} joined ${props.organizationName} with view-only access because every full seat is taken.`;
+}
 
 export const seatRequestSubject = (props: SeatRequestProps) =>
   `${seatRequestHeading(props)} in ${props.organizationName}`;
@@ -103,11 +118,7 @@ export const SeatRequestEmail = (props: SeatRequestProps) => {
       heading={seatRequestHeading(props)}
       footNote={recipientNotice}
     >
-      <Paragraph>
-        {props.heldWithoutAccess
-          ? `${person} joined ${props.organizationName}, but every seat is taken, so they have no access yet.`
-          : `${person} joined ${props.organizationName} with view-only access because every full seat is taken.`}
-      </Paragraph>
+      <Paragraph>{situationSentence({ props, person })}</Paragraph>
       <Paragraph>{approvalSentence(props.approval)}</Paragraph>
       {props.idpRefused && (
         <Paragraph>
@@ -125,7 +136,7 @@ export const seatRequestTemplate = defineTemplate({
   id: "seat-request",
   title: "A person is waiting for a seat",
   sentWhen:
-    "A person joins an organization over its seat limit. Sent to its administrators and Billing members.",
+    "A person joins an organization over its seat limit, or a Lite Member presses Request access. Sent to its administrators and Billing members.",
   schema: seatRequestProps,
   subject: seatRequestSubject,
   Component: SeatRequestEmail,
@@ -149,6 +160,17 @@ export const seatRequestTemplate = defineTemplate({
       idpRefused: { idpName: "Okta" },
       approval: { kind: "contact_sales" },
       requestsUrl: "https://app.langwatch.ai/settings/members?tab=requests",
+    },
+    "a Lite Member pressed Request access": {
+      recipientEmail: "priya@acme.example",
+      organizationName: "Acme Corp",
+      personName: "Lena Lite",
+      personEmail: "lena@acme.example",
+      heldWithoutAccess: false,
+      idpRefused: null,
+      approval: { kind: "seat_free" },
+      requestsUrl: "https://app.langwatch.ai/settings/directory?tab=people",
+      askedFor: { reason: "run the workbench" },
     },
     "no public origin to link from": {
       recipientEmail: "priya@acme.example",
@@ -237,4 +259,81 @@ export const sendIdpRefusedSignInEmail = async ({
 }: IdpRefusedSignInProps & { mailer: MailSender; idempotencyKey?: string }) => {
   const { subject, html } = await renderMailTemplate(idpRefusedSignInTemplate, props);
   await sendEmail({ mailer, content: { to: props.recipientEmail, subject, html, idempotencyKey } });
+};
+/* ── The person who asked hears the answer. ──────────────────────────────── */
+
+export const seatRequestAnsweredProps = z.object({
+  recipientEmail: z.email(),
+  organizationName: z.string().min(1),
+  outcome: z.enum(["approved", "declined"]),
+  /** Where LangWatch opens, or null when the deployment has no public origin to link from. */
+  appUrl: z.url().nullable(),
+});
+
+export type SeatRequestAnsweredProps = z.infer<typeof seatRequestAnsweredProps>;
+
+export const seatRequestAnsweredSubject = ({
+  outcome,
+  organizationName,
+}: SeatRequestAnsweredProps) =>
+  outcome === "approved"
+    ? `You have a full seat in ${organizationName}`
+    : `Your seat request in ${organizationName} was declined`;
+
+export const SeatRequestAnsweredEmail = (props: SeatRequestAnsweredProps) => (
+  <EmailLayout
+    preview={seatRequestAnsweredSubject(props)}
+    heading={seatRequestAnsweredSubject(props)}
+    footNote={`You are receiving this because you asked for a full seat in ${props.organizationName}.`}
+  >
+    <Paragraph>
+      {props.outcome === "approved"
+        ? "An admin approved your request. Reload LangWatch and everything your role allows is open to you."
+        : "An admin declined your request, so you keep the access you have now. If you still need more, talk to an organization admin."}
+    </Paragraph>
+    {props.outcome === "approved" && props.appUrl && (
+      <PrimaryButton href={props.appUrl}>Open LangWatch</PrimaryButton>
+    )}
+  </EmailLayout>
+);
+
+export const seatRequestAnsweredTemplate = defineTemplate({
+  id: "seat-request-answered",
+  title: "A seat request was answered",
+  sentWhen:
+    "An administrator approves or declines a seat request. Sent to the person who asked, when LangWatch knows their account.",
+  schema: seatRequestAnsweredProps,
+  subject: seatRequestAnsweredSubject,
+  Component: SeatRequestAnsweredEmail,
+  fixtures: {
+    approved: {
+      recipientEmail: "lena@acme.example",
+      organizationName: "Acme Corp",
+      outcome: "approved",
+      appUrl: "https://app.langwatch.ai",
+    },
+    declined: {
+      recipientEmail: "lena@acme.example",
+      organizationName: "Acme Corp",
+      outcome: "declined",
+      appUrl: "https://app.langwatch.ai",
+    },
+  },
+});
+
+export const sendSeatRequestAnsweredEmail = async ({
+  mailer,
+  idempotencyKey,
+  ...props
+}: SeatRequestAnsweredProps & { mailer: MailSender; idempotencyKey?: string }) => {
+  const { subject, html } = await renderMailTemplate(seatRequestAnsweredTemplate, props);
+  await sendEmail({
+    mailer,
+    content: {
+      to: props.recipientEmail,
+      subject,
+      html,
+      idempotencyKey,
+    },
+  });
 };

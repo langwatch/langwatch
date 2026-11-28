@@ -264,6 +264,29 @@ export const organizationTrpcTransport: TrpcRouterDeclaration<
     return { success: true as const, teamsLeftWithoutAdmin };
   })
 
+  /** A role change that needs one more full seat: validated, charged, then written; needs both. */
+  .procedure("changeMemberRoleWithSeat")
+  .withMiddlewareContext(organizationSessionPersonContext)
+  .withPermission(["organization:manage", "subscription:manage"])
+  .handle(({ app, input, actor }, person) =>
+    app.changeMemberRoleWithSeat(input, callerOf(actor, person)),
+  )
+
+  .procedure("completeSeatRoleChange")
+  .withPermission(["organization:manage", "subscription:manage"])
+  .handle(({ app, input }) => app.completeSeatRoleChange(input))
+
+  .procedure("pendingSeatRoleChange")
+  .withPermission("organization:manage")
+  .handle(({ app, input }) => app.pendingSeatRoleChange(input))
+
+  .procedure("recordBlockedRoleChange")
+  .withMiddlewareContext(organizationSessionPersonContext)
+  .withPermission(["organization:manage", "subscription:manage"])
+  .handle(({ app, input, actor }, person) =>
+    app.recordBlockedRoleChange(input, callerOf(actor, person)),
+  )
+
   /** A security policy of the organization's, so an administrator's to read and to change. */
   .procedure("getDocsPlaygroundPolicy")
   .withPermission("organization:manage")

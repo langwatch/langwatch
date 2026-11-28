@@ -3,8 +3,9 @@
  * explicitly; message is always customer-safe.
  */
 
-import { HandledError } from "@langwatch/handled-error";
+import { HandledError, remediation } from "@langwatch/handled-error";
 
+import type { LivePlanConflict } from "./one-live-plan.ts";
 import type { BilledSeatKind } from "./stripe-prices.ts";
 export { OrganizationNotFoundError } from "@langwatch/organization-contract";
 
@@ -159,6 +160,55 @@ export class SubscriptionNotLinkedError extends HandledError {
 }
 
 /**
+ * The organization's only active plan is a local row that never reached Stripe (an operator
+ * added it), so there is no Stripe subscription to change: the seats are bought through
+ * Checkout, whose completion links that row.
+ */
+export class SeatCheckoutRequiredError extends HandledError {
+  declare readonly code: "seat_checkout_required";
+
+  constructor() {
+    super("seat_checkout_required", "Seats on this plan are bought through checkout", {
+      httpStatus: 409,
+      fault: "customer",
+      ...remediation("seat_checkout_required"),
+    });
+    this.name = "SeatCheckoutRequiredError";
+  }
+}
+
+/**
+ * The organization's plan is ENTERPRISE or carries limits an operator set: seats change through
+ * support, never a card checkout that would replace the deal.
+ */
+export class SeatChangeNeedsSupportError extends HandledError {
+  declare readonly code: "seat_change_needs_support";
+
+  constructor() {
+    super("seat_change_needs_support", "Seats on this plan are changed by support", {
+      httpStatus: 409,
+      fault: "customer",
+      ...remediation("seat_change_needs_support"),
+    });
+    this.name = "SeatChangeNeedsSupportError";
+  }
+}
+
+/** Stripe held the seat change for payment but named no page to pay it on. */
+export class SeatPaymentUnavailableError extends HandledError {
+  declare readonly code: "seat_payment_unavailable";
+
+  constructor() {
+    super("seat_payment_unavailable", "The seat payment page could not be opened", {
+      httpStatus: 503,
+      fault: "provider",
+      ...remediation("seat_payment_unavailable"),
+    });
+    this.name = "SeatPaymentUnavailableError";
+  }
+}
+
+/**
  * Multiple subscriptions exist; refusing to guess which to change avoids
  * silently billing the wrong plan.
  */
@@ -169,7 +219,12 @@ export class AmbiguousSubscriptionError extends HandledError {
     super(
       "subscription_ambiguous",
       "This account has more than one active plan, so we can't tell which one to change",
-      { httpStatus: 409, fault: "platform", meta: { count } },
+      {
+        httpStatus: 409,
+        fault: "platform",
+        meta: { count },
+        ...remediation("subscription_ambiguous"),
+      },
     );
     this.name = "AmbiguousSubscriptionError";
   }
@@ -237,15 +292,18 @@ export class SubscriptionCreationFailedError extends HandledError {
   }
 }
 
-/** A checkout asked for on a live subscription: changing that one is the billing portal's. */
+/**
+ * A checkout asked for on a live subscription: changing that one is the billing portal's. A
+ * refused write another module asked about carries the organization and its live rows in meta.
+ */
 export class SubscriptionAlreadyActiveError extends HandledError {
   declare readonly code: "subscription_already_active";
 
-  constructor() {
+  constructor(conflict?: LivePlanConflict) {
     super(
       "subscription_already_active",
       "This organization already has an active subscription; nothing was charged",
-      { httpStatus: 409, fault: "customer" },
+      { httpStatus: 409, fault: "customer", ...(conflict ? { meta: { ...conflict } } : {}) },
     );
     this.name = "SubscriptionAlreadyActiveError";
   }

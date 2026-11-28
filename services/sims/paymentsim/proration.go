@@ -1,6 +1,10 @@
 package paymentsim
 
-import "fmt"
+import (
+	"fmt"
+	"math"
+	"time"
+)
 
 // prorateAlwaysInvoice bills a subscription change's proration at once; the
 // other behaviors leave it for the next invoice or skip it.
@@ -62,10 +66,65 @@ func (s *Server) prorationLines(sub *Subscription, before, after []*Item, at int
 
 // invoiceProrations bills lines on a fresh invoice for sub and collects it.
 func (s *Server) invoiceProrations(sub *Subscription, lines []*Line) {
+	s.finalize(s.draftProrations(sub, lines))
+}
+
+// draftProrations puts lines on a fresh draft that becomes sub's latest invoice.
+func (s *Server) draftProrations(sub *Subscription, lines []*Line) *Invoice {
 	inv := s.draftInvoice(sub.Customer, sub.Currency, sub.CollectionMethod, nil, nil)
 	inv.BillingReason, inv.Subscription = "subscription_update", &sub.ID
 	for _, l := range lines {
 		s.addLine(inv, l)
 	}
+	sub.LatestInvoice = ptr(inv.ID)
+	return inv
+}
+
+// pendingIfIncomplete is payment_behavior's mode that holds item changes as a
+// pending update until their proration invoice is paid.
+const pendingIfIncomplete = "pending_if_incomplete"
+
+// pendingLifetime is how long Stripe keeps a pending update before discarding it.
+const pendingLifetime = 23 * time.Hour
+
+// holdPending bills lines and, since the charge is about to fail, keeps items
+// as sub's pending update instead of applying them. It expires after
+// pendingLifetime, or at the period end when that comes first, as Stripe does.
+func (s *Server) holdPending(sub *Subscription, items []*Item, lines []*Line) {
+	inv := s.draftProrations(sub, lines)
+	s.billOutstandingUsage(sub, inv)
+	expires := min(s.now().Add(pendingLifetime).Unix(), sub.CurrentPeriodEnd)
+	sub.PendingUpdate = &PendingUpdate{ExpiresAt: expires, SubscriptionItems: items}
+	sub.pendingInvoice = inv.ID
 	s.finalize(inv)
+}
+
+// billOutstandingUsage moves the metered usage to date onto inv, as Stripe bills it
+// on a pending update invoice: the next invoice starts after it, so usage the
+// invoice took is lost when the update expires or is voided unpaid.
+func (s *Server) billOutstandingUsage(sub *Subscription, inv *Invoice) {
+	now := s.now().Unix()
+	from := max(sub.CurrentPeriodStart, sub.usageFrom)
+	for _, it := range sub.Items.Data {
+		if !isMetered(it.Price) {
+			continue
+		}
+		full := s.st.price(it.Price.ID)
+		used := s.meteredUsage(full, usageWindow{customer: sub.Customer, from: from, to: now + 1})
+		s.addLine(inv, &Line{
+			Amount: meteredAmount(full, used), Price: it.Price, Quantity: ptr(int64(math.Round(used))),
+			Period: Period{Start: from, End: now + 1}, Subscription: ptr(sub.ID), Type: "subscription",
+		})
+	}
+	sub.usageFrom = now + 1
+}
+
+// willHold is whether an update keeps its items pending: it asks for
+// pending_if_incomplete, owes money now and the customer's next charge fails.
+func (s *Server) willHold(sub *Subscription, p params, lines []*Line) bool {
+	var total int64
+	for _, l := range lines {
+		total += l.Amount
+	}
+	return p.str("payment_behavior") == pendingIfIncomplete && total > 0 && s.st.failPayments[sub.Customer] != 0
 }

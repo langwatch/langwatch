@@ -1,3 +1,4 @@
+import type { PlanSlotRow } from "@langwatch/enterprise-billing-contract";
 import type { Instant } from "@langwatch/time";
 export type BillingSubscriptionRecord = {
   id: string;
@@ -25,6 +26,12 @@ export type BillingSubscriptionRecord = {
   /** The over-plan mark: open while `overPlanSince` is set and `overPlanEndedAt` is not. */
   overPlanSince?: Instant | null;
   overPlanEndedAt?: Instant | null;
+};
+
+/** An operator's live row with no provider link, and whether it is a custom deal (isCustomDeal). */
+export type LiveUnlinkedSubscription = BillingSubscriptionRecord & {
+  /** An operator set a limit beyond seats on it. */
+  customLimits: boolean;
 };
 
 type BillingOrganizationRecord = {
@@ -56,6 +63,10 @@ export abstract class BillingSubscriptionRepository {
   abstract updateStatus(input: { id: string; status: string }): Promise<BillingSubscriptionRecord>;
   abstract updatePlan(input: { id: string; plan: string }): Promise<BillingSubscriptionRecord>;
   abstract findByStripeId(stripeSubscriptionId: string): Promise<BillingSubscriptionRecord | null>;
+  /**
+   * Links the row while it is unlinked or already holds this id; a row linked to another Stripe
+   * subscription refuses with subscription_already_active. Answers 0 for a missing row.
+   */
   abstract linkStripeId(input: {
     id: string;
     stripeSubscriptionId: string;
@@ -72,6 +83,30 @@ export abstract class BillingSubscriptionRepository {
     organizationId: string;
     excludeSubscriptionId: string;
   }): Promise<SupersededSubscription[]>;
+  /** The ACTIVE rows with no provider link in the checkout row's organization, the row excluded. */
+  abstract findLiveUnlinkedBeside(input: {
+    pendingId: string;
+  }): Promise<LiveUnlinkedSubscription[]>;
+  /** The checkout row's organization's other ACTIVE non-tiered rows linked to Stripe. */
+  abstract findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]>;
+  /** The rows with these ids, as the one-live-plan rule reads them; a missing id answers none. */
+  abstract findPlanSlots(input: { ids: readonly string[] }): Promise<PlanSlotRow[]>;
+  /** The rows taking the one live plan slot of each of these organizations. */
+  abstract findLivePlanHolders(input: {
+    organizationIds: readonly string[];
+  }): Promise<PlanSlotRow[]>;
+  /**
+   * The live row takes the checkout's plan, seats, retention and Stripe link, and the checkout
+   * row is cancelled, in one step: a paid checkout lands on the plan the organization already
+   * has. A live row another checkout linked first refuses with subscription_already_active.
+   */
+  abstract adoptCheckout(input: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void>;
+  /** Cancels the row only while its checkout is still PENDING; answers the rows it cancelled. */
+  abstract cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]>;
   abstract updateQuantities(input: {
     id: string;
     maxMembers: number | null;

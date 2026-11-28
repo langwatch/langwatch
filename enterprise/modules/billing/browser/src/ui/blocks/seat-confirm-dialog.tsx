@@ -39,6 +39,7 @@ export function SeatConfirmDialog({
     >
       {confirm && (
         <VStack align="stretch" gap={4}>
+          {confirm.lead && <Text data-testid="seat-confirm-lead">{confirm.lead}</Text>}
           <VStack align="stretch" gap={3}>
             {confirm.lines.map((line, index) => (
               <VStack key={line.label} align="stretch" gap={3}>
@@ -46,9 +47,11 @@ export function SeatConfirmDialog({
                 <HStack justify="space-between" align="start" gap={4}>
                   <VStack align="start" gap={0.5}>
                     <Text fontWeight="medium">{line.label}</Text>
-                    <Text textStyle="bodySm" color="fg.muted">
-                      {line.detail}
-                    </Text>
+                    {line.detail && (
+                      <Text textStyle="bodySm" color="fg.muted">
+                        {line.detail}
+                      </Text>
+                    )}
                   </VStack>
                   <VStack align="end" gap={0.5} flexShrink={0}>
                     <Text fontWeight="semibold" fontVariantNumeric="tabular-nums">

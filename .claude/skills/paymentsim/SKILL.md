@@ -27,13 +27,18 @@ spec: `specs/setup/payment-simulator.feature`. State is in memory: a restart for
 ## Stripe surface
 
 customers create/retrieve/del · prices list (`expand[]=data.product`) · subscriptions
-create/retrieve/update/cancel · checkout sessions create + `line_items` · billing portal
+create/retrieve/update/cancel (update and retrieve take `expand[]=latest_invoice`; update takes
+`payment_behavior=pending_if_incomplete`: a failed proration charge keeps the items, holds
+`pending_update` for 23 h and leaves the invoice open; paying it applies the update once, expiry
+voids it) · hosted invoice page at `hosted_invoice_url` (`/invoice/<id>`, a Pay button) · checkout sessions create + `line_items`, list (`customer`, `status`, `subscription`) and `expire` · refunds
+create (`payment_intent` or `charge`, optional `amount`; a paid invoice carries `payment_intent`
+`pi_<invoice>`, its charge is `ch_<invoice>`) · billing portal
 sessions · invoices create/list/search/retrieve/finalize/pay/create_preview · invoiceitems
 create · billing meter_events create, meters list, `event_summaries` (minute-aligned) ·
 billing credit_grants create. Anything else answers Stripe's 404 "Unrecognized request URL".
 
 Events fired: `checkout.session.completed`, `customer.subscription.created|updated|deleted`,
-`invoice.finalized|paid|payment_succeeded|payment_failed`.
+`invoice.finalized|paid|payment_succeeded|payment_failed|payment_action_required|voided`, `refund.created`.
 
 ## Control API (`/_sim/api`) and `haven sim payment`
 
@@ -45,8 +50,9 @@ Events fired: `checkout.session.completed`, `customer.subscription.created|updat
 | finish a checkout             | `POST checkout/{id}/complete`, or open the session `url` |                                            |
 | finish as a named buyer       | `POST checkout/{id}/complete {"email","name"}`           |                                            |
 | advance the test clock        | `POST clock/advance {"seconds"}` or `{"to"}`             | `haven sim payment advance --seconds N`    |
-| decline the next charges      | `POST payment-failures {"customer","times"}`             | `haven sim payment fault --customer cus_…` |
+| fail the next charges         | `POST payment-failures {"customer","times","kind"}`      | `haven sim payment fault --customer cus_…` |
 | retry an open invoice         | `POST invoices/{id}/retry`                               |                                            |
+| refunds given, with invoice   | `GET refunds`                                            | `haven sim payment refunds`                |
 | list events + attempts        | `GET events?type=`                                       | `haven sim payment list`                   |
 | deliver ids in this order     | `POST events/deliver {"ids","signingSecret"}`            | `haven sim payment deliver --ids a,b`      |
 | queue without delivering      | `POST webhooks/hold {"held":true}`                       | `haven sim payment hold` / `release`       |
@@ -64,6 +70,10 @@ Duplicate = the same id twice in `deliver`; out of order = ids reversed; bad sig
 so Stripe's 5-minute tolerance holds after the test clock moves.
 
 ## Known gaps (it is not Stripe)
+
+`kind` is `decline` (default) or `requires_action`; the hosted page pays with no card form. A
+pending update is only held when the charge is armed to fail, and other parameters of that update
+apply at once.
 
 Proration only for proration_behavior always_invoice (preview and update bill the unused-time credit and charge), other behaviours preview whole periods; no automatic webhook retries; unknown request
 parameters are accepted; credit grants are recorded, never applied; invoice items need a

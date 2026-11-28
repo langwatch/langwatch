@@ -7,6 +7,7 @@ import type {
   UiEditProjectDrawerProps,
   UiInviteMemberDrawerProps,
   UiPersonDrawerProps,
+  SeatRequestReason,
 } from "@langwatch/organization-contract";
 import type { ReactNode } from "react";
 
@@ -48,6 +49,14 @@ export type ProjectDepartmentFieldProps = {
 /** The card of people waiting to join needs nothing handed in: it reads scope. */
 export type PendingJoinRequestsProps = Record<string, never>;
 
+/** What a refusal hands Request access: which fixed reason the reader was refused for. */
+export type RequestAccessProps = {
+  /** `run_experiments`; the request reads "use this feature" without one. */
+  reason?: SeatRequestReason;
+  /** The permission refused; Request access is offered only where a full member holds it. */
+  permission?: string;
+};
+
 /** What onboarding hands the held-membership gate: the screen to draw when nothing is held. */
 export type HeldMembershipGateProps = { children: ReactNode };
 
@@ -68,6 +77,8 @@ export const JoinInsteadToken = organization.component<JoinInsteadProps>("joinIn
 /** Onboarding's welcome, drawn only for somebody with no membership they cannot use. */
 export const HeldMembershipGateToken =
   organization.component<HeldMembershipGateProps>("heldMembershipGate");
+/** Request access for a Lite Member a refusal stopped; draws nothing for anybody else. */
+export const RequestAccessToken = organization.component<RequestAccessProps>("requestAccess");
 export const ProjectDepartmentFieldToken =
   organization.component<ProjectDepartmentFieldProps>("projectDepartmentField");
 export const PendingJoinRequestsToken =

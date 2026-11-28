@@ -337,6 +337,118 @@ Feature: Enterprise billing compatibility
       And it answers the checkout url and the pending subscription's id
 
     @unit
+    Scenario: A seat checkout is refused while a linked plan it would not replace is live
+      Given the organization has an active Growth seat subscription linked to Stripe
+      When a seat checkout is asked for
+      Then it is refused with subscription_already_active
+      And no pending subscription and no checkout are opened
+
+    @unit
+    Scenario: A seat checkout still opens beside the tiered plan it supersedes
+      Given the organization has an active tiered subscription linked to Stripe
+      When a seat checkout is asked for
+      Then the checkout opens
+
+    @unit
+    Scenario: An abandoned seat checkout can no longer be paid
+      Given the organization left a seat checkout open in another tab
+      When a new seat checkout is asked for
+      Then the abandoned checkout's Stripe session is expired, so it can no longer be paid
+      And the new checkout still opens when Stripe refuses the expiry
+
+  # An Ops edit can activate a PENDING Growth row while the customer pays a checkout.
+  Rule: A paid seat checkout leaves the organization one active subscription
+
+    @unit
+    Scenario: A paid checkout lands on the active row an operator made
+      Given an operator activated an older PENDING Growth row in Ops
+      And the customer opened a new seat checkout and paid it
+      When the checkout completion arrives
+      Then the operator's row carries the Stripe subscription, the checkout's plan and seats
+      And the checkout's own row is cancelled
+      And the organization holds exactly one active subscription
+      And the invitations held against the checkout's row are opened
+
+    @unit @integration
+    Scenario: A paid checkout is never moved onto an operator's custom-limit plan
+      Given an operator's active row with no Stripe subscription carries a limit beyond seats
+      And a seat checkout opened before that limit was set is paid
+      When the checkout completion arrives
+      Then the operator's row keeps its plan, seats and limits
+      And the move onto it is neither made nor audited, and ops are told to settle the two rows
+
+    @integration
+    Scenario: A paid checkout links the only subscription an operator added
+      Given an operator added the organization's only subscription in Ops, with no Stripe subscription
+      And a seat change on it went to checkout
+      When the customer pays the checkout
+      Then that row carries the Stripe subscription and the checkout's plan and seats
+      And the checkout's own row is cancelled
+      And the organization holds exactly one active subscription
+      And the move onto the operator's row is audited
+
+    @unit
+    Scenario: A paid checkout on the row an operator activated starts the plan
+      Given an operator activated the checkout's own PENDING Growth row in Ops
+      When the checkout completion arrives
+      Then that row carries the Stripe subscription and is the one active subscription
+      And the organization moves to seat pricing as any first seat checkout does
+
+    @unit
+    Scenario: Two paid seat checkouts keep one plan
+      Given the organization already holds an active Growth seat plan linked to Stripe
+      When a second seat checkout is paid, from a session opened before the first was paid
+      Then the second checkout's Stripe subscription is cancelled and its paid invoice refunded
+      And its row is cancelled, so the organization holds exactly one active subscription
+      And ops are alerted to the duplicate
+
+    @unit @integration
+    Scenario: The database refuses a second live Stripe-backed plan for an organization
+      Given the organization holds an active seat plan linked to Stripe, however old
+      When a second linked plan for it is activated, linked or reactivated, even at the same moment
+      Then the write is refused with subscription_already_active and leaves the row as it was
+      And a seat plan still goes live beside the tiered plan it replaces
+      And duplicates that existed before the index stay outside it, so the index builds on existing data
+
+    @unit
+    Scenario: A duplicate plan the index exempts still blocks a second plan
+      Given an older duplicate live plan the index exempts, beside a newer one that was cancelled
+      When a new seat checkout is paid for the organization
+      Then the new plan is refused, cancelled and refunded, and the older one stays the only live plan
+
+    @unit @integration
+    Scenario: Billing refuses another module's write that would start a second live plan
+      Given the organization holds an active seat plan linked to Stripe beside the tiered plan it replaces
+      When another module asks whether a write may create, activate, link or move in a second linked plan
+      Then billing refuses with subscription_already_active naming the organization and its live plan
+      And an edit to the tiered plan, to the live plan itself or to an unlinked row is allowed
+      And the answer is the same off LangWatch Cloud, as the database index holds everywhere
+
+    @unit
+    Scenario: A checkout paid in a race with another is refused as a second plan
+      Given two seat checkouts for the organization are paid at the same moment
+      And the first one's plan went live after the second passed its check
+      When the second checkout's plan is activated
+      Then the activation is refused with subscription_already_active
+      And the second checkout's Stripe subscription is cancelled and its paid invoice refunded
+      And ops are alerted to the duplicate and nothing starts for it
+
+    @unit @integration
+    Scenario: Two checkouts paid onto an operator's row keep the first one's plan
+      Given an operator's active row with no Stripe subscription
+      And two seat checkouts are paid at the same moment, both read before either landed
+      When both are moved onto the operator's row
+      Then the first links the row and its plan and seats stay on it
+      And the second is refused with subscription_already_active and goes the way of a second paid plan
+      And its Stripe subscription is cancelled and ops are alerted
+
+    @unit
+    Scenario: A redelivered checkout completion changes nothing more
+      Given a checkout completion already landed on the operator's row
+      When Stripe delivers it again
+      Then the organization still holds exactly one active subscription
+
+    @unit
     Scenario: The invite checkout is organization's procedure
       Then invite.upgradeWithInvites is declared by organization with organization:manage
       And billing declares no subscription.upgradeWithInvites

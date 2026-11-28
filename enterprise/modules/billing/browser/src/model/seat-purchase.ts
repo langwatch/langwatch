@@ -3,6 +3,8 @@
  * becomes the upgrade past it; on Growth it adds or lowers seats in place.
  * @see specs/licensing/seat-buying.feature
  */
+import { withArticle } from "@langwatch/enterprise-billing-contract";
+import { readHandledError } from "@langwatch/handled-error/read-handled-error";
 import { Temporal } from "@langwatch/time";
 
 import { type Currency, EXCLUDING_VAT, formatPrice } from "./billing-plans.ts";
@@ -269,9 +271,19 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
   const day = nextPeriodDay(plan);
   const monthly =
     seats * price.seatCents + (developer ? developer.target * developer.unitCents : 0);
+  const due = dueTodayCents({
+    delta,
+    quote,
+    devDelta,
+    developerDueCents: plan.developerDueCents,
+  });
   return {
     heading: `You pay for ${paid}. ${inUseLine({ inUse, held })}`,
-    rowChip: "Invited when you confirm",
+    /** Seats paid for that nobody holds yet; none while seats are being added. */
+    freeSeats: delta > 0 ? 0 : Math.max(0, paid - inUse),
+    /** Whether the stepper or the Developer seats ask for a change. */
+    changed: delta !== 0 || devDelta !== 0,
+    rowChip: inUse + invites <= paid ? FREE_SEAT_CHIP : "Invited after you pay",
     minimumHint:
       seats <= growthMinimumSeats({ inUse, invites }) && seats < paid
         ? growthMinimumHint({ inUse, held })
@@ -285,10 +297,17 @@ export function growthSeatPlan(plan: GrowthSeatPlan) {
       invites,
       price,
       developer,
-      priceFailed: plan.priceFailed === true,
+      due: plan.priceFailed === true ? undefined : due,
     }),
   };
 }
+
+/** The invite row's chip when the address fits a seat already paid for. */
+export const FREE_SEAT_CHIP = "Uses your free seat";
+
+/** Lite seats cost nothing, and the stepper adds now and lowers later. */
+export const GROWTH_SEATS_HINT =
+  "Lite members are free and unlimited on Growth. Seats are added now and lowered from the next period.";
 
 function growthMinimumHint({ inUse, held }: { inUse: number; held: HeldSeats }): string {
   const lower = "Remove someone in Users to go lower.";
@@ -327,9 +346,6 @@ function growthNote({
   }
   if (delta > 0 && quote?.appliesAt != null && day) {
     return `Nothing to pay today: you keep ${quote.keptSeats ?? paid} seats until ${day}, then pay for ${seats}.`;
-  }
-  if (delta > 0 && day) {
-    return `Added to your subscription now, prorated to ${day}. No new checkout.`;
   }
   return undefined;
 }
@@ -384,8 +400,8 @@ function growthSummary({
   if (delta > 0 || devDelta > 0) {
     const due = dueTodayCents({ delta, quote, devDelta, developerDueCents });
     const taxCents = dueTodayTaxCents({ delta, quote, devDelta, developerTaxCents });
-    const seatsValue = delta > 0 ? `${paid} → ${seats}` : `${seats}, ${inUse} in use`;
-    return addingSummary({ seatsValue, devLine, due, taxCents, day, monthly, price });
+    const addedLines = [...moreSeatsLine({ delta, price }), ...devLine];
+    return addingSummary({ addedLines, due, taxCents, day, monthly, seats, price });
   }
   return [
     { label: "Full seats", value: `${seats}, ${inUse} in use`, muted: true },
@@ -400,34 +416,41 @@ function growthSummary({
   ];
 }
 
+/** "1 more full seat €29/mo", or nothing when no full seat is added. */
+function moreSeatsLine({ delta, price }: { delta: number; price: SeatPrice }): SeatSummaryLine[] {
+  if (delta <= 0) return [];
+  const value = `${money(price, delta * price.seatCents)}${price.periodSuffix}`;
+  return [{ label: `${delta} more full ${delta === 1 ? "seat" : "seats"}`, value, muted: true }];
+}
+
 function addingSummary({
-  seatsValue,
-  devLine,
+  addedLines,
   due,
   taxCents,
   day,
   monthly,
+  seats,
   price,
 }: {
-  seatsValue: string;
-  devLine: SeatSummaryLine[];
+  addedLines: SeatSummaryLine[];
   due: number | undefined;
   taxCents: number;
   day: string | undefined;
   monthly: number;
+  seats: number;
   price: SeatPrice;
 }): SeatSummaryLine[] {
   return [
-    { label: "Full seats", value: seatsValue, muted: true },
-    ...devLine,
+    ...addedLines,
     {
-      label: "Due today, prorated",
+      label: todayLabel(day),
       value: due === undefined ? "…" : money(price, due),
       note: vatSplit({ price, dueCents: due, taxCents }),
+      emphasis: true,
     },
     {
       label: day ? `Then from ${day}` : "Then each period",
-      value: `${money(price, monthly)}${price.periodSuffix}`,
+      value: `${money(price, monthly)}${price.periodSuffix} for ${plural(seats, "seat")}`,
       note: recurringNote(monthly),
       ruled: true,
       emphasis: true,
@@ -470,6 +493,11 @@ export function dueTodayTaxCents({
   return Math.max(0, seatsTax) + Math.max(0, devTax);
 }
 
+/** "Today, prorated to 1 Dec", or "Today" while the next period's day is unknown. */
+function todayLabel(day: string | undefined): string {
+  return day ? `Today, prorated to ${day}` : "Today";
+}
+
 function growthAction({
   delta,
   devDelta,
@@ -477,7 +505,7 @@ function growthAction({
   invites,
   price,
   developer,
-  priceFailed,
+  due,
 }: {
   delta: number;
   devDelta: number;
@@ -485,23 +513,16 @@ function growthAction({
   invites: number;
   price: SeatPrice;
   developer: DeveloperSeatPlan | undefined;
-  priceFailed: boolean;
+  /** Charged today; undefined while the price has not loaded or did not load. */
+  due: number | undefined;
 }): SeatAction {
-  const priced = (text: string, cents: number) =>
-    priceFailed ? text : `${text} · ${money(price, cents)}${price.periodSuffix}`;
+  const priced = (text: string) =>
+    due === undefined || due <= 0 ? text : `${text} · ${money(price, due)} today`;
   if (delta !== 0 && devDelta !== 0) return { kind: "change", label: "Confirm seat changes" };
-  if (delta > 0) {
-    return {
-      kind: "change",
-      label: priced(`Add ${plural(delta, "seat")}`, delta * price.seatCents),
-    };
-  }
+  if (delta > 0) return { kind: "change", label: priced(`Add ${plural(delta, "seat")}`) };
   if (delta < 0) return { kind: "change", label: `Lower to ${plural(seats, "seat")}` };
   if (devDelta > 0 && developer) {
-    return {
-      kind: "change",
-      label: priced(`Add ${plural(devDelta, "developer seat")}`, devDelta * developer.unitCents),
-    };
+    return { kind: "change", label: priced(`Add ${plural(devDelta, "developer seat")}`) };
   }
   if (devDelta < 0 && developer) {
     return { kind: "change", label: `Lower to ${plural(developer.target, "developer seat")}` };
@@ -513,7 +534,7 @@ function growthAction({
 /** A line of the confirm dialog: what, when, and how much. */
 export type ConfirmLine = {
   label: string;
-  detail: string;
+  detail?: string;
   value: string;
   /** Quiet words under the value: "excl. VAT", or how a charge splits into price and VAT. */
   note?: string;
@@ -521,6 +542,8 @@ export type ConfirmLine = {
 
 export type SeatConfirm = {
   title: string;
+  /** The sentence above the lines: what the change does. */
+  lead?: string;
   lines: ConfirmLine[];
   body: string | undefined;
   actionLabel: string;
@@ -615,11 +638,11 @@ function todayLine({
   if (due === 0) {
     return [{ label: "Today", detail: "Nothing to pay today.", value: money(price, 0) }];
   }
-  const period = `${billingDay(todayMs)}${day ? ` to ${day}` : ""}`;
   return [
     {
-      label: "Today",
-      detail: `Charged today to the card on file, for ${period}.`,
+      label: todayLabel(day),
+      // The label names the period's end; without one, say where the charge starts.
+      detail: day ? undefined : `From ${billingDay(todayMs)} to the end of this period.`,
       value: money(price, due),
       note: vatSplit({ price, dueCents: due, taxCents }),
     },
@@ -656,24 +679,94 @@ export function seatConfirm({
     devDelta,
     developerTaxCents: plan.developerTaxCents,
   });
-  const added = delta > 0 ? plural(delta, "seat") : plural(Math.max(devDelta, 0), "developer seat");
+  const added =
+    delta > 0
+      ? `${delta} full ${delta === 1 ? "seat" : "seats"}`
+      : plural(Math.max(devDelta, 0), "developer seat");
   const charged = due !== undefined && due > 0;
   return {
-    title:
-      delta !== 0 || devDelta > 0
-        ? `Add ${added} to your organization?`
-        : "Change your developer seats?",
+    title: delta !== 0 || devDelta > 0 ? `Add ${added}?` : "Change your developer seats?",
+    lead: addLead({ paid, seats, delta }),
     lines: [
       ...todayLine({ due, taxCents, price, todayMs, day: pricing.day }),
       {
-        label: pricing.fromDay,
+        label: pricing.day ? `Then from ${pricing.day}` : "Then each period",
         detail: pricing.seatsDetail(seats),
         value: pricing.perPeriod(pricing.monthly(seats)),
         note: recurringNote(pricing.monthly(seats)),
       },
     ],
     body: inviteBody({ emails, delta }),
-    actionLabel: charged ? `Pay ${money(price, due)} and add` : "Confirm",
+    actionLabel: charged ? `Pay ${money(price, due)}` : "Confirm",
+  };
+}
+
+/** "You go from 3 to 4 full seats. The new seat is free to use at once." */
+function addLead({ paid, seats, delta }: { paid: number; seats: number; delta: number }) {
+  if (delta <= 0) return undefined;
+  const ready = delta === 1 ? "The new seat is" : "The new seats are";
+  return `You go from ${paid} to ${seats} full seats. ${ready} free to use at once.`;
+}
+
+/** The banner once a confirm that adds full seats is paid; undefined when it adds none. */
+export function seatsAddedNoticeOf({
+  plan,
+  emails,
+}: {
+  plan: GrowthSeatPlan;
+  emails: string[];
+}): { title: string; body: string } | undefined {
+  const added = plan.seats - plan.paid;
+  if (added <= 0) return undefined;
+  const devDelta = plan.developer ? plan.developer.target - plan.developer.current : 0;
+  return seatsAddedNotice({
+    added,
+    developerAdded: Math.max(0, devDelta),
+    dueCents: dueTodayCents({
+      delta: added,
+      quote: plan.quote,
+      devDelta,
+      developerDueCents: plan.developerDueCents,
+    }),
+    seats: plan.seats,
+    inUse: plan.inUse + emails.length,
+    emails,
+    price: plan.price,
+  });
+}
+
+/** The banner at the top of Manage seats once added seats are paid for. */
+export function seatsAddedNotice({
+  added,
+  developerAdded = 0,
+  dueCents,
+  seats,
+  inUse,
+  emails,
+  price,
+}: {
+  added: number;
+  /** Developer seats the same confirm added. */
+  developerAdded?: number;
+  dueCents: number | undefined;
+  seats: number;
+  /** Full seats held after the change, the people just invited included. */
+  inUse: number;
+  emails: string[];
+  price: SeatPrice;
+}): { title: string; body: string } {
+  const paidPart = dueCents !== undefined && dueCents > 0 ? `Paid ${money(price, dueCents)}. ` : "";
+  const free = Math.max(0, seats - inUse);
+  const freePart = free > 0 ? `, ${free} free` : "";
+  const invites =
+    emails.length === 0
+      ? ""
+      : ` ${emails.length === 1 ? "Invite" : "Invites"} sent to ${joinEmails(emails)}.`;
+  const developerPart =
+    developerAdded > 0 ? ` and ${plural(developerAdded, "developer seat")}` : "";
+  return {
+    title: `${plural(added, "seat")}${developerPart} added`,
+    body: `${paidPart}You have ${seats} full seats${freePart}.${invites}`,
   };
 }
 
@@ -728,4 +821,28 @@ function fullSeatsLine({
   const added = delta === 1 ? "Seat" : `${delta} seats`;
   const also = devNow ? ` and ${devNow}` : "";
   return `${added} added. You now pay for ${plural(seats, "seat")}${also}.`;
+}
+/** The members page with one member's drawer open, where their role is changed. */
+export function memberAddress(userId: string): string {
+  return `/settings/directory?tab=people&drawer.open=person&drawer.userId=${encodeURIComponent(userId)}`;
+}
+/** Whether a refusal says billing is held on our side: two live subscriptions for one org. */
+export function isBillingStuck(error: unknown): boolean {
+  return readHandledError(error)?.code === "subscription_ambiguous";
+}
+const MEMBER_TYPE_ROLE: Record<string, string> = {
+  LiteMember: "Lite Member",
+  BillingOnly: "Billing only",
+  Developer: "Developer",
+};
+
+/** "an Admin", "a Member", "a Lite Member": the role as the members page names it. */
+export function memberRoleWithArticle({
+  role,
+  memberType,
+}: {
+  role: string;
+  memberType: string;
+}): string {
+  return withArticle(MEMBER_TYPE_ROLE[memberType] ?? (role === "ADMIN" ? "Admin" : "Member"));
 }

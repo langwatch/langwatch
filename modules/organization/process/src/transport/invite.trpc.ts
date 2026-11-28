@@ -25,6 +25,23 @@ export const inviteTrpcTransport: TrpcRouterDeclaration<OrganizationApi, typeof 
       app.createInvitations({ ...input, validation: "lenient" }, callerOf(actor, person)),
     )
 
+    /**
+     * Asked before a seat is bought for these invitations, so an address that already
+     * belongs to a member is refused before anything is charged.
+     */
+    .procedure("checkInvites")
+    .withMiddlewareContext(organizationSessionPersonContext)
+    .withPermission("organization:manage")
+    .handle(({ app, input, actor }, person) =>
+      app.checkInvitesWithinCaller(
+        {
+          organizationId: input.organizationId,
+          invites: input.invites.map(({ email, role }) => ({ email, role, teamIds: "" })),
+        },
+        callerOf(actor, person),
+      ),
+    )
+
     .procedure("deleteInvite")
     .withPermission("organization:manage")
     .handle(async ({ app, input }) => {

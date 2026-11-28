@@ -149,7 +149,26 @@ Feature: Buying seats
       When I open Manage seats
       Then it reads "You pay for 3. 3 in use."
       And the full seats read 3
+      And it reads "Lite members are free and unlimited on Growth. Seats are added now and lowered from the next period."
+      And there is one address to invite someone new, with no price shown
       And the confirm reads "No changes" and cannot be chosen
+
+    @integration
+    Scenario: Manage seats on Growth names the seats paid for that nobody uses
+      Given "ACME" has a Growth subscription for 3 seats with 2 in use
+      When I open Manage seats
+      Then it reads "You pay for 3. 2 in use." and "1 free"
+
+    @integration
+    Scenario: Raising the seats prices them under the stepper before anything is paid
+      Given "ACME" has a Growth subscription for 3 seats with 3 in use
+      And Manage seats is open
+      When I raise the full seats to 4
+      Then it reads "1 more full seat" "€29/mo"
+      And it reads "Today, prorated to 1 Dec" "€24.17"
+      And it reads "Then from 1 Dec" "€116/mo for 4 seats"
+      And it names no card
+      And the confirm reads "Add 1 seat · €24.17 today"
 
     @integration
     Scenario: Inviting past the seats paid for raises the count
@@ -157,28 +176,46 @@ Feature: Buying seats
       And Manage seats is open
       When I add "qux@acme.example"
       Then the full seats read 4
-      And the row reads "Invited when you confirm"
-      And the confirm reads "Add 1 seat · €29/mo"
-      And the summary reads "Full seats 3 → 4", the prorated amount due today and the price from the next period
-      And it reads "Added to your subscription now, prorated to 1 Dec. No new checkout."
+      And the row reads "Invited after you pay"
+      And the confirm reads "Add 1 seat · €24.17 today"
+      And it reads "1 more full seat", the prorated amount due today and the price from the next period
 
     @integration
     Scenario: Adding seats asks to confirm the charge
       Given Manage seats on Growth raises the seats from 3 to 4 for "qux@acme.example"
-      When I choose "Add 1 seat · €29/mo"
-      Then a dialog "Add 1 seat to your organization?" names the amount charged today and the period it covers
+      When I choose "Add 1 seat · €24.17 today"
+      Then a dialog "Add 1 full seat?" reads "You go from 3 to 4 full seats. The new seat is free to use at once."
+      And it reads "Today, prorated to 1 Dec" "€24.17"
       And it reads the price from 1 Dec, "4 seats × €29"
       And it reads "qux@acme.example gets the invite as soon as the seat is added."
-      And its button reads "Pay €24.17 and add"
+      And it names no card
+      And its button reads "Pay €24.17"
 
     @integration
     Scenario: Confirming the added seat changes the subscription and sends the invite
       Given the confirm to add 1 seat for "qux@acme.example" is open
-      When I choose "Pay €24.17 and add"
+      When I choose "Pay €24.17"
       Then the subscription is changed to 4 seats at the price I was quoted
       And "qux@acme.example" is invited
-      And I am told "Seat added. You now pay for 4 seats. Invite sent to qux@acme.example."
-      And Manage seats closes with no pending seat change left on the page
+      And the confirm closes and Manage seats reads "1 seat added" and "Paid €24.17. You have 4 full seats. Invite sent to qux@acme.example."
+      And its button reads "Done", which closes Manage seats
+
+    @unit
+    Scenario: Adding full and Developer seats in one confirm names both in the banner
+      Given a Developer seat price of €5 a month is configured
+      And Manage seats raises the full seats from 3 to 4 and the Developer seats from 0 to 2
+      When I confirm and the change is paid
+      Then Manage seats reads "1 seat and 2 developer seats added"
+      And it reads "Paid €32.50", the full seat and the Developer seats charged today together
+
+    @integration
+    Scenario: Paying for a seat with nobody to invite leaves it free
+      Given "ACME" has a Growth subscription for 3 seats with 3 in use
+      And Manage seats raises the full seats to 4 with no address typed
+      When I choose "Add 1 seat · €24.17 today" and "Pay €24.17"
+      Then the subscription is changed to 4 seats
+      And Manage seats reads "1 seat added" and "Paid €24.17. You have 4 full seats, 1 free."
+      And nobody is invited
 
     @integration
     Scenario: Back from the confirm returns to the drawer unchanged
@@ -193,9 +230,10 @@ Feature: Buying seats
       And Manage seats is open
       When I add "qux@acme.example"
       Then the full seats still read 5
-      And the confirm reads "Invite 1 person"
-      When I choose "Invite 1 person"
+      And the row reads "Uses your free seat" and no price is shown
+      When I choose "Invite" in the row
       Then "qux@acme.example" is invited and the subscription is not changed
+      And Manage seats stays open with the address cleared
 
     @integration
     Scenario: Lowering seats stops at the people who use them
@@ -233,7 +271,7 @@ Feature: Buying seats
     Scenario: A charge the payment provider refuses keeps the confirm open and invites nobody
       Given the confirm to add 1 seat for "qux@acme.example" is open
       And the payment provider refuses the change
-      When I choose "Pay €24.17 and add"
+      When I choose "Pay €24.17"
       Then I am told the seats could not be updated
       And "qux@acme.example" is not invited
       And the confirm is still open
@@ -242,11 +280,66 @@ Feature: Buying seats
     Scenario: An invite refused after the seats changed keeps Manage seats open
       Given the confirm to add 1 seat for "qux@acme.example" is open
       And the invitation for "qux@acme.example" is refused
-      When I choose "Pay €24.17 and add"
+      When I choose "Pay €24.17"
       Then the subscription is changed to 4 seats
       And I am told the invites could not be sent
       And I am not told the seat was added with an invite sent
       And the confirm closes and Manage seats stays open
+
+    @integration
+    Scenario: An address already on the team is refused in Manage seats before any price
+      Given Manage seats on Growth with 3 seats paid for and "member1@acme.example" a member
+      When I add a person "Member1@acme.example"
+      Then the row reads "Member 1 is already on your team as a Member. Change their role instead."
+      And no seat is added, priced or charged for them
+      When I choose "Change their role instead"
+      Then the members page opens on that member
+
+    @integration
+    Scenario: An existing member is refused by the role they hold
+      Given Manage seats on Growth with "member0@acme.example" an Admin of "ACME"
+      When I add a person "member0@acme.example"
+      Then the row reads "Member 0 is already on your team as an Admin. Change their role instead."
+
+    @integration
+    Scenario: Manage seats asks the server about the invite before it charges
+      Given the confirm to add 1 seat for "qux@acme.example" is open
+      And the server refuses "qux@acme.example" as already a member
+      When I choose "Pay €24.17"
+      Then the subscription is not changed and nothing is charged
+      And I am told these people could not be added, and the confirm stays open
+
+    @integration
+    Scenario: Manage seats stops calmly while two live subscriptions hold the billing
+      Given "ACME" has two live subscriptions on our side
+      When I open Manage seats and the price for the change is refused for that
+      Then it reads "We couldn't add seats yet"
+      And it reads "Something on our side is holding ACME's billing. We were alerted automatically and are fixing it."
+      And it reads "Nothing was charged." and "We'll email you when it's done, usually the same working day."
+      And it offers "Contact support" by email
+      And it shows no seat count, price or invite
+      And the attempt is kept once for me, so I get the email when billing is fixed
+
+    @unit
+    Scenario: A seat purchase held by two live subscriptions is kept for the admin who tried
+      Given an administrator of "ACME" whose seat price was refused for two live subscriptions
+      When Manage seats records the attempt for 2 seats
+      Then a seat purchase of 2 seats is kept for that administrator
+      And someone without subscription:manage is refused
+
+    @unit
+    Scenario: A refused seat change that buys no seat is not kept
+      Given "ACME" bills 5 seats on two live subscriptions
+      When an administrator's change to 4 seats or to 5 seats is refused for that
+      Then nothing is kept for that administrator, so no seat price is emailed later
+      And a refused change to 7 seats is kept as a purchase of 2 seats
+
+    @integration
+    Scenario: The confirm keeps its question while the invite after a payment is sent
+      Given the confirm to add 1 seat for "qux@acme.example" is open
+      When I choose "Pay €24.17" and the plan is read again with 4 seats
+      Then the confirm still asks to add 1 seat until the invite is sent
+      And it never turns into "Change your developer seats?"
 
     @unit
     Scenario: Lowering full seats while adding Developer seats names what is due today
@@ -277,7 +370,7 @@ Feature: Buying seats
       Given a Developer seat price of €5 a month is configured
       And Manage seats on Growth is open with "Other seat types" unfolded
       When I raise the Developer seats from 0 to 2
-      Then the confirm reads "Add 2 developer seats · €10/mo"
+      Then the confirm reads "Add 2 developer seats · €8.33 today"
       And the summary reads "Developer seats 2 × €5"
 
     @unit
@@ -420,10 +513,10 @@ Feature: Buying seats
     Scenario: The seat change confirm splits VAT out of the charge today
       Given Manage seats on Growth raises the seats from 3 to 4 for "qux@acme.example"
       And the change charges €29.24 today, €5.07 of it VAT
-      When I choose "Add 1 seat · €29/mo"
+      When I choose "Add 1 seat · €29.24 today"
       Then the confirm reads "€29.24" today with "€24.17 + €5.07 VAT"
       And it reads the price from 1 Dec as "€116/mo" and "excl. VAT"
-      And its button reads "Pay €29.24 and add"
+      And its button reads "Pay €29.24"
 
     @unit
     Scenario: A charge today with no VAT names no split
@@ -437,8 +530,8 @@ Feature: Buying seats
     Scenario: The drawer summary splits VAT out of the amount due today
       Given Manage seats on Growth raises the seats from 3 to 4
       And the change charges €29.24 today, €5.07 of it VAT
-      Then the summary reads "Due today, prorated" "€29.24" with "€24.17 + €5.07 VAT"
-      And "Then from 1 Dec" "€116/mo" with "excl. VAT"
+      Then the summary reads "Today, prorated to 1 Dec" "€29.24" with "€24.17 + €5.07 VAT"
+      And "Then from 1 Dec" "€116/mo for 4 seats" with "excl. VAT"
 
     @unit
     Scenario: Lowering seats says each recurring price excludes VAT

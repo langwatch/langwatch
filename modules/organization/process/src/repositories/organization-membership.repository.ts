@@ -201,6 +201,24 @@ export interface UpdateMemberRoleInput {
   caller: AuthzGrantCaller;
   /** What the change does to the person's full seat; absent leaves it as it stands. */
   seat?: SeatTransition;
+  /** Writes only while the member's role version still reads this; else `RoleVersionMovedError`. */
+  expectedRoleVersion?: number;
+  /** The paid role change this write applies, stored with it; any other role write clears it. */
+  roleChangeId?: string;
+}
+
+/**
+ * A role write that expected a role version another role write already moved; nothing written.
+ * `appliedChangeId` names the paid role change the newest write applied, null for a direct one.
+ */
+export class RoleVersionMovedError extends Error {
+  constructor(
+    userId: string,
+    readonly appliedChangeId: string | null,
+  ) {
+    super(`The role of member ${userId} changed since the expected role version`);
+    this.name = "RoleVersionMovedError";
+  }
 }
 
 /** A membership as the seat hold rule reads it (seat-rotation.feature). */
@@ -383,6 +401,16 @@ export abstract class OrganizationMembershipRepository {
     organizationId: string;
     userId: string;
   }) => Promise<OrganizationMemberSummary>;
+
+  /** The member's role version: every role write moves it by one. Throws `MemberNotFoundError`. */
+  abstract getRoleVersion(params: { organizationId: string; userId: string }): Promise<number>;
+
+  /** Whether the member's newest role write applied this paid change (`lastRoleChangeId`). */
+  abstract isRoleChangeApplied(params: {
+    organizationId: string;
+    userId: string;
+    changeId: string;
+  }): Promise<boolean>;
 
   // listAllMembers and the members through updateTeamMemberRole below are
   // function-typed properties, not method shorthand, so test mocks can be

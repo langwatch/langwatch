@@ -1,5 +1,6 @@
 import { addressConfirmationEmailTemplate } from "./address-confirmation-email.tsx";
 import { automationLimitEmailTemplate } from "./automation-limit-email.tsx";
+import { billingFixedEmailTemplate } from "./billing-fixed-email.tsx";
 import { budgetIncreaseRequestEmailTemplate } from "./budget-increase-request-email.tsx";
 import { connectedStatementEmailTemplate } from "./connected-statement-email.tsx";
 import { digestCodingAgentWeekTemplate } from "./digest-coding-agent-week.tsx";
@@ -24,7 +25,11 @@ import { paymentRecoveryEmailTemplate } from "./payment-recovery-email.tsx";
 import { platformOperatorChangeEmailTemplate } from "./platform-operator-change-email.tsx";
 import type { MailTemplate } from "./registry.ts";
 import { resetPasswordEmailTemplate } from "./reset-password-email.tsx";
-import { idpRefusedSignInTemplate, seatRequestTemplate } from "./seat-request-emails.tsx";
+import {
+  idpRefusedSignInTemplate,
+  seatRequestAnsweredTemplate,
+  seatRequestTemplate,
+} from "./seat-request-emails.tsx";
 import { signUpVerificationEmailTemplate } from "./sign-up-verification-email.tsx";
 import {
   ssoDomainProofLapsedTemplate,
@@ -52,6 +57,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   joinRequestExpiredTemplate,
   domainAutoJoinedTemplate,
   seatRequestTemplate,
+  seatRequestAnsweredTemplate,
   idpRefusedSignInTemplate,
   ssoDomainProofWaveringTemplate,
   ssoDomainProofLapsedTemplate,
@@ -62,6 +68,7 @@ export const mailTemplates: readonly MailTemplate[] = [
   platformOperatorChangeEmailTemplate,
   connectedStatementEmailTemplate,
   paymentRecoveryEmailTemplate,
+  billingFixedEmailTemplate,
   budgetIncreaseRequestEmailTemplate,
   usageLimitEmailTemplate,
   automationLimitEmailTemplate,

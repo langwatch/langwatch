@@ -1,3 +1,4 @@
+import { findLivePlanConflicts, type PlanSlotRow } from "@langwatch/enterprise-billing-contract";
 import { generate } from "@langwatch/ksuid";
 import type {
   AdminDataResult,
@@ -51,12 +52,23 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
               ? String(given)
               : generate(resource).toString(),
         };
+        this.refuseSecondLivePlan({ resource, rows, written: [row] });
         rows.set(row.id, row);
         return { data: row };
       }
       case "update":
+        this.refuseSecondLivePlan({
+          resource,
+          rows,
+          written: this.merged({ rows, ids: [id], data: params.data }),
+        });
         return { data: this.merge({ rows, id, data: params.data }) };
       case "updateMany":
+        this.refuseSecondLivePlan({
+          resource,
+          rows,
+          written: this.merged({ rows, ids, data: params.data }),
+        });
         for (const each of ids) this.merge({ rows, id: each, data: params.data });
         return { data: ids };
       case "delete": {
@@ -80,6 +92,43 @@ export class MemoryInstanceAdminRepository extends InstanceAdminRepository {
     const rows = new Map<string, AdminRow>();
     this.store.adminRows.set(resource, rows);
     return rows;
+  }
+
+  /** The rows a write would leave, unwritten. */
+  private merged({
+    rows,
+    ids,
+    data,
+  }: {
+    rows: Map<string, AdminRow>;
+    ids: string[];
+    data: AdminOperationParams["data"];
+  }): AdminRow[] {
+    return ids.flatMap((id) => {
+      const existing = rows.get(id);
+      return existing ? [{ ...existing, ...data, id }] : [];
+    });
+  }
+
+  /**
+   * The table's one-live-plan index, which billing owns and declares in its contract: a write it
+   * refuses fails as the database's unique violation would, before anything is written.
+   */
+  private refuseSecondLivePlan({
+    resource,
+    rows,
+    written,
+  }: {
+    resource: AdminOperationInput["resource"];
+    rows: Map<string, AdminRow>;
+    written: AdminRow[];
+  }): void {
+    if (resource !== "subscription") return;
+    const conflicts = findLivePlanConflicts({
+      rows: [...rows.values()].map(planSlotOf),
+      written: written.map(planSlotOf),
+    });
+    if (conflicts.length > 0) throw new Error("Unique constraint failed on the live plan index");
   }
 
   private merge({
@@ -116,4 +165,15 @@ function page({
     .filter((row) => Object.entries(filter).every(([key, value]) => row[key] === value))
     .toSorted((left, right) => direction * String(left[field]).localeCompare(String(right[field])));
   return { data: matching.slice(start, start + perPage), total: matching.length };
+}
+
+function planSlotOf(row: AdminRow): PlanSlotRow {
+  return {
+    id: String(row.id),
+    organizationId: String(row.organizationId),
+    status: String(row.status),
+    plan: String(row.plan),
+    stripeSubscriptionId:
+      typeof row.stripeSubscriptionId === "string" ? row.stripeSubscriptionId : null,
+  };
 }

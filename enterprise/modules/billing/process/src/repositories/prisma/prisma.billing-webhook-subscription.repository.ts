@@ -13,6 +13,7 @@ import {
 import type {
   BillingSubscriptionRecord,
   BillingSubscriptionRepository,
+  LiveUnlinkedSubscription,
   SupersededSubscription,
 } from "../subscription.repository.ts";
 
@@ -80,6 +81,10 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     return this.subscriptions.cancel(input);
   }
 
+  cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]> {
+    return this.subscriptions.cancelPendingCheckout(input);
+  }
+
   cancelTrialSubscriptions(organizationId: string): Promise<void> {
     return this.subscriptions.cancelTrialSubscriptions(organizationId);
   }
@@ -89,6 +94,22 @@ export class PrismaBillingWebhookSubscriptionRepository extends BillingWebhookSu
     excludeSubscriptionId: string;
   }): Promise<SupersededSubscription[]> {
     return this.subscriptions.findSupersededBySeatEvent(input);
+  }
+
+  findLiveUnlinkedBeside(input: { pendingId: string }): Promise<LiveUnlinkedSubscription[]> {
+    return this.subscriptions.findLiveUnlinkedBeside(input);
+  }
+
+  findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]> {
+    return this.subscriptions.findLiveLinkedBeside(input);
+  }
+
+  adoptCheckout(input: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void> {
+    return this.subscriptions.adoptCheckout(input);
   }
 
   async updateQuantities(input: {

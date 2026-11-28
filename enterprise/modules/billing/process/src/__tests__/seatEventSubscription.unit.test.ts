@@ -14,6 +14,7 @@ import type {
   BillingSubscription,
 } from "../rules/billing-stripe-shapes.rules.ts";
 import type { BillingLifecycleAnnouncerService } from "../services/billing-lifecycle-announcer.service.ts";
+import type { DuplicateSubscriptionAlerts } from "../services/duplicate-subscription-alert.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
@@ -54,6 +55,8 @@ const createMockSubscriptions = (): {
   [K in keyof SeatEventSubscriptionRepository]: Mock<SeatEventSubscriptionRepository[K]>;
 } => ({
   findSeatCandidates: vi.fn().mockResolvedValue([]),
+  findActivePlans: vi.fn().mockResolvedValue([]),
+  supersedeStrayRows: vi.fn().mockResolvedValue(undefined),
   cancelPendingSeatCheckouts: vi.fn().mockResolvedValue([]),
   createPendingSeatCheckout: vi.fn().mockResolvedValue({ id: "sub_new_1" }),
   keepSeats: vi.fn(),
@@ -87,6 +90,10 @@ describe("seatEventSubscription", () => {
   /** Billing's fact that organization drops the held invitations from (R42). */
   let abandoned: {
     seatCheckoutsAbandoned: Mock<BillingLifecycleAnnouncerService["seatCheckoutsAbandoned"]>;
+    audited: Mock<BillingLifecycleAnnouncerService["audited"]>;
+  };
+  let duplicates: {
+    reportDuplicateActive: Mock<DuplicateSubscriptionAlerts["reportDuplicateActive"]>;
   };
   let service: SeatEventSubscriptionService;
 
@@ -97,7 +104,8 @@ describe("seatEventSubscription", () => {
     // New customers have no fixed currency until their first subscription.
     customers.seed({ id: "cus_1", currency: null });
     subscriptions = createMockSubscriptions();
-    abandoned = { seatCheckoutsAbandoned: vi.fn() };
+    abandoned = { seatCheckoutsAbandoned: vi.fn(), audited: vi.fn().mockResolvedValue(undefined) };
+    duplicates = { reportDuplicateActive: vi.fn().mockResolvedValue(undefined) };
     service = SeatEventSubscriptionService.create({
       stripeSubscriptions,
       subscriptions,
@@ -107,6 +115,7 @@ describe("seatEventSubscription", () => {
         customers,
         stripeErrors: StripeErrorTranslatorService.create(),
       }),
+      duplicates,
     });
   });
 
@@ -532,8 +541,8 @@ describe("seatEventSubscription", () => {
     });
 
     describe("when the active subscription has no billing-provider link", () => {
-      /** @scenario "An active subscription with no billing-provider link is named as such" */
-      it("raises subscription_not_linked instead of the retryable sync error", async () => {
+      /** @scenario "A seat change on a plan that never reached Stripe goes to checkout" */
+      it("raises seat_checkout_required instead of the retryable sync error", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([
           { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE", ...NO_KEPT },
         ]);
@@ -543,7 +552,7 @@ describe("seatEventSubscription", () => {
             organizationId: "org_1",
             newTotalSeats: 3,
           }),
-        ).rejects.toMatchObject({ code: "subscription_not_linked" });
+        ).rejects.toMatchObject({ code: "seat_checkout_required" });
         expect(stripeSubscriptions.reads).toEqual([]);
       });
 
@@ -567,62 +576,240 @@ describe("seatEventSubscription", () => {
             organizationId: "org_1",
             newTotalSeats: 3,
           }),
-        ).rejects.toMatchObject({ code: "subscription_not_linked" });
+        ).rejects.toMatchObject({ code: "seat_checkout_required" });
         expect(stripeSubscriptions.reads).toEqual([]);
       });
     });
 
     describe("when the organization has two active subscriptions", () => {
-      /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
-      it("refuses rather than charging whichever one still carries a link", async () => {
-        // Reachable through the admin console subscription form, which writes any
-        // status against any organization with no uniqueness check behind it.
-        // Preferring the linked row would charge the older plan even when the
-        // newer one was added to supersede it.
-        subscriptions.findSeatCandidates.mockResolvedValue([
-          { id: "sub_db_new", stripeSubscriptionId: null, status: "ACTIVE", ...NO_KEPT },
-          {
-            id: "sub_db_old",
-            stripeSubscriptionId: "sub_stripe_old",
-            status: "ACTIVE",
-            ...NO_KEPT,
-          },
-        ]);
+      /** An Ops row nothing bills, beside the row Stripe bills. */
+      const strayOpsRow = {
+        id: "sub_db_ops",
+        stripeSubscriptionId: null,
+        status: "ACTIVE",
+        ...NO_KEPT,
+      };
+      const twoLiveInStripe = [
+        { id: "sub_db_a", stripeSubscriptionId: "sub_stripe_a", status: "ACTIVE", ...NO_KEPT },
+        { id: "sub_db_b", stripeSubscriptionId: "sub_stripe_b", status: "ACTIVE", ...NO_KEPT },
+      ];
 
-        await expect(
-          service.previewProration({
+      describe("and only one of them is live in Stripe", () => {
+        beforeEach(() => {
+          subscriptions.findSeatCandidates.mockResolvedValue([strayOpsRow, linkedActive]);
+          stripeSubscriptions.seed({ subscription: seatSubscription() });
+        });
+
+        /** @scenario "A seat preview beside a stray local subscription changes nothing" */
+        it("prices the change on the linked one and closes nothing", async () => {
+          stripeSubscriptions.seedPreview({
+            preview: previewOf({ currency: "usd", total: 1500, amountDue: 1500 }),
+          });
+
+          const quote = await service.previewProration({
             organizationId: "org_1",
-            newTotalSeats: 3,
-          }),
-        ).rejects.toMatchObject({ code: "subscription_ambiguous" });
-        expect(stripeSubscriptions.reads).toEqual([]);
+            newTotalSeats: 4,
+          });
+
+          expect(quote.amountDueCents).toBe(1500);
+          expect(subscriptions.supersedeStrayRows).not.toHaveBeenCalled();
+          expect(abandoned.audited).not.toHaveBeenCalled();
+          expect(stripeSubscriptions.reads).toEqual(["sub_stripe_1"]);
+          expect(duplicates.reportDuplicateActive).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "A seat preview beside a stray local subscription changes nothing" */
+        it("leaves the stray row when the billing-fixed sweep quotes the seats", async () => {
+          stripeSubscriptions.seedPreview({
+            preview: previewOf({ currency: "usd", total: 1500, amountDue: 1500 }),
+          });
+
+          await service.quoteAddedSeats({ organizationId: "org_1", added: 1 });
+
+          expect(subscriptions.supersedeStrayRows).not.toHaveBeenCalled();
+          expect(abandoned.audited).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "A stray local subscription beside the one live in Stripe is closed and the change goes on" */
+        it("closes the stray row on a confirmed change, audited first", async () => {
+          await service.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });
+
+          expect(subscriptions.supersedeStrayRows).toHaveBeenCalledWith({ ids: ["sub_db_ops"] });
+          expect(abandoned.audited).toHaveBeenCalledWith(
+            expect.objectContaining({
+              tenantId: "org_1",
+              action: "subscription.supersedeStrayRows",
+              args: { keptId: "sub_db_1", strayIds: ["sub_db_ops"] },
+            }),
+          );
+          expect(abandoned.audited.mock.invocationCallOrder[0]).toBeLessThan(
+            subscriptions.supersedeStrayRows.mock.invocationCallOrder[0] ?? 0,
+          );
+          expect(duplicates.reportDuplicateActive).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "A stray local subscription beside the one live in Stripe is closed and the change goes on" */
+        it("applies the confirmed update on the live one", async () => {
+          await service.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });
+
+          expect(subscriptions.supersedeStrayRows).toHaveBeenCalledWith({ ids: ["sub_db_ops"] });
+          expect(stripeSubscriptions.updates.at(-1)?.subscriptionId).toBe("sub_stripe_1");
+        });
+
+        /** @scenario "A stray local subscription beside the one live in Stripe is closed and the change goes on" */
+        it("treats a linked row Stripe has cancelled as a stray too", async () => {
+          subscriptions.findSeatCandidates.mockResolvedValue([
+            {
+              id: "sub_db_old",
+              stripeSubscriptionId: "sub_stripe_old",
+              status: "ACTIVE",
+              ...NO_KEPT,
+            },
+            linkedActive,
+          ]);
+          stripeSubscriptions.seed({
+            subscription: subscriptionOf({ id: "sub_stripe_old", status: "canceled" }),
+          });
+          await service.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 });
+
+          expect(subscriptions.supersedeStrayRows).toHaveBeenCalledWith({ ids: ["sub_db_old"] });
+        });
+
+        /** @scenario "A closing that cannot be audited is refused rather than applied" */
+        it("refuses, and cancels nothing, when the audit entry cannot be recorded", async () => {
+          abandoned.audited.mockRejectedValue(new Error("audit pipeline down"));
+
+          await expect(
+            service.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 }),
+          ).rejects.toMatchObject({ code: "subscription_ambiguous" });
+          expect(subscriptions.supersedeStrayRows).not.toHaveBeenCalled();
+        });
       });
 
-      /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
-      it("refuses the update too, so nothing is charged", async () => {
-        subscriptions.findSeatCandidates.mockResolvedValue([
-          {
-            id: "sub_db_a",
-            stripeSubscriptionId: "sub_stripe_a",
-            status: "ACTIVE",
-            ...NO_KEPT,
-          },
-          {
-            id: "sub_db_b",
-            stripeSubscriptionId: "sub_stripe_b",
-            status: "ACTIVE",
-            ...NO_KEPT,
-          },
-        ]);
+      describe("when a refused change counts the seats it asked for", () => {
+        /** @scenario "A seat change refused for two live subscriptions is remembered for the admin who tried" */
+        it("counts from the Stripe-backed rows, never the local stray", async () => {
+          subscriptions.findSeatCandidates.mockResolvedValue([
+            { ...strayOpsRow, maxMembers: 40 },
+            { ...linkedActive, maxMembers: 3 },
+            { ...linkedActive, id: "sub_db_gone", status: "CANCELLED", maxMembers: 90 },
+          ]);
 
-        await expect(
-          service.updateSeatEventItems({
+          await expect(service.billedSeats("org_1")).resolves.toBe(3);
+        });
+      });
+
+      describe("and the stray is a custom plan", () => {
+        beforeEach(() => {
+          stripeSubscriptions.seed({ subscription: seatSubscription() });
+        });
+
+        /** @scenario "A custom plan beside the live one is never closed on its own" */
+        it.each([
+          { stray: { ...strayOpsRow, plan: "ENTERPRISE" }, kind: "an ENTERPRISE row" },
+          {
+            stray: { ...strayOpsRow, plan: "GROWTH_SEAT_USD_MONTHLY", customLimits: true },
+            kind: "a row with custom limits",
+          },
+        ])("refuses a preview and a change beside $kind and alerts ops", async ({ stray }) => {
+          subscriptions.findSeatCandidates.mockResolvedValue([stray, linkedActive]);
+
+          await expect(
+            service.previewProration({ organizationId: "org_1", newTotalSeats: 3 }),
+          ).rejects.toMatchObject({ code: "subscription_ambiguous" });
+          await expect(
+            service.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 }),
+          ).rejects.toMatchObject({ code: "subscription_ambiguous" });
+          expect(subscriptions.supersedeStrayRows).not.toHaveBeenCalled();
+          expect(stripeSubscriptions.updates).toEqual([]);
+          expect(duplicates.reportDuplicateActive).toHaveBeenCalledWith({
             organizationId: "org_1",
-            totalMembers: 3,
-          }),
-        ).rejects.toMatchObject({ code: "subscription_ambiguous" });
-        expect(stripeSubscriptions.updates).toEqual([]);
-        expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
+            subscriptionIds: ["sub_db_ops", "sub_db_1"],
+          });
+        });
+      });
+
+      describe("and the only active plan is a custom one with no Stripe link", () => {
+        /** @scenario "A seat change on a custom plan goes to support, not checkout" */
+        it.each([{ plan: "ENTERPRISE" }, { plan: "GROWTH_SEAT_EUR_MONTHLY", customLimits: true }])(
+          "refuses the preview with seat_change_needs_support for %o",
+          async (deal) => {
+            subscriptions.findSeatCandidates.mockResolvedValue([{ ...strayOpsRow, ...deal }]);
+
+            await expect(
+              service.previewProration({ organizationId: "org_1", newTotalSeats: 3 }),
+            ).rejects.toMatchObject({ code: "seat_change_needs_support" });
+            expect(stripeSubscriptions.reads).toEqual([]);
+          },
+        );
+
+        /** @scenario "A seat change on a custom plan goes to support, not checkout" */
+        it("refuses a seat checkout too, opening nothing", async () => {
+          subscriptions.findActivePlans.mockResolvedValue([
+            { id: "sub_db_ops", plan: "ENTERPRISE", stripeSubscriptionId: null },
+          ]);
+
+          await expect(
+            service.createSeatEventCheckout({
+              organizationId: "org_1",
+              customerId: "cus_1",
+              baseUrl: "https://app.test",
+              currency: Currency.USD,
+              billingInterval: "monthly",
+              membersToAdd: 1,
+            }),
+          ).rejects.toMatchObject({ code: "seat_change_needs_support" });
+          expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+          expect(stripeSubscriptions.checkoutSessions).toEqual([]);
+        });
+      });
+
+      describe("and both are live in Stripe", () => {
+        beforeEach(() => {
+          subscriptions.findSeatCandidates.mockResolvedValue(twoLiveInStripe);
+          stripeSubscriptions.seed({ subscription: seatSubscription({ id: "sub_stripe_a" }) });
+          stripeSubscriptions.seed({ subscription: seatSubscription({ id: "sub_stripe_b" }) });
+        });
+
+        /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
+        it("refuses the preview, sends nothing and alerts ops with both ids", async () => {
+          await expect(
+            service.previewProration({ organizationId: "org_1", newTotalSeats: 3 }),
+          ).rejects.toMatchObject({ code: "subscription_ambiguous" });
+          expect(stripeSubscriptions.updates).toEqual([]);
+          expect(subscriptions.supersedeStrayRows).not.toHaveBeenCalled();
+          expect(duplicates.reportDuplicateActive).toHaveBeenCalledWith({
+            organizationId: "org_1",
+            subscriptionIds: ["sub_db_a", "sub_db_b"],
+          });
+        });
+
+        /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
+        it("refuses the update too, so nothing is charged", async () => {
+          await expect(
+            service.updateSeatEventItems({ organizationId: "org_1", totalMembers: 3 }),
+          ).rejects.toMatchObject({ code: "subscription_ambiguous" });
+          expect(stripeSubscriptions.updates).toEqual([]);
+          expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
+        });
+
+        /** @scenario "Two active subscriptions refuse a seat change rather than picking one" */
+        it("counts a subscription Stripe cannot be asked about as live", async () => {
+          subscriptions.findSeatCandidates.mockResolvedValue([
+            ...twoLiveInStripe.slice(0, 1),
+            {
+              id: "sub_db_x",
+              stripeSubscriptionId: "sub_stripe_unknown",
+              status: "ACTIVE",
+              ...NO_KEPT,
+            },
+          ]);
+
+          await expect(
+            service.previewProration({ organizationId: "org_1", newTotalSeats: 3 }),
+          ).rejects.toMatchObject({ code: "subscription_ambiguous" });
+          expect(subscriptions.supersedeStrayRows).not.toHaveBeenCalled();
+        });
       });
     });
 
@@ -880,7 +1067,7 @@ describe("seatEventSubscription", () => {
 
     describe("when the active subscription has no billing-provider link", () => {
       /** @scenario "An unlinked subscription blocks the seat update itself" */
-      it("raises subscription_not_linked so the seat update cannot pass as a success", async () => {
+      it("raises seat_checkout_required so the seat update cannot pass as a success", async () => {
         subscriptions.findSeatCandidates.mockResolvedValue([
           { id: "sub_db_1", stripeSubscriptionId: null, status: "ACTIVE", ...NO_KEPT },
         ]);
@@ -890,7 +1077,7 @@ describe("seatEventSubscription", () => {
             organizationId: "org_1",
             totalMembers: 5,
           }),
-        ).rejects.toMatchObject({ code: "subscription_not_linked" });
+        ).rejects.toMatchObject({ code: "seat_checkout_required" });
         expect(stripeSubscriptions.reads).toEqual([]);
         expect(subscriptions.reactivateWithSeats).not.toHaveBeenCalled();
       });
@@ -950,12 +1137,62 @@ describe("seatEventSubscription", () => {
   // ── createSeatEventCheckout ───────────────────────────────────────────────
 
   describe("createSeatEventCheckout()", () => {
+    const askCheckout = () =>
+      service.createSeatEventCheckout({
+        organizationId: "org_1",
+        customerId: "cus_1",
+        baseUrl: "https://app.test",
+        currency: Currency.USD,
+        billingInterval: "monthly",
+        membersToAdd: 2,
+      });
+
+    describe("when a linked Growth seat plan is already live", () => {
+      /** @scenario "A seat checkout is refused while a linked plan it would not replace is live" */
+      it("refuses with subscription_already_active and opens nothing", async () => {
+        subscriptions.findActivePlans.mockResolvedValue([
+          { id: "sub_db_1", plan: "GROWTH_SEAT_USD_MONTHLY", stripeSubscriptionId: "sub_stripe_1" },
+        ]);
+
+        await expect(askCheckout()).rejects.toMatchObject({ code: "subscription_already_active" });
+        expect(subscriptions.createPendingSeatCheckout).not.toHaveBeenCalled();
+        expect(stripeSubscriptions.checkoutSessions).toEqual([]);
+      });
+    });
+
+    describe("when the live plan is a linked tiered one the seat plan supersedes", () => {
+      /** @scenario "A seat checkout still opens beside the tiered plan it supersedes" */
+      it("opens the checkout", async () => {
+        subscriptions.findActivePlans.mockResolvedValue([
+          { id: "sub_db_1", plan: "LAUNCH", stripeSubscriptionId: "sub_stripe_1" },
+        ]);
+
+        const result = await askCheckout();
+
+        expect(result.subscriptionId).toBe("sub_new_1");
+      });
+    });
+
+    describe("when the live plan is an unlinked row an operator made", () => {
+      /** @scenario "A paid checkout lands on the active row an operator made" */
+      it("opens the checkout, which lands on that row once paid", async () => {
+        subscriptions.findActivePlans.mockResolvedValue([
+          { id: "sub_db_ops", plan: "GROWTH_SEAT_USD_MONTHLY", stripeSubscriptionId: null },
+        ]);
+
+        const result = await askCheckout();
+
+        expect(result.subscriptionId).toBe("sub_new_1");
+      });
+    });
+
     describe("when the organization's currency and the Stripe customer's disagree", () => {
       const usagePricedService = () =>
         SeatEventSubscriptionService.create({
           stripeSubscriptions,
           subscriptions,
           abandoned,
+          duplicates,
           prices: {
             ...prices,
             GROWTH_INSTANT_EVAL_USD: "price_instant_eval_usd",
@@ -1057,6 +1294,52 @@ describe("seatEventSubscription", () => {
           organizationId: "org_1",
           subscriptionIds: ["stale_sub_1", "stale_sub_2"],
         });
+      });
+
+      /** @scenario "An abandoned seat checkout can no longer be paid" */
+      it("expires the stale rows' open Stripe sessions so they can no longer be paid", async () => {
+        const stale = await stripeSubscriptions.createCheckoutSession({
+          customerId: "cus_1",
+          currency: "usd",
+          lineItems: [],
+          successUrl: "https://app.test/ok",
+          cancelUrl: "https://app.test/back",
+          clientReferenceId: "subscription_setup_stale_sub_1",
+          allowPromotionCodes: true,
+        });
+
+        await service.createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_1",
+          baseUrl: "https://app.test",
+          currency: Currency.USD,
+          billingInterval: "monthly",
+          membersToAdd: 3,
+        });
+
+        expect(stripeSubscriptions.expirations).toEqual(["cs_memory_1"]);
+        expect(stale.url).toContain("cs_memory_1");
+        expect(stripeSubscriptions.checkoutSessions.at(-1)?.status).toBe("open");
+      });
+
+      /** @scenario "An abandoned seat checkout can no longer be paid" */
+      it("still opens the new checkout when Stripe refuses the expiry", async () => {
+        stripeSubscriptions.refuse({
+          operation: "expireOpenCheckouts",
+          error: new Error("stripe down"),
+        });
+
+        const result = await service.createSeatEventCheckout({
+          organizationId: "org_1",
+          customerId: "cus_1",
+          baseUrl: "https://app.test",
+          currency: Currency.USD,
+          billingInterval: "monthly",
+          membersToAdd: 3,
+        });
+
+        expect(result.subscriptionId).toBe("sub_new_1");
+        expect(abandoned.seatCheckoutsAbandoned).toHaveBeenCalled();
       });
     });
 

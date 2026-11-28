@@ -3573,6 +3573,24 @@
           "documentation": "Set when an admin disables this membership to stay within the licensed\nseat count. The person loses access to this organization only, keeps\ntheir role, department and everything they did, and frees their seat.\nReversible: re-enabling restores access if a seat is available.\nSeat counting excludes disabled memberships. See\nseat-reconciliation.feature."
         },
         {
+          "name": "roleVersion",
+          "columnName": "roleVersion",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "Moved by one on every role write. A role change waiting on a seat payment keeps the\nversion it was asked at and applies only while it still holds, so a later role\nwrite always wins. See role-change-seat.feature."
+        },
+        {
+          "name": "lastRoleChangeId",
+          "columnName": "lastRoleChangeId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "The paid role change the newest role write applied, written with the version bump; null\nafter a direct role write. A retry that finds the version moved by its own change\nsettles it applied. See role-change-seat.feature."
+        },
+        {
           "name": "pendingSsoGrantId",
           "columnName": "pendingSsoGrantId",
           "type": "String",
@@ -3770,7 +3788,16 @@
           "kind": "scalar",
           "isList": false,
           "isOptional": false,
-          "documentation": "pending | lite | idp_refused: how the person was left when the request opened."
+          "documentation": "pending | lite | idp_refused | requested: how the person was left when the request opened,\nor `requested` when a Lite Member pressed Request access."
+        },
+        {
+          "name": "reason",
+          "columnName": "reason",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "What a member who pressed Request access was trying to do; null for arrivals."
         },
         {
           "name": "idpRefused",
@@ -30008,6 +30035,79 @@
           "isList": false,
           "isOptional": true,
           "documentation": "The `licenseId` inside the delivered licence."
+        }
+      ]
+    },
+    {
+      "name": "BlockedSeatChange",
+      "tableName": "BlockedSeatChange",
+      "documentation": "A seat change billing refused because the organization held two live subscriptions,\nkept until the admin who tried is told once that billing works again.",
+      "primaryKey": [
+        "id"
+      ],
+      "fields": [
+        {
+          "name": "id",
+          "columnName": "id",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "organizationId",
+          "columnName": "organizationId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "userId",
+          "columnName": "userId",
+          "type": "String",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "attempt",
+          "columnName": "attempt",
+          "type": "Json",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "What was tried: { kind: \"role_change\", memberName, role } or { kind: \"seat_purchase\", seats }."
+        },
+        {
+          "name": "seats",
+          "columnName": "seats",
+          "type": "Int",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": "The seats the change needs beyond the plan's current ones."
+        },
+        {
+          "name": "createdAt",
+          "columnName": "createdAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": false,
+          "documentation": ""
+        },
+        {
+          "name": "notifiedAt",
+          "columnName": "notifiedAt",
+          "type": "DateTime",
+          "kind": "scalar",
+          "isList": false,
+          "isOptional": true,
+          "documentation": "When the admin was emailed; null while the change still waits."
         }
       ]
     },

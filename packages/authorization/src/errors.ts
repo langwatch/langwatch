@@ -103,9 +103,10 @@ export class BlankScopeIdError extends HandledError {
 export class LiteMemberRestrictedError extends HandledError {
   declare readonly code: "lite_member_restricted";
 
-  constructor(resource: string) {
+  /** `permission` is the one refused, so a client offers a full seat only where one lifts it. */
+  constructor(resource: string, permission?: string) {
     super("lite_member_restricted", "This feature is not available for your account", {
-      meta: { resource },
+      meta: permission === undefined ? { resource } : { resource, permission },
       httpStatus: 401,
     });
     this.name = "LiteMemberRestrictedError";

@@ -25,7 +25,15 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   readonly reads: string[] = [];
   readonly updates: { subscriptionId: string; change: BillingSubscriptionChange }[] = [];
   readonly cancellations: { subscriptionId: string; prorate?: boolean }[] = [];
-  readonly checkoutSessions: { request: BillingCheckoutRequest; url: string }[] = [];
+  readonly checkoutSessions: {
+    request: BillingCheckoutRequest;
+    url: string;
+    id: string;
+    status: "open" | "complete" | "expired";
+  }[] = [];
+  readonly expirations: string[] = [];
+  /** What each give-back of a latest invoice did, in order. */
+  readonly refunds: { subscriptionId: string; outcome: "voided" | "refunded" | "nothing" }[] = [];
   readonly portalSessions: { customerId: string; returnUrl: string; url: string }[] = [];
   readonly previews: { subscriptionId: string; change: BillingSubscriptionPreviewChange }[] = [];
   private readonly held = new Map<string, BillingSubscription>();
@@ -39,6 +47,8 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
   private readonly subscriptionCheckouts = new Map<string, BillingSubscriptionCheckout>();
   readonly checkoutLookups: string[] = [];
   private preview: BillingInvoicePreview | undefined;
+  /** The invoice the next change held for payment waits on, as a test scripts it. */
+  private heldForPayment: { id: string; hostedUrl: string } | undefined;
   private readonly previewsByQuantity = new Map<number, BillingInvoicePreview>();
 
   private constructor() {
@@ -81,6 +91,11 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     checkout: BillingSubscriptionCheckout;
   }): void {
     this.subscriptionCheckouts.set(subscriptionId, checkout);
+  }
+
+  /** The next change asking to wait for payment is held on this unpaid invoice, once. */
+  holdNextChangeForPayment(invoice: { id: string; hostedUrl: string }): void {
+    this.heldForPayment = invoice;
   }
 
   /** What every invoice preview answers from now on, or only one moving the line to `quantity`. */
@@ -142,7 +157,16 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
     this.throwIfRefused("updateSubscription");
     const subscription = this.find(subscriptionId);
     this.updates.push({ subscriptionId, change });
-    return subscription;
+    const held = change.paymentBehavior ? this.heldForPayment : undefined;
+    if (!held) return subscription;
+    this.heldForPayment = undefined;
+    const pending: BillingSubscription = {
+      ...subscription,
+      pendingUpdate: true,
+      latestInvoice: { id: held.id, status: "open", hostedUrl: held.hostedUrl },
+    };
+    this.held.set(subscriptionId, pending);
+    return pending;
   }
 
   async cancelSubscription({
@@ -185,9 +209,49 @@ export class MemoryStripeSubscriptionsChannel extends StripeSubscriptionsChannel
 
   async createCheckoutSession(request: BillingCheckoutRequest): Promise<{ url: string | null }> {
     this.throwIfRefused("createCheckoutSession");
-    const url = `https://checkout.memory.test/cs_memory_${this.checkoutSessions.length + 1}`;
-    this.checkoutSessions.push({ request, url });
+    const id = `cs_memory_${this.checkoutSessions.length + 1}`;
+    const url = `https://checkout.memory.test/${id}`;
+    this.checkoutSessions.push({ request, url, id, status: "open" });
     return { url };
+  }
+
+  /** Marks a session paid, as Stripe does when the customer completes it. */
+  completeCheckout({ checkoutSessionId }: { checkoutSessionId: string }): void {
+    const session = this.checkoutSessions.find((s) => s.id === checkoutSessionId);
+    if (session) session.status = "complete";
+  }
+
+  async expireOpenCheckouts({
+    customerId,
+    clientReferenceIds,
+  }: {
+    customerId: string;
+    clientReferenceIds: string[];
+  }): Promise<string[]> {
+    this.throwIfRefused("expireOpenCheckouts");
+    const expired: string[] = [];
+    for (const session of this.checkoutSessions) {
+      if (session.status !== "open" || session.request.customerId !== customerId) continue;
+      if (!clientReferenceIds.includes(session.request.clientReferenceId)) continue;
+      session.status = "expired";
+      expired.push(session.id);
+    }
+    this.expirations.push(...expired);
+    return expired;
+  }
+
+  async refundLatestInvoice({
+    subscriptionId,
+  }: {
+    subscriptionId: string;
+  }): Promise<"voided" | "refunded" | "nothing"> {
+    this.throwIfRefused("refundLatestInvoice");
+    const status = this.find(subscriptionId).latestInvoice?.status;
+    let outcome: "voided" | "refunded" | "nothing" = "nothing";
+    if (status === "open") outcome = "voided";
+    if (status === "paid") outcome = "refunded";
+    this.refunds.push({ subscriptionId, outcome });
+    return outcome;
   }
 
   async createBillingPortalSession({

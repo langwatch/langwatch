@@ -284,7 +284,7 @@ export class AuthzPermissionGateService {
     }
 
     if (result.organizationRole === "EXTERNAL") {
-      throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown");
+      throw new LiteMemberRestrictedError(permission.split(":")[0] ?? "unknown", permission);
     }
     if (result.organizationRole === "DEVELOPER") {
       throw new DeveloperSeatRestrictedError(permission.split(":")[0] ?? "unknown");

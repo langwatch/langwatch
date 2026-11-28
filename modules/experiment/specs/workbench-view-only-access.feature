@@ -12,6 +12,12 @@ Feature: A workbench the reader's role cannot change says so
     And the save status reads View only
 
   @integration
+  Scenario: A Lite Member can request access from the view-only notice
+    Given I hold a Lite Member seat and the workbench is view only
+    When I read the view-only notice
+    Then it offers Request access to run and save experiments
+
+  @integration
   Scenario: A view-only workbench does not send my edits to the server
     Given I can view experiments but not change them
     And the workbench is open

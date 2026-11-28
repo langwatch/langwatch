@@ -17,6 +17,10 @@ import type { InstanceAdminRepository } from "../repositories/instance-admin.rep
 import { legacySsoStringWritesToRefuse } from "../rules/legacy-sso-string-writes.rules.ts";
 import { isOrganizationDatasetLimitWriteAllowed } from "../rules/organization-dataset-limit.rules.ts";
 import type { AdminAccess } from "./admin-access.service.ts";
+import {
+  type AdminSubscriptionRule,
+  AdminSubscriptionWriteService,
+} from "./admin-subscription-write.service.ts";
 import type { AdminAuditSink } from "./impersonation.service.ts";
 
 const MUTATING_METHODS = new Set(["create", "update", "updateMany", "delete", "deleteMany"]);
@@ -39,6 +43,8 @@ interface InstanceAdminServiceOptions {
   /** Absent only where no sharing switch is edited; a switch then refuses by name. */
   projects?: InstanceAdminProjects | undefined;
   shares?: InstanceAdminShares | undefined;
+  /** Billing's one-live-plan rule; absent where no subscription is edited, a write then fails. */
+  billing?: AdminSubscriptionRule | undefined;
   audit: AdminAuditSink;
   /** Whether an organization's own connection decides its sign-in, asked of
    *  the module that owns connections. */
@@ -62,6 +68,11 @@ const STRINGS_STILL_DECIDE: OrganizationSsoRouting = {
   connectionDecides: async () => false,
 };
 
+const NO_BILLING: AdminSubscriptionRule = {
+  assertSubscriptionWriteAllowed: () =>
+    Promise.reject(new Error("instance admin composed without billing")),
+};
+
 const NO_SHARING_DOOR: InstanceAdminProjects & InstanceAdminShares = {
   setTraceSharing: () => Promise.reject(new Error("instance admin composed without project")),
   countTraceShares: () => Promise.reject(new Error("instance admin composed without share")),
@@ -77,6 +88,7 @@ export class InstanceAdminService {
   private readonly operators: InstanceAdminOperators;
   private readonly projects: InstanceAdminProjects;
   private readonly shares: InstanceAdminShares;
+  private readonly subscriptions: AdminSubscriptionWriteService;
   private readonly audit: AdminAuditSink;
   private readonly ssoRouting: OrganizationSsoRouting;
   private readonly operatorAddressesFixed: boolean;
@@ -88,6 +100,7 @@ export class InstanceAdminService {
     operators: InstanceAdminOperators;
     projects: InstanceAdminProjects;
     shares: InstanceAdminShares;
+    subscriptions: AdminSubscriptionWriteService;
     audit: AdminAuditSink;
     ssoRouting: OrganizationSsoRouting;
     operatorAddressesFixed: boolean;
@@ -98,6 +111,7 @@ export class InstanceAdminService {
     this.operators = deps.operators;
     this.projects = deps.projects;
     this.shares = deps.shares;
+    this.subscriptions = deps.subscriptions;
     this.audit = deps.audit;
     this.ssoRouting = deps.ssoRouting;
     this.operatorAddressesFixed = deps.operatorAddressesFixed;
@@ -111,6 +125,9 @@ export class InstanceAdminService {
       operators: options.operators,
       projects: options.projects ?? NO_SHARING_DOOR,
       shares: options.shares ?? NO_SHARING_DOOR,
+      subscriptions: AdminSubscriptionWriteService.create({
+        billing: options.billing ?? NO_BILLING,
+      }),
       audit: options.audit,
       ssoRouting: options.ssoRouting ?? STRINGS_STILL_DECIDE,
       operatorAddressesFixed: options.operatorAddressesFixed ?? true,
@@ -153,6 +170,7 @@ export class InstanceAdminService {
     }
 
     this.refuseOutOfRangeDatasetLimit(parsed);
+    const subscriptionWrites = await this.subscriptions.check(parsed);
     const normalized = await this.normalizeOrganizationDomain(parsed);
     await this.auditMutation(normalized);
 
@@ -163,7 +181,10 @@ export class InstanceAdminService {
       return this.projectWithTraceShareCount(normalized);
     }
 
-    return this.repository.execute(normalized);
+    return this.subscriptions.written({
+      writes: subscriptionWrites,
+      write: () => this.repository.execute(normalized),
+    });
   }
 
   /** The sharing switch goes through project's door; every other field stays a generic write. */

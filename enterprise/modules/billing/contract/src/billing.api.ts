@@ -8,6 +8,7 @@ import type {
   ResourceLimitNotifierInput,
   SubscriptionPlanInput,
 } from "./billing-types.ts";
+import type { BlockedSeatChangeAttempt } from "./blocked-seat-change.ts";
 import type {
   ConnectedAddCommitRequest,
   ConnectedBillingAccountView,
@@ -18,7 +19,9 @@ import type {
 } from "./connected-billing.schemas.ts";
 import type { RenewalCompletion } from "./connected-billing.ts";
 import type { RetentionStorageOutcome, RetentionStorageReport } from "./growth-seat-event.ts";
+import type { SubscriptionWrite } from "./one-live-plan.ts";
 import type { Currency } from "./pricing.ts";
+import type { SeatPayment, SeatPaymentStatus, SeatPurchase } from "./seat-purchase.ts";
 import type { SubscriptionBillingInterval } from "./subscription.trpc.ts";
 
 /**
@@ -81,7 +84,8 @@ export interface BillingApi {
   notifyResourceLimitReached(input: ResourceLimitNotifierInput): Promise<void>;
   /**
    * Tells sales that a person waits for a seat in an organization whose plan only sales can grow,
-   * on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never throws.
+   * on the subscriptions Slack channel. SaaS only; the caller sends it once per request. Never
+   * throws: `sent` is false when it did not go out, so the caller can let a later ask retry it.
    */
   notifySalesOfSeatRequest(input: {
     organizationId: string;
@@ -89,7 +93,7 @@ export interface BillingApi {
     plan: string;
     seats: number;
     requestedSeats: number;
-  }): Promise<void>;
+  }): Promise<{ sent: boolean }>;
   /** The organization's pricing model column, which is empty for organizations never migrated. */
   getPricingModel(input: {
     organizationId: string;
@@ -108,11 +112,46 @@ export interface BillingApi {
     retentionDays?: number;
   }): Promise<{ url: string | null; subscriptionId: string }>;
   /**
+   * Keeps a seat change refused with `subscription_ambiguous` for the admin who tried; once the
+   * organization is back on one subscription that admin gets one email to finish it. `seats`:
+   * the seats the change needs beyond today's. `recorded` is false where nothing keeps it (off
+   * Cloud). Never throws.
+   */
+  recordBlockedSeatChange(input: {
+    organizationId: string;
+    userId: string;
+    attempt: BlockedSeatChangeAttempt;
+    seats: number;
+  }): Promise<{ recorded: boolean }>;
+  /**
    * Bills the storage an organization keeps beyond the 90 days Growth includes: the metered line
    * follows the longest retention, and a measurement goes to the meter as that day's share of a
    * GB-month. Answers what it did; an organization with no Growth seat subscription is skipped.
    */
   recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome>;
+  /**
+   * Adds one full seat for a role change: charged to the subscription's payment method, or a
+   * payment page (the seat invoice, or a seat checkout) when the customer must act first.
+   * `successPath` is where a checkout returns. Refuses `subscription_ambiguous` untouched.
+   */
+  addFullSeat(input: {
+    organizationId: string;
+    quotedAt?: number;
+    baseUrl: string;
+    successPath: string;
+    customerEmail: string | null;
+  }): Promise<SeatPurchase>;
+  /**
+   * Refuses, with subscription_already_active naming the organization and its live rows, writes
+   * that would leave an organization a second live Stripe-backed plan; the tiered plan a seat
+   * plan replaces never counts. Holds on and off Cloud, as the database index does.
+   */
+  assertSubscriptionWriteAllowed(input: { writes: readonly SubscriptionWrite[] }): Promise<void>;
+  /** Whether a seat payment is paid, still open, or over; a paid one has its seat recorded. */
+  settleSeatPayment(input: {
+    organizationId: string;
+    payment: SeatPayment;
+  }): Promise<{ status: SeatPaymentStatus }>;
 }
 
 export const BillingApi = moduleApi<BillingApi>()("billing");

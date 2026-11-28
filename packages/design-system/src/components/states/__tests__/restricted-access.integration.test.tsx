@@ -53,6 +53,21 @@ describe("given a permission gate", () => {
   });
 });
 
+describe("given a caller's own way to ask for access", () => {
+  it("draws it first and keeps copying the request as the secondary action", () => {
+    renderWithDesignSystem(
+      <RestrictedAccess
+        permission="evaluations:manage"
+        compact
+        requestAction={<button type="button">Request access</button>}
+      />,
+    );
+    const buttons = screen.getAllByRole("button");
+    expect(buttons[0]).toHaveTextContent("Request access");
+    expect(screen.getByRole("button", { name: "Copy access request" })).toBeTruthy();
+  });
+});
+
 describe("given a page that needs platform operator access", () => {
   /** @scenario "An organization admin without platform operator access opens an operator page" */
   it("says it needs platform operator access, not an organization admin", () => {

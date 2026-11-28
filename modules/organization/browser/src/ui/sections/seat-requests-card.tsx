@@ -64,6 +64,8 @@ export function SeatRequestsCard({ showAllLink = false }: { showAllLink?: boolea
             approvalPath={seats.approvalPath}
             canManage={seats.canManage}
             answeringId={seats.answeringId}
+            waitingId={seats.waitingId}
+            waitingUrl={seats.waitingUrl}
             onApprove={seats.approve}
             onDecline={seats.decline}
           />

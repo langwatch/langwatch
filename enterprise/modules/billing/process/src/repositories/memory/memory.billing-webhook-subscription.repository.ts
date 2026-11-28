@@ -9,6 +9,7 @@ import {
 import type {
   BillingSubscriptionRepository,
   BillingSubscriptionRecord,
+  LiveUnlinkedSubscription,
   SupersededSubscription,
 } from "../subscription.repository.ts";
 import type { MemoryBillingStore } from "./memory.billing.store.ts";
@@ -97,6 +98,26 @@ export class MemoryBillingWebhookSubscriptionRepository extends BillingWebhookSu
     excludeSubscriptionId: string;
   }): Promise<SupersededSubscription[]> {
     return this.subscriptions.findSupersededBySeatEvent(input);
+  }
+
+  findLiveUnlinkedBeside(input: { pendingId: string }): Promise<LiveUnlinkedSubscription[]> {
+    return this.subscriptions.findLiveUnlinkedBeside(input);
+  }
+
+  findLiveLinkedBeside(input: { pendingId: string }): Promise<BillingSubscriptionRecord[]> {
+    return this.subscriptions.findLiveLinkedBeside(input);
+  }
+
+  adoptCheckout(input: {
+    pendingId: string;
+    liveId: string;
+    stripeSubscriptionId: string;
+  }): Promise<void> {
+    return this.subscriptions.adoptCheckout(input);
+  }
+
+  cancelPendingCheckout(input: { id: string }): Promise<BillingSubscriptionRecord[]> {
+    return this.subscriptions.cancelPendingCheckout(input);
   }
 
   async updateQuantities(input: {

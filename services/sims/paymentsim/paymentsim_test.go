@@ -797,3 +797,368 @@ func TestPaymentLinkCheckoutCarriesBuyer(t *testing.T) {
 		t.Fatalf("event %s %v", ev.Type, obj)
 	}
 }
+
+// seatChange asks for qty seats with always_invoice and expand[]=latest_invoice,
+// plus payment_behavior when one is given.
+func (g *rig) seatChange(subID string, qty int, behavior string) (int, map[string]any) {
+	g.t.Helper()
+	_, sub := g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	var seat string
+	for _, it := range sub["items"].(map[string]any)["data"].([]any) {
+		if item := it.(map[string]any); item["price"].(map[string]any)["id"] == seatPrice {
+			seat = item["id"].(string)
+		}
+	}
+	form := url.Values{
+		"items[0][id]": {seat}, "items[0][quantity]": {strconv.Itoa(qty)},
+		"proration_behavior": {"always_invoice"}, "expand[0]": {"latest_invoice"},
+	}
+	if behavior != "" {
+		form.Set("payment_behavior", behavior)
+	}
+	return g.stripe(http.MethodPost, "/v1/subscriptions/"+subID, form.Encode())
+}
+
+func seatQuantity(t *testing.T, items []any) float64 {
+	t.Helper()
+	for _, it := range items {
+		if item := it.(map[string]any); item["price"].(map[string]any)["id"] == seatPrice {
+			return item["quantity"].(float64)
+		}
+	}
+	t.Fatalf("no seat item in %v", items)
+	return 0
+}
+
+func subItems(sub map[string]any) []any {
+	return sub["items"].(map[string]any)["data"].([]any)
+}
+
+// typesSince is the event types fired after the first n.
+func (g *rig) typesSince(n int) []string {
+	return g.eventTypes()[n:]
+}
+
+// @scenario "A pending_if_incomplete seat change that pays applies at once"
+func TestPendingIfIncompletePaidAppliesAtOnce(t *testing.T) {
+	g := newRig(t)
+	_, subID := g.subscribe(2)
+	status, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	if status != http.StatusOK || seatQuantity(t, subItems(sub)) != 3 || sub["pending_update"] != nil {
+		t.Fatalf("%d %v", status, sub)
+	}
+	inv, ok := sub["latest_invoice"].(map[string]any)
+	if !ok || inv["status"] != "paid" || inv["billing_reason"] != "subscription_update" ||
+		inv["hosted_invoice_url"] != g.s.cfg.PublicURL+"/invoice/"+inv["id"].(string) {
+		t.Fatalf("latest_invoice %v", sub["latest_invoice"])
+	}
+	_, plain := g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if plain["latest_invoice"] != inv["id"] {
+		t.Fatalf("unexpanded latest_invoice %v, want the id %v", plain["latest_invoice"], inv["id"])
+	}
+}
+
+// @scenario "The default payment_behavior applies a declined seat change as before"
+func TestDefaultPaymentBehaviorAppliesDeclinedChange(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 3, "")
+	if seatQuantity(t, subItems(sub)) != 3 || sub["pending_update"] != nil || sub["status"] != "past_due" {
+		t.Fatalf("%v", sub)
+	}
+}
+
+// @scenario "A declined pending_if_incomplete change keeps the items and holds a pending update"
+// @scenario "Paying the held invoice applies the pending update once"
+func TestPendingUpdateDeclinedThenPaidOnce(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	seen := len(g.eventTypes())
+	status, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	if status != http.StatusOK || seatQuantity(t, subItems(sub)) != 2 || sub["status"] != "active" {
+		t.Fatalf("%d %v", status, sub)
+	}
+	pending, _ := sub["pending_update"].(map[string]any)
+	if pending == nil || pending["expires_at"].(float64) != float64(epoch.Add(23*time.Hour).Unix()) ||
+		seatQuantity(t, pending["subscription_items"].([]any)) != 3 {
+		t.Fatalf("pending_update %v", sub["pending_update"])
+	}
+	inv := sub["latest_invoice"].(map[string]any)
+	invoiceID := inv["id"].(string)
+	if inv["status"] != "open" || inv["attempted"] != true || inv["hosted_invoice_url"] != g.s.cfg.PublicURL+"/invoice/"+invoiceID {
+		t.Fatalf("latest_invoice %v", inv)
+	}
+	want := []string{"invoice.finalized", "invoice.payment_failed", "customer.subscription.updated"}
+	if got := g.typesSince(seen); !slices.Equal(got, want) {
+		t.Fatalf("events %v, want %v", got, want)
+	}
+
+	seen = len(g.eventTypes())
+	status, paid := g.stripe(http.MethodPost, "/v1/invoices/"+invoiceID+"/pay", "")
+	if status != http.StatusOK || paid["status"] != "paid" {
+		t.Fatalf("pay: %d %v", status, paid)
+	}
+	want = []string{"customer.subscription.updated", "invoice.paid", "invoice.payment_succeeded"}
+	if got := g.typesSince(seen); !slices.Equal(got, want) {
+		t.Fatalf("events %v, want %v", got, want)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 3 || sub["pending_update"] != nil {
+		t.Fatalf("after pay %v", sub)
+	}
+
+	seen = len(g.eventTypes())
+	status, again := g.stripe(http.MethodPost, "/v1/invoices/"+invoiceID+"/pay", "")
+	if status != http.StatusBadRequest || again["error"].(map[string]any)["code"] != "invoice_already_paid" || len(g.typesSince(seen)) != 0 {
+		t.Fatalf("second pay: %d %v %v", status, again, g.typesSince(seen))
+	}
+}
+
+// @scenario "A charge needing customer action fires invoice.payment_action_required"
+// @scenario "The hosted invoice page pays an open invoice"
+func TestRequiresActionPaidOnHostedPage(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	if status, out := g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`","kind":"bogus"}`); status != http.StatusBadRequest {
+		t.Fatalf("unknown kind: %d %v", status, out)
+	}
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`","kind":"requires_action"}`)
+	seen := len(g.eventTypes())
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	want := []string{"invoice.finalized", "invoice.payment_failed", "invoice.payment_action_required", "customer.subscription.updated"}
+	if got := g.typesSince(seen); !slices.Equal(got, want) || sub["pending_update"] == nil {
+		t.Fatalf("events %v, want %v; %v", got, want, sub)
+	}
+	hosted := sub["latest_invoice"].(map[string]any)["hosted_invoice_url"].(string)
+	page := g.page(http.MethodGet, strings.Replace(hosted, g.s.cfg.PublicURL, g.url, 1))
+	if !strings.Contains(page, "Pay") || !strings.Contains(page, "32.00 USD") {
+		t.Fatalf("hosted page %s", page)
+	}
+	page = g.page(http.MethodPost, strings.Replace(hosted, g.s.cfg.PublicURL, g.url, 1))
+	if !strings.Contains(page, "Paid") {
+		t.Fatalf("after paying %s", page)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 3 || sub["pending_update"] != nil {
+		t.Fatalf("after hosted pay %v", sub)
+	}
+}
+
+// @scenario "A control retry of the held invoice applies the pending update"
+func TestRetryAppliesPendingUpdate(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 4, "pending_if_incomplete")
+	status, inv := g.control(http.MethodPost, "/_sim/api/invoices/"+sub["latest_invoice"].(map[string]any)["id"].(string)+"/retry", "")
+	if status != http.StatusOK || inv["status"] != "paid" {
+		t.Fatalf("retry: %d %v", status, inv)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 4 || sub["pending_update"] != nil {
+		t.Fatalf("after retry %v", sub)
+	}
+}
+
+// @scenario "An expired pending update is discarded and its invoice voided"
+func TestPendingUpdateExpires(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	invoiceID := sub["latest_invoice"].(map[string]any)["id"].(string)
+	seen := len(g.eventTypes())
+	g.control(http.MethodPost, "/_sim/api/clock/advance", `{"seconds":86400}`)
+	want := []string{"customer.subscription.updated", "invoice.voided"}
+	if got := g.typesSince(seen); !slices.Equal(got, want) {
+		t.Fatalf("events %v, want %v", got, want)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 2 || sub["pending_update"] != nil {
+		t.Fatalf("after expiry %v", sub)
+	}
+	_, inv := g.stripe(http.MethodGet, "/v1/invoices/"+invoiceID, "")
+	if inv["status"] != "void" {
+		t.Fatalf("invoice %v", inv)
+	}
+	if status, out := g.stripe(http.MethodPost, "/v1/invoices/"+invoiceID+"/pay", ""); status != http.StatusBadRequest {
+		t.Fatalf("paying a void invoice: %d %v", status, out)
+	}
+}
+
+func TestPendingUpdateExpiredBeforeAdvanceIsNotPaid(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	invoiceID := sub["latest_invoice"].(map[string]any)["id"].(string)
+	g.s.mu.Lock()
+	g.s.real = func() time.Time { return epoch.Add(24 * time.Hour) }
+	g.s.mu.Unlock()
+	if status, out := g.stripe(http.MethodPost, "/v1/invoices/"+invoiceID+"/pay", ""); status != http.StatusBadRequest {
+		t.Fatalf("paying an expired held invoice: %d %v", status, out)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 2 || sub["pending_update"] != nil {
+		t.Fatalf("after expiry %v", sub)
+	}
+}
+
+func TestPendingUpdateExpiresAtPeriodEndWhenSooner(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.s.mu.Lock()
+	end := g.s.st.subscriptions[subID].CurrentPeriodEnd
+	g.s.real = func() time.Time { return time.Unix(end, 0).Add(-time.Hour) }
+	g.s.mu.Unlock()
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	pending, _ := sub["pending_update"].(map[string]any)
+	if pending == nil || pending["expires_at"].(float64) != float64(end) {
+		t.Fatalf("pending_update %v, want expires_at %d", sub["pending_update"], end)
+	}
+}
+
+func TestNewItemChangeSupersedesHeldUpdate(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`","times":1}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	heldID := sub["latest_invoice"].(map[string]any)["id"].(string)
+	_, sub = g.seatChange(subID, 4, "pending_if_incomplete")
+	if seatQuantity(t, subItems(sub)) != 4 || sub["pending_update"] != nil {
+		t.Fatalf("after second change %v", sub)
+	}
+	_, inv := g.stripe(http.MethodGet, "/v1/invoices/"+heldID, "")
+	if inv["status"] != "void" {
+		t.Fatalf("superseded invoice %v", inv)
+	}
+	if status, out := g.stripe(http.MethodPost, "/v1/invoices/"+heldID+"/pay", ""); status != http.StatusBadRequest {
+		t.Fatalf("paying a superseded invoice: %d %v", status, out)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 4 {
+		t.Fatalf("seats %v", sub)
+	}
+}
+
+// @scenario "Voiding the held invoice discards its pending update"
+func TestVoidingHeldInvoiceDiscardsPendingUpdate(t *testing.T) {
+	g := newRig(t)
+	cus, subID := g.subscribe(2)
+	g.control(http.MethodPost, "/_sim/api/payment-failures", `{"customer":"`+cus+`"}`)
+	_, sub := g.seatChange(subID, 3, "pending_if_incomplete")
+	invoiceID := sub["latest_invoice"].(map[string]any)["id"].(string)
+	if status, out := g.stripe(http.MethodPost, "/v1/invoices/"+invoiceID+"/void", ""); status != http.StatusOK {
+		t.Fatalf("voiding: %d %v", status, out)
+	}
+	_, sub = g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "")
+	if seatQuantity(t, subItems(sub)) != 2 || sub["pending_update"] != nil {
+		t.Fatalf("after void %v", sub)
+	}
+	_, inv := g.stripe(http.MethodGet, "/v1/invoices/"+invoiceID, "")
+	if inv["status"] != "void" {
+		t.Fatalf("invoice %v", inv)
+	}
+	if status, out := g.stripe(http.MethodPost, "/v1/invoices/"+invoiceID+"/pay", ""); status != http.StatusBadRequest {
+		t.Fatalf("paying a void invoice: %d %v", status, out)
+	}
+}
+
+// page fetches a hosted page as a browser does, following its redirect.
+func (g *rig) page(method, target string) string {
+	g.t.Helper()
+	req, _ := http.NewRequestWithContext(g.t.Context(), method, target, nil)
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		g.t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	body, _ := io.ReadAll(resp.Body)
+	return string(body)
+}
+
+// @scenario "An open checkout session is listed and expired as Stripe does"
+func TestCheckoutSessionListAndExpire(t *testing.T) {
+	g := newRig(t)
+	_, cus := g.stripe(http.MethodPost, "/v1/customers", "email=a%40b.c&name=Acme")
+	cusID := cus["id"].(string)
+	open := func(ref string) string {
+		form := url.Values{
+			"mode": {"subscription"}, "customer": {cusID}, "success_url": {"http://app/ok"},
+			"line_items[0][price]": {seatPrice}, "line_items[0][quantity]": {"1"}, "client_reference_id": {ref},
+		}
+		status, sess := g.stripe(http.MethodPost, "/v1/checkout/sessions", form.Encode())
+		if status != http.StatusOK {
+			t.Fatalf("checkout: %d %v", status, sess)
+		}
+		return sess["id"].(string)
+	}
+	first, second := open("subscription_setup_a"), open("subscription_setup_b")
+
+	_, list := g.stripe(http.MethodGet, "/v1/checkout/sessions", "customer="+cusID+"&status=open")
+	data := list["data"].([]any)
+	if len(data) != 2 || data[0].(map[string]any)["id"] != second {
+		t.Fatalf("list %v", list)
+	}
+
+	status, expired := g.stripe(http.MethodPost, "/v1/checkout/sessions/"+first+"/expire", "")
+	if status != http.StatusOK || expired["status"] != "expired" {
+		t.Fatalf("expire: %d %v", status, expired)
+	}
+	if ids := g.eventIDs("checkout.session.expired"); len(ids) != 1 {
+		t.Fatalf("checkout.session.expired events: %v", ids)
+	}
+	_, list = g.stripe(http.MethodGet, "/v1/checkout/sessions", "customer="+cusID+"&status=open")
+	if data = list["data"].([]any); len(data) != 1 || data[0].(map[string]any)["id"] != second {
+		t.Fatalf("open after expiry %v", list)
+	}
+	if status, _ = g.stripe(http.MethodPost, "/v1/checkout/sessions/"+first+"/expire", ""); status != http.StatusBadRequest {
+		t.Fatalf("second expire: %d", status)
+	}
+	if status, _ = g.control(http.MethodPost, "/_sim/api/checkout/"+first+"/complete", ""); status == http.StatusOK {
+		t.Fatal("an expired session completed")
+	}
+}
+
+// @scenario "A paid invoice's payment is refunded as Stripe refunds it"
+func TestRefundGivesBackAPaidInvoice(t *testing.T) {
+	g := newRig(t)
+	_, subID := g.subscribe(3)
+	_, sub := g.stripe(http.MethodGet, "/v1/subscriptions/"+subID, "expand[0]=latest_invoice")
+	inv := sub["latest_invoice"].(map[string]any)
+	intent, _ := inv["payment_intent"].(string)
+	if inv["status"] != "paid" || !strings.HasPrefix(intent, "pi_") {
+		t.Fatalf("paid invoice %v", inv)
+	}
+
+	for _, bad := range []string{"abc", "99999999999999999999"} {
+		status, refused := g.stripe(http.MethodPost, "/v1/refunds", "payment_intent="+intent+"&amount="+bad)
+		if status != http.StatusBadRequest || refused["error"].(map[string]any)["code"] != "parameter_invalid" {
+			t.Fatalf("malformed amount %q: %d %v", bad, status, refused)
+		}
+	}
+	status, refund := g.stripe(http.MethodPost, "/v1/refunds", "payment_intent="+intent)
+	if status != http.StatusOK || refund["status"] != "succeeded" || refund["amount"] != inv["amount_paid"] {
+		t.Fatalf("refund: %d %v", status, refund)
+	}
+	if !slices.Contains(g.eventTypes(), "refund.created") {
+		t.Fatalf("events %v", g.eventTypes())
+	}
+	_, listed := g.control(http.MethodGet, "/_sim/api/refunds", "")
+	refunds := listed["refunds"].([]any)
+	if len(refunds) != 1 || refunds[0].(map[string]any)["invoice"] != inv["id"] {
+		t.Fatalf("listed %v", listed)
+	}
+
+	charge := "ch_" + strings.TrimPrefix(intent, "pi_")
+	status, again := g.stripe(http.MethodPost, "/v1/refunds", "charge="+charge)
+	if status != http.StatusBadRequest || again["error"].(map[string]any)["code"] != "charge_already_refunded" {
+		t.Fatalf("second refund: %d %v", status, again)
+	}
+	if status, _ = g.stripe(http.MethodPost, "/v1/refunds", "payment_intent=pi_unknown"); status != http.StatusNotFound {
+		t.Fatalf("unknown intent: %d", status)
+	}
+}

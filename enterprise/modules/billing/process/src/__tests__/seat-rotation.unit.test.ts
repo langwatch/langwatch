@@ -19,6 +19,7 @@ import { MemorySeatEventSubscriptionRepository } from "../repositories/memory/me
 import { MemoryBillingSubscriptionRepository } from "../repositories/memory/memory.subscription.repository.ts";
 import type { BillingSubscriptionStatus } from "../rules/billing-stripe-shapes.rules.ts";
 import { BillingSubscriptionLifecycleService } from "../services/billing-subscription-lifecycle.service.ts";
+import { NO_DUPLICATE_SUBSCRIPTION_ALERTS } from "../services/duplicate-subscription-alert.service.ts";
 import { SaaSPlanProviderService } from "../services/plan-provider.service.ts";
 import { SeatEventSubscriptionService } from "../services/seat-event-subscription.service.ts";
 import {
@@ -140,7 +141,8 @@ describe("Growth seat changes", () => {
     seats = SeatEventSubscriptionService.create({
       stripeSubscriptions,
       subscriptions: MemorySeatEventSubscriptionRepository.create(store),
-      abandoned: { seatCheckoutsAbandoned: vi.fn() },
+      abandoned: { seatCheckoutsAbandoned: vi.fn(), audited: vi.fn() },
+      duplicates: NO_DUPLICATE_SUBSCRIPTION_ALERTS,
       prices,
       customerCurrency: StripeCustomerCurrencyService.create({
         customers,
@@ -237,7 +239,8 @@ describe("Growth seat changes", () => {
             throw new Error("database unavailable");
           },
         }),
-        abandoned: { seatCheckoutsAbandoned: vi.fn() },
+        abandoned: { seatCheckoutsAbandoned: vi.fn(), audited: vi.fn() },
+        duplicates: NO_DUPLICATE_SUBSCRIPTION_ALERTS,
         prices,
         customerCurrency: StripeCustomerCurrencyService.create({
           customers: MemoryStripeCustomersChannel.create(),
@@ -432,7 +435,8 @@ describe("Growth seat changes", () => {
             throw new Error("database unavailable");
           },
         }),
-        abandoned: { seatCheckoutsAbandoned: vi.fn() },
+        abandoned: { seatCheckoutsAbandoned: vi.fn(), audited: vi.fn() },
+        duplicates: NO_DUPLICATE_SUBSCRIPTION_ALERTS,
         prices,
         customerCurrency: StripeCustomerCurrencyService.create({
           customers: MemoryStripeCustomersChannel.create(),

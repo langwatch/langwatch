@@ -79,41 +79,55 @@ export class SeatRequestApprovalService {
 
   private constructor(private readonly dependencies: Dependencies) {}
 
-  /** Gives the full seat; refuses member_seat_limit_reached while no full seat is free. */
+  /**
+   * Gives the full seat; refuses member_seat_limit_reached while no full seat is free. With
+   * `buySeat`, the full seat limit buys one seat while the claim is held, so a concurrent
+   * approval of the same request cannot buy another; false from it refuses as before.
+   */
   async approve({
     organizationId,
     seatRequestId,
     by,
+    buySeat,
+    openedAt,
   }: {
     organizationId: string;
     seatRequestId: string;
     by: OrganizationPlanUser;
+    buySeat?: () => Promise<boolean>;
+    /** Approves only this opening of the request, never one reopened since. */
+    openedAt?: number;
   }): Promise<SeatRequestResolved> {
     const { requests } = this.dependencies;
     const request = await requests.getOpen({ organizationId, id: seatRequestId });
     const membership = await this.membershipOf({ organizationId, request });
+    // A person who had a membership and left asked as a member, not as an address to invite:
+    // their request closes, so Approve never invites them back or buys a seat for them.
+    if (request.userId !== null && membership === null) {
+      await requests.resolve({
+        organizationId,
+        id: request.id,
+        status: "DECLINED",
+        resolvedByUserId: by.id,
+        at: this.now(),
+      });
+      throw new SeatRequestNotFoundError(request.id);
+    }
     const isFull =
       membership !== null &&
       (membership.role === OrganizationUserRole.MEMBER ||
         membership.role === OrganizationUserRole.ADMIN);
     // Claimed first, so a concurrent decline or second approval cannot also act on it.
     const claim = { organizationId, id: request.id, resolvedByUserId: by.id, at: this.now() };
-    if (!(await requests.resolve({ ...claim, status: "APPROVED" }))) {
+    const opening = openedAt === undefined ? {} : { openedAt };
+    if (!(await requests.resolve({ ...claim, ...opening, status: "APPROVED" }))) {
       throw new SeatRequestNotFoundError(request.id);
     }
     // The early check spares a doomed write; the writes giveFullSeat calls each re-check the
     // seat under the organization's seat lease, so of two approvals for the last seat one wins.
     try {
-      if (!(isFull && membership.disabledAt === null)) {
-        await this.assertFullSeatFree({ organizationId, by });
-      }
-      const outcome = await this.giveFullSeat({
-        organizationId,
-        request,
-        membership,
-        isFull,
-        by,
-      });
+      const give = { organizationId, request, membership, isFull, by };
+      const outcome = await this.giveFullSeatOrBuy({ give, buySeat });
       await this.settle(claim);
       return { outcome };
     } catch (error) {
@@ -232,22 +246,49 @@ export class SeatRequestApprovalService {
     throw new SeatRequestReleaseError({ claim, refusal, releaseFailure: failure });
   }
 
-  private async assertFullSeatFree({
-    organizationId,
-    by,
+  private async assertSeatFreeFor({
+    give,
+    resource,
   }: {
-    organizationId: string;
-    by: OrganizationPlanUser;
+    give: { organizationId: string; by: OrganizationPlanUser };
+    resource: "members" | "membersLite";
   }): Promise<void> {
     const result = await this.dependencies.seats.checkLimit({
-      organizationId,
-      resource: "members",
-      user: by,
+      organizationId: give.organizationId,
+      resource,
+      user: give.by,
     });
     assertSeatFree(result);
   }
 
   /** Lite becomes full, a held row becomes full and is enabled, an address alone is invited. */
+  private async giveFullSeatOrBuy({
+    give,
+    buySeat,
+  }: {
+    give: Parameters<SeatRequestApprovalService["giveFullSeat"]>[0];
+    buySeat: (() => Promise<boolean>) | undefined;
+  }): Promise<SeatRequestResolved["outcome"]> {
+    try {
+      if (!(give.isFull && give.membership?.disabledAt === null)) {
+        await this.assertSeatFreeFor({ give, resource: "members" });
+      }
+      return await this.giveFullSeat(give);
+    } catch (error) {
+      // Only a full seat shortage is one a bought seat resolves; a Lite one refuses again.
+      const refusal = readSeatRefusal(error);
+      if (!buySeat || refusal.kind !== "seat-limit" || refusal.limit.limitType !== "members") {
+        throw error;
+      }
+      // A held Lite row is enabled as Lite first: with no Lite seat free, a bought one is wasted.
+      if (!give.isFull && give.membership !== null && give.membership.disabledAt !== null) {
+        await this.assertSeatFreeFor({ give, resource: "membersLite" });
+      }
+      if (!(await buySeat())) throw error;
+      return this.giveFullSeat(give);
+    }
+  }
+
   private async giveFullSeat({
     organizationId,
     request,

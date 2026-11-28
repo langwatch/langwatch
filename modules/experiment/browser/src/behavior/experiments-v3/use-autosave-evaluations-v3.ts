@@ -1,5 +1,9 @@
 import { type UiAnalytics, useUiAnalytics } from "@langwatch/browser-host/analytics";
-import { isNotFoundError as isTrpcNotFound, showErrorToast } from "@langwatch/browser-host/errors";
+import {
+  isHandledByGlobalHandler,
+  isNotFoundError as isTrpcNotFound,
+  showErrorToast,
+} from "@langwatch/browser-host/errors";
 import { toaster } from "@langwatch/browser-host/toaster";
 import { useOrganizationTeamProject } from "@langwatch/browser-host/use-organization-team-project";
 import { useRouter } from "@langwatch/browser-host/use-router";
@@ -117,6 +121,9 @@ const isEvaluationsV3BySlugQuery = (query: { queryKey: readonly unknown[] }): bo
   return Array.isArray(path) && path[0] === "experiments" && path[1] === "getEvaluationsV3BySlug";
 };
 
+/** The autosave status line when a plan limit refused the save. */
+const AUTOSAVE_REFUSED_BY_PLAN_REASON = "Not saved: your plan's limit refused this save";
+
 /** An unexpected autosave failure: logged, shown in the status and toasted. */
 const reportUnexpectedSaveFailure = (error: unknown): void => {
   console.error("Failed to autosave evaluations v3:", error);
@@ -149,7 +156,8 @@ const handleAutosaveFailure = ({
 }): RefusalOutcome => {
   const state = useEvaluationsV3Store.getState();
   if (isAccessRefusal(error)) {
-    // The role, not the edit, is refused: every later save would be too.
+    // The role, not the edit, is refused: every later save would be too. A Lite Member
+    // refusal already opened licensing's modal with Request access, so the toast stays quiet.
     const refusal = useWorkbenchAccessRefusal.getState();
     if (refusal.visit !== visit) return "failed";
     state.setAutosaveStatus("evaluation", "idle");
@@ -169,6 +177,11 @@ const handleAutosaveFailure = ({
     }
     state.setStaleWorkbench(refusal);
     state.setAutosaveStatus("evaluation", "error", AUTOSAVE_OUT_OF_DATE_REASON);
+    return "refused";
+  }
+  // A plan limit already opened licensing's upgrade modal: no second toast.
+  if (isHandledByGlobalHandler(error)) {
+    state.setAutosaveStatus("evaluation", "error", AUTOSAVE_REFUSED_BY_PLAN_REASON);
     return "refused";
   }
   reportUnexpectedSaveFailure(error);

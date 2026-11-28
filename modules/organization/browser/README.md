@@ -4,7 +4,7 @@ The browser half of [organization](../README.md). What a browser installs when i
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 
-Declared in `src/organization.web.ts:25` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
+Declared in `src/organization.web.ts:26` (`defineBrowserModule("organization")`), exported as `organizationWeb` at `./declaration`.
 
 Installed by ui, from the app's generated module list (`pnpm generate:modules`).
 
@@ -27,7 +27,7 @@ A URL marked (route table) is joined from `apps/ui/src/shell/ui-route-table.ts`;
 | `editProject`   | `src/ui/sections/edit-project-drawer.tsx`   | –                     |
 | `createTeam`    | `src/ui/sections/create-team-drawer.tsx`    | navigation            |
 | `inviteMember`  | `src/ui/sections/invite-member-drawer.tsx`  | licensing, navigation |
-| `person`        | `src/ui/sections/person-drawer.tsx`         | –                     |
+| `person`        | `src/ui/sections/person-drawer.tsx`         | billing               |
 
 Opened from lists the other modules (and `ui`, the app) whose browser source names the drawer in a
 `…Drawer("<name>")` call, a `?drawer.open=<name>` link or by its token; a name held in a constant is not followed.
@@ -35,8 +35,8 @@ Opened from lists the other modules (and `ui`, the app) whose browser source nam
 ## Calls
 
 - `withApi(organizationApi)`, tRPC contracts: `organization.*`, `plan.*`.
-- Client packages (package.json): `@langwatch/enterprise-licensing-client`, `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
-- Lends: `JoinOfferToken`, `JoinInsteadToken`, `HeldMembershipGateToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
+- Client packages (package.json): `@langwatch/enterprise-billing-client`, `@langwatch/enterprise-licensing-client`, `@langwatch/enterprise-scim-client`, `@langwatch/identity-client`, `@langwatch/organization-client`, `@langwatch/project-client`.
+- Lends: `JoinOfferToken`, `JoinInsteadToken`, `HeldMembershipGateToken`, `RequestAccessToken`, `PendingJoinRequestsToken`, `ProjectDepartmentFieldToken`.
 - Host APIs it requires: `OrganizationHostApi`.
 - Capabilities: `scope`, `copyTargets`, `organizationFacts`, `teamAccessWaiting`.
 

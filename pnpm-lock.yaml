@@ -2659,6 +2659,12 @@ importers:
       '@langwatch/entitlement-contract':
         specifier: workspace:*
         version: link:../../../../modules/entitlement/contract
+      '@langwatch/handled-error':
+        specifier: workspace:*
+        version: link:../../../../packages/handled-error
+      '@langwatch/organization-contract':
+        specifier: workspace:*
+        version: link:../../../../modules/organization/contract
       '@langwatch/plans':
         specifier: workspace:*
         version: link:../../../../packages/plans
@@ -8857,6 +8863,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-licensing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/licensing/client
       '@langwatch/evaluation-contract':
         specifier: workspace:*
         version: link:../../evaluation/contract
@@ -8890,6 +8899,9 @@ importers:
       '@langwatch/ops-contract':
         specifier: workspace:*
         version: link:../../ops/contract
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../organization/client
       '@langwatch/prompt-client':
         specifier: workspace:*
         version: link:../../prompt/client
@@ -12751,6 +12763,9 @@ importers:
       '@langwatch/dataset-contract':
         specifier: workspace:*
         version: link:../../dataset/contract
+      '@langwatch/enterprise-billing-contract':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/contract
       '@langwatch/enterprise-licensing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/licensing/contract
@@ -12938,6 +12953,9 @@ importers:
       '@langwatch/design-system':
         specifier: workspace:*
         version: link:../../../packages/design-system
+      '@langwatch/enterprise-billing-client':
+        specifier: workspace:*
+        version: link:../../../enterprise/modules/billing/client
       '@langwatch/enterprise-billing-contract':
         specifier: workspace:*
         version: link:../../../enterprise/modules/billing/contract
@@ -13017,9 +13035,6 @@ importers:
       '@emotion/react':
         specifier: 'catalog:'
         version: 11.14.0(@types/react@19.2.18)(react@19.2.8)(supports-color@10.2.2)
-      '@langwatch/enterprise-billing-client':
-        specifier: workspace:*
-        version: link:../../../enterprise/modules/billing/client
       '@langwatch/test-harness':
         specifier: workspace:*
         version: link:../../../packages/test-harness
@@ -16754,6 +16769,9 @@ importers:
       '@langwatch/onboarding-client':
         specifier: workspace:*
         version: link:../../onboarding/client
+      '@langwatch/organization-client':
+        specifier: workspace:*
+        version: link:../../organization/client
       '@langwatch/time':
         specifier: workspace:*
         version: link:../../../packages/time

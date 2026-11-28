@@ -48,6 +48,9 @@
       "path": "../../ops/contract/tsconfig.build.json"
     },
     {
+      "path": "../../organization/client/tsconfig.build.json"
+    },
+    {
       "path": "../../langy/contract/tsconfig.build.json"
     },
     {
@@ -55,6 +58,9 @@
     },
     {
       "path": "../../../packages/handled-error/tsconfig.build.json"
+    },
+    {
+      "path": "../../../enterprise/modules/licensing/client/tsconfig.build.json"
     },
     {
       "path": "../../feature-flag/contract/tsconfig.build.json"

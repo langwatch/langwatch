@@ -7,7 +7,9 @@ import (
 	"math/big"
 	"net/http"
 	"reflect"
+	"slices"
 	"strconv"
+	"strings"
 	"time"
 )
 
@@ -277,6 +279,7 @@ func (s *Server) draftInvoice(customer, currency, collection string, daysUntilDu
 	inv := &Invoice{
 		ID: s.st.id("in"), Object: "invoice", BillingReason: "manual", CollectionMethod: collection, Created: now,
 		Currency: currency, Customer: customer, Metadata: orEmpty(meta), PeriodStart: now, PeriodEnd: now, Status: ptr("draft"),
+		AutoAdvance: true,
 	}
 	inv.Lines = listOf([]*Line{}, false, "/v1/invoices/"+inv.ID+"/lines")
 	if collection == "send_invoice" && daysUntilDue != nil {
@@ -293,40 +296,124 @@ func (s *Server) addLine(inv *Invoice, line *Line) {
 	inv.Total, inv.AmountDue, inv.AmountRemaining = inv.Subtotal, inv.Subtotal, inv.Subtotal
 }
 
-// finalize opens a draft; a charge_automatically invoice is attempted at once.
+// finalize opens a draft; a charge_automatically invoice that advances on its
+// own is attempted at once, one with auto_advance off waits for a pay call.
 func (s *Server) finalize(inv *Invoice) {
-	now := s.now().Unix()
-	inv.Status, inv.Number = ptr("open"), ptr(fmt.Sprintf("SIM-%04d", s.st.counters["number"]+1))
-	s.st.counters["number"]++
-	inv.StatusTransitions.FinalizedAt = ptr(now)
-	inv.HostedInvoiceURL, inv.InvoicePDF = ptr(s.cfg.PublicURL+"/invoices/"+inv.ID), ptr(s.cfg.PublicURL+"/invoices/"+inv.ID+"/pdf")
-	s.emit("invoice.finalized", inv, nil)
-	if inv.CollectionMethod == "charge_automatically" {
+	s.open(inv)
+	if inv.CollectionMethod == "charge_automatically" && inv.AutoAdvance {
 		s.charge(inv)
 	}
 }
 
-// charge tries to collect inv; a failure armed for its customer declines it.
-func (s *Server) charge(inv *Invoice) bool {
+// open gives a draft its number and hosted page and fires invoice.finalized.
+func (s *Server) open(inv *Invoice) {
+	now := s.now().Unix()
+	inv.Status, inv.Number = ptr("open"), ptr(fmt.Sprintf("SIM-%04d", s.st.counters["number"]+1))
+	s.st.counters["number"]++
+	inv.StatusTransitions.FinalizedAt = ptr(now)
+	inv.HostedInvoiceURL, inv.InvoicePDF = ptr(s.cfg.PublicURL+"/invoice/"+inv.ID), ptr(s.cfg.PublicURL+"/invoice/"+inv.ID+"/pdf")
+	s.emit("invoice.finalized", inv, nil)
+}
+
+// Fault kinds a payment-failures entry arms: a plain decline, or a payment
+// left needing the customer's action (3D Secure).
+const (
+	faultDecline        = "decline"
+	faultRequiresAction = "requires_action"
+)
+
+// takeFault consumes one armed failure for customer and names its kind.
+func (s *Server) takeFault(customer string) (string, bool) {
+	n := s.st.failPayments[customer]
+	if n == 0 {
+		return "", false
+	}
+	if n > 0 {
+		s.st.failPayments[customer] = n - 1
+	}
+	if kind := s.st.failKinds[customer]; kind != "" {
+		return kind, true
+	}
+	return faultDecline, true
+}
+
+// charge tries to collect inv and answers the fault kind that stopped it, or "".
+// Paying an invoice that holds a pending update applies the update first; a
+// failure on one leaves the subscription's status alone, as Stripe does.
+func (s *Server) charge(inv *Invoice) string {
 	inv.Attempted, inv.AttemptCount = true, inv.AttemptCount+1
-	if n := s.st.failPayments[inv.Customer]; n != 0 {
-		if n > 0 {
-			s.st.failPayments[inv.Customer] = n - 1
-		}
+	pending := s.pendingSub(inv)
+	if kind, failed := s.takeFault(inv.Customer); failed {
 		s.emit("invoice.payment_failed", inv, nil)
-		s.setSubStatus(inv, "past_due")
-		return false
+		if kind == faultRequiresAction {
+			s.emit("invoice.payment_action_required", inv, nil)
+		}
+		if pending == nil {
+			s.setSubStatus(inv, "past_due")
+		}
+		return kind
+	}
+	if pending != nil {
+		s.applyPending(pending)
 	}
 	s.markPaid(inv, false)
 	s.emit("invoice.payment_succeeded", inv, nil)
 	s.setSubStatus(inv, "active")
-	return true
+	return ""
+}
+
+// pendingSub is the subscription whose pending update waits on inv, if any.
+func (s *Server) pendingSub(inv *Invoice) *Subscription {
+	if inv.Subscription == nil {
+		return nil
+	}
+	sub := s.st.subscriptions[*inv.Subscription]
+	if sub == nil || sub.PendingUpdate == nil || sub.pendingInvoice != inv.ID {
+		return nil
+	}
+	return sub
+}
+
+// applyPending moves the pending items onto sub and fires customer.subscription.updated.
+func (s *Server) applyPending(sub *Subscription) {
+	before := fields(sub)
+	sub.Items.Data = sub.PendingUpdate.SubscriptionItems
+	sub.PendingUpdate, sub.pendingInvoice = nil, ""
+	s.emit("customer.subscription.updated", sub, changed(before, fields(sub)))
+}
+
+// expirePending discards every pending update past expires_at, items unchanged,
+// and voids the invoice it waited on so it can no longer be paid.
+func (s *Server) expirePending(now int64) {
+	ids := make([]string, 0, len(s.st.subscriptions))
+	for id, sub := range s.st.subscriptions {
+		if sub.PendingUpdate != nil && sub.PendingUpdate.ExpiresAt <= now {
+			ids = append(ids, id)
+		}
+	}
+	slices.Sort(ids)
+	for _, id := range ids {
+		s.discardPending(s.st.subscriptions[id], now)
+	}
+}
+
+func (s *Server) discardPending(sub *Subscription, now int64) {
+	before, invoiceID := fields(sub), sub.pendingInvoice
+	sub.PendingUpdate, sub.pendingInvoice = nil, ""
+	s.emit("customer.subscription.updated", sub, changed(before, fields(sub)))
+	if inv := s.st.invoice(invoiceID); inv != nil && deref(inv.Status) == "open" {
+		inv.Status, inv.StatusTransitions.VoidedAt, inv.AmountRemaining = ptr("void"), ptr(now), 0
+		s.emit("invoice.voided", inv, nil)
+	}
 }
 
 func (s *Server) markPaid(inv *Invoice, outOfBand bool) {
 	inv.Status, inv.Paid, inv.PaidOutOfBand = ptr("paid"), true, outOfBand
 	inv.AmountPaid, inv.AmountRemaining = inv.AmountDue, 0
 	inv.StatusTransitions.PaidAt = ptr(s.now().Unix())
+	if !outOfBand && inv.AmountPaid > 0 {
+		inv.PaymentIntent = ptr("pi_" + strings.TrimPrefix(inv.ID, "in_"))
+	}
 	s.emit("invoice.paid", inv, nil)
 }
 
@@ -362,6 +449,7 @@ func (s *Server) cancel(sub *Subscription) {
 func (s *Server) advance(d time.Duration) {
 	s.st.offset += d
 	now := s.now().Unix()
+	s.expirePending(now)
 	for {
 		due := s.nextDue(now)
 		if due == nil {
@@ -373,7 +461,7 @@ func (s *Server) advance(d time.Duration) {
 		}
 		before := fields(due)
 		start, end := due.CurrentPeriodEnd, addInterval(due.CurrentPeriodEnd, due.Items.Data[0].Price.Recurring)
-		usedFrom := due.CurrentPeriodStart
+		usedFrom := max(due.CurrentPeriodStart, due.usageFrom)
 		due.CurrentPeriodStart, due.CurrentPeriodEnd = start, end
 		s.emit("customer.subscription.updated", due, changed(before, fields(due)))
 		s.billPeriod(due, "subscription_cycle", start, end, usedFrom, start)
@@ -407,10 +495,7 @@ func (s *Server) completeCheckout(sess *Session) *apiError {
 		s.st.customers[cus.ID] = cus
 		sess.Customer = &cus.ID
 	}
-	if n := s.st.failPayments[*sess.Customer]; n != 0 {
-		if n > 0 {
-			s.st.failPayments[*sess.Customer] = n - 1
-		}
+	if _, failed := s.takeFault(*sess.Customer); failed {
 		return &apiError{status: http.StatusPaymentRequired, errType: "card_error", code: "card_declined", message: "Your card was declined."}
 	}
 	items := make([]params, 0, len(sess.lines))

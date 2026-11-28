@@ -44,6 +44,10 @@ const createMockBillingSubscription = (): {
   cancel: vi.fn(),
   cancelTrialSubscriptions: vi.fn(),
   findSupersededBySeatEvent: vi.fn(),
+  findLiveUnlinkedBeside: vi.fn().mockResolvedValue([]),
+  findLiveLinkedBeside: vi.fn().mockResolvedValue([]),
+  adoptCheckout: vi.fn(),
+  cancelPendingCheckout: vi.fn().mockResolvedValue([]),
   updateQuantities: vi.fn(),
 });
 
@@ -62,6 +66,7 @@ const ORGANIZATION_ROW_COMMANDS = [
   "recordSeatCheckoutPaid",
   "recordSeatCheckoutsAbandoned",
   "recordOverPlanChanged",
+  "recordSeatInvoicePaid",
 ] as const;
 type OrganizationRowCommand = (typeof ORGANIZATION_ROW_COMMANDS)[number];
 
@@ -105,6 +110,7 @@ function recordingAnnouncer(refuse?: OrganizationRowCommand) {
     recordSeatCheckoutPaid: rowSender("recordSeatCheckoutPaid"),
     recordSeatCheckoutsAbandoned: rowSender("recordSeatCheckoutsAbandoned"),
     recordOverPlanChanged: rowSender("recordOverPlanChanged"),
+    recordSeatInvoicePaid: rowSender("recordSeatInvoicePaid"),
   });
   return { announcer, sent };
 }
@@ -1677,6 +1683,7 @@ describe("EEWebhookService with the lifecycle announcer composed", () => {
       recordSeatCheckoutPaid: { send: async () => {}, ...unused },
       recordSeatCheckoutsAbandoned: { send: async () => {}, ...unused },
       recordOverPlanChanged: { send: async () => {}, ...unused },
+      recordSeatInvoicePaid: { send: async () => {}, ...unused },
     });
     service = EEWebhookService.create({
       licenses,

@@ -12,6 +12,8 @@ import {
   PRICING_MODEL_CHANGED_EVENT_TYPE,
   SEAT_CHECKOUT_PAID_EVENT_TYPE,
   SEAT_CHECKOUTS_ABANDONED_EVENT_TYPE,
+  SEAT_INVOICE_PAID_EVENT_TYPE,
+  seatInvoicePaidEventDataSchema,
   planLimitAlertSentEventDataSchema,
   checkoutCurrencySelectedEventDataSchema,
   pricingModelChangedEventDataSchema,
@@ -169,6 +171,19 @@ export const seatCheckoutsAbandonedEventSchema = z.object({
 });
 export type SeatCheckoutsAbandonedEvent = z.infer<typeof seatCheckoutsAbandonedEventSchema>;
 
+export const RECORD_SEAT_INVOICE_PAID_COMMAND_TYPE = "lw.billing.record_seat_invoice_paid" as const;
+export const recordSeatInvoicePaidCommandDataSchema = seatInvoicePaidEventDataSchema;
+export type RecordSeatInvoicePaidCommandData = z.infer<
+  typeof recordSeatInvoicePaidCommandDataSchema
+>;
+export const seatInvoicePaidEventSchema = z.object({
+  ...EventSchema.shape,
+  type: z.literal(SEAT_INVOICE_PAID_EVENT_TYPE),
+  version: z.literal(BILLING_LIFECYCLE_EVENT_VERSION),
+  data: seatInvoicePaidEventDataSchema,
+});
+export type SeatInvoicePaidEvent = z.infer<typeof seatInvoicePaidEventSchema>;
+
 export const RECORD_OVER_PLAN_CHANGED_COMMAND_TYPE = "lw.billing.record_over_plan_changed" as const;
 export const recordOverPlanChangedCommandDataSchema = overPlanChangedEventDataSchema;
 export type RecordOverPlanChangedCommandData = z.infer<
@@ -193,4 +208,5 @@ export type BillingLifecycleEvent =
   | PricingModelChangedEvent
   | SeatCheckoutPaidEvent
   | SeatCheckoutsAbandonedEvent
+  | SeatInvoicePaidEvent
   | OverPlanChangedEvent;

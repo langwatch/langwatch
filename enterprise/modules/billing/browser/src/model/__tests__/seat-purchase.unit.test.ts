@@ -18,6 +18,8 @@ import {
   joinEmails,
   seatChangeToast,
   seatConfirm,
+  seatsAddedNotice,
+  seatsAddedNoticeOf,
   upgradeMinimumHint,
   upgradeTotal,
 } from "../seat-purchase.ts";
@@ -247,20 +249,19 @@ describe("seatConfirm()", () => {
       emails: ["qux@acme.example"],
       todayMs: NOV_6,
     });
-    expect(confirm.title).toBe("Add 1 seat to your organization?");
-    expect(confirm.lines[0]).toEqual({
-      label: "Today",
-      detail: "Charged today to the card on file, for 6 Nov to 1 Dec.",
-      value: "€24.17",
-    });
+    expect(confirm.title).toBe("Add 1 full seat?");
+    expect(confirm.lead).toBe(
+      "You go from 3 to 4 full seats. The new seat is free to use at once.",
+    );
+    expect(confirm.lines[0]).toEqual({ label: "Today, prorated to 1 Dec", value: "€24.17" });
     expect(confirm.lines[1]).toEqual({
-      label: "From 1 Dec",
+      label: "Then from 1 Dec",
       detail: "4 seats × €29",
       value: "€116/mo",
       note: "excl. VAT",
     });
     expect(confirm.body).toBe("qux@acme.example gets the invite as soon as the seat is added.");
-    expect(confirm.actionLabel).toBe("Pay €24.17 and add");
+    expect(confirm.actionLabel).toBe("Pay €24.17");
   });
 
   describe("when the charge today carries VAT", () => {
@@ -273,13 +274,12 @@ describe("seatConfirm()", () => {
         todayMs: NOV_6,
       });
       expect(confirm.lines[0]).toEqual({
-        label: "Today",
-        detail: "Charged today to the card on file, for 6 Nov to 1 Dec.",
+        label: "Today, prorated to 1 Dec",
         value: "€29.24",
         note: "€24.17 + €5.07 VAT",
       });
       expect(confirm.lines[1]).toMatchObject({ value: "€116/mo", note: "excl. VAT" });
-      expect(confirm.actionLabel).toBe("Pay €29.24 and add");
+      expect(confirm.actionLabel).toBe("Pay €29.24");
     });
 
     it("adds the Developer seats' VAT to the full seats' VAT", () => {
@@ -302,13 +302,17 @@ describe("seatConfirm()", () => {
       const { summary } = growthSeatPlan(growth({ seats: 4, quote: taxed }));
       expect(summary).toContainEqual(
         expect.objectContaining({
-          label: "Due today, prorated",
+          label: "Today, prorated to 1 Dec",
           value: "€29.24",
           note: "€24.17 + €5.07 VAT",
         }),
       );
       expect(summary).toContainEqual(
-        expect.objectContaining({ label: "Then from 1 Dec", value: "€116/mo", note: "excl. VAT" }),
+        expect.objectContaining({
+          label: "Then from 1 Dec",
+          value: "€116/mo for 4 seats",
+          note: "excl. VAT",
+        }),
       );
     });
   });
@@ -347,12 +351,12 @@ describe("seatConfirm()", () => {
       emails: [],
       todayMs: NOV_6,
     });
-    expect(confirm.lines[0]).toEqual({
-      label: "Today",
-      detail: "Charged today to the card on file, for 6 Nov to 1 Dec.",
-      value: "€8.33",
-    });
-    expect(confirm.lines.map((line) => line.label)).toEqual(["Today", "Until 1 Dec", "From 1 Dec"]);
+    expect(confirm.lines[0]).toEqual({ label: "Today, prorated to 1 Dec", value: "€8.33" });
+    expect(confirm.lines.map((line) => line.label)).toEqual([
+      "Today, prorated to 1 Dec",
+      "Until 1 Dec",
+      "From 1 Dec",
+    ]);
   });
 
   it("adds no Today line when only the full seats go down", () => {
@@ -362,6 +366,110 @@ describe("seatConfirm()", () => {
       todayMs: NOV_6,
     });
     expect(confirm.lines.map((line) => line.label)).toEqual(["Until 1 Dec", "From 1 Dec"]);
+  });
+});
+
+describe("seatsAddedNotice()", () => {
+  it("names what was paid and the seats left free", () => {
+    expect(
+      seatsAddedNotice({ added: 1, dueCents: 519, seats: 3, inUse: 2, emails: [], price: EUR }),
+    ).toEqual({ title: "1 seat added", body: "Paid €5.19. You have 3 full seats, 1 free." });
+  });
+
+  it("names the invite sent and no free seat when the new seat is taken", () => {
+    expect(
+      seatsAddedNotice({
+        added: 1,
+        dueCents: 2417,
+        seats: 4,
+        inUse: 4,
+        emails: ["qux@acme.example"],
+        price: EUR,
+      }).body,
+    ).toBe("Paid €24.17. You have 4 full seats. Invite sent to qux@acme.example.");
+  });
+});
+
+describe("seatsAddedNoticeOf()", () => {
+  const quote = {
+    amountDueCents: 2417,
+    formattedAmountDue: "€24.17",
+    formattedCreditApplied: null,
+    formattedRecurringTotal: "€116",
+    billingInterval: "month" as const,
+    quotedAt: 1,
+    appliesAt: null,
+    keptSeats: null,
+    formattedKeptRecurringTotal: null,
+  };
+
+  /** @scenario "Adding full and Developer seats in one confirm names both in the banner" */
+  it("names the Developer seats added and adds their charge to what was paid", () => {
+    expect(
+      seatsAddedNoticeOf({
+        plan: growth({
+          seats: 4,
+          quote,
+          developer: { current: 0, target: 2, unitCents: 500 },
+          developerDueCents: 833,
+        }),
+        emails: [],
+      }),
+    ).toEqual({
+      title: "1 seat and 2 developer seats added",
+      body: "Paid €32.50. You have 4 full seats, 1 free.",
+    });
+  });
+
+  it("says nothing of Developer seats that were lowered, and charges nothing for them", () => {
+    expect(
+      seatsAddedNoticeOf({
+        plan: growth({
+          seats: 4,
+          quote,
+          developer: { current: 3, target: 1, unitCents: 500 },
+          developerDueCents: 0,
+        }),
+        emails: [],
+      }),
+    ).toEqual({ title: "1 seat added", body: "Paid €24.17. You have 4 full seats, 1 free." });
+  });
+
+  it("shows no banner when no full seat is added", () => {
+    expect(
+      seatsAddedNoticeOf({
+        plan: growth({ developer: { current: 0, target: 2, unitCents: 500 } }),
+        emails: [],
+      }),
+    ).toBeUndefined();
+  });
+});
+
+describe("growthSeatPlan() adding seats", () => {
+  const quote = {
+    amountDueCents: 2417,
+    formattedAmountDue: "€24.17",
+    formattedCreditApplied: null,
+    formattedRecurringTotal: "€116",
+    billingInterval: "month" as const,
+    quotedAt: 1,
+    appliesAt: null,
+    keptSeats: null,
+    formattedKeptRecurringTotal: null,
+  };
+
+  it("puts today's amount on the button and prices the added seat", () => {
+    const view = growthSeatPlan(growth({ seats: 4, quote }));
+    expect(view.action.label).toBe("Add 1 seat · €24.17 today");
+    expect(view.summary[0]).toEqual({ label: "1 more full seat", value: "€29/mo", muted: true });
+    expect(view.freeSeats).toBe(0);
+  });
+
+  it("says an address that fits a paid seat uses the free seat", () => {
+    const view = growthSeatPlan(growth({ paid: 5, seats: 5, invites: 1 }));
+    expect(view.rowChip).toBe("Uses your free seat");
+    expect(view.freeSeats).toBe(2);
+    expect(view.changed).toBe(false);
   });
 });
 

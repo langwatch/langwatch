@@ -519,6 +519,7 @@ var baseTable = []commandSpec{
 			flagSpec{long: "--customer", takesValue: true, value: "<id>", summary: "usage/fail: the customer"},
 			flagSpec{long: "--seconds", takesValue: true, value: "<n>", summary: "advance: move the test clock on this far"},
 			flagSpec{long: "--times", takesValue: true, value: "<n>", summary: "fail: decline this many charges (default 1, -1 every one)"},
+			flagSpec{long: "--kind", takesValue: true, value: "<decline|requires_action>", summary: "fail: decline the charge (default) or ask for 3D Secure"},
 			flagSpec{long: "--ids", takesValue: true, value: "<a,b>", summary: "deliver: event ids, in the order to send them; repeat one for a duplicate"},
 			flagSpec{long: "--secret", takesValue: true, value: "<whsec>", summary: "deliver: sign with this secret instead (tests the refusal)"},
 		),

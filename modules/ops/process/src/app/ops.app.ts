@@ -23,6 +23,7 @@ import {
   type DataRetentionApi as DataRetentionApiContract,
 } from "@langwatch/data-retention-contract";
 import { DatasetApi } from "@langwatch/dataset-contract";
+import { BillingApi } from "@langwatch/enterprise-billing-contract";
 import {
   DEFAULT_LICENSE_PUBLIC_KEY,
   LicensingApi,
@@ -347,6 +348,7 @@ import {
   type AdminAccessServiceOptions,
 } from "../services/admin-access.service.ts";
 import { AdminAuditService } from "../services/admin-audit.service.ts";
+import type { AdminSubscriptionRule } from "../services/admin-subscription-write.service.ts";
 import { AnomalyDetectorService } from "../services/anomaly-detector.service.ts";
 import { BlobStoreService } from "../services/blob-store.service.ts";
 import { EventExplorerService } from "../services/event-explorer.service.ts";
@@ -604,6 +606,8 @@ export interface OpsAppDependencies {
   >;
   /** The daily insight schedules the operator scheduler lists; insight owns every write. */
   insights: Pick<InsightApi, "findOperatorDailySchedules">;
+  /** The one live plan an organization holds, asked before Cloud admin writes a subscription. */
+  billing: AdminSubscriptionRule;
 }
 
 /** The process-owned adapters used to make one Ops capability at boot. */
@@ -845,6 +849,7 @@ export class OpsModule implements OpsApi {
     notifications: NotificationApi,
     storedObjects: StoredObjectApi,
     analytics: AnalyticsApi,
+    billing: BillingApi,
   };
   static readonly config = opsConfig;
   static readonly secrets = {
@@ -2629,6 +2634,7 @@ function buildOpsInfrastructure(input: {
         users: dependencies.users,
         accounts: dependencies.auth,
         shares: dependencies.shares,
+        billing: dependencies.billing,
         scheduler: {
           schedules: dependencies.automations,
           projects: dependencies.projects,
@@ -2753,6 +2759,8 @@ interface OpsOperationsOptions {
   users: UserApi;
   accounts: InstanceAdminAccounts;
   shares: InstanceAdminShares;
+  /** Billing's one-live-plan rule; absent where nothing edits a subscription. */
+  billing?: AdminSubscriptionRule | undefined;
   /** Whether one organization's own connection decides its sign-in. */
   ssoRouting?: OrganizationSsoRouting | undefined;
   scheduler: {
@@ -2796,6 +2804,7 @@ export class OpsOperations {
         audit: this.options.audit,
         projects: this.options.scheduler.projects,
         shares: this.options.shares,
+        billing: this.options.billing,
         ssoRouting: this.options.ssoRouting,
         operatorAddressesFixed: this.options.operatorAddressesFixed,
       }),

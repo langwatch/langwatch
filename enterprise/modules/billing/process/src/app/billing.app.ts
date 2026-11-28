@@ -2,6 +2,7 @@
 
 import { AuthzApi, PLATFORM_TENANT_ID } from "@langwatch/authz-contract";
 import {
+  AmbiguousSubscriptionError,
   BillingApi,
   billingBrowserConfig,
   billingConfig,
@@ -12,6 +13,7 @@ import {
   type BillingAuditRecordedEventData,
   type BillingStaff,
   type BillingDisplayInvoice,
+  type BlockedSeatChangeAttempt,
   type ConnectedAddCommitRequest,
   type DeveloperSeatQuote,
   type DeveloperSeats,
@@ -35,7 +37,13 @@ import {
   type ResourceLimitNotifierInput,
   type RetentionStorageOutcome,
   type RetentionStorageReport,
+  SeatBillingUnavailableError,
+  type SeatOffer,
+  type SeatPayment,
+  type SeatPaymentStatus,
+  type SeatPurchase,
   type SubscriptionPlanInput,
+  type SubscriptionWrite,
   type BillingPricingModel,
 } from "@langwatch/enterprise-billing-contract";
 import { LicensingApi, type PlanInfo } from "@langwatch/enterprise-licensing-contract";
@@ -46,9 +54,11 @@ import type {
 } from "@langwatch/eventing";
 import { NotFoundError } from "@langwatch/handled-error";
 import { NotificationService as NotificationApi } from "@langwatch/notification-contract";
+import { createLogger } from "@langwatch/observability";
 import type { FeatureSetup } from "@langwatch/process";
 import { Temporal } from "@langwatch/time";
 
+import type { BillingFixedEmailChannel } from "../channels/billing-fixed-email.channel.ts";
 import type { BillingStripeChannels } from "../channels/billing-stripe.channels.ts";
 import type { BillingSubscriptionNotifier } from "../channels/billing-subscription-notifier.channel.ts";
 import type { BillingWebhookHost } from "../channels/billing-webhook-host.channel.ts";
@@ -79,6 +89,7 @@ import type { BillingRepositories } from "../repositories/billing.repositories.t
 import { priceLineOf } from "../rules/price-line.rules.ts";
 import { isStripeTestModeKey } from "../rules/stripe-mode.rules.ts";
 import {
+  duplicateSubscriptionCooldown,
   planLimitCooldown,
   planLimitInFlight,
   resourceLimitCooldown,
@@ -90,13 +101,20 @@ import type { CheckoutBillingRoles } from "../services/billing-starter-role.serv
 import { StripeWebhookReceiptService } from "../services/billing-stripe-webhook-receipt.service.ts";
 import { EEWebhookService } from "../services/billing-stripe-webhook.service.ts";
 import { NotificationService as BillingUsageNoticeService } from "../services/billing-usage-notice.service.ts";
+import { BlockedSeatChangeService } from "../services/blocked-seat-change.service.ts";
 import { CurrencyService } from "../services/currency.service.ts";
 import { CustomerService } from "../services/customer.service.ts";
 import {
   DeveloperSeatService,
   type DevelopersInUseCounter,
 } from "../services/developer-seat.service.ts";
+import {
+  type DuplicateSubscriptionAlerts,
+  DuplicateSubscriptionAlertService,
+  NO_DUPLICATE_SUBSCRIPTION_ALERTS,
+} from "../services/duplicate-subscription-alert.service.ts";
 import { InstantEvalSpendQueryService } from "../services/instant-eval-spend-query.service.ts";
+import { LivePlanSlotService } from "../services/live-plan-slot.service.ts";
 import { OrganizationPricingService } from "../services/organization-pricing.service.ts";
 import { OverPlanService } from "../services/over-plan.service.ts";
 import {
@@ -113,6 +131,7 @@ import {
   type SeatLineRepairOutcome,
   SeatLineRepairService,
 } from "../services/seat-line-repair.service.ts";
+import { SeatPurchaseService } from "../services/seat-purchase.service.ts";
 import { StripeCustomerCurrencyService } from "../services/stripe-customer-currency.service.ts";
 import { StripeErrorTranslatorService } from "../services/stripe-error-translator.service.ts";
 import { SubscriptionItemCalculatorService } from "../services/subscription-item-calculator.service.ts";
@@ -129,6 +148,8 @@ import { UsageWarningService } from "../services/usage-warning.service.ts";
 import type { BillingStripeWebhookApi } from "../transport/billing-stripe-webhook.rest.ts";
 import type { BillingCurrencyApi } from "../transport/currency.trpc.ts";
 import type { BillingSubscriber, BillingSubscriptionApi } from "../transport/subscription.trpc.ts";
+
+const logger = createLogger("langwatch:billing:app");
 
 /** Main's `env.BASE_HOST ?? "https://app.langwatch.ai"` for the usage link. */
 const DEFAULT_PUBLIC_BASE_URL = "https://app.langwatch.ai";
@@ -187,13 +208,20 @@ type PaymentRecoveryComposition = Readonly<{
 type SubscriptionComposition = Readonly<{
   notifier: BillingSubscriptionNotifier;
   /** Abandoned checkouts' held invitations close from billing's fact (R42). */
-  facts: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned">;
+  facts: Pick<BillingLifecycleAnnouncerService, "seatCheckoutsAbandoned" | "audited">;
+  /** Ops hear about an organization with more than one active subscription; absent, nobody does. */
+  duplicates?: DuplicateSubscriptionAlerts;
+  /** The once-per-admin email after a refused seat change; absent, nobody is told. */
+  fixedMail?: Readonly<{ emails: BillingFixedEmailChannel; publicBaseUrl: string }>;
 }>;
 
 type SubscriptionDoor = Readonly<{
   customers: CustomerService;
   subscriptions: BillingSubscriptionService;
+  seatPurchases: SeatPurchaseService;
   seatLines: SeatLineRepairService;
+  blockedSeatChanges: BlockedSeatChangeService | undefined;
+  seatEvents: Pick<SeatEventSubscriptionService, "billedSeats">;
   developerSeats: DeveloperSeatService;
   retentionStorage: RetentionStorageBillingService;
 }>;
@@ -284,6 +312,11 @@ export class BillingModule
       subscription: {
         notifier: SlackBillingSubscriptionNotifierChannel.create({ notices }),
         facts: lifecycle,
+        duplicates: BillingModule.#composeDuplicateSubscriptionAlerts(setup, notices, stamps),
+        fixedMail: {
+          emails: channels.billingFixedEmail,
+          publicBaseUrl: setup.config.publicBaseUrl ?? DEFAULT_PUBLIC_BASE_URL,
+        },
       },
     });
   }
@@ -357,6 +390,27 @@ export class BillingModule
     });
   }
 
+  /** Ops' duplicate-subscription alert, over the resource-limit alert's channel and admin read. */
+  static #composeDuplicateSubscriptionAlerts(
+    setup: BillingSetup,
+    notices: BillingUsageNoticeService,
+    stamps: PlanLimitStamps,
+  ): DuplicateSubscriptionAlertService {
+    const { projects, organizations } = setup.repositories;
+    const { isSaas } = setup.config;
+    return DuplicateSubscriptionAlertService.create({
+      isSaas,
+      cooldown: duplicateSubscriptionCooldown,
+      organizations: UsageLimitOrganizationService.create({ organizations, projects, stamps }),
+      plans: SaaSPlanProviderService.create({
+        subscriptions: setup.repositories.subscriptions,
+        isSaas,
+      }),
+      notices,
+      errors: BillingErrorReporterService.create(),
+    });
+  }
+
   /** Main's plan-limit alert, guarded in flight, by the 30-day damper and the organization's stamp. */
   static #composePlanLimitAlerts(
     setup: BillingSetup,
@@ -401,6 +455,7 @@ export class BillingModule
       | "webhookSubscriptions"
       | "webhookOrganizations"
       | "licenseRenewalClaims"
+      | "blockedSeatChanges"
       | "seatEventSubscriptions"
       | "organizations"
       | "gatewaySpend"
@@ -465,6 +520,7 @@ export class BillingModule
       isSaas,
       resourceLimitAlerts,
       pricing: OrganizationPricingService.create(repositories.organizationPricing),
+      livePlans: LivePlanSlotService.create({ subscriptions: repositories.subscriptions }),
       reporting: BillingModule.#composeReporting({
         repositories,
         peers,
@@ -534,6 +590,7 @@ export class BillingModule
             billingRoles,
             paymentRecovery,
             overPlan,
+            duplicates: subscription?.duplicates,
           })
         : BillingModule.#undispatchedWebhook(),
       paymentRecovery,
@@ -593,7 +650,7 @@ export class BillingModule
     seatsInUse: SeatsInUseCounter & DevelopersInUseCounter;
     repositories: Pick<
       BillingRepositories,
-      "subscriptions" | "organizations" | "seatEventSubscriptions"
+      "subscriptions" | "organizations" | "seatEventSubscriptions" | "blockedSeatChanges"
     >;
   }): SubscriptionDoor {
     const catalogue = BillingPriceCatalogue.create(
@@ -602,30 +659,63 @@ export class BillingModule
     const { prices } = catalogue;
     const stripeErrors = StripeErrorTranslatorService.create();
     const { customers, subscriptions: stripeSubscriptions } = stripe.channels;
+    const seatEventService = SeatEventSubscriptionService.create({
+      stripeSubscriptions,
+      subscriptions: repositories.seatEventSubscriptions,
+      abandoned: subscription.facts,
+      prices,
+      customerCurrency: StripeCustomerCurrencyService.create({ customers, stripeErrors }),
+      duplicates: subscription.duplicates ?? NO_DUPLICATE_SUBSCRIPTION_ALERTS,
+    });
+    const customerService = CustomerService.create({
+      customers,
+      organizations: repositories.organizations,
+    });
+    const subscriptions = BillingSubscriptionService.create({
+      repository: repositories.subscriptions,
+      organizationRepository: repositories.organizations,
+      stripeSubscriptions,
+      stripeInvoices: stripe.channels.invoices,
+      itemCalculator: SubscriptionItemCalculatorService.create(prices),
+      seatEventService,
+      notifier: subscription.notifier,
+      stripeErrors,
+      seatsInUse,
+    });
     return {
-      customers: CustomerService.create({ customers, organizations: repositories.organizations }),
-      subscriptions: BillingSubscriptionService.create({
-        repository: repositories.subscriptions,
-        organizationRepository: repositories.organizations,
+      customers: customerService,
+      subscriptions,
+      seatPurchases: SeatPurchaseService.create({
+        seats: seatEventService,
         stripeSubscriptions,
         stripeInvoices: stripe.channels.invoices,
-        itemCalculator: SubscriptionItemCalculatorService.create(prices),
-        seatEventService: SeatEventSubscriptionService.create({
-          stripeSubscriptions,
-          subscriptions: repositories.seatEventSubscriptions,
-          abandoned: subscription.facts,
-          prices,
-          customerCurrency: StripeCustomerCurrencyService.create({ customers, stripeErrors }),
-        }),
-        notifier: subscription.notifier,
-        stripeErrors,
-        seatsInUse,
+        subscriptions: repositories.seatEventSubscriptions,
+        pricingModel: (organizationId) =>
+          repositories.organizations.findPricingModel(organizationId),
+        openCheckout: async ({ customerEmail, ...checkout }) =>
+          subscriptions.createSeatCheckout({
+            ...checkout,
+            customerId: await customerService.getOrCreateCustomerId({
+              user: { email: customerEmail },
+              organizationId: checkout.organizationId,
+            }),
+          }),
       }),
       seatLines: SeatLineRepairService.create({
         stripeSubscriptions,
         subscriptions: repositories.seatEventSubscriptions,
         prices,
       }),
+      blockedSeatChanges: subscription.fixedMail
+        ? BlockedSeatChangeService.create({
+            changes: repositories.blockedSeatChanges,
+            organizations: repositories.organizations,
+            quote: (input) => seatEventService.quoteAddedSeats(input),
+            emails: subscription.fixedMail.emails,
+            publicBaseUrl: subscription.fixedMail.publicBaseUrl,
+          })
+        : void 0,
+      seatEvents: seatEventService,
       developerSeats: DeveloperSeatService.create({
         stripeSubscriptions,
         subscriptions: repositories.seatEventSubscriptions,
@@ -669,13 +759,48 @@ export class BillingModule
     totalMembers: number;
     totalTraces: number;
     quotedAt?: number;
+    /** Who asked and what for, kept when the change is refused for two live subscriptions. */
+    requestedBy?: { userId: string; attempt?: BlockedSeatChangeAttempt };
   }): Promise<{ success: boolean }> {
+    const { requestedBy, ...items } = input;
     await this.#paymentRecovery?.assertSeatsNotHeld({
-      organizationId: input.organizationId,
+      organizationId: items.organizationId,
       // The seat drawer always sends upgradeMembers; only more seats than today are held.
-      adding: () => this.#addsSeats({ ...input, newTotalSeats: input.totalMembers }),
+      adding: () => this.#addsSeats({ ...items, newTotalSeats: items.totalMembers }),
     });
-    return this.#subscriptionDoor.subscriptions.updateSubscriptionItems(input);
+    try {
+      return await this.#subscriptionDoor.subscriptions.updateSubscriptionItems(items);
+    } catch (error) {
+      if (requestedBy && error instanceof AmbiguousSubscriptionError) {
+        await this.#keepRefusedChange({ items, requestedBy }).catch((recordError: unknown) =>
+          logger.error(
+            { error: recordError, organizationId: items.organizationId },
+            "Refused seat change not kept",
+          ),
+        );
+      }
+      throw error;
+    }
+  }
+
+  async #keepRefusedChange({
+    items,
+    requestedBy,
+  }: {
+    items: { organizationId: string; upgradeMembers: boolean; totalMembers: number };
+    requestedBy: { userId: string; attempt?: BlockedSeatChangeAttempt };
+  }): Promise<void> {
+    if (!items.upgradeMembers) return;
+    const billed = await this.#subscriptionDoor.seatEvents.billedSeats(items.organizationId);
+    const seats = items.totalMembers - billed;
+    // Fewer seats, or as many, buy nothing, so there is no price to email the admin later.
+    if (seats <= 0) return;
+    await this.recordBlockedSeatChange({
+      organizationId: items.organizationId,
+      userId: requestedBy.userId,
+      attempt: requestedBy.attempt ?? { kind: "seat_purchase", seats },
+      seats,
+    });
   }
 
   async #addsSeats(input: { organizationId: string; newTotalSeats: number }): Promise<boolean> {
@@ -778,6 +903,38 @@ export class BillingModule
     return this.#subscriptionDoor.subscriptions.createSeatCheckout({ ...checkout, customerId });
   }
 
+  /** What one more full seat costs; nothing to sell off Cloud or without a payment provider. */
+  async seatOffer(input: { organizationId: string }): Promise<SeatOffer> {
+    if (!this.#subscriptions) return { kind: "none" };
+    return this.#subscriptions.seatPurchases.offer(input);
+  }
+
+  async addFullSeat(input: {
+    organizationId: string;
+    quotedAt?: number;
+    baseUrl: string;
+    successPath: string;
+    customerEmail: string | null;
+  }): Promise<SeatPurchase> {
+    await this.#paymentRecovery?.assertSeatsNotHeld({
+      organizationId: input.organizationId,
+      adding: () => Promise.resolve(true),
+    });
+    if (!this.#subscriptions) throw new SeatBillingUnavailableError();
+    return this.#subscriptions.seatPurchases.addFullSeat(input);
+  }
+
+  async settleSeatPayment(input: {
+    organizationId: string;
+    payment: SeatPayment;
+  }): Promise<{ status: SeatPaymentStatus }> {
+    return this.#subscriptionDoor.seatPurchases.settle(input);
+  }
+
+  assertSubscriptionWriteAllowed(input: { writes: readonly SubscriptionWrite[] }): Promise<void> {
+    return this.#livePlans.assertWriteAllowed(input);
+  }
+
   /** Off Cloud, or where no payment provider is composed, nothing is billed for storage. */
   async recordRetentionStorage(input: RetentionStorageReport): Promise<RetentionStorageOutcome> {
     if (!this.#subscriptions) return { line: "skipped", reportedGbMonths: null };
@@ -801,9 +958,12 @@ export class BillingModule
     billingRoles,
     paymentRecovery,
     overPlan,
+    duplicates,
   }: {
     paymentRecovery: PaymentRecoveryService | undefined;
     overPlan: OverPlanService | undefined;
+    /** Ops hear about a second paid seat checkout; absent, nobody does. */
+    duplicates: DuplicateSubscriptionAlerts | undefined;
     announcer: BillingLifecycleAnnouncerService | undefined;
     /** The Billing role a completed checkout hands its starter. */
     billingRoles: CheckoutBillingRoles | undefined;
@@ -847,6 +1007,7 @@ export class BillingModule
       ...(announcer ? { announcer } : {}),
       ...(paymentRecovery ? { recovery: paymentRecovery } : {}),
       ...(overPlan ? { overPlan } : {}),
+      ...(duplicates ? { duplicates } : {}),
     });
     return StripeWebhookReceiptService.create({
       dispatchesEvents: () => isSaas,
@@ -882,6 +1043,7 @@ export class BillingModule
   readonly #subscriptionPlans: SaaSPlanProviderService;
   readonly #isSaas: boolean;
   readonly #pricing: OrganizationPricingService;
+  readonly #livePlans: LivePlanSlotService;
   readonly #reporting: BillingReportingPipeline;
   readonly #resourceLimitAlerts: ResourceLimitAlertService;
   readonly #lifecycle: BillingLifecycleAnnouncerService | undefined;
@@ -899,6 +1061,7 @@ export class BillingModule
     subscriptionPlans,
     isSaas,
     pricing,
+    livePlans,
     reporting,
     resourceLimitAlerts,
     lifecycle,
@@ -915,6 +1078,7 @@ export class BillingModule
     subscriptionPlans: SaaSPlanProviderService;
     isSaas: boolean;
     pricing: OrganizationPricingService;
+    livePlans: LivePlanSlotService;
     reporting: BillingReportingPipeline;
     resourceLimitAlerts: ResourceLimitAlertService;
   }) {
@@ -926,6 +1090,7 @@ export class BillingModule
     this.#subscriptionPlans = subscriptionPlans;
     this.#isSaas = isSaas;
     this.#pricing = pricing;
+    this.#livePlans = livePlans;
     this.#reporting = reporting;
     this.#resourceLimitAlerts = resourceLimitAlerts;
     this.#lifecycle = lifecycle;
@@ -943,7 +1108,7 @@ export class BillingModule
     plan: string;
     seats: number;
     requestedSeats: number;
-  }): Promise<void> {
+  }): Promise<{ sent: boolean }> {
     return this.#resourceLimitAlerts.notifySalesOfSeatRequest(input);
   }
 
@@ -1270,6 +1435,47 @@ export class BillingModule
       throw new Error("This billing app was composed without a lifecycle pipeline");
     }
     return this.#lifecycle;
+  }
+
+  /** Keeps a seat change refused with `subscription_ambiguous` for the admin who tried. */
+  async recordBlockedSeatChange(input: {
+    organizationId: string;
+    userId: string;
+    attempt: BlockedSeatChangeAttempt;
+    seats: number;
+  }): Promise<{ recorded: boolean }> {
+    return { recorded: await this.#keepBlockedSeatChange(input) };
+  }
+
+  async #keepBlockedSeatChange(input: {
+    organizationId: string;
+    userId: string;
+    attempt: BlockedSeatChangeAttempt;
+    seats: number;
+  }): Promise<boolean> {
+    return (await this.#subscriptions?.blockedSeatChanges?.record(input)) ?? false;
+  }
+
+  /** A seat purchase Manage seats could not price for two live subscriptions; kept for its admin. */
+  async recordBlockedSeatPurchase(input: {
+    organizationId: string;
+    seats: number;
+    userId: string | undefined;
+  }): Promise<{ recorded: boolean }> {
+    if (!input.userId) return { recorded: false };
+    const recorded = await this.#keepBlockedSeatChange({
+      organizationId: input.organizationId,
+      userId: input.userId,
+      attempt: { kind: "seat_purchase", seats: input.seats },
+      seats: input.seats,
+    });
+    return { recorded };
+  }
+
+  /** Emails each admin whose refused seat change can be finished now; nothing where not composed. */
+  async noticeFixedBilling(): Promise<{ sent: number; waiting: number }> {
+    const changes = this.#subscriptions?.blockedSeatChanges;
+    return changes ? changes.noticeFixed() : { sent: 0, waiting: 0 };
   }
 
   /** Puts back seat lines Stripe refused to roll back; nothing where no subscription door is composed. */

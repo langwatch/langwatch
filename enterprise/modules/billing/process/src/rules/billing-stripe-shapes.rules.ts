@@ -55,6 +55,10 @@ export type BillingSubscription = Readonly<{
   currency?: string | null;
   /** The customer the subscription bills; absent where a caller did not read it. */
   customerId?: string | null;
+  /** A change held until its invoice is paid (`pending_if_incomplete`); absent when none. */
+  pendingUpdate?: boolean;
+  /** The newest invoice, read only where the change asked for it. */
+  latestInvoice?: Readonly<{ id: string; status: string | null; hostedUrl: string | null }> | null;
 }>;
 
 /** Stripe statuses after which a subscription bills nothing more and cannot come back. */
@@ -78,6 +82,8 @@ export type BillingSubscriptionChange = {
   prorationBehavior?: "always_invoice" | "none";
   /** The instant, in epoch seconds, the proration is priced at. */
   prorationDate?: number;
+  /** Holds the change until its invoice is paid; the answer then carries that invoice. */
+  paymentBehavior?: "pending_if_incomplete";
   /** Lifts a cancellation scheduled for the period end. */
   cancelAtPeriodEnd?: false;
   billingThreshold?: { amountGte: number; resetBillingCycleAnchor: boolean };
@@ -92,6 +98,8 @@ export type BillingInvoicePreview = Readonly<{
   amountDue: number;
   /** The tax inside `total`, added on top or included; absent when there is none. */
   tax?: number;
+  /** The proration lines alone, before tax: no usage or other items; absent where not read. */
+  prorations?: number;
   currency: string | null;
 }>;
 

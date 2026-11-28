@@ -12,6 +12,8 @@ export type SeatRequestRow = Readonly<{
   source: SeatRequestSource;
   idpRefused: boolean;
   idpKind: SignInIdpKind | null;
+  /** What a member who pressed Request access was trying to do; null for arrivals. */
+  reason: string | null;
   salesNotifiedAt: number | null;
   openedAt: number;
   resolvedAt: number | null;
@@ -29,7 +31,10 @@ export type SeatRequestOpened = Readonly<{
 
 /** The seat requests organization keeps, one row per organization and address. */
 export abstract class SeatRequestRepository {
-  /** Opens the request for this address, reusing the row; an open one only gains what is new. */
+  /**
+   * Opens the request for this address, reusing the row; an open one only gains what is new,
+   * and becomes `requested` once the member asks for it themselves.
+   */
   abstract open(input: {
     id: string;
     organizationId: string;
@@ -39,6 +44,8 @@ export abstract class SeatRequestRepository {
     source: SeatRequestSource;
     idpRefused: boolean;
     idpKind: SignInIdpKind | null;
+    /** Kept on an open request when the new opening names none. */
+    reason?: string | null;
     at: number;
     /** Only when the address has no row yet: an open or answered request is left untouched. */
     onlyIfAbsent?: boolean;
@@ -47,13 +54,15 @@ export abstract class SeatRequestRepository {
   abstract findOpen(input: { organizationId: string }): Promise<SeatRequestRow[]>;
   /** One open request; throws seat_request_not_found when absent or closed. */
   abstract getOpen(input: { organizationId: string; id: string }): Promise<SeatRequestRow>;
-  /** Closes an open request; false when it was no longer open. */
+  /** Closes an open request; false when it was no longer open, or open since another time. */
   abstract resolve(input: {
     organizationId: string;
     id: string;
     status: "APPROVED" | "DECLINED";
     resolvedByUserId: string | null;
     at: number;
+    /** Only the opening made at this time: a reopened request is left open. */
+    openedAt?: number;
   }): Promise<boolean>;
   /** Reopens an approval whose seat could not be given; only the approval made at `at` by `by`. */
   abstract release(input: {
@@ -71,6 +80,8 @@ export abstract class SeatRequestRepository {
   }): Promise<SeatRequestRow[]>;
   /** Claims the one sales notice of this opening; false when it was claimed already. */
   abstract claimSalesNotice(input: { id: string; at: number }): Promise<boolean>;
+  /** Frees the sales notice claimed at `at` when it did not go out; a newer claim stays. */
+  abstract releaseSalesNotice(input: { id: string; at: number }): Promise<void>;
   /** Every request naming this person, in any organization. */
   abstract findForUser(input: { userId: string }): Promise<SeatRequestRow[]>;
 }

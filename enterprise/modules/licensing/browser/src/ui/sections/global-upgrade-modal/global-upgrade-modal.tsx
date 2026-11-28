@@ -34,7 +34,14 @@ export function GlobalUpgradeModal({
     );
   }
   if (variant.mode === "liteMemberRestriction") {
-    return <LiteMemberRestrictionContent open={isOpen} onClose={close} />;
+    return (
+      <LiteMemberRestrictionContent
+        open={isOpen}
+        onClose={close}
+        resource={variant.resource}
+        permission={variant.permission}
+      />
+    );
   }
   if (SeatProrationPreview) {
     return (

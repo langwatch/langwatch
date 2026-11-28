@@ -1,6 +1,6 @@
 Feature: Seat requests when an organization is over its seat limit
   A person who arrives asking for a full seat the organization has no room for opens a seat
-  request. Administrators and Billing members are told, in the product and by mail, and approve
+  request, and so does a Lite Member who presses Request access where a full seat was needed. Administrators and Billing members are told, in the product and by mail, and approve
   it in the way the organization pays. Rulings R1, R2, R4, R5 and R6 of the seat-requests design.
 
   Background:
@@ -223,6 +223,28 @@ Feature: Seat requests when an organization is over its seat limit
       But when reopening keeps failing, the approval fails with an infrastructure error naming both failures
 
     @unit
+    Scenario: Approving the request of a member who has since left invites nobody and buys no seat
+      Given "lena@acme.example" asked for access as a Lite Member and has since left the organization
+      And the organization pays per seat through a live Stripe subscription with every full seat in use
+      When an administrator approves with a seat
+      Then the approval refuses with seat_request_not_found
+      And no invitation is created, no seat is bought and the request is closed
+
+    @unit
+    Scenario: Removing a member closes their open seat request
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      When an administrator removes her from the organization
+      Then no open seat request names "lena@acme.example"
+
+    @unit
+    Scenario: Promoting a member to a full seat from the role editor closes their seat request
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      And a full member seat is free
+      When an administrator changes her role to Member in the role editor
+      Then no open seat request names "lena@acme.example"
+      And her request reads "approved"
+
+    @unit
     Scenario: Approving a seat request that is not open is refused
       When an administrator approves a seat request that does not exist
       Then the approval refuses with seat_request_not_found
@@ -300,17 +322,17 @@ Feature: Seat requests when an organization is over its seat limit
 
     @integration
     Scenario: Approve on a live Stripe seat subscription adds the seat, then approves
-      Given the approval path is "stripe_seats" from 5 seats to 6
-      When an administrator presses Approve and confirms the seats upgrade
-      Then the subscription is raised to 6 seats
-      And then the request is approved
+      Given the approval path is "stripe_seats" from 5 seats to 6 and no full seat is free
+      When an administrator presses "Approve and add a seat"
+      Then the request is approved with a seat in one call, with no seats upgrade dialog
+      And the seat totals and the open requests are read again
 
     @integration
     Scenario: A failed seat expansion approves nothing
-      Given the approval path is "stripe_seats"
-      When the administrator confirms the seats upgrade and adding the seat fails
+      Given the approval path is "stripe_seats" and no full seat is free
+      When an administrator presses "Approve and add a seat" and adding the seat fails
       Then an error says the seat could not be added
-      And the request is not approved
+      And no approval is announced
 
     @unit
     Scenario: Sales hear about a seat request from an account-managed organization once
@@ -419,3 +441,312 @@ Feature: Seat requests when an organization is over its seat limit
       Given "late@acme.example" has an open seat request
       When an administrator opens the requests on the Users page
       Then the seat request is listed with Approve and Decline
+
+  Rule: a Lite Member refused for want of a full seat asks for one from the refusal
+    A refusal that a full seat would resolve, such as the workbench, offers Request access.
+    Admin-only actions offer none, since a full seat does not open them.
+    The request is a seat request like any other, so it lands where admins already answer them.
+
+    @unit
+    Scenario: A Lite Member asks for a full seat from a refusal
+      Given "lena@acme.example" is a Lite Member
+      When she asks for access to run experiments
+      Then an open seat request names "lena@acme.example" as requested, for "run and save experiments"
+      And "Ada Admin" and "Bill Payer" are mailed that "lena@acme.example" asked for a full seat
+
+    @unit
+    Scenario: A member names one of the fixed reasons, never their own words
+      Given "lena@acme.example" is a Lite Member
+      When she asks for access with a reason of her own wording
+      Then the request refuses with validation_error and no seat request is opened
+      And a request stored with free text before the reasons were fixed still lists, in the fixed words
+
+    @unit
+    Scenario: Administrators and Billing members get an in-app push when a member asks
+      Given "lena@acme.example" is a Lite Member named "Lena Lite"
+      When she asks for access to run experiments
+      Then "Ada Admin" and "Bill Payer" each get a push "Lena Lite asked for a full seat"
+      And the push says "To run and save experiments" and opens the People tab of the directory
+      And it is recorded on the organization's oldest project, never on the organization id
+      And asking again the same day pushes nobody again
+
+    @unit
+    Scenario: An organization with no project yet gets no push and is still mailed
+      Given the organization has no project
+      When "lena@acme.example" asks for access
+      Then nobody gets a push
+      And "Ada Admin" and "Bill Payer" are still mailed
+
+    @unit
+    Scenario: A push that cannot be sent leaves the request standing
+      Given "lena@acme.example" is a Lite Member
+      And pushes cannot be sent
+      When she asks for access
+      Then her seat request is open
+      And "Ada Admin" and "Bill Payer" are still mailed
+
+    @unit
+    Scenario: Asking again while a request is open answers the same request
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      When she asks for access again
+      Then exactly one seat request names "lena@acme.example"
+      And no second mail goes out about her that day
+
+    @unit
+    Scenario: A member can ask again after a decline
+      Given "lena@acme.example" is a Lite Member whose seat request was declined
+      When she asks for access again
+      Then her seat request is open again
+
+    @unit
+    Scenario: A member approved earlier and moved back to Lite can ask again
+      Given "lena@acme.example" was approved for a full seat
+      And an administrator later moved her back to Lite Member
+      Then her request reads "none"
+      When she asks for access again
+      Then her seat request is open again
+
+    @unit
+    Scenario: A full member who asks is refused with seat_request_full_member
+      Given "mel@acme.example" holds a full member seat
+      When she asks for access
+      Then the request refuses with seat_request_full_member
+      And no seat request names "mel@acme.example"
+
+    @unit
+    Scenario: A Lite Member with no email address is refused with seat_request_no_email
+      Given a Lite Member whose account has no email address
+      When she asks for access
+      Then the request refuses with seat_request_no_email
+      And no seat request is opened
+
+    @unit
+    Scenario: Asking needs only a membership in the organization
+      When the request access procedure is declared
+      Then it needs members:view, which every organization role holds
+      And reading one's own request needs the same
+
+    @unit
+    Scenario: A member reads where their own request stands
+      Given "lena@acme.example" is a Lite Member
+      Then her request reads "none"
+      When she asks for access
+      Then her request reads "open"
+      When an administrator approves it
+      Then her request reads "approved"
+
+    @integration
+    Scenario: The Lite Member refusal offers Request access
+      Given I am on a Lite Member seat
+      When a call I make is refused as restricted for that seat
+      Then the restriction modal offers "Request access"
+      When I press it
+      Then the button reads "Access requested" and says the admins were told
+
+    @integration
+    Scenario: Request access works in a modal drawn outside the organization pages
+      Given I am on a Lite Member seat
+      When a restriction modal drawn above every page offers Request access
+      Then the "Request access" button is shown there too
+
+    @integration
+    Scenario: A full member is not offered Request access
+      Given I hold a full member seat
+      When a page refuses me for a missing permission
+      Then no "Request access" button is shown
+
+    @integration
+    Scenario: An admin-only refusal offers no Request access
+      Given I am on a Lite Member seat
+      When a call I make is refused for "project:manage", which a full member does not hold either
+      Then no "Request access" button is shown
+      But a refusal for a permission a full member holds still offers it
+
+    @integration
+    Scenario: Request access says what was answered
+      Given my request for a full seat was approved
+      Then the button place says my access was approved and offers to reload
+      Given instead it was declined
+      Then it says an admin declined it and offers to ask again
+
+    @integration
+    Scenario: A request that could not be sent keeps the button
+      When I press Request access and the request fails
+      Then an error says the request could not be sent
+      And "Request access" can be pressed again
+
+    @integration
+    Scenario: Running the workbench as a Lite Member offers Request access
+      Given I am on a Lite Member seat in the experiment workbench
+      When I press Run and the server refuses it as restricted for that seat
+      Then the restriction modal opens with "Request access" instead of a red error toast
+
+    @integration
+    Scenario: A requested seat shows what the member was trying to do
+      Given "lena@acme.example" asked for access to "run the workbench"
+      When an administrator opens the seat requests
+      Then her row reads "Asked for access" and "run the workbench"
+
+    @integration
+    Scenario: The member drawer shows the person's open seat request
+      Given "lena@acme.example" has an open seat request
+      When an administrator opens her member drawer
+      Then the drawer shows her seat request with Approve and Decline
+
+  Rule: the person who asked learns the answer
+
+    @unit
+    Scenario: Approving mails the person that they have a full seat
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      And a full member seat is free
+      When an administrator approves the seat request
+      Then "lena@acme.example" is mailed that her full seat was approved
+
+    @unit
+    Scenario: Declining mails the person that it was declined
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      When an administrator declines the seat request
+      Then "lena@acme.example" is mailed that an admin declined her request
+
+    @unit
+    Scenario: The member who asked gets an in-app push with the answer
+      Given "lena@acme.example" is a Lite Member who asked for access
+      When an administrator approves the seat request
+      Then she gets a push "Your seat request was approved" that opens LangWatch
+      Given instead an administrator declined it
+      Then she gets a push "Your seat request was declined"
+
+    @unit
+    Scenario: An answer push that cannot be sent leaves the answer standing
+      Given "lena@acme.example" is a Lite Member who asked for access
+      And pushes cannot be sent
+      When an administrator declines the seat request
+      Then the seat request is declined
+
+    @unit
+    Scenario: A refused sign-in is never mailed the answer
+      Given "late@acme.example" has an open seat request from a refused sign-in and no membership
+      When an administrator declines the seat request
+      Then no answer mail goes to "late@acme.example"
+
+    @unit
+    Scenario: An answer mail that cannot be sent leaves the answer standing
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      And mail cannot be sent
+      When an administrator declines the seat request
+      Then the seat request is declined
+
+  Rule: Approve buys the full seat it needs in one click, opening Stripe only when Stripe needs the customer
+
+    @unit
+    Scenario: Approve with no seat free on a live Stripe seat subscription adds the seat and approves
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      And the organization pays per seat through a live Stripe subscription with every full seat in use
+      When an administrator approves with a seat
+      Then one full seat is added to the subscription
+      And "lena@acme.example" is a full member
+
+    @unit
+    Scenario: When Stripe needs the customer, Approve answers the Stripe page and approves nothing yet
+      Given the seat charge needs the customer to confirm the payment
+      When an administrator approves with a seat
+      Then the answer is the Stripe page to finish
+      And the seat request stays open
+
+    @unit
+    Scenario: Once the Stripe page is paid, completing the approval approves the request
+      Given an approval is waiting on its Stripe page
+      When the payment is paid and the administrator completes the approval
+      Then "lena@acme.example" is a full member and the seat request is approved
+
+    @unit
+    Scenario: A Stripe page still open leaves the request open
+      Given an approval is waiting on its Stripe page
+      When the administrator completes the approval before paying
+      Then the answer is waiting and the seat request stays open
+
+    @unit
+    Scenario: A Stripe page that ended unpaid approves nothing
+      Given an approval is waiting on its Stripe page
+      When the payment failed and the administrator completes the approval
+      Then the answer is failed and the seat request stays open
+
+    @unit
+    Scenario: A Stripe page from before a decline never approves the request opened again
+      Given an approval is waiting on a Stripe page for Lena's request
+      And an administrator declines the request and Lena asks again
+      When the old Stripe page is completed
+      Then it refuses with seat_request_not_found and the new request stays open
+
+    @unit
+    Scenario: A request declined and asked again as an approval starts approves nothing
+      Given "lena@acme.example" is a Lite Member with an open seat request
+      And an administrator declines the request and Lena asks again just as an approval starts
+      When the approval claims the request
+      Then it refuses with seat_request_not_found, buys no seat and the new request stays open
+
+    @unit
+    Scenario: A held Lite Member with no Lite seat free is refused without buying a full seat
+      Given "hana@acme.example" is a held Lite Member with an open seat request
+      And no Lite seat is free, whether or not a full seat is
+      When an administrator approves with a seat
+      Then the approval refuses with member_seat_limit_reached naming the Lite seat limit
+      And no full seat is bought
+
+    @unit
+    Scenario: Asking again while an approval is giving its seat reopens nothing
+      Given an administrator approves with a seat and the purchase is still running
+      When Lena asks for access again
+      Then the approval stands, one seat is bought and nothing is reopened
+
+    @unit
+    Scenario: A payment reference that does not parse is refused
+      When an administrator completes an approval with a payment reference that is not one
+      Then it refuses with validation_error and nothing is approved
+
+    @unit
+    Scenario: Completing an approval settles only the payment that approval recorded
+      Given an approval is waiting on its Stripe page
+      When an administrator completes it with a payment reference naming another invoice
+      Then only the payment the approval recorded is settled
+      And a completion for an opening no approval waits on settles nothing and refuses with validation_error
+
+    @unit
+    Scenario: Approve with a seat where the organization does not pay per seat in Stripe buys nothing
+      Given the organization is on the free plan with every full seat in use
+      When an administrator approves with a seat
+      Then the approval refuses with member_seat_limit_reached and nothing is bought
+
+    @integration
+    Scenario: The approval toast says what the approval did
+      Given a seat request from a refused sign-in with no membership and a full seat free
+      When an administrator presses Approve
+      Then the toast says the address was invited as a full member, not that it has a full seat
+
+    @integration
+    Scenario: Approve in one click with no seat free adds the seat without a confirmation dialog
+      Given the approval path is "stripe_seats" and no full seat is free
+      When an administrator presses "Approve and add a seat"
+      Then the request is approved and the toast says a seat was added
+
+    @integration
+    Scenario: Approve opens the Stripe page only when Stripe needs the customer, then approves once paid
+      Given the approval path is "stripe_seats" and the seat charge needs the customer
+      When an administrator presses "Approve and add a seat"
+      Then the Stripe page opens in a new tab and the row says it waits on the payment
+      When the payment is paid
+      Then the request is approved
+
+    @integration
+    Scenario: A return while the payment is still being asked about is not lost
+      Given an approval waits on its Stripe page
+      And the administrator comes back to the window twice while the first ask is still out
+      When that ask answers that the payment is still open and the payment has landed since
+      Then it asks once more by itself and the request is approved
+
+    @integration
+    Scenario: An approval waiting on its Stripe page stops waiting once the request is answered elsewhere
+      Given an approval waits on its Stripe page
+      And another administrator declines the request
+      When the administrator comes back to the window
+      Then the row stops waiting, says the request was already answered and the list is read again

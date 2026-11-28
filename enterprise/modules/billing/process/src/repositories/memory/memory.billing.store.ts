@@ -100,6 +100,8 @@ export class MemoryBillingStore {
   /** When each account's statement for a month went out, keyed `accountId|month`. */
   readonly connectedStatements = new Map<string, string>();
   readonly subscriptions: BillingSubscriptionRecord[] = [];
+  /** The Subscription rows an operator gave a limit beyond seats (a custom deal), by id. */
+  readonly customLimitSubscriptions = new Set<string>();
   /** The Subscription row's seat line repair columns, keyed by subscription id while one is pending. */
   readonly seatRepairs = new Map<string, MemorySeatRepair>();
   /** The Subscription row's seatLineQuantity and seatLineQuantityAt, once a seat change set them. */

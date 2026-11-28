@@ -107,6 +107,55 @@ Feature: Billing-only invite
     When the limit message shows
     Then it tells them to ask an organization admin
 
+  Scenario: On Free the invite seat list says what each seat costs there
+    Given an admin of an organization on Free with 2 of 2 member seats used
+    When they open the seat list in the invite drawer
+    Then Member reads "2 of 2 used on Free"
+    And Lite Member reads "Not on Free"
+    And Billing only reads "Pays for LangWatch: plan, invoices, upgrade"
+
+  Scenario: Picking Lite on Free offers Billing only in place
+    Given an admin of an organization on Free inviting lena@acme.com
+    When they pick Lite Member
+    Then the drawer says Free has no Lite seats and that lena@acme.com can be invited as Billing only to upgrade the organization
+    And it offers "Invite as Billing only" and "Upgrade to Growth"
+    And it says Growth has unlimited Lite members, from the Growth seat price per full seat
+    And Send invites is held, and no limit dialog opens
+
+  Scenario: Invite as Billing only sends the invite from the Free notice
+    Given the Free notice for lena@acme.com
+    When the admin presses "Invite as Billing only"
+    Then lena@acme.com is invited as Billing only, on no team
+    And the toast says "lena@acme.com was invited as Billing only"
+
+  Scenario: Upgrade to Growth from the Free notice opens the plan page
+    Given the Free notice in the invite drawer
+    When the admin presses "Upgrade to Growth"
+    Then the drawer closes and the plan page opens
+
+  @unit
+  Scenario: The Growth line leaves the price out when it is not known
+    Given no Growth seat price in this deployment's catalogue
+    When the Free notice shows
+    Then it says Growth has unlimited Lite members, with no price
+
+  Scenario: An admin at the Free Lite limit is pointed to Billing only and Growth
+    Given an admin on Free reaches the Lite member limit
+    When the limit message shows
+    Then it says Free has no Lite seats and to invite whoever pays as Billing only
+    And it says Growth has unlimited Lite members
+    And it does not tell them to ask an organization admin
+
+  Scenario: An organization admin reads as an admin wherever the active project is
+    Given an organization admin whose active project does not grant organization:manage
+    When the limit message decides who is asking
+    Then they are treated as an organization admin
+
+  Scenario: The admin check falls back when the organization cannot answer
+    Given a session that cannot answer at the organization
+    When the limit message decides who is asking
+    Then it uses the session's scope-wide answer
+
   Scenario: Staff are warned that limits on a PENDING row do nothing
     Given a subscription row whose status is PENDING
     When staff set seat or resource limits on it
