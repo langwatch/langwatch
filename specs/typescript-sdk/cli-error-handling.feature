@@ -143,3 +143,24 @@ Feature: CLI error handling
       Then the command exits non-zero with a validation error
       And the message says to update the CLI
       And no TypeError reaches the user
+
+  Rule: a 403 the platform did not name is forbidden, not unauthorized
+
+    A bare 403 was read as `unauthorized`, which tells the reader their API
+    key is bad when the key was accepted and the action was refused. 401 is a
+    credential the platform did not accept; 403 is a credential it accepted
+    for something it will not allow.
+
+    @unit
+    Scenario: an unnamed 403 is read as forbidden
+      Given the API answers 403 with no body, plain text or an HTML page
+      When the failure is read into the CLI's error structure
+      Then the code is forbidden
+      And it is not unauthorized
+      And it is still marked as a failure the platform did not name
+
+    @unit
+    Scenario: a 403 the platform named keeps its own code
+      Given the API answers 403 with a body naming its own code
+      When the failure is read into the CLI's error structure
+      Then that code is kept
