@@ -382,7 +382,7 @@ func wakeKeyLeaks(workflow *ciscan.Workflow, job ciscan.Job, wake int) []string 
 			continue
 		}
 		problems = append(problems, fmt.Sprintf(
-			"%s review job's step %q can read %s; only the wake step may", PRReviewBotWorkflow, stepLabel(step), prReviewBotWakeKey))
+			"%s review job's step %q can read %s; only the wake step may", PRReviewBotWorkflow, stepLabel(step, i), prReviewBotWakeKey))
 	}
 
 	return problems
@@ -397,19 +397,6 @@ func envCarriesWakeKey(env map[string]string) bool {
 	}
 
 	return false
-}
-
-// stepLabel names a step in a message: its name, else its action, else its command's first line.
-func stepLabel(step *ciscan.Step) string {
-	switch {
-	case step.Name != "":
-		return step.Name
-	case step.Uses != "":
-		return step.Uses
-	}
-	line, _, _ := strings.Cut(strings.TrimSpace(step.Run), "\n")
-
-	return line
 }
 
 // prReviewBotTriggers checks the pull_request trigger still fires on every
