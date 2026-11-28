@@ -103,13 +103,13 @@ FROM python-runtime AS service
 # with Runtime.InvalidEntrypoint. Start from / instead.
 WORKDIR /
 COPY --from=sandbox-build /pylibs /opt/sandbox-libs
-# Execute-only, the engine and the interpreter both: a process that execs a
-# file its user cannot read is made non-dumpable by the kernel, so its /proc
-# files (environment, memory, descriptors) are closed to user code without the
-# prctl AWS Lambda refuses. The engine checks this at start-up and serves no
-# code blocks when it does not hold (specs/nlp-go/_shared/contract.md §7).
+# Execute-only: a process that execs a file its user cannot read is made
+# non-dumpable by the kernel, so its /proc files (environment, memory,
+# descriptors) are closed to user code without the prctl AWS Lambda refuses.
+# The engine checks this at start-up and serves no code blocks when it does not
+# hold (specs/nlp-go/_shared/contract.md §7). The interpreter stays readable
+# here; only the lambda stage ships it execute-only.
 COPY --from=go-build --chmod=0711 /out/service /usr/local/bin/service
-COPY --from=python-runtime --chmod=0711 /usr/bin/python3.11 /usr/bin/python3.11
 
 # Code-block sandbox: the interpreter and its curated libraries. PYTHONPATH is
 # only consulted when nlpgo spawns python3 for a code-block node.
@@ -134,6 +134,10 @@ FROM service AS lambda
 # holds both modes.
 COPY --from=go-build --chmod=0755 /out/lambda-extension /opt/extensions/lambda-adapter
 COPY --from=lambda-adapter --chmod=0711 /lambda-adapter /opt/lwa/lambda-adapter
+# The interpreter is execute-only here and only here: Lambda refuses the prctl
+# that hides a run, and the k8s and self-hosted images hide it with that prctl.
+# ciguard's exec-only-interpreter guard holds this.
+COPY --from=python-runtime --chmod=0711 /usr/bin/python3.11 /usr/bin/python3.11
 # nlpgo binds $SERVER_ADDR and serves /go/* and /healthz. The adapter probes
 # its liveness and streams each SSE flush as its own response chunk.
 ENV SERVER_ADDR=:8080

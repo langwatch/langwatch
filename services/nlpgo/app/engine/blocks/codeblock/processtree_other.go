@@ -27,7 +27,13 @@ func detectExposure(string) string { return "" }
 func runStartMarker(int) uint64 { return 0 }
 
 // runTeardownFor is the process group alone: the runner has no seccomp here.
-func runTeardownFor(string) runTeardown { return teardownGroup }
+func runTeardownFor(string, bool) runTeardown { return teardownGroup }
+
+// confinementAvailable is false off Linux: the runner has no seccomp there.
+func confinementAvailable() bool { return false }
+
+// platformRefusals is empty off Linux: there is no prctl to refuse.
+func platformRefusals() []zap.Field { return nil }
 
 func terminateRunTree(scope runScope, _ *zap.Logger) {
 	if scope.pgid > 0 {

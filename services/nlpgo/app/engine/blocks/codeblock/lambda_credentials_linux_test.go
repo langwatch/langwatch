@@ -4,11 +4,14 @@ package codeblock_test
 
 import (
 	"context"
+	"fmt"
 	"io"
 	"net/http/httptest"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"slices"
+	"strconv"
 	"strings"
 	"testing"
 	"time"
@@ -57,36 +60,15 @@ func lambdaInjected(readable bool) []string {
 	)
 }
 
-// credentialProbe looks everywhere a code block could look for the runner's
-// credentials: its own environment, every process's environment and memory,
-// and every route on the runner's loopback listener.
+// credentialProbe looks where a code block could look for the runner's
+// credentials: its own environment, every process's environment, and the
+// routes on the runner's loopback listener. Process memory is the runner's to
+// refuse, so the probe reports what opening the control process's memory gave.
 const credentialProbe = `import os, urllib.request, urllib.error
 
 CANARY = "` + credentialCanary + `".encode()
 
-def scan_memory(pid):
-    try:
-        maps = open(f"/proc/{pid}/maps").read().splitlines()
-        mem = open(f"/proc/{pid}/mem", "rb")
-    except OSError:
-        return False
-    with mem:
-        for line in maps:
-            span, perms = line.split()[:2]
-            if not perms.startswith("r"):
-                continue
-            start, end = (int(x, 16) for x in span.split("-"))
-            if end - start > 64 << 20:
-                continue
-            try:
-                mem.seek(start)
-                if CANARY in mem.read(end - start):
-                    return True
-            except (OSError, OverflowError, ValueError):
-                continue
-    return False
-
-def execute(router, harness):
+def execute(router, harness, control):
     found = []
     for name, value in os.environ.items():
         if name.startswith("AWS_") or CANARY.decode() in value:
@@ -100,12 +82,17 @@ def execute(router, harness):
                     found.append(f"/proc/{entry}/environ")
         except OSError:
             pass
-        if scan_memory(entry):
-            found.append(f"/proc/{entry}/mem")
+    control_memory = ""
+    if control:
+        try:
+            open(f"/proc/{control}/mem", "rb").close()
+            control_memory = "opened"
+        except OSError as e:
+            control_memory = str(e)
     statuses = {}
     if router:
         for path in ("/env", "/debug/pprof/", "/debug/pprof/cmdline", "/metrics",
-                     "/health", "/healthz", "/readyz", "/v1/models", "/go/version"):
+                     "/healthz", "/readyz", "/startupz", "/go/version"):
             try:
                 with urllib.request.urlopen(router + path, timeout=5) as resp:
                     status, body = resp.status, resp.read()
@@ -114,8 +101,16 @@ def execute(router, harness):
             statuses[path] = status
             if CANARY in body:
                 found.append("http " + path)
-    return {"found": found, "statuses": statuses}
+    return {"found": found, "statuses": statuses, "control_memory": control_memory}
 `
+
+// controlSecretEnv carries the canary in the control process under a name the
+// exposure check does not look for, so code blocks still run beside it and the
+// probe must find it: proof the probe can see a readable process.
+const (
+	controlSecretEnv = "NLPGO_TEST_CONTROL_SECRET"
+	controlPidEnv    = "NLPGO_TEST_CONTROL_PID"
+)
 
 // requireUnprivilegedForExecOnly skips where an execute-only file proves
 // nothing: root reads it anyway, so the kernel never marks the process
@@ -153,9 +148,12 @@ type lambdaSandbox struct {
 	// adapter starts a stand-in for the web adapter extension beside the
 	// engine, holding the same credentials: "" none, "readable" or "exec-only".
 	adapter string
+	// control starts a readable process holding the canary under controlSecretEnv.
+	control bool
 	// wantExposure is the start of the reason code blocks are refused, or ""
-	// when they must run.
-	wantExposure string
+	// when they must run. wantAdapterNamed refuses naming the adapter instead.
+	wantExposure     string
+	wantAdapterNamed bool
 }
 
 // runInLambdaSandbox starts the adapter stand-in, then re-executes this test
@@ -169,19 +167,35 @@ func runInLambdaSandbox(t *testing.T, name string, box lambdaSandbox) {
 		requireUnprivilegedForExecOnly(t)
 		engineBinary, python = execOnlyCopy(t, engineBinary), execOnlyCopy(t, python)
 	}
+	want := box.wantExposure
 	if box.adapter != "" {
 		sleep := mustLookPath(t, "sleep")
 		if box.adapter == "exec-only" {
 			requireUnprivilegedForExecOnly(t)
 			sleep = execOnlyCopy(t, sleep)
 		}
-		adapter := exec.Command(sleep, "120")
-		adapter.Env = lambdaInjected(box.adapter == "readable")
-		require.NoError(t, adapter.Start())
-		t.Cleanup(func() { _ = adapter.Process.Kill(); _, _ = adapter.Process.Wait() })
+		pid := startSleeper(t, sleep, lambdaInjected(box.adapter == "readable"))
+		if box.wantAdapterNamed {
+			want = fmt.Sprintf("process %d holds %s and its environment is readable by user code; ship its binary execute-only", pid, roleSecretEnv)
+		}
 	}
-	env := append(lambdaInjected(!box.execOnly), lambdaPythonEnv+"="+python, wantExposureEnv+"="+box.wantExposure)
+	env := append(lambdaInjected(!box.execOnly), lambdaPythonEnv+"="+python, wantExposureEnv+"="+want)
+	if box.control {
+		pid := startSleeper(t, mustLookPath(t, "sleep"), []string{controlSecretEnv + "=" + credentialCanary})
+		env = append(env, controlPidEnv+"="+strconv.Itoa(pid))
+	}
 	runChildBinary(t, engineBinary, name, env...)
+}
+
+// startSleeper starts sleep from the given binary with only env, for the life
+// of the test, and returns its pid.
+func startSleeper(t *testing.T, sleep string, env []string) int {
+	t.Helper()
+	cmd := exec.Command(sleep, "120")
+	cmd.Env = env
+	require.NoError(t, cmd.Start())
+	t.Cleanup(func() { _ = cmd.Process.Kill(); _, _ = cmd.Process.Wait() })
+	return cmd.Process.Pid
 }
 
 func mustLookPath(t *testing.T, name string) string {
@@ -203,7 +217,7 @@ func TestLambdaCredentials_UserCodeCannotReadTheRunnerProcess(t *testing.T) {
 
 // @scenario "on AWS Lambda, user code cannot read another process that holds the credentials"
 func TestLambdaCredentials_UserCodeCannotReadTheAdapterProcess(t *testing.T) {
-	runInLambdaSandbox(t, "lambda-probe-proc", lambdaSandbox{execOnly: true, adapter: "readable", wantExposure: "process "})
+	runInLambdaSandbox(t, "lambda-probe-proc", lambdaSandbox{execOnly: true, adapter: "readable", wantAdapterNamed: true})
 }
 
 // @scenario "on AWS Lambda, the runner's loopback listener serves no credential and no debug route"
@@ -213,7 +227,7 @@ func TestLambdaCredentials_LoopbackListenerServesNone(t *testing.T) {
 
 // @scenario "a platform that refuses the hide step runs code blocks when the image ships the engine and python execute-only"
 func TestLambdaCredentials_ExecOnlyImageRunsCodeBlocksHidden(t *testing.T) {
-	runInLambdaSandbox(t, "lambda-probe-all", lambdaSandbox{execOnly: true, adapter: "exec-only"})
+	runInLambdaSandbox(t, "lambda-probe-all", lambdaSandbox{execOnly: true, adapter: "exec-only", control: true})
 }
 
 // leftBehind is user code that keeps a process running past its run: its own
@@ -245,6 +259,31 @@ def execute(spool):
     return {"how": how}
 `
 
+// leftBehindByFork is leftBehind for a run that may start no other program,
+// as on AWS Lambda: the process it leaves is a fork of the interpreter.
+const leftBehindByFork = `import os, time
+
+def execute(spool):
+    read, write = os.pipe()
+    if os.fork() == 0:
+        try:
+            os.setsid()
+            how = "session"
+        except PermissionError:
+            how = "double fork"
+        if os.fork() == 0:
+            os.chdir("/")
+            os.write(write, f"{how}:{os.getpid()}".encode())
+            time.sleep(120)
+            os._exit(0)
+        os._exit(1)  # the intermediate child: its exit code is never read
+    how, pid = os.read(read, 64).decode().split(":")
+    time.sleep(0.2)
+    with open(spool, "w") as handle:
+        handle.write(pid)
+    return {"how": how}
+`
+
 // @scenario "on AWS Lambda, nothing user code starts outlives its run"
 func TestLambdaCredentials_NothingUserCodeStartsOutlivesItsRun(t *testing.T) {
 	runInLambdaSandbox(t, "lambda-left-behind", lambdaSandbox{execOnly: true})
@@ -262,7 +301,7 @@ func TestLambdaCredentials_ARunThatCannotBeConfinedLeavesNothingBehindOnTimeout(
 
 // @scenario "on AWS Lambda, a run the platform will not confine still leaves nothing behind"
 func TestLambdaCredentials_ARunThatCannotBeConfinedReadsNoCredential(t *testing.T) {
-	runInLambdaSandbox(t, "lambda-probe-all-unconfined", lambdaSandbox{execOnly: true, adapter: "exec-only"})
+	runInLambdaSandbox(t, "lambda-probe-all-unconfined", lambdaSandbox{execOnly: true, adapter: "exec-only", control: true})
 }
 
 // runCageRefused is a platform that also refuses PR_SET_NO_NEW_PRIVS and the
@@ -273,7 +312,7 @@ func runCageRefused(t *testing.T, timesOut bool) {
 	exe, err := codeblock.New(codeblock.Options{Python: os.Getenv(lambdaPythonEnv)})
 	require.NoError(t, err)
 	spool := filepath.Join(t.TempDir(), "pid")
-	code, timeout := leftBehind, 30*time.Second
+	code, timeout := leftBehindByFork, 30*time.Second
 	if timesOut {
 		code, timeout = leftBehindThenHang, 3*time.Second
 	}
@@ -295,8 +334,8 @@ func runCageRefused(t *testing.T, timesOut bool) {
 		"pid %d, in a session of its own, was still running after its run returned", pid)
 }
 
-// leftBehindThenHang is leftBehind that then runs past its timeout.
-const leftBehindThenHang = leftBehind + `
+// leftBehindThenHang is leftBehindByFork that then runs past its timeout.
+const leftBehindThenHang = leftBehindByFork + `
 _left_behind = execute
 
 def execute(spool):
@@ -313,7 +352,7 @@ func runLeftBehind(t *testing.T) {
 	require.NoError(t, err)
 	spool := filepath.Join(t.TempDir(), "pid")
 	res, err := exe.Execute(context.Background(), codeblock.Request{
-		Code:            leftBehind,
+		Code:            leftBehindByFork,
 		Inputs:          map[string]any{"spool": spool},
 		DeclaredOutputs: []string{"how"},
 		Timeout:         30 * time.Second,
@@ -346,15 +385,15 @@ func runLambdaProbe(t *testing.T, name string) {
 		defer srv.Close()
 		router = srv.URL
 	}
-	codeblock.AlsoTreatAsAmbientCredential(roleSecretEnv)
+	control, _ := strconv.Atoi(os.Getenv(controlPidEnv))
 	exe, err := codeblock.New(codeblock.Options{Python: os.Getenv(lambdaPythonEnv)})
 	require.NoError(t, err)
 	res, err := exe.Execute(context.Background(), codeblock.Request{
 		Code: credentialProbe,
 		// The test process that started this engine stands outside the sandbox
 		// under test, and what it holds depends on which tests ran first.
-		Inputs:          map[string]any{"router": router, "harness": os.Getppid()},
-		DeclaredOutputs: []string{"found", "statuses"},
+		Inputs:          map[string]any{"router": router, "harness": os.Getppid(), "control": control},
+		DeclaredOutputs: []string{"found", "statuses", "control_memory"},
 		Timeout:         60 * time.Second,
 	})
 	require.NoError(t, err)
@@ -367,6 +406,9 @@ func runLambdaProbe(t *testing.T, name string) {
 	}
 	require.Nil(t, res.Error, "code blocks must run here: %+v\nstderr: %s", res.Error, res.Stderr)
 	found, _ := res.Outputs["found"].([]any)
+	if control != 0 {
+		found = assertProbeSeesTheControl(t, found, control, res.Outputs["control_memory"])
+	}
 	for _, entry := range found {
 		for _, category := range probeCategories[name] {
 			assert.NotContains(t, entry, category, "user code obtained a credential the runner holds: %v", found)
@@ -377,8 +419,23 @@ func runLambdaProbe(t *testing.T, name string) {
 		for _, path := range []string{"/env", "/debug/pprof/", "/debug/pprof/cmdline", "/metrics"} {
 			assert.EqualValues(t, 502, statuses[path], "%s must not be served", path)
 		}
+		for _, path := range []string{"/healthz", "/readyz", "/startupz", "/go/version"} {
+			status, probed := statuses[path]
+			assert.True(t, probed && fmt.Sprint(status) != "502", "%s is mounted and must be probed at its handler, got %v", path, status)
+		}
 	}
 	assert.NotContains(t, res.Stdout+res.Stderr, credentialCanary)
+}
+
+// assertProbeSeesTheControl requires the probe to have found the control
+// process's environment and to have been refused its memory by the runner, and
+// returns the other findings.
+func assertProbeSeesTheControl(t *testing.T, found []any, control int, memory any) []any {
+	t.Helper()
+	entry := fmt.Sprintf("/proc/%d/environ", control)
+	assert.Contains(t, found, entry, "the probe must find the canary a readable process holds under a name the check ignores")
+	assert.Contains(t, memory, "code blocks cannot open process memory", "the runner must refuse the control process's memory")
+	return slices.DeleteFunc(slices.Clone(found), func(f any) bool { return f == entry })
 }
 
 func init() {
@@ -388,6 +445,9 @@ func init() {
 		extraRefusals[name] = []uint32{38, 22} // PR_SET_NO_NEW_PRIVS, PR_SET_SECCOMP
 	}
 	extraRefusals["lambda-probe-all-unconfined"] = []uint32{38, 22}
+	lambdaCases["lambda-runtime-api"] = runRuntimeAPIFence
+	lambdaCases["lambda-runtime-api-unconfined"] = runRuntimeAPIFence
+	extraRefusals["lambda-runtime-api-unconfined"] = []uint32{38, 22}
 	for name := range probeCategories {
 		lambdaCases[name] = func(t *testing.T) {
 			t.Helper()

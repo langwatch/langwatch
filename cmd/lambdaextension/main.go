@@ -12,15 +12,14 @@ import (
 	"os"
 	"strings"
 	"syscall"
+
+	"github.com/langwatch/langwatch/pkg/cloudcredentials"
 )
 
 // adapterPath is the real adapter. Its file name stays lambda-adapter: the
 // adapter registers under its own file name, which Lambda requires to match
 // the extension's file in /opt/extensions.
 const adapterPath = "/opt/lwa/lambda-adapter"
-
-// roleCredentials are the variables Lambda fills with the role's keys.
-var roleCredentials = []string{"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY", "AWS_SESSION_TOKEN"}
 
 func main() {
 	launch(adapterPath, os.Args, os.Environ())
@@ -35,23 +34,15 @@ func launch(target string, argv, environ []string) {
 	fmt.Fprintf(os.Stderr, "lambdaextension: cannot start %s: %v\n", target, err)
 }
 
-// withoutRoleCredentials is environ minus every roleCredentials entry.
+// withoutRoleCredentials is environ minus every variable the code-block engine
+// counts as a workload credential (pkg/cloudcredentials), the role's keys among them.
 func withoutRoleCredentials(environ []string) []string {
 	kept := make([]string, 0, len(environ))
 	for _, kv := range environ {
 		name, _, _ := strings.Cut(kv, "=")
-		if !isRoleCredential(name) {
+		if !cloudcredentials.IsAmbient(name) {
 			kept = append(kept, kv)
 		}
 	}
 	return kept
-}
-
-func isRoleCredential(name string) bool {
-	for _, credential := range roleCredentials {
-		if name == credential {
-			return true
-		}
-	}
-	return false
 }

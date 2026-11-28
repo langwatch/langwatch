@@ -24,6 +24,8 @@ import (
 	"path/filepath"
 	"strconv"
 	"syscall"
+
+	"github.com/langwatch/langwatch/pkg/cloudcredentials"
 )
 
 // prGetDumpable is PR_GET_DUMPABLE; suidDumpUser is the value it returns for a
@@ -36,13 +38,7 @@ const (
 // ambientCredentialVariables are the variables a cloud platform puts the
 // workload's own identity in. A readable process holding one of them hands it
 // to every code block, so finding one disables code blocks.
-var ambientCredentialVariables = []string{
-	"AWS_ACCESS_KEY_ID",
-	"AWS_SECRET_ACCESS_KEY",
-	"AWS_SESSION_TOKEN",
-	"AWS_CONTAINER_AUTHORIZATION_TOKEN",
-	"AZURE_CLIENT_SECRET",
-}
+var ambientCredentialVariables = cloudcredentials.Names()
 
 // detectExposure names the first thing a code block could read that it must
 // not, or returns "" when there is none. python is the interpreter the
@@ -57,9 +53,50 @@ func detectExposure(python string) string {
 		}
 	}
 	if pid, name, found := readableCredentialHolder(); found {
-		return fmt.Sprintf("process %d holds %s and its environment is readable by user code; ship its binary execute-only (mode 0711)", pid, name)
+		return credentialHolderExposure(pid, name)
 	}
 	return ""
+}
+
+// credentialHolderExposure names a readable holder and the advice that fits
+// it. Shipping a binary execute-only helps only a process the image starts
+// beside the engine (the Lambda adapter); a shell or IDE that started the
+// engine, or a process in another PID namespace, needs something else.
+func credentialHolderExposure(pid int, name string) string {
+	held := fmt.Sprintf("process %d holds %s and its environment is readable by user code", pid, name)
+	switch {
+	case startedTheEngine(pid):
+		return held + "; it started the engine, so unset " + name + " in the environment the engine is started from"
+	case inAnotherPIDNamespace(pid):
+		return held + "; it runs in another PID namespace, so stop it or run the engine in a PID namespace of its own"
+	}
+	return held + "; ship its binary execute-only (mode 0711)"
+}
+
+// startedTheEngine reports whether pid is an ancestor of this process.
+func startedTheEngine(pid int) bool {
+	for parent, hops := os.Getppid(), 0; parent > 0 && hops < maxAncestryHops; hops++ {
+		if parent == pid {
+			return true
+		}
+		entry, ok := readProcEntry(parent)
+		if !ok {
+			return false
+		}
+		parent = entry.ppid
+	}
+	return false
+}
+
+// inAnotherPIDNamespace reports whether pid's PID namespace differs from this
+// process's. A namespace that cannot be read is not called another.
+func inAnotherPIDNamespace(pid int) bool {
+	theirs, err := os.Readlink(procPath(pid, "ns/pid"))
+	if err != nil {
+		return false
+	}
+	ours, err := os.Readlink(procPath(os.Getpid(), "ns/pid"))
+	return err == nil && theirs != ours
 }
 
 // processHidden reports whether this process's /proc files are closed to its
@@ -112,18 +149,18 @@ func readableCredentialHolder() (int, string, bool) {
 		if err != nil {
 			continue
 		}
-		if name, found := carriesAmbientCredential(raw); found {
+		if name, found := carriesAmbientCredential(raw, ambientCredentialVariables); found {
 			return pid, name, true
 		}
 	}
 	return 0, "", false
 }
 
-// carriesAmbientCredential reports the first ambient credential variable set to
-// a non-empty value in a NUL-separated environment block.
-func carriesAmbientCredential(environ []byte) (string, bool) {
+// carriesAmbientCredential reports the first of names set to a non-empty value
+// in a NUL-separated environment block.
+func carriesAmbientCredential(environ []byte, names []string) (string, bool) {
 	for _, kv := range bytes.Split(environ, []byte{0}) {
-		for _, name := range ambientCredentialVariables {
+		for _, name := range names {
 			if bytes.HasPrefix(kv, []byte(name+"=")) && len(kv) > len(name)+1 {
 				return name, true
 			}

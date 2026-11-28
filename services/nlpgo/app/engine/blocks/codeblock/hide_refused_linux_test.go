@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"runtime"
+	"slices"
 	"strings"
 	"syscall"
 	"testing"
@@ -24,6 +25,7 @@ import (
 	"go.uber.org/zap/zapcore"
 	"go.uber.org/zap/zaptest/observer"
 
+	"github.com/langwatch/langwatch/pkg/cloudcredentials"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/codeblock"
 	"github.com/langwatch/langwatch/services/nlpgo/app/engine/blocks/httpblock"
@@ -103,12 +105,12 @@ func refusePrSetDumpable(refusal syscall.Errno, alsoRefused ...uint32) error {
 }
 
 // childEnvFor builds one case's environment without leaking the settings of the
-// machine running the tests.
+// machine running the tests, its cloud credentials among them.
 func childEnvFor(name string, extra ...string) []string {
 	env := []string{}
 	for _, kv := range os.Environ() {
-		switch strings.SplitN(kv, "=", 2)[0] {
-		case caseEnv, hideModeEnv:
+		key := strings.SplitN(kv, "=", 2)[0]
+		if key == caseEnv || key == hideModeEnv || cloudcredentials.IsAmbient(key) {
 			continue
 		}
 		if strings.HasPrefix(kv, "NLPGO_") || strings.HasPrefix(kv, "AWS_LAMBDA_") {
@@ -131,10 +133,18 @@ func runChild(t *testing.T, name string, extra ...string) {
 // how a case runs the engine from an execute-only file.
 func runChildBinary(t *testing.T, binary, name string, extra ...string) {
 	t.Helper()
+	runChildCommand(t, []string{binary}, name, extra...)
+}
+
+// runChildCommand is runChild through argv, which ends in this test binary or
+// its copy and may start with a process that starts it.
+func runChildCommand(t *testing.T, argv []string, name string, extra ...string) {
+	t.Helper()
 	requirePython(t)
 	ctx, cancel := context.WithTimeout(context.Background(), childTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, binary, "-test.run=^TestHideRefusedChild$", "-test.v", "-test.timeout=80s") //nolint:gosec,nolintlint // this test binary or its copy; gosec taint flags it on some runs only
+	argv = append(slices.Clone(argv), "-test.run=^TestHideRefusedChild$", "-test.v", "-test.timeout=80s")
+	cmd := exec.CommandContext(ctx, argv[0], argv[1:]...) //nolint:gosec,nolintlint // this test binary or its copy; gosec taint flags it on some runs only
 	cmd.Env = childEnvFor(name, extra...)
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
@@ -173,7 +183,24 @@ func TestHideRefused_DisabledWhenTheInterpreterIsReadable(t *testing.T) {
 	runExecOnly(t, "refused-readable-python", false)
 }
 
+// @scenario "a platform that refuses the hide step and PR_GET_DUMPABLE still tells a hidden process from a readable one"
+func TestHideRefused_WithoutGetDumpable(t *testing.T) {
+	t.Run("an execute-only engine and interpreter run in strict mode", func(t *testing.T) {
+		runExecOnly(t, "refused-exec-only-no-get-dumpable", true)
+	})
+	t.Run("a readable engine disables code blocks", func(t *testing.T) {
+		runChild(t, "refused-readable-no-get-dumpable")
+	})
+	t.Run("a readable runner exits 1 with the hide message", func(t *testing.T) {
+		runChild(t, "runner-readable-no-get-dumpable")
+	})
+	t.Run("an execute-only runner continues", func(t *testing.T) {
+		runExecOnly(t, "runner-exec-only-no-get-dumpable", true)
+	})
+}
+
 // @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
+// @scenario "a platform that refuses the hide step serves no code blocks when the interpreter is readable"
 func TestHideRefused_RunnerFailsWhenStillReadable(t *testing.T) {
 	t.Run("given prctl is refused and the interpreter is readable", func(t *testing.T) {
 		t.Run("the runner exits 1 with the hide message", func(t *testing.T) {
@@ -210,7 +237,7 @@ func TestHideRefusedChild(t *testing.T) {
 	if name == "" {
 		t.Skip("entry point for the re-executed child; run through TestHideRefused_*")
 	}
-	if name == "not-refused" {
+	if acceptsHide[name] {
 		exitSkippedIfHostRefusesHide()
 	} else if err := refusePrSetDumpable(syscall.EPERM, extraRefusals[name]...); err != nil {
 		fmt.Fprintf(os.Stderr, "seccomp install failed: %v\n", err)
@@ -232,13 +259,26 @@ type runnerCase struct {
 }
 
 var runnerCases = map[string]*runnerCase{
-	"runner-readable":          {wantFailure: true},
-	"runner-readable-old-flag": {oldFlag: true, wantFailure: true},
-	"runner-exec-only":         {wantFailure: false},
+	"runner-readable":                  {wantFailure: true},
+	"runner-readable-old-flag":         {oldFlag: true, wantFailure: true},
+	"runner-readable-no-get-dumpable":  {wantFailure: true},
+	"runner-exec-only":                 {wantFailure: false},
+	"runner-exec-only-no-get-dumpable": {wantFailure: false},
 }
 
+// acceptsHide names the cases whose platform accepts PR_SET_DUMPABLE.
+var acceptsHide = map[string]bool{"not-refused": true}
+
+// prGetDumpable is the prctl option a no-get-dumpable case also refuses.
+const prGetDumpable = 3
+
 // extraRefusals names the cases whose platform refuses more prctl options.
-var extraRefusals = map[string][]uint32{}
+var extraRefusals = map[string][]uint32{
+	"refused-exec-only-no-get-dumpable": {prGetDumpable},
+	"refused-readable-no-get-dumpable":  {prGetDumpable},
+	"runner-readable-no-get-dumpable":   {prGetDumpable},
+	"runner-exec-only-no-get-dumpable":  {prGetDumpable},
+}
 
 // lambdaCases are the credential cases, registered by their own file.
 var lambdaCases = map[string]func(t *testing.T){}
@@ -277,19 +317,37 @@ func runExecutorCase(t *testing.T, name string) {
 	require.NoError(t, runErr)
 	require.NotNil(t, res)
 
-	switch name {
-	case "refused-readable":
-		require.NotNil(t, res.Error)
-		assert.Contains(t, res.Error.Message, "code blocks are disabled: the engine's own process files are readable by user code")
-		assert.Contains(t, res.Error.Message, syscall.EPERM.Error())
-		assertOtherBlocksRunThroughEngine(t, exe)
-	case "refused-readable-python":
-		require.NotNil(t, res.Error)
-		assert.Contains(t, res.Error.Message, "code blocks are disabled: the interpreter cannot hide a run from user code")
-	default:
+	want := executorCases[name]
+	switch want.refusal {
+	case "":
 		require.Nil(t, res.Error, "expected success, got %+v\nstderr: %s", res.Error, res.Stderr)
 		assert.EqualValues(t, 42, res.Outputs["answer"])
+	case engineReadable:
+		require.NotNil(t, res.Error)
+		assert.Contains(t, res.Error.Message, engineReadable)
+		assert.Contains(t, res.Error.Message, syscall.EPERM.Error())
+		assertOtherBlocksRunThroughEngine(t, exe)
+	default:
+		require.NotNil(t, res.Error)
+		assert.Contains(t, res.Error.Message, want.refusal)
 	}
+}
+
+const engineReadable = "code blocks are disabled: the engine's own process files are readable by user code"
+
+// executorCases is what each executor case expects: the mode it logs and the
+// start of the refusal, "" when a trivial block runs. A no-get-dumpable case
+// also refuses PR_GET_DUMPABLE, so the outcome is read from who owns /proc.
+var executorCases = map[string]struct {
+	mode    string
+	refusal string
+}{
+	"not-refused":                       {"strict", ""},
+	"refused-exec-only":                 {"strict", ""},
+	"refused-exec-only-no-get-dumpable": {"strict", ""},
+	"refused-readable":                  {"disabled", engineReadable},
+	"refused-readable-no-get-dumpable":  {"disabled", engineReadable},
+	"refused-readable-python":           {"disabled", "code blocks are disabled: the interpreter cannot hide a run from user code"},
 }
 
 // assertOtherBlocksRunThroughEngine builds an engine around this disabled
@@ -346,18 +404,15 @@ func assertOtherBlocksRunThroughEngine(t *testing.T, exe *codeblock.Executor) {
 // info when strict, a warning naming the exposure when disabled.
 func assertHideModeLogged(t *testing.T, logs *observer.ObservedLogs, name string) {
 	t.Helper()
-	want := map[string]struct {
-		mode  string
-		level zapcore.Level
-	}{
-		"not-refused":             {"strict", zapcore.InfoLevel},
-		"refused-exec-only":       {"strict", zapcore.InfoLevel},
-		"refused-readable":        {"disabled", zapcore.WarnLevel},
-		"refused-readable-python": {"disabled", zapcore.WarnLevel},
-	}[name]
+	want := executorCases[name]
+	require.NotEmpty(t, want.mode, "case %s names no expected mode", name)
+	level := zapcore.InfoLevel
+	if want.mode == "disabled" {
+		level = zapcore.WarnLevel
+	}
 	entries := logs.FilterMessage("nlpgo_code_block_hide_mode").All()
 	require.Len(t, entries, 1, "the mode is logged exactly once")
-	assert.Equal(t, want.level, entries[0].Level)
+	assert.Equal(t, level, entries[0].Level)
 	assert.Equal(t, want.mode, entries[0].ContextMap()["mode"])
 	if want.mode == "disabled" {
 		assert.NotEmpty(t, entries[0].ContextMap()["exposure"], "a disabled mode names what is exposed")

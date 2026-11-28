@@ -261,6 +261,9 @@ const DEFAULT_GO_TEST_ROOTS: string[] = [
   // asserts it, so scenarios under specs/ci/ can only bind from this root.
   // Without it those feature files report "all bound" while binding nothing.
   "tools/ciguard",
+  // The Lambda extension launcher: only its Go tests assert which variables the
+  // web adapter starts without (specs/nlp-go/code-block.feature).
+  "cmd/lambdaextension",
   // The review job's wait for the other checks (specs/ci/pr-review-bot.feature).
   "tools/waitforchecks",
   // The wait for CI's background datastore containers (specs/ci/app-ci-datastores.feature).
