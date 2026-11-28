@@ -1,0 +1,6 @@
+{
+  "repository": "disposable-email-domains/disposable-email-domains",
+  "file": "disposable_email_blocklist.conf",
+  "commit": "9cf2bee345b0276e1b65cee7484beb51e5c715b1",
+  "domains": 10455
+}

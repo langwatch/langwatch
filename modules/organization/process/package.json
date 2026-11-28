@@ -25,7 +25,7 @@
     "typecheck": "GOMAXPROCS=2 GOMEMLIMIT=2GiB tsc -b",
     "test": "vitest run",
     "test:integration": "vitest run --config vitest.integration.config.ts",
-    "generate:disposable-email-domains": "node --experimental-transform-types scripts/refresh-disposable-email-domains.ts"
+    "generate:disposable-email-domains": "cd ../../.. && go run ./cmd/disposabledomains"
   },
   "dependencies": {
     "@langwatch/api": "workspace:*",

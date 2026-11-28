@@ -1,5 +1,6 @@
 /**
  * Whether an address's domain belongs to a disposable (throwaway) email service.
+ * List: `disposable-email-domains.generated.json`, read at the commit `.source.json` names.
  * Spec: specs/auth/sign-up-disposable-email.feature
  */
 import type { SignUpDisposableEmails } from "@langwatch/organization-contract";
