@@ -13948,7 +13948,9 @@ The receiver compares the signature in constant time before it checks the timest
 
 ## Egress controls
 
-A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to start unless the first two guards below are on. Every provider connection resolves the host once, checks each address and connects only to one it checked, so a name cannot pass the check on one address and connect to another. Bedrock is the exception: its client connects on its own, so a Bedrock credential reaches only AWS regional hosts or a host on `ALLOWED_PROXY_HOSTS`, and its region must be an AWS region identifier such as `eu-west-1`. That keeps PrivateLink endpoints on private addresses working. Turn them on for any deployment that reaches the public internet.
+A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to start unless the first two guards below are on. Every provider connection resolves the host once, checks each address and connects only to one it checked, so a name cannot pass the check on one address and connect to another. Turn them on for any deployment that reaches the public internet.
+
+Bedrock is the exception: its client connects on its own, so a Bedrock credential reaches only AWS regional hosts or a host on `ALLOWED_PROXY_HOSTS`, and its region must be an AWS region identifier such as `eu-west-1`. That keeps PrivateLink endpoints on private addresses working.
 
 | Variable                         | Effect                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
