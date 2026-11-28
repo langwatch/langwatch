@@ -422,19 +422,3 @@ export function secretScrubberOf(values: readonly string[]): SecretScrubber {
   };
   return { text, json: <T>(value: T) => scrub(value) as T };
 }
-
-/** Text with every known secret value, and its encoded forms, replaced, longest first. */
-export function scrubbedText({
-  text,
-  values,
-}: {
-  text: string;
-  values: readonly string[];
-}): string {
-  return secretScrubberOf(values).text(text);
-}
-
-/** A JSON value with every secret value in its strings and keys replaced by the placeholder. */
-export function scrubbedJson<T>({ value, values }: { value: T; values: readonly string[] }): T {
-  return secretScrubberOf(values).json(value);
-}
