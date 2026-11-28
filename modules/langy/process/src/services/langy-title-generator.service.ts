@@ -6,6 +6,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
+  isCodexModel,
   isPermanentAiCallFailure,
   type ModelProviderApi,
 } from "@langwatch/model-provider-contract";
@@ -49,7 +50,7 @@ const TITLE_SYSTEM_PROMPT = [
 type LangyTitleGeneratorDeps = Readonly<{
   /** The transcript, off the conversation's own message projection. */
   messages: LangyTrustedMessageReader;
-  /** The project's model for the title key, and the completion run on it. */
+  /** The title model and the completion run on it. */
   models: Pick<ModelProviderApi, "resolveModelForFeature" | "generateText">;
 }>;
 
@@ -73,7 +74,10 @@ export class LangyTitleGeneratorService {
     return (input) => this.generate(input);
   }
 
-  /** Every failure but a permanent one throws, so the process outbox retries it. */
+  /**
+   * Permanent failures (no model configured, a provider not connected) leave the title unchanged
+   * without throwing. Every other failure throws so the process outbox retries it.
+   */
   async generate(input: {
     projectId: string;
     conversationId: string;
@@ -90,6 +94,17 @@ export class LangyTitleGeneratorService {
 
     try {
       const model = await this.titleModel(projectId);
+      if (model.steppedOverCodexModel) {
+        logger.info(
+          {
+            projectId,
+            conversationId,
+            configuredModel: model.steppedOverCodexModel,
+            substitutedModel: model.name,
+          },
+          "Langy title model is a Codex model this process cannot run; using the cheap default instead",
+        );
+      }
       const { text } = await this.deps.models.generateText({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
@@ -113,13 +128,28 @@ export class LangyTitleGeneratorService {
     }
   }
 
-  /** The project's model for titles, else the cheap default so titles work out of the box. */
-  private async titleModel(projectId: string): Promise<{ name: string; fallback: boolean }> {
+  /**
+   * The project's model for titles, else the cheap default so titles work out of the box.
+   * A Codex model is stepped over the same way: this process cannot execute Codex models.
+   */
+  private async titleModel(projectId: string): Promise<{
+    name: string;
+    fallback: boolean;
+    steppedOverCodexModel?: string;
+  }> {
     try {
       const resolved = await this.deps.models.resolveModelForFeature({
         projectId,
         featureKey: LANGY_TITLE_FEATURE_KEY,
       });
+
+      if (isCodexModel(resolved.model)) {
+        return {
+          name: LANGY_TITLE_GENERATION.MODEL,
+          fallback: true,
+          steppedOverCodexModel: resolved.model,
+        };
+      }
 
       return { name: resolved.model, fallback: false };
     } catch (error) {

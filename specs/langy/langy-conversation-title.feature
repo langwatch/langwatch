@@ -88,9 +88,18 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
     When the title is generated
     Then no title is produced and nothing is retried
 
+  @unit
+  Scenario: A project with no model for titles whose cheap default provider is unavailable is not retried
+    Given the project has no model configured for titles
+    And the cheap default model's provider is missing or turned off
+    When the title is generated
+    Then the placeholder title is kept
+    And nothing is raised, so the process outbox does not retry it
+
   @regression
-  Scenario: A title model this deployment cannot execute is not retried
-    Given the project's model for titles is a codex model this deployment cannot execute
+  Scenario: A Codex title model whose cheap default cannot run is not retried
+    Given the project's model for titles is a Codex model
+    And the cheap default model's provider is missing or turned off
     When the title is generated
     Then the placeholder title is kept
     And nothing is raised, so the process outbox does not retry it
@@ -112,6 +121,19 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
   @unit
   Scenario: A provider failure a retry could fix is still raised
     Given the title model fails with a server error, a timeout or a rate limit
+    When the title is generated
+    Then the failure is raised so the process outbox retries it
+
+  @unit
+  Scenario: A Codex title model falls back to the cheap default
+    Given the project's model for titles is a Codex model
+    When the title is generated
+    Then the title is generated on the cheap default model
+
+  @unit
+  Scenario: A Codex title model whose cheap default fails is retried
+    Given the project's model for titles is a Codex model
+    And the cheap default model fails on a provider blip
     When the title is generated
     Then the failure is raised so the process outbox retries it
 
