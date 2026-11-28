@@ -1,5 +1,48 @@
 # Changelog
 
+## [3.32.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.31.0...langwatch@v3.32.0) (2026-11-28)
+
+
+### Features
+
+* **billing:** euro prices for Instant Evals and PII usage ([#10015](https://github.com/langwatch/langwatch/issues/10015)) ([cb11566](https://github.com/langwatch/langwatch/commit/cb115662561a16006323c2967889402957451231))
+* **ci:** share the Nx task cache in S3 between CI and laptops ([#9929](https://github.com/langwatch/langwatch/issues/9929)) ([fc8506d](https://github.com/langwatch/langwatch/commit/fc8506d7ef324865dc3766aa75c8a70a9ae70f15))
+* **coding-agent:** record the subscription account on each call, queryable in LangWatchQL ([#10006](https://github.com/langwatch/langwatch/issues/10006)) ([17645a0](https://github.com/langwatch/langwatch/commit/17645a0b3e0ea3d8034fa13ced44670841254939))
+* **dashboards:** drag to reorder sidebar dashboards, and search and filter the library table ([#10029](https://github.com/langwatch/langwatch/issues/10029)) ([2f720c8](https://github.com/langwatch/langwatch/commit/2f720c8678bce81f9ef433c7619da55c3f92d84d))
+* **data-privacy:** a privacy rule may name API keys that read its restricted content ([#10011](https://github.com/langwatch/langwatch/issues/10011)) ([f2d8824](https://github.com/langwatch/langwatch/commit/f2d8824b7d4d064a277b60f9d5207cf5310a5ac1))
+* **data-retention:** tell deferred retention drift apart and keep Applied on after a lost change record ([#10062](https://github.com/langwatch/langwatch/issues/10062)) ([3be4ac4](https://github.com/langwatch/langwatch/commit/3be4ac4234b0373873b6d34365b501379109fce3))
+* **digest:** on for everyone, one email per organisation, Weekly digest switch in settings ([#10032](https://github.com/langwatch/langwatch/issues/10032)) ([4c9a6be](https://github.com/langwatch/langwatch/commit/4c9a6be34fd6f8cce4c6d328d0065eb792917494))
+* **digest:** send staff tests to the person, drop coding-agent cost ([#10069](https://github.com/langwatch/langwatch/issues/10069)) ([ace9fbf](https://github.com/langwatch/langwatch/commit/ace9fbf054a473fc9110c51bb7c64f9cde236063))
+* **digest:** staff test sends: my digests, or anyone's by email and digest type ([#10056](https://github.com/langwatch/langwatch/issues/10056)) ([90c086b](https://github.com/langwatch/langwatch/commit/90c086b0475cf1698a0303a7198e3a4addcc964e))
+* **instant-eval-judge:** difficulty gate and reasoning effort for the judge router ([#9923](https://github.com/langwatch/langwatch/issues/9923)) ([934653d](https://github.com/langwatch/langwatch/commit/934653d9a97147e565153a2a9e5fa34e19ea4fb4))
+* **langy:** resize the Langy panel by dragging its edge ([#10025](https://github.com/langwatch/langwatch/issues/10025)) ([655fc7c](https://github.com/langwatch/langwatch/commit/655fc7c5edf0ea52bba0b70572599f7e74089b4f))
+* **lwql:** give each private instance its own reader password ([#10061](https://github.com/langwatch/langwatch/issues/10061)) ([2db42bd](https://github.com/langwatch/langwatch/commit/2db42bdf23803b5ab89c0229c53995dce6f8634a))
+* **mail:** digest review view, list search and a logo that loads on the hosted studio ([#10053](https://github.com/langwatch/langwatch/issues/10053)) ([7c73f0b](https://github.com/langwatch/langwatch/commit/7c73f0bed7fc77ef93a652b24207c7359eb13345))
+* **mail:** left and right arrow keys step through the studio's emails ([#10052](https://github.com/langwatch/langwatch/issues/10052)) ([be68e00](https://github.com/langwatch/langwatch/commit/be68e00fe826b580fc86e29278111d0689c2d556))
+* **mail:** simpler studio navigation, emails grouped by area, a short how-to at the top ([#10050](https://github.com/langwatch/langwatch/issues/10050)) ([0a669da](https://github.com/langwatch/langwatch/commit/0a669da80ff5d60dbdb952f16108ad7be0fca0ac))
+* **staff-access:** copy an organization's projects into another organization ([#9538](https://github.com/langwatch/langwatch/issues/9538)) ([7abf0c5](https://github.com/langwatch/langwatch/commit/7abf0c5335e079eec12250f52aca603df516fb25))
+* **staff-access:** passkey-approved one-hour agent access for operators ([#9267](https://github.com/langwatch/langwatch/issues/9267)) ([26bb2bf](https://github.com/langwatch/langwatch/commit/26bb2bffbd7b03f91b7e4205d058aba307317a02))
+
+
+### Bug Fixes
+
+* **billing:** a Growth seat upgrade stops the old tiered plan whatever order Stripe's messages arrive in ([#10023](https://github.com/langwatch/langwatch/issues/10023)) ([3bdffba](https://github.com/langwatch/langwatch/commit/3bdffba0ce9a2f633567b279cf020b0fe2f919d9))
+* **billing:** bill usage only from the moment its price line was added ([#10024](https://github.com/langwatch/langwatch/issues/10024)) ([a525a24](https://github.com/langwatch/langwatch/commit/a525a24db4f3ca87818f1eb33829178c2244ae07))
+* **ci:** retry the flaky metrics probe, Playwright install, clipboard read and apt update ([#9978](https://github.com/langwatch/langwatch/issues/9978)) ([e9cce5d](https://github.com/langwatch/langwatch/commit/e9cce5de64586c5b83d0f1c4a7a9e0811174ef01))
+* **data-privacy:** bill Strict only after an organization admin accepts the price ([#10009](https://github.com/langwatch/langwatch/issues/10009)) ([f7577c8](https://github.com/langwatch/langwatch/commit/f7577c821b347efc1e5d6a1168409dda3f76ea3e))
+* **data-privacy:** let the PII redaction model take a high-volume organisation's traffic ([#10057](https://github.com/langwatch/langwatch/issues/10057)) ([9174f76](https://github.com/langwatch/langwatch/commit/9174f766345bf81518c9c85b7bf0ebcdb56d7137))
+* **eventing:** replay drain reads the queue's per-tenant claim list instead of scanning Redis ([#10044](https://github.com/langwatch/langwatch/issues/10044)) ([8a7c331](https://github.com/langwatch/langwatch/commit/8a7c3318a70cd72203b99132b92f05a6b8f12f74))
+* **gateway:** retry a failed managed mint within five minutes ([#10045](https://github.com/langwatch/langwatch/issues/10045)) ([cf2a85e](https://github.com/langwatch/langwatch/commit/cf2a85e302ccd195fbffd7cd4b5abfba8649b164))
+* **gateway:** run managed providers through the customer's private endpoint ([#10034](https://github.com/langwatch/langwatch/issues/10034)) ([b2afda4](https://github.com/langwatch/langwatch/commit/b2afda4b949a4b5dca46524f2b67425f073fc72b))
+* hide Admins-only trace content from project Members in analytics, and stop Members lifting the rule ([#10013](https://github.com/langwatch/langwatch/issues/10013)) ([6c6ea71](https://github.com/langwatch/langwatch/commit/6c6ea71141f38e9f8be0453e47b29df68c7adf5f))
+* **instant-eval:** bill the judged pages of a run whose page fails ([#9857](https://github.com/langwatch/langwatch/issues/9857)) ([b6563f6](https://github.com/langwatch/langwatch/commit/b6563f6b13e034e7634ac4d4dab612c66405a4eb))
+* **lwql:** render the private-ClickHouse reader instead of creating it by SQL ([#10026](https://github.com/langwatch/langwatch/issues/10026)) ([5d1e1bb](https://github.com/langwatch/langwatch/commit/5d1e1bbc5f4f4285e8f4eb6f166d08aecafd7a98))
+* **nlpgo:** code blocks on AWS Lambda run without access to the runner's credentials ([#10067](https://github.com/langwatch/langwatch/issues/10067)) ([5f4aba5](https://github.com/langwatch/langwatch/commit/5f4aba5f4e52195e22aeabc9f871564dd2503836))
+* **process:** answer 413 to oversized uploads instead of resetting the connection ([#10035](https://github.com/langwatch/langwatch/issues/10035)) ([831ee4a](https://github.com/langwatch/langwatch/commit/831ee4ab4ea162224f3e0d5746a5f40e3b645f92))
+* **stored-object:** accept project ids that start with a dash or an underscore ([#10027](https://github.com/langwatch/langwatch/issues/10027)) ([2bb0870](https://github.com/langwatch/langwatch/commit/2bb0870ed55f4316243624e37ca4784afe8cc65d))
+* **topic:** answer a clustering model with no API key as the customer's to fix ([#10031](https://github.com/langwatch/langwatch/issues/10031)) ([f3468c5](https://github.com/langwatch/langwatch/commit/f3468c58f9fec31e1854af3af920cfa9d322b8e9))
+* **upgradelab:** list dashboard:mark-my-dashboards once in the seed coverage ([#10033](https://github.com/langwatch/langwatch/issues/10033)) ([6b2f327](https://github.com/langwatch/langwatch/commit/6b2f3273b19246c18034b4194c6094e6206af8aa))
+
 ## [3.31.0](https://github.com/langwatch/langwatch/compare/langwatch@v3.30.0...langwatch@v3.31.0) (2026-11-26)
 
 
