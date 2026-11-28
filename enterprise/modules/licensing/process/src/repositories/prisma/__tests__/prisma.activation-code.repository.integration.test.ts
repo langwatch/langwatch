@@ -154,5 +154,56 @@ describe.skipIf(!TEST_DATABASE_URL)("activation codes on Postgres", () => {
         }),
       ).resolves.toBe(false);
     });
+
+    /** @scenario "Exactly one of two simultaneous revokes marks an activation code" */
+    it("reports one revocation when two revokes wait on the same row", async () => {
+      const row = await issue(false);
+      const at = nowInstant();
+      const revokeFor = (operator: string) => (tx: Prisma.TransactionClient) =>
+        PrismaActivationCodeRepository.create(tx).revoke({
+          id: row.id,
+          at,
+          revokedById: `${RUN}-${operator}`,
+        });
+
+      const answers = await raceOnOneRow({
+        prisma,
+        table: "ActivationCode",
+        first: revokeFor("first"),
+        second: revokeFor("second"),
+      });
+
+      expect(answers).toEqual({ first: true, second: false });
+      const stored = await prisma.activationCode.findUniqueOrThrow({ where: { id: row.id } });
+      expect(stored.revokedById).toBe(`${RUN}-first`);
+    });
+
+    /** @scenario "A revoke waiting on a row does not overwrite the earlier revocation" */
+    it("leaves the earlier revoker recorded when another revoke waited on the row", async () => {
+      const row = await issue(false);
+      const at = nowInstant();
+
+      const answers = await raceOnOneRow<string | boolean>({
+        prisma,
+        table: "ActivationCode",
+        first: async (tx) => {
+          await tx.activationCode.update({
+            where: { id: row.id },
+            data: { revokedAt: new Date(), revokedById: `${RUN}-earlier` },
+          });
+          return "earlier";
+        },
+        second: (tx) =>
+          PrismaActivationCodeRepository.create(tx).revoke({
+            id: row.id,
+            at,
+            revokedById: `${RUN}-later`,
+          }),
+      });
+
+      expect(answers.second).toBe(false);
+      const stored = await prisma.activationCode.findUniqueOrThrow({ where: { id: row.id } });
+      expect(stored.revokedById).toBe(`${RUN}-earlier`);
+    });
   });
 });
