@@ -21,8 +21,11 @@ Feature: Pre-compiled Scenario Child Process
     copies of it — the SDK registering its provider into one, the flush code
     reading the other and finding a no-op proxy — and every span would be
     dropped silently.
-  - In development, tsx is used for fast iteration; in production, the
-    pre-compiled bundle is required — packaged deployments carry no tsx
+  - In development, a current bundle is spawned with node. Otherwise tsx is
+    used for fast iteration, but only when it resolves from the child package.
+    In production the pre-compiled bundle is required — packaged deployments
+    carry no tsx. A missing runtime fails with an install or build remedy
+    instead of a pnpm wrapper error.
   - The child is its own app, @langwatch/scenario-child; its bundle lives at
     dist/server/scenario-child-process.cjs relative to that package root
   - The build step is integrated into the existing build pipeline
@@ -92,6 +95,12 @@ Feature: Pre-compiled Scenario Child Process
     When the bundle is loaded from a production-shaped directory layout
     Then no module fails to resolve
 
+  @integration
+  Scenario: Installed tsx starts the child source without a bundle
+    Given tsx is installed for the scenario child package
+    When the child source is started with input that is not valid job data
+    Then the child reports that it could not parse the job data
+
   # ---------------------------------------------------------------------------
   # Spawning — processor uses the compiled bundle
   # ---------------------------------------------------------------------------
@@ -107,6 +116,8 @@ Feature: Pre-compiled Scenario Child Process
   @integration
   Scenario: Processor spawns child process using tsx in development
     Given NODE_ENV is "development"
+    And the pre-compiled bundle is missing or older than the child source
+    And tsx resolves from the scenario child package
     When the scenario processor spawns a child process
     Then it invokes "pnpm exec tsx" with the TypeScript source file
 
@@ -147,15 +158,44 @@ Feature: Pre-compiled Scenario Child Process
   # ---------------------------------------------------------------------------
 
   @unit
-  Scenario: Processor falls back to tsx with loud logging when bundle is missing in production
+  Scenario: Processor fails loudly when the bundle is missing in production
     Given the pre-compiled bundle file does not exist at the expected path
     And NODE_ENV is "production"
     When the scenario processor resolves the child process spawn
-    Then it returns the tsx command rather than throwing
+    Then resolution fails rather than returning a tsx command
     And it logs an error with the missing bundle path and remediation steps
 
-  # The fallback above resolves without throwing, but it only RUNS where dev
-  # dependencies are installed. tsx is a devDependency, so the Docker image and
-  # the published npx tree prune it and the spawn fails there. The bundle is
-  # the only supported production path; the fallback covers source checkouts
-  # running with NODE_ENV=production.
+  @unit @regression
+  Scenario: Missing tsx fails before spawn when the bundle is missing
+    Given the pre-compiled bundle file does not exist at the expected path
+    And NODE_ENV is not production
+    And tsx does not resolve from the scenario child package
+    When the scenario processor resolves the child process spawn
+    Then resolution fails before returning a pnpm command
+    And the error names the bundle as missing, tsx as unavailable, and the remedies "pnpm install" or "pnpm --filter @langwatch/scenario-child build"
+    And the original resolution cause is logged without environment values
+
+  @unit @regression
+  Scenario: Missing tsx fails before spawn when the bundle is stale
+    Given a pre-compiled bundle older than the child source
+    And NODE_ENV is not production
+    And tsx does not resolve from the scenario child package
+    When the scenario processor resolves the child process spawn
+    Then resolution fails before returning a pnpm command
+    And the error names the bundle as stale, tsx as unavailable, and the remedies "pnpm install" or "pnpm --filter @langwatch/scenario-child build"
+
+  @unit @regression
+  Scenario: A child startup failure is stored on the run
+    Given the scenario processor starts a run
+    When starting the child process fails with an actionable message
+    Then the run is finished as failed with that complete message
+    And the failure metric is recorded
+    And the execution pool is released
+
+  # Outside production, the fallback returns a tsx command only when tsx
+  # resolves from the scenario child package. tsx is a devDependency of
+  # @langwatch/scenario-child, so a source checkout that installed dev
+  # dependencies can run it. Where it does not resolve, the resolver fails with
+  # the install or build remedy instead of handing pnpm a command it cannot
+  # run. Production never falls back: the bundle is the only supported
+  # packaged-deployment path.
