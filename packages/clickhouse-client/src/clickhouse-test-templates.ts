@@ -20,8 +20,8 @@ interface TemplateObject {
 }
 
 /**
- * Builds `template` once per server under the machine-wide schema lock, then gives `target`
- * the same tables, views and rows. `build` receives the held lock, so a migration task it
+ * Builds `template` once per server, then gives `target` the same tables, views and rows,
+ * both under the machine-wide schema lock. `build` receives the held lock, so a migration task it
  * starts re-enters it instead of waiting on this caller.
  */
 export async function cloneClickHouseTemplate({
@@ -29,6 +29,7 @@ export async function cloneClickHouseTemplate({
   template,
   target,
   build,
+  supersedes,
   lock = ClickHouseSchemaLock.create(),
 }: {
   /** An administrative client on the server, not bound to either database. */
@@ -37,24 +38,47 @@ export async function cloneClickHouseTemplate({
   template: string;
   target: string;
   build: (input: { database: string; lock: ClickHouseSchemaLock }) => Promise<void>;
+  /** The name every version of this template starts with; building drops the other versions. */
+  supersedes?: string;
   lock?: ClickHouseSchemaLock;
 }): Promise<void> {
-  if (!(await isTemplateReady({ client, template }))) {
-    const release = await lock.acquire();
-    try {
-      if (!(await isTemplateReady({ client, template }))) {
-        await client.command({ query: `DROP DATABASE IF EXISTS ${template} SYNC` });
-        await client.command({ query: `CREATE DATABASE ${template}` });
-        await build({ database: template, lock });
-        await client.command({
-          query: `CREATE TABLE ${template}.${TEMPLATE_READY_TABLE} (ready UInt8) ENGINE = TinyLog`,
-        });
-      }
-    } finally {
-      release();
+  // The copy holds the lock too, so building another version never drops its source mid-copy.
+  const release = await lock.acquire();
+  try {
+    if (!(await isTemplateReady({ client, template }))) {
+      if (supersedes) await dropOtherVersions({ client, template, prefix: supersedes });
+      await client.command({ query: `DROP DATABASE IF EXISTS ${template} SYNC` });
+      await client.command({ query: `CREATE DATABASE ${template}` });
+      await build({ database: template, lock });
+      await client.command({
+        query: `CREATE TABLE ${template}.${TEMPLATE_READY_TABLE} (ready UInt8) ENGINE = TinyLog`,
+      });
     }
+    await cloneClickHouseDatabase({ client, from: template, to: target });
+  } finally {
+    release();
   }
-  await cloneClickHouseDatabase({ client, from: template, to: target });
+}
+
+/** Drops the databases named like `prefix` other than `template`: schemas no checkout builds. */
+async function dropOtherVersions({
+  client,
+  template,
+  prefix,
+}: {
+  client: ClickHouseClient;
+  template: string;
+  prefix: string;
+}): Promise<void> {
+  const result = await client.query({
+    query:
+      "SELECT name FROM system.databases WHERE startsWith(name, {prefix:String}) AND name != {template:String}",
+    query_params: { prefix, template },
+    format: "JSONEachRow",
+  });
+  for (const { name } of await result.json<{ name: string }>()) {
+    await client.command({ query: `DROP DATABASE IF EXISTS \`${name}\` SYNC` });
+  }
 }
 
 async function isTemplateReady({
@@ -177,11 +201,22 @@ async function inParallel<T>({
   run: (item: T) => Promise<void>;
 }): Promise<void> {
   let next = 0;
+  let failed = false;
   const worker = async (): Promise<void> => {
-    while (next < items.length) {
+    while (!failed && next < items.length) {
       const item = items[next++] as T;
-      await run(item);
+      try {
+        await run(item);
+      } catch (error) {
+        failed = true;
+        throw error;
+      }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(CLONE_CONCURRENCY, items.length) }, worker));
+  // Every worker settles before this returns, so none still writes once the caller's lock is gone.
+  const settled = await Promise.allSettled(
+    Array.from({ length: Math.min(CLONE_CONCURRENCY, items.length) }, worker),
+  );
+  const rejected = settled.find((result) => result.status === "rejected");
+  if (rejected) throw rejected.reason;
 }

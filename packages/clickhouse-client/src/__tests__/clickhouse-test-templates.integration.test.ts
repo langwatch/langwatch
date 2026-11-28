@@ -19,6 +19,8 @@ const RUN = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}
 const TEMPLATE = `test_template_${RUN}`;
 const FIRST = `test_template_${RUN}_first`;
 const SECOND = `test_template_${RUN}_second`;
+const VERSIONS = `test_template_${RUN}_v_`;
+const THIRD = `test_template_${RUN}_third`;
 
 let admin: ClickHouseClient;
 const lockPath = join(mkdtempSync(join(tmpdir(), "template-lock-")), "schema.lock");
@@ -61,7 +63,7 @@ beforeAll(async () => {
 });
 
 afterAll(async () => {
-  for (const database of [TEMPLATE, FIRST, SECOND]) {
+  for (const database of [TEMPLATE, FIRST, SECOND, THIRD, `${VERSIONS}old`, `${VERSIONS}new`]) {
     await admin.command({ query: `DROP DATABASE IF EXISTS ${database} SYNC` });
   }
   await admin.close();
@@ -111,6 +113,36 @@ describe("cloneClickHouseTemplate", () => {
       expect(
         await rows<{ id: string }>(`SELECT toString(id) AS id FROM ${FIRST}.recent ORDER BY id`),
       ).toEqual([{ id: "11" }, { id: "12" }]);
+    });
+  });
+
+  describe("given an older version of a template on the server", () => {
+    /** @scenario "Building a template drops its older versions" */
+    it("drops the older version and leaves other databases alone", async () => {
+      await cloneClickHouseTemplate({
+        client: admin,
+        template: `${VERSIONS}old`,
+        target: THIRD,
+        build: buildSchema,
+        supersedes: VERSIONS,
+        lock: ClickHouseSchemaLock.create({ lockPath }),
+      });
+
+      await cloneClickHouseTemplate({
+        client: admin,
+        template: `${VERSIONS}new`,
+        target: THIRD,
+        build: buildSchema,
+        supersedes: VERSIONS,
+        lock: ClickHouseSchemaLock.create({ lockPath }),
+      });
+
+      const left = await rows<{ name: string }>(
+        `SELECT name FROM system.databases WHERE startsWith(name, 'test_template_${RUN}') ORDER BY name`,
+      );
+      expect(left.map(({ name }) => name)).toEqual(
+        [FIRST, SECOND, THIRD, TEMPLATE, `${VERSIONS}new`].toSorted(),
+      );
     });
   });
 });

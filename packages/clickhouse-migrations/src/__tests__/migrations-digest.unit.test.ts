@@ -36,6 +36,20 @@ describe("shippedMigrationsDigest", () => {
     });
   });
 
+  describe("given the code that shapes the schema changes", () => {
+    /** @scenario "The template is named by the code that shapes it too" */
+    it("changes the digest", () => {
+      const sql = migrationsDir({ "00001_a.sql": "CREATE TABLE a (x UInt8)" });
+      const before = migrationsDir({ "runner.ts": "const ENGINE = 'ReplacingMergeTree'" });
+      const after = migrationsDir({ "runner.ts": "const ENGINE = 'SharedReplacingMergeTree'" });
+      expect(
+        shippedMigrationsDigest({ migrationsDir: sql, sourceFiles: [join(before, "runner.ts")] }),
+      ).not.toBe(
+        shippedMigrationsDigest({ migrationsDir: sql, sourceFiles: [join(after, "runner.ts")] }),
+      );
+    });
+  });
+
   describe("given a file that is not a migration", () => {
     it("leaves it out", () => {
       const sql = { "00001_a.sql": "CREATE TABLE a (x UInt8)" };

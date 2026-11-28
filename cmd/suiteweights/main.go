@@ -42,7 +42,7 @@ func run(runs int, src suiteweights.Source) error {
 	if err != nil {
 		return err
 	}
-	ids, measured, err := suiteweights.Collect(src, runs)
+	ids, older, measured, err := suiteweights.Collect(src, runs)
 	if err != nil {
 		return err
 	}
@@ -50,10 +50,10 @@ func run(runs int, src suiteweights.Source) error {
 	// Absent on a first run; then every package is weighed from the runs alone.
 	committed, _ := os.ReadFile(path)
 	previous := suiteweights.ParseWeights(string(committed))
-	content := suiteweights.Render(suiteweights.Weigh(measured, previous), ids)
+	content := suiteweights.Render(suiteweights.Weigh(measured, previous), ids, older)
 	if err := os.WriteFile(path, []byte(content), 0o644); err != nil { //nolint:gosec // G306: a checked-in file everyone reads
 		return err
 	}
-	fmt.Printf("wrote %s from runs %v\n", path, ids)
+	fmt.Printf("wrote %s from runs %v and older runs %v\n", path, ids, older)
 	return nil
 }

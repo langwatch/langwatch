@@ -78,6 +78,36 @@ func TestWeighKeepsTheCommittedWeightWhenAScriptOnlyReplayed(t *testing.T) {
 	assert.InDelta(t, 804.0, weights["@x/process"], 0.001)
 }
 
+func replayLine(pkg string, seconds string) string {
+	return "##[group]" + pkg + " (dir) — pnpm run test (" + seconds + "s)\n" +
+		"Nx read the output from the cache instead of running the command for 1 out of 1 tasks.\n"
+}
+
+// @scenario "A script the newest runs only replayed is measured in an older run"
+func TestCollectLooksInOlderRunsForAScriptOnlyReplayed(t *testing.T) {
+	src := fakeSource{
+		runs: []int64{4, 3, 2, 1},
+		jobs: map[int64][]Job{
+			4: shards(4, "success"), 3: shards(3, "success"), 2: shards(2, "success"), 1: shards(1, "success"),
+		},
+		logs: map[int64]string{
+			40: replayLine("@x/browser", "4") + logLine("@x/ran", "50"),
+			30: replayLine("@x/browser", "3") + logLine("@x/ran", "40"),
+			20: logLine("@x/browser", "90") + logLine("@x/ran", "999"),
+			10: logLine("@x/browser", "500"),
+		},
+	}
+
+	ids, older, measured, err := Collect(src, 2)
+
+	require.NoError(t, err)
+	assert.Equal(t, []int64{4, 3}, ids)
+	assert.Equal(t, []int64{2}, older, "the search stops once every script ran for real")
+	weights := Weigh(measured, ParseWeights("@x/browser  176\n"))
+	assert.InDelta(t, 90.0, weights["@x/browser"], 0.001, "a real run lets the weight drop below the file's")
+	assert.InDelta(t, 45.0, weights["@x/ran"], 0.001, "an older run adds only the replayed script")
+}
+
 // @scenario "A package's weight is the median of its runs, summed over its scripts"
 func TestWeighSumsTheMedianOfEachScript(t *testing.T) {
 	weights := Weigh([][]Measurement{
@@ -132,10 +162,11 @@ func TestCollectSkipsARunWithAFailedShard(t *testing.T) {
 		logs: map[int64]string{20: logLine("a", "10"), 21: logLine("b", "20"), 10: logLine("a", "30"), 11: logLine("b", "40")},
 	}
 
-	ids, measured, err := Collect(src, 2)
+	ids, older, measured, err := Collect(src, 2)
 
 	require.NoError(t, err)
 	assert.Equal(t, []int64{2, 1}, ids)
+	assert.Empty(t, older)
 	assert.Len(t, measured, 2)
 	assert.Equal(t, []Measurement{m("a", "test", 10, false), m("b", "test", 20, false)}, measured[0])
 }
@@ -148,7 +179,7 @@ func TestCollectRefusesTooFewGreenRuns(t *testing.T) {
 		logs: map[int64]string{10: logLine("a", "10")},
 	}
 
-	_, _, err := Collect(src, 2)
+	_, _, _, err := Collect(src, 2)
 
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "found 1")
@@ -157,7 +188,7 @@ func TestCollectRefusesTooFewGreenRuns(t *testing.T) {
 // @scenario "Asking for no runs is an error rather than an empty file"
 func TestCollectRefusesANonPositiveRunCount(t *testing.T) {
 	for _, want := range []int{0, -1} {
-		_, _, err := Collect(fakeSource{runs: []int64{1}}, want)
+		_, _, _, err := Collect(fakeSource{runs: []int64{1}}, want)
 
 		require.Error(t, err)
 	}
@@ -171,7 +202,7 @@ func TestARunMissingAShardIsNotComplete(t *testing.T) {
 
 // @scenario "The file is written heaviest first and names its runs"
 func TestRenderListsHeaviestFirstAndNamesTheRuns(t *testing.T) {
-	out := Render(map[string]float64{"@x/b": 120.4, "@x/a": 120.2, "@x/c": 300, "@x/tiny": 9.4}, []int64{11, 22})
+	out := Render(map[string]float64{"@x/b": 120.4, "@x/a": 120.2, "@x/c": 300, "@x/tiny": 9.4}, []int64{11, 22}, []int64{7})
 
 	var body []string
 	for _, line := range strings.Split(out, "\n") {
@@ -181,6 +212,7 @@ func TestRenderListsHeaviestFirstAndNamesTheRuns(t *testing.T) {
 	}
 	assert.Equal(t, []string{"@x/c  300", "@x/a  120", "@x/b  120"}, body)
 	assert.Contains(t, out, "main runs 11, 22")
+	assert.Contains(t, out, "measured in runs 7")
 }
 
 // @scenario "GitHub's listings are read strictly"
