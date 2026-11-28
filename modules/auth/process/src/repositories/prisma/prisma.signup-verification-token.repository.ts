@@ -1,4 +1,5 @@
-import { PrismaRepository } from "@langwatch/prisma-client";
+import { prismaTables, skipTenantCheck } from "@langwatch/prisma-client";
+import type { PrismaClient } from "@langwatch/prisma-client/generated";
 import { Temporal, fromDate, toDate, type Instant } from "@langwatch/time";
 
 import type {
@@ -11,16 +12,23 @@ const SPENT_NAMESPACE = "identity-signup-spent:";
 
 const UNCLAIMED: TokenClaim = { claimed: false };
 
+type VerificationTokenDatabase = Pick<PrismaClient, "verificationToken" | "$executeRaw">;
+
 /**
  * Sign-up's address-confirmation tokens, over the `VerificationToken` table.
  */
-export class PrismaSignUpVerificationTokenRepository
-  extends PrismaRepository.for("VerificationToken")
-  implements SignUpVerificationTokenRepository
-{
-  static readonly create = this.factory(
-    (prisma) => new PrismaSignUpVerificationTokenRepository(prisma),
-  );
+export class PrismaSignUpVerificationTokenRepository implements SignUpVerificationTokenRepository {
+  static readonly tables = prismaTables("VerificationToken");
+
+  static create({
+    prisma,
+  }: {
+    prisma: VerificationTokenDatabase;
+  }): PrismaSignUpVerificationTokenRepository {
+    return new PrismaSignUpVerificationTokenRepository(prisma);
+  }
+
+  private constructor(private readonly prisma: VerificationTokenDatabase) {}
 
   async issue({
     identifier,
@@ -37,8 +45,8 @@ export class PrismaSignUpVerificationTokenRepository
   }
 
   /**
-   * Renaming the row into the spent namespace is the claim. The update is conditional on
-   * the identifier it read, so of two racing openings only one wins.
+   * Renaming the row into the spent namespace is the claim. One statement re-checks the
+   * live identifier and expiry at the write, so two concurrent openings cannot both win.
    */
   async claim({
     token,
@@ -57,12 +65,21 @@ export class PrismaSignUpVerificationTokenRepository
     if (!row || Temporal.Instant.compare(fromDate(row.expires), now) <= 0) return UNCLAIMED;
     if (row.identifier.startsWith(SPENT_NAMESPACE)) return UNCLAIMED;
 
-    const marked = await this.prisma.verificationToken.updateMany({
-      where: { token, identifier: row.identifier },
-      data: { identifier: `${SPENT_NAMESPACE}${row.identifier}`, expires: toDate(keepSpentUntil) },
-    });
+    const marked = await this.prisma.$executeRaw`
+      ${skipTenantCheck({
+        // The row is addressed by its token and identifier, both in the WHERE.
+        SKIP_TENANT_CHECK: true,
+      })}
+      UPDATE "VerificationToken"
+         SET "identifier" = ${`${SPENT_NAMESPACE}${row.identifier}`},
+             "expires" = ${toDate(keepSpentUntil)}
+       WHERE "token" = ${token}
+         AND "identifier" = ${row.identifier}
+         AND "identifier" NOT LIKE ${`${SPENT_NAMESPACE}%`}
+         AND "expires" > ${toDate(now)}
+    `;
 
-    return marked.count === 0 ? UNCLAIMED : { claimed: true, identifier: row.identifier };
+    return marked === 1 ? { claimed: true, identifier: row.identifier } : UNCLAIMED;
   }
 
   async findSpent({
