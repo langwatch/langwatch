@@ -149,6 +149,7 @@ export class ScenarioExecutorService {
         secrets: peers.secrets,
         datasets: peers.datasets,
         featureFlags: peers.featureFlags,
+        projects: peers.projects,
       }),
     });
     const execution = ScenarioExecutionService.create({

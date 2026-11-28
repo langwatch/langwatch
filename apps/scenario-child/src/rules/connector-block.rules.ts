@@ -4,11 +4,16 @@
  * @see modules/scenario/specs/scenario-run-hooks.feature
  */
 
-import { CONNECTOR_SECRET_NAME_PATTERN, STATE_MAX_BYTES } from "@langwatch/agent-contract";
+import {
+  CONNECTOR_SECRET_NAME_PATTERN,
+  CONNECTOR_SECRET_NAMES_MAX,
+  CONNECTOR_SETUP_SECRETS_MAX_BYTES,
+  STATE_MAX_BYTES,
+} from "@langwatch/agent-contract";
 import type { ConnectorBlockData, RunParameterValues } from "@langwatch/scenario-contract";
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 
-import * as ScenarioSecretReferenceAdapter from "./scenario-secret-reference.rules.ts";
+import { REDACTED_PLACEHOLDER } from "./scenario-secret-reference.rules.ts";
 
 export type ConnectorBlockKind = "setup" | "call" | "teardown";
 export type ConnectorObject = Record<string, unknown>;
@@ -272,6 +277,9 @@ export function connectorSetupAnswer({
   const { state, secrets, ...rest } = outputs;
   const entries = isObject(secrets) ? Object.entries(secrets) : [];
   const named = entries.filter((entry): entry is [string, string] => typeof entry[1] === "string");
+  const overCap = secretMapOverCap(named);
+  // Over the cap the whole answer is dropped: nothing is kept that so many values would scrub.
+  if (overCap) return { secrets: {}, secretValues: [], problem: overCap };
   const names = named.map(([name]) => name);
   const badNames = names.filter((name) => !CONNECTOR_SECRET_NAME_PATTERN.test(name));
   const clashes = names.filter((name) => projectSecretNames.includes(name));
@@ -294,6 +302,18 @@ export function connectorSetupAnswer({
     secretValues: named.map(([, value]) => value),
     ...(problem ? { problem } : {}),
   };
+}
+
+/** Why setup's run-scoped secrets are more than a run takes, naming no value. */
+function secretMapOverCap(named: readonly [string, string][]): string | undefined {
+  if (named.length > CONNECTOR_SECRET_NAMES_MAX) {
+    return `The setup block returned ${named.length} secrets; at most ${CONNECTOR_SECRET_NAMES_MAX} may be returned.`;
+  }
+  const bytes = named.reduce((total, [, value]) => total + Buffer.byteLength(value, "utf8"), 0);
+  if (bytes > CONNECTOR_SETUP_SECRETS_MAX_BYTES) {
+    return `The setup block's secrets are over the ${CONNECTOR_SETUP_SECRETS_MAX_BYTES / 1024} KiB a run takes.`;
+  }
+  return undefined;
 }
 
 /** The first way setup's answer breaks its shape, naming keys and secret names, never values. */
@@ -344,19 +364,52 @@ export function connectorTeardownAnswer(outputs: ConnectorObject): { state?: Con
   return Object.keys(outputs).length > 0 ? { state: outputs } : {};
 }
 
-/** Each secret as written, base64 (standard and URL-safe, padded or not) and URL-encoded. */
+/**
+ * Each secret as written, JSON-escaped (so a multi-line secret in a JSON body or a stringified
+ * reply is caught), base64 (standard and URL-safe, padded or not) and URL-encoded.
+ */
 export function secretVariants(values: readonly string[]): string[] {
   const variants = new Set<string>();
   for (const value of values) {
     if (value === "") continue;
     const base64 = Buffer.from(value).toString("base64");
     const urlSafe = base64.replaceAll("+", "-").replaceAll("/", "_");
-    for (const form of [value, base64, urlSafe, encodeURIComponent(value)]) {
+    const jsonEscaped = JSON.stringify(value).slice(1, -1);
+    for (const form of [value, jsonEscaped, base64, urlSafe, encodeURIComponent(value)]) {
       variants.add(form);
       variants.add(form.replace(/=+$/, ""));
     }
   }
+  variants.delete("");
   return [...variants];
+}
+
+/** Replaces every known secret in text and JSON; its variants are built once, longest first. */
+export interface SecretScrubber {
+  text(text: string): string;
+  json<T>(value: T): T;
+}
+
+export function secretScrubberOf(values: readonly string[]): SecretScrubber {
+  const variants = secretVariants(values).toSorted((a, b) => b.length - a.length);
+  const text = (input: string): string => {
+    let scrubbed = input;
+    for (const variant of variants) {
+      if (scrubbed.includes(variant)) scrubbed = scrubbed.split(variant).join(REDACTED_PLACEHOLDER);
+    }
+    return scrubbed;
+  };
+  const scrub = (item: unknown): unknown => {
+    if (typeof item === "string") return text(item);
+    if (Array.isArray(item)) return item.map(scrub);
+    if (isObject(item)) {
+      return Object.fromEntries(
+        Object.entries(item).map(([key, inner]) => [text(key), scrub(inner)]),
+      );
+    }
+    return item;
+  };
+  return { text, json: <T>(value: T) => scrub(value) as T };
 }
 
 /** Text with every known secret value, and its encoded forms, replaced, longest first. */
@@ -367,27 +420,10 @@ export function scrubbedText({
   text: string;
   values: readonly string[];
 }): string {
-  const secrets = Object.fromEntries(
-    secretVariants(values).map((value, index) => [String(index), value]),
-  );
-  return ScenarioSecretReferenceAdapter.redact({ message: text, secrets });
+  return secretScrubberOf(values).text(text);
 }
 
 /** A JSON value with every secret value in its strings and keys replaced by the placeholder. */
 export function scrubbedJson<T>({ value, values }: { value: T; values: readonly string[] }): T {
-  const variants = secretVariants(values);
-  const scrub = (item: unknown): unknown => {
-    if (typeof item === "string") return scrubbedText({ text: item, values: variants });
-    if (Array.isArray(item)) return item.map(scrub);
-    if (isObject(item)) {
-      return Object.fromEntries(
-        Object.entries(item).map(([key, inner]) => [
-          scrubbedText({ text: key, values: variants }),
-          scrub(inner),
-        ]),
-      );
-    }
-    return item;
-  };
-  return scrub(value) as T;
+  return secretScrubberOf(values).json(value);
 }

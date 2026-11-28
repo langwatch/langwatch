@@ -23,8 +23,8 @@ import {
   connectorIdempotencyKey,
   connectorSetupAnswer,
   connectorTeardownAnswer,
-  scrubbedJson,
-  scrubbedText,
+  secretScrubberOf,
+  type SecretScrubber,
 } from "../rules/connector-block.rules.ts";
 import {
   capErrorDetail,
@@ -62,6 +62,7 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
   private secrets: Record<string, string> = {};
   /** Every secret value setup returned, kept or refused, so none is shown. */
   private setupSecretValues: string[] = [];
+  private scrubber: SecretScrubber | null = null;
 
   private constructor(options: ScenarioConnectorOptions) {
     this.config = options.config;
@@ -112,6 +113,7 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
       });
       // Kept before the answer is judged, so a failed setup's data can still be torn down.
       this.setupSecretValues = answer.secretValues;
+      this.scrubber = null;
       this.secrets = answer.secrets;
       this.state = answer.state ? this.scrubbed(answer.state) : null;
       if (answer.problem) throw new ConnectorBlockError({ message: answer.problem });
@@ -132,7 +134,8 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
         turn,
         turnIndex: this.turnCount++,
       });
-      return this.scrub(connectorCallReply(outputs));
+      // Scrubbed as JSON first: a stringified object reply holds each secret JSON-escaped.
+      return this.scrub(connectorCallReply(this.scrubbed(outputs)));
     });
   }
 
@@ -213,11 +216,17 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
     return [...Object.values(this.config.secrets), ...this.setupSecretValues, this.projectApiKey];
   }
 
+  /** Built once per set of known secrets, so each string scrubbed does not redo the variants. */
+  private get activeScrubber(): SecretScrubber {
+    this.scrubber ??= secretScrubberOf(this.knownSecretValues);
+    return this.scrubber;
+  }
+
   private scrub(text: string): string {
-    return scrubbedText({ text, values: this.knownSecretValues });
+    return this.activeScrubber.text(text);
   }
 
   private scrubbed(value: ConnectorObject): ConnectorObject {
-    return scrubbedJson({ value, values: this.knownSecretValues });
+    return this.activeScrubber.json(value);
   }
 }

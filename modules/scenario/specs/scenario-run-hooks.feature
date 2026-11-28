@@ -551,6 +551,19 @@ Feature: Scenario run hooks: setup and teardown
       When the error is recorded
       Then it holds no part of the secret
 
+    @unit
+    Scenario: A multi-line secret JSON-escaped in a reply or a code-runner answer leaves none of itself
+      Given a multi-line secret the block was given, such as a PEM key
+      When the call block returns it nested in an object reply, or the code runner answers a block with an HTTP error whose JSON body holds it
+      Then the reply and the recorded error hold no part of the secret
+
+    @unit
+    Scenario: A connector setup that returns more than 50 secrets, or over 64 KiB of them, fails setup
+      Given a setup block that returns 51 run-scoped secrets, or secrets over 64 KiB together
+      When setup's answer is checked
+      Then setup records "failed" naming the limit and no value
+      And none of those secrets reaches the call or teardown
+
     @integration
     Scenario: A failed connector teardown leaves the verdict unchanged
       Given a passing run whose teardown block raises
@@ -597,6 +610,13 @@ Feature: Scenario run hooks: setup and teardown
       Given a project with release_scenario_connector_steps on
       When the run is prepared
       Then the run carries no refusal
+
+    @unit
+    Scenario: An organisation rule for the release flag releases a connector run
+      Given release_scenario_connector_steps is on for the project's organisation by a targeting rule
+      When the run is prepared
+      Then the flag is asked with the project's organisation
+      And the run carries no refusal, as the card shows for that organisation
 
     # The Python code runner has no app-level egress fence yet (ADR-194, Isolation and egress).
     @integration @unimplemented

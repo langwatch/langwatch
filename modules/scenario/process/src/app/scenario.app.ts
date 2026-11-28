@@ -423,6 +423,7 @@ export class ScenarioModule implements ScenarioApi {
           secrets: peers.secrets,
           datasets: peers.datasets,
           featureFlags: peers.featureFlags,
+          projects: peers.projects,
         }),
       }),
       failures: ScenarioFailureHandlerService.create({ agents: peers.agents, simulations }),

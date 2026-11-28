@@ -9,7 +9,7 @@ import type { ConnectorAgentData } from "@langwatch/scenario-contract";
 import { describe, expect, it } from "vitest";
 
 import type { ConnectorBlockChannel } from "../channels/connector-block.channel.ts";
-import { CONNECTOR_BLOCK_NODE_ID } from "../rules/connector-block.rules.ts";
+import { CONNECTOR_BLOCK_NODE_ID, ConnectorBlockError } from "../rules/connector-block.rules.ts";
 import { ScenarioConnectorService } from "../services/scenario-connector.service.ts";
 import {
   ScenarioRunHooksError,
@@ -362,6 +362,102 @@ describe("ScenarioConnectorService", () => {
       expect(message).toContain("[redacted]");
       expect(message).not.toContain("shop-key");
       expect(message).not.toContain("10.4.2.11");
+    });
+  });
+
+  describe("when a multi-line secret comes back JSON-escaped", () => {
+    const pem =
+      "-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASC\n-----END PRIVATE KEY-----";
+    const pemConfig = { ...config, secrets: { SHOP_PEM: pem } };
+    const expectNoPartOfThePem = (text: string) => {
+      expect(text).not.toContain("MIIEvQIBADANBgkqhkiG9w0BAQEFAASC");
+      expect(text).not.toContain("BEGIN PRIVATE");
+    };
+
+    /** @scenario "A multi-line secret JSON-escaped in a reply or a code-runner answer leaves none of itself" */
+    it("a secret nested in an object reply is scrubbed", async () => {
+      const { connector } = connectorWith(
+        { secrets: pemConfig.secrets },
+        { call: { reply: { order: { note: `key ${pem}`, keys: [pem] } } } },
+      );
+
+      const reply = await connector.callTurn(turn);
+
+      expectNoPartOfThePem(reply);
+      expect(reply).toContain("[redacted]");
+    });
+
+    /** @scenario "A multi-line secret JSON-escaped in a reply or a code-runner answer leaves none of itself" */
+    it("a secret in a non-2xx answer's JSON body is scrubbed", async () => {
+      const channel: ConnectorBlockChannel = {
+        post: async () => {
+          throw new ConnectorBlockError({
+            message: `The code runner answered the setup block with HTTP 500: ${JSON.stringify({ detail: `bad key ${pem}` })}`,
+          });
+        },
+      };
+      const connector = ScenarioConnectorService.create({
+        config: pemConfig,
+        channel,
+        projectApiKey: "sk-lw-run-key-value",
+      });
+
+      const failure = await connector
+        .callHook({ kind: "setup", timeoutMs: 1_000 })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(Error);
+      const { message } = failure as Error;
+      expect(message).toContain("HTTP 500");
+      expectNoPartOfThePem(message);
+    });
+  });
+
+  describe("when setup returns more secrets than a run takes", () => {
+    const secretsOf = (count: number, size = 8) =>
+      Object.fromEntries(
+        Array.from({ length: count }, (_, index) => [
+          `RUN_KEY_${index}`,
+          `v${index}`.padEnd(size, "x"),
+        ]),
+      );
+
+    /** @scenario "A connector setup that returns more than 50 secrets, or over 64 KiB of them, fails setup" */
+    it("fails setup on 51 secrets and hands none of them on", async () => {
+      const { hooks, posts } = connectorWith(
+        {},
+        { setup: { state: { accountId: "acc_1" }, secrets: secretsOf(51) } },
+      );
+
+      const recorded = await recordedHooks(hooks.around(async () => "turns"));
+
+      expect(recorded.setup).toMatchObject({
+        status: "failed",
+        error: "The setup block returned 51 secrets; at most 50 may be returned.",
+      });
+      const teardown = posts.find(({ kind }) => kind === "teardown");
+      expect(Object.keys(teardown?.workflow.secrets ?? {})).toEqual(["SHOP_ADMIN_KEY"]);
+    });
+
+    /** @scenario "A connector setup that returns more than 50 secrets, or over 64 KiB of them, fails setup" */
+    it("fails setup on secrets over 64 KiB together", async () => {
+      const { hooks } = connectorWith(
+        {},
+        { setup: { state: {}, secrets: secretsOf(2, 33 * 1024) } },
+      );
+
+      const recorded = await recordedHooks(hooks.around(async () => "turns"));
+
+      expect(recorded.setup).toMatchObject({
+        status: "failed",
+        error: "The setup block's secrets are over the 64 KiB a run takes.",
+      });
+    });
+
+    it("accepts 50 secrets", async () => {
+      const { hooks } = connectorWith({}, { setup: { state: {}, secrets: secretsOf(50) } });
+
+      await expect(hooks.around(async () => "turns")).resolves.toBeDefined();
     });
   });
 

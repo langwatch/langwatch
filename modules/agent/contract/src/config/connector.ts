@@ -17,6 +17,8 @@ export type ConnectorBlockLanguage = (typeof CONNECTOR_BLOCK_LANGUAGES)[number];
 /** A block's code, and the fixture rows every block receives, in bytes. */
 export const CONNECTOR_BLOCK_MAX_BYTES = 64 * 1024;
 export const CONNECTOR_ROWS_MAX_BYTES = 64 * 1024;
+/** All the secret values a setup block returns for its run, together, in bytes. */
+export const CONNECTOR_SETUP_SECRETS_MAX_BYTES = 64 * 1024;
 
 /** SECRET_NAME_PATTERN in the secret contract, which this package does not depend on. */
 export const CONNECTOR_SECRET_NAME_PATTERN = /^[A-Z][A-Z0-9_]*$/;

@@ -6,13 +6,15 @@
  */
 import { AgentNotFoundError, type Agent, type AgentApi } from "@langwatch/agent-contract";
 import type { DatasetApi, DatasetPage } from "@langwatch/dataset-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { type FeatureFlagApi, SCENARIO_CONNECTOR_FLAG_KEY } from "@langwatch/feature-flag-contract";
+import type { ProjectApi } from "@langwatch/project-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 import { describe, expect, it } from "vitest";
 
 import { ScenarioConnectorTargetService } from "../scenario-connector-target.service.ts";
 
 const PROJECT_ID = "project-1";
+const ORGANIZATION_ID = "org-1";
 const NOT_RELEASED = "Connector steps are not released for this project yet.";
 const call = { language: "python" as const, code: "def execute(input):\n    return {}\n" };
 
@@ -70,7 +72,8 @@ function serviceWith({
   dataset = null,
 }: {
   agent?: Agent | "missing";
-  released?: boolean | "unreadable";
+  /** "organization" answers on only for a context naming the project's organisation. */
+  released?: boolean | "unreadable" | "organization";
   projectSecrets?: Record<string, string>;
   /** The dataset's rows, or null when it no longer exists. */
   dataset?: Record<string, unknown>[] | null;
@@ -100,16 +103,28 @@ function serviceWith({
     },
   };
   const featureFlags: Pick<FeatureFlagApi, "isEnabled"> = {
-    isEnabled: async () => {
+    isEnabled: async (key, context) => {
       if (released === "unreadable") throw new Error("flag store unreachable");
+      if (released === "organization") {
+        return (
+          key === SCENARIO_CONNECTOR_FLAG_KEY &&
+          context?.kind === "project" &&
+          context.organizationId === ORGANIZATION_ID
+        );
+      }
       return released;
     },
+  };
+  const projects: Pick<ProjectApi, "findOrganizationId"> = {
+    findOrganizationId: async (projectId) =>
+      projectId === PROJECT_ID ? ORGANIZATION_ID : undefined,
   };
   const service = ScenarioConnectorTargetService.create({
     agents,
     secrets,
     datasets,
     featureFlags,
+    projects,
   });
   const read = (runSecretValues: Record<string, string> = {}) =>
     service.getConnectorTarget({ projectId: PROJECT_ID, agentId: "agent-1", runSecretValues });
@@ -160,6 +175,17 @@ describe("ScenarioConnectorTargetService", () => {
         secrets: {},
         timeoutMs: 300_000,
       });
+    });
+  });
+
+  describe("given the release flag on for the project's organisation only", () => {
+    /** @scenario "An organisation rule for the release flag releases a connector run" */
+    it("an org-wide flag rule lets a connector run go through", async () => {
+      const { read } = serviceWith({ released: "organization" });
+
+      const data = await read();
+
+      expect(data).not.toHaveProperty("refusal");
     });
   });
 

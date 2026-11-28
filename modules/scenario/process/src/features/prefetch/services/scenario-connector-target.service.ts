@@ -14,15 +14,13 @@ import {
   type ConnectorAgentConfig,
 } from "@langwatch/agent-contract";
 import type { DatasetApi } from "@langwatch/dataset-contract";
-import type { FeatureFlagApi } from "@langwatch/feature-flag-contract";
+import { type FeatureFlagApi, SCENARIO_CONNECTOR_FLAG_KEY } from "@langwatch/feature-flag-contract";
 import { createLogger } from "@langwatch/observability";
+import type { ProjectApi } from "@langwatch/project-contract";
 import { type ConnectorAgentData, ScenarioTargetNotFoundError } from "@langwatch/scenario-contract";
 import type { SecretApi } from "@langwatch/secret-contract";
 
 const logger = createLogger("langwatch:scenarios:connector-target");
-
-/** The release gate for Scenario Connector blocks (ADR-194), off by default everywhere. */
-const SCENARIO_CONNECTOR_STEPS_FLAG_KEY = "release_scenario_connector_steps";
 
 /** What every block of a connector agent records while the release is off for its project. */
 const SCENARIO_CONNECTOR_NOT_RELEASED_MESSAGE =
@@ -38,6 +36,7 @@ type ConnectorTargetOptions = {
   secrets: Pick<SecretApi, "getValuesByName">;
   datasets: Pick<DatasetApi, "findDatasetPage">;
   featureFlags: Pick<FeatureFlagApi, "isEnabled">;
+  projects: Pick<ProjectApi, "findOrganizationId">;
 };
 
 /** What the target prefetch reads a connector agent through. */
@@ -99,12 +98,17 @@ export class ScenarioConnectorTargetService implements ConnectorTargetReader {
     }
   }
 
-  /** A flag read that fails answers off: no block runs on a guess. */
+  /**
+   * Asked with the project's organisation too, so an organisation rule releases the run as it
+   * shows the card. A flag read that fails answers off: no block runs on a guess.
+   */
   private async isReleased(projectId: string): Promise<boolean> {
     try {
-      return await this.options.featureFlags.isEnabled(SCENARIO_CONNECTOR_STEPS_FLAG_KEY, {
+      const organizationId = await this.options.projects.findOrganizationId(projectId);
+      return await this.options.featureFlags.isEnabled(SCENARIO_CONNECTOR_FLAG_KEY, {
         kind: "project",
         projectId,
+        ...(organizationId === undefined ? {} : { organizationId }),
       });
     } catch (error) {
       logger.warn({ error, projectId }, "Connector release flag read failed; treating it as off");
