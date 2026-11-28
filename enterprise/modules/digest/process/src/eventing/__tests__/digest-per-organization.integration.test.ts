@@ -462,6 +462,7 @@ async function memberInBothOrganizationsThisMonday() {
 const testsFor = (input: {
   email: string;
   template: Parameters<InstalledDigest["sendTestFor"]>[0]["template"];
+  deliverTo?: "me" | "person";
 }) => digest.sendTestFor({ ...input, operatorId: OPERATOR });
 
 describe("an operator sending themself another person's digests", () => {
@@ -493,6 +494,72 @@ describe("an operator sending themself another person's digests", () => {
       expect(
         digest.mail.every((mail) => mail.test && mail.email.subject.startsWith("[Test] ")),
       ).toBe(true);
+    });
+  });
+
+  describe("when they deliver the tests to the person", () => {
+    /** @scenario "Staff send a person's digests to the person, not to themselves" */
+    it("mails the person at their own address and the operator nothing", async () => {
+      await memberInBothOrganizationsThisMonday();
+
+      const answer = await testsFor({
+        email: emailOf(MEMBER),
+        template: "auto",
+        deliverTo: "person",
+      });
+
+      expect(answer.organizations.map((each) => each.outcome)).toEqual(["sent", "sent"]);
+      expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(MEMBER), emailOf(MEMBER)]);
+      expect(digest.mail.every((mail) => mail.test)).toBe(true);
+    });
+  });
+
+  describe("when they deliver the tests to a deactivated person", () => {
+    /** @scenario "A test send to a deactivated person is skipped" */
+    it("skips each organization as deactivated and mails no one", async () => {
+      await memberInBothOrganizationsThisMonday();
+      digest.world.deactivated.add(MEMBER);
+
+      const answer = await testsFor({
+        email: emailOf(MEMBER),
+        template: "auto",
+        deliverTo: "person",
+      });
+
+      expect(answer.organizations.map((each) => each.outcome === "skipped" && each.reason)).toEqual(
+        ["deactivated", "deactivated"],
+      );
+      expect(digest.mail).toEqual([]);
+    });
+
+    /** @scenario "A test send to yourself of a deactivated person's digests still works" */
+    it("still previews their digests to the operator", async () => {
+      await memberInBothOrganizationsThisMonday();
+      digest.world.deactivated.add(MEMBER);
+
+      const answer = await testsFor({ email: emailOf(MEMBER), template: "auto" });
+
+      expect(answer.organizations.map((each) => each.outcome)).toEqual(["sent", "sent"]);
+      expect(digest.mail.map((mail) => mail.to)).toEqual([emailOf(OPERATOR), emailOf(OPERATOR)]);
+    });
+  });
+
+  describe("when they deliver the tests to a person with no email address", () => {
+    /** @scenario "A test send to a person with no email address is skipped" */
+    it("skips each organization as without an address and mails no one", async () => {
+      await memberInBothOrganizationsThisMonday();
+      digest.world.withoutAddress.add(MEMBER);
+
+      const answer = await testsFor({
+        email: emailOf(MEMBER),
+        template: "auto",
+        deliverTo: "person",
+      });
+
+      expect(answer.organizations.map((each) => each.outcome === "skipped" && each.reason)).toEqual(
+        ["no_address", "no_address"],
+      );
+      expect(digest.mail).toEqual([]);
     });
   });
 

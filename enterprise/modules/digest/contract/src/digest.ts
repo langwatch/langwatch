@@ -70,6 +70,10 @@ export const DIGEST_MY_TEST_SKIP_REASONS = [
   "nothing_to_send",
   "opted_out",
   "not_a_member",
+  /** Delivery to the person was asked for, and their account is deactivated. */
+  "deactivated",
+  /** Delivery to the person was asked for, and they have no email address. */
+  "no_address",
   /** A forced template had no data to show for the person here. */
   "no_data_for_template",
 ] as const;
@@ -107,10 +111,18 @@ export interface DigestMyTestsSchema extends Named<typeof digestMyTestsSchemaDef
 export const digestMyTestsSchema: DigestMyTestsSchema = digestMyTestsSchemaDefinition;
 export type DigestMyTests = z.infer<typeof digestMyTestsSchema>;
 
-/** The person whose digests the operator is sent, by address, and which template to send. */
+/** Who a staff test is mailed to: the operator ("me"), or the person it is of ("person"). */
+export const digestTestDeliverySchema = z.enum(["me", "person"]);
+export type DigestTestDelivery = z.infer<typeof digestTestDeliverySchema>;
+
+/**
+ * The person whose digests the operator tests, by address, which template to send and where it
+ * goes. Only the operator or that person can receive it, never an address typed in.
+ */
 const digestSendTestForInputSchemaDefinition = z.object({
   email: z.string().trim().toLowerCase().pipe(z.email()),
   template: digestTestTemplateSchema,
+  deliverTo: digestTestDeliverySchema.default("me"),
 });
 export interface DigestSendTestForInputSchema extends Named<
   typeof digestSendTestForInputSchemaDefinition

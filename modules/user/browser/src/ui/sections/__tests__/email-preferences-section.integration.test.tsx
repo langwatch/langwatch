@@ -307,11 +307,30 @@ describe("given the email preferences band and the staff send of a person's dige
 
       const results = await screen.findByTestId("send-test-for-results");
       expect(stored.sendTestForCalls).toEqual([
-        { email: "sam@acme.test", template: "digest-traces-week" },
+        { email: "sam@acme.test", template: "digest-traces-week", deliverTo: "me" },
       ]);
       expect(screen.getByText("For Sam Lee (sam@acme.test)")).toBeTruthy();
       expect(results.textContent).toContain("Sent: Traces week");
       expect(results.textContent).toContain("Skipped: no data for this digest");
+    });
+  });
+
+  describe("when staff choose Send to them", () => {
+    /** @scenario "Staff choose to send a person's digests to them from their settings" */
+    it("asks for delivery to the person and says so on the button", async () => {
+      renderWithPersonalWorkspaceHost(<EmailPreferencesSection />, {
+        host: fakePersonalWorkspaceHost({ permissions: ["ops:manage"] }),
+      });
+
+      await userEvent.type(screen.getByTestId("send-test-for-email"), "sam@acme.test");
+      await userEvent.selectOptions(screen.getByTestId("send-test-for-deliver-to"), "Send to them");
+      expect(screen.getByTestId("send-test-for-button").textContent).toBe("Send test to them");
+      await userEvent.click(screen.getByTestId("send-test-for-button"));
+
+      await screen.findByTestId("send-test-for-results");
+      expect(stored.sendTestForCalls).toEqual([
+        { email: "sam@acme.test", template: "auto", deliverTo: "person" },
+      ]);
     });
   });
 

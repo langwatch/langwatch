@@ -65,6 +65,34 @@ export class DigestPersonNotFoundError extends HandledError {
   }
 }
 
+/** A test was asked to be delivered to a member whose account is deactivated. */
+export class DigestMemberDeactivatedError extends HandledError {
+  declare readonly code: "digest_member_deactivated";
+
+  constructor(userId: string) {
+    super("digest_member_deactivated", "This member's account is deactivated.", {
+      meta: { userId },
+      httpStatus: 409,
+      fault: "customer",
+    });
+    this.name = "DigestMemberDeactivatedError";
+  }
+}
+
+/** A test was asked to be delivered to a member with no email address. */
+export class DigestMemberAddressMissingError extends HandledError {
+  declare readonly code: "digest_member_address_missing";
+
+  constructor(userId: string) {
+    super(
+      "digest_member_address_missing",
+      "This member has no email address, so a test digest can't be sent to them.",
+      { meta: { userId }, httpStatus: 409, fault: "customer" },
+    );
+    this.name = "DigestMemberAddressMissingError";
+  }
+}
+
 /** A test was asked for a member who opted out of the digest. */
 export class DigestMemberUnsubscribedError extends HandledError {
   declare readonly code: "digest_member_unsubscribed";

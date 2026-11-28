@@ -287,6 +287,8 @@ export const APP_ERROR_CODES = [
   "digest_impersonation_refused",
   "digest_link_invalid",
   "digest_links_unavailable",
+  "digest_member_address_missing",
+  "digest_member_deactivated",
   "digest_member_not_found",
   "digest_member_unsubscribed",
   "digest_nothing_to_send",

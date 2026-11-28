@@ -64,7 +64,7 @@ Feature: Weekly digest emails
   Scenario: A coding-agent week shows only the counts its agent reported
     Given a member with 5 coding-agent sessions this week
     When their digest-coding-agent-week email is built
-    Then it shows their sessions, tokens, cost and active minutes
+    Then it shows their sessions, tokens and active minutes, and no cost
     And lines changed, commits, pull requests and a top repository only when they were reported
 
   @unit
@@ -619,6 +619,34 @@ Feature: Weekly digest emails
     And the answer names the member and lists each organization with the template it was sent with
 
   @unit @integration
+  Scenario: Staff send a person's digests to the person, not to themselves
+    Given a member in two organizations, each with a busy week, and an operator
+    When the operator sends the member's digests to the person
+    Then the member receives one test per organization at their own address, marked [Test]
+    And the operator is sent nothing
+    And an address typed in is never accepted as where to send
+
+  @integration
+  Scenario: A test send to a deactivated person is skipped
+    Given a member whose account is deactivated
+    When the operator sends the member's digests to the person
+    Then each organization is reported as skipped because the account is deactivated
+    And no email is sent
+
+  @integration
+  Scenario: A test send to yourself of a deactivated person's digests still works
+    Given a member whose account is deactivated
+    When the operator sends themself the member's digests
+    Then the operator receives one test per organization
+
+  @integration
+  Scenario: A test send to a person with no email address is skipped
+    Given a member whose account has no email address
+    When the operator sends the member's digests to the person
+    Then each organization is reported as skipped because they have no address
+    And no email is sent
+
+  @unit @integration
   Scenario: Staff force one digest for a person, past its threshold
     Given a member whose busiest project had 40 traces this week, below the traces-week threshold
     When the operator sends themself the member's digests with traces week forced
@@ -643,6 +671,12 @@ Feature: Weekly digest emails
     Given Cloud admin staff holding ops:manage on their Profile page
     When they enter a person's email, choose a digest and press "Send test to me"
     Then the person and each of their organizations are listed with what was sent, or why nothing was
+
+  @integration
+  Scenario: Staff choose to send a person's digests to them from their settings
+    Given Cloud admin staff holding ops:manage on their Profile page
+    When they enter a person's email and choose "Send to them"
+    Then the button reads "Send test to them" and the tests go to that person, not to the staff member
 
   @integration @unimplemented
   Scenario: Metrics count sends, unique clickers and unsubscribes by template and week

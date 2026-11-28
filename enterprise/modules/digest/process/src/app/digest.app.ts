@@ -209,10 +209,16 @@ export class DigestModule implements DigestApiContract {
   sendMyTests: DigestApiContract["sendMyTests"] = async ({ operator }) =>
     this.#tests.sendMyTests({ operatorId: await this.#operators.admitManager(operator) });
 
-  sendTestFor: DigestApiContract["sendTestFor"] = async ({ operator, email, template }) =>
+  sendTestFor: DigestApiContract["sendTestFor"] = async ({
+    operator,
+    email,
+    template,
+    deliverTo,
+  }) =>
     this.#tests.sendTestFor({
       email,
       template,
+      deliverTo,
       operatorId: await this.#operators.admitManager(operator),
     });
 

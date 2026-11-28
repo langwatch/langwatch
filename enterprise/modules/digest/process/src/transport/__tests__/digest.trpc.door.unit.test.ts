@@ -109,8 +109,8 @@ function recordingDigest(reached: string[]) {
         reached.push(`sendMyTests:${operator?.id}`);
         return { organizations: [] };
       },
-      sendTestFor: async ({ operator }) => {
-        reached.push(`sendTestFor:${operator?.id}`);
+      sendTestFor: async ({ operator, deliverTo }) => {
+        reached.push(`sendTestFor:${operator?.id}:${deliverTo}`);
         return TESTS_FOR;
       },
       getPreference: async ({ userId }) => {
@@ -227,8 +227,21 @@ describe("the digest's operator controls at the platform door", () => {
         "setArmed:user-staff",
         "sendTest:user-staff",
         "sendMyTests:user-staff",
-        "sendTestFor:user-staff",
+        "sendTestFor:user-staff:me",
       ]);
+    });
+
+    /** @scenario "Staff send a person's digests to the person, not to themselves" */
+    it("passes a choice to deliver to the person through, and defaults to the operator", async () => {
+      const reached: string[] = [];
+      const staff = recordingDigest(reached)("user-staff");
+
+      await staff.sendTestFor({ ...TEST_FOR, deliverTo: "person" });
+      await expect(
+        staff.sendTestFor({ ...TEST_FOR, deliverTo: "anyone@example.test" as never }),
+      ).rejects.toBeDefined();
+
+      expect(reached).toEqual(["sendTestFor:user-staff:person"]);
     });
   });
 
