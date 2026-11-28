@@ -1,5 +1,23 @@
 # Changelog
 
+## [3.1.1](https://github.com/langwatch/langwatch/compare/langevals@v3.1.0...langevals@v3.1.1) (2026-11-28)
+
+
+### Bug Fixes
+
+* **gateway:** record platform provider-key spend in the ledger and stop topic clustering re-embedding ([#9302](https://github.com/langwatch/langwatch/issues/9302)) ([5dacb3f](https://github.com/langwatch/langwatch/commit/5dacb3f3dc85bb2a433a81ad04bbdbfb43a85a19))
+* **langevals:** embed a clustering page's batches concurrently and keep unpriced names ([#9563](https://github.com/langwatch/langwatch/issues/9563)) ([73570b2](https://github.com/langwatch/langwatch/commit/73570b289faa9f55dfb6eb3dcd41b6e4ec9e9d40))
+* **model-provider:** send each model's output token limit under the name it takes ([#9080](https://github.com/langwatch/langwatch/issues/9080)) ([82e552f](https://github.com/langwatch/langwatch/commit/82e552f5c077cf0f589c100cfc3f55927b2e84f6))
+* **security:** bump soupsieve, opentelemetry-api and tornado, drop unused arize-phoenix ([#9895](https://github.com/langwatch/langwatch/issues/9895)) ([95c5195](https://github.com/langwatch/langwatch/commit/95c5195023d83cab52121fea0098d2ff8db6b0cc))
+* **security:** raise uv floors for nltk, pyasn1, pypdf, filelock, dnspython and joserfc ([#9783](https://github.com/langwatch/langwatch/issues/9783)) ([0e3f51f](https://github.com/langwatch/langwatch/commit/0e3f51f4c40b0f3ac3dc6d2376bf6e91912c8baf))
+* **security:** vitest 5.0.5, go-chi, scenario-go grpc, fastmcp-slim and the remaining uv floors ([#8995](https://github.com/langwatch/langwatch/issues/8995)) ([1349269](https://github.com/langwatch/langwatch/commit/1349269a6001241beaf31ed23855808f15a13d7b))
+* **topic:** answer a clustering model with no API key as the customer's to fix ([#10031](https://github.com/langwatch/langwatch/issues/10031)) ([f3468c5](https://github.com/langwatch/langwatch/commit/f3468c58f9fec31e1854af3af920cfa9d322b8e9))
+
+
+### Miscellaneous
+
+* **main:** release langwatch 3.31.0 ([#10004](https://github.com/langwatch/langwatch/issues/10004)) ([1edc0e5](https://github.com/langwatch/langwatch/commit/1edc0e59ff48ffe7704527abe0d741d21a45604c))
+
 ## [3.1.0](https://github.com/langwatch/langwatch/compare/langevals@v3.0.0...langevals@v3.1.0) (2026-09-12)
 
 ### Features
