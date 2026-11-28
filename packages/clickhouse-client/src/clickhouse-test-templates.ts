@@ -20,8 +20,8 @@ interface TemplateObject {
 }
 
 /**
- * Builds `template` once per server under the machine-wide schema lock, then gives `target`
- * the same tables, views and rows. `build` receives the held lock, so a migration task it
+ * Builds `template` once per server, then gives `target` the same tables, views and rows,
+ * both under the machine-wide schema lock. `build` receives the held lock, so a migration task it
  * starts re-enters it instead of waiting on this caller.
  */
 export async function cloneClickHouseTemplate({
@@ -42,23 +42,22 @@ export async function cloneClickHouseTemplate({
   supersedes?: string;
   lock?: ClickHouseSchemaLock;
 }): Promise<void> {
-  if (!(await isTemplateReady({ client, template }))) {
-    const release = await lock.acquire();
-    try {
-      if (!(await isTemplateReady({ client, template }))) {
-        if (supersedes) await dropOtherVersions({ client, template, prefix: supersedes });
-        await client.command({ query: `DROP DATABASE IF EXISTS ${template} SYNC` });
-        await client.command({ query: `CREATE DATABASE ${template}` });
-        await build({ database: template, lock });
-        await client.command({
-          query: `CREATE TABLE ${template}.${TEMPLATE_READY_TABLE} (ready UInt8) ENGINE = TinyLog`,
-        });
-      }
-    } finally {
-      release();
+  // The copy holds the lock too, so building another version never drops its source mid-copy.
+  const release = await lock.acquire();
+  try {
+    if (!(await isTemplateReady({ client, template }))) {
+      if (supersedes) await dropOtherVersions({ client, template, prefix: supersedes });
+      await client.command({ query: `DROP DATABASE IF EXISTS ${template} SYNC` });
+      await client.command({ query: `CREATE DATABASE ${template}` });
+      await build({ database: template, lock });
+      await client.command({
+        query: `CREATE TABLE ${template}.${TEMPLATE_READY_TABLE} (ready UInt8) ENGINE = TinyLog`,
+      });
     }
+    await cloneClickHouseDatabase({ client, from: template, to: target });
+  } finally {
+    release();
   }
-  await cloneClickHouseDatabase({ client, from: template, to: target });
 }
 
 /** Drops the databases named like `prefix` other than `template`: schemas no checkout builds. */
