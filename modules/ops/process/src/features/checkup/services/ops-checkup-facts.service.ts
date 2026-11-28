@@ -12,6 +12,7 @@ import type {
 } from "@langwatch/model-provider-contract";
 import type { NotificationService as NotificationApi } from "@langwatch/notification-contract";
 import type { OrganizationApi } from "@langwatch/organization-contract";
+import { gatewayInternalSignatureHeaders } from "@langwatch/process/gateway-internal-signature";
 import type { ProjectApi } from "@langwatch/project-contract";
 import type {
   StoredObjectApi,
@@ -38,6 +39,8 @@ import { findCheckupProjectId } from "./checkup-canary-project.service.ts";
 
 export const GATEWAY_PROBE_TIMEOUT_MS = 5_000;
 const CANARY_TIMEOUT_MS = 150_000;
+/** The gateway's signed route naming where it ships spend, budget and auth traffic. */
+const CONTROL_PLANE_PATH = "/internal/control-plane";
 const CHECKUP_PROJECT_MISSING =
   "the checkup project is not set up yet: run the upgrade so step ops:checkup-canary-project creates it";
 
@@ -222,14 +225,25 @@ export function appAddresses(candidates: (string | undefined)[]): string[] {
 export async function probeControlPlane({
   probes,
   baseUrl,
+  internalSecret,
 }: {
   probes: CheckupProbeChannel;
   baseUrl: string | undefined;
+  internalSecret: string | undefined;
 }): Promise<ControlPlaneProbe> {
   if (!baseUrl) return { kind: "unreachable", reason: "no gateway" };
+  if (!internalSecret) {
+    return { kind: "unreachable", reason: "LW_GATEWAY_INTERNAL_SECRET is not set on this app" };
+  }
   try {
     const answer = await probes.get({
-      url: `${baseUrl}/debug/control-plane`,
+      url: `${baseUrl.replace(/\/$/, "")}${CONTROL_PLANE_PATH}`,
+      headers: gatewayInternalSignatureHeaders({
+        secret: internalSecret,
+        method: "GET",
+        path: CONTROL_PLANE_PATH,
+        nowMs: nowInstant().epochMilliseconds,
+      }),
       timeoutMs: GATEWAY_PROBE_TIMEOUT_MS,
     });
     if (answer.status < 200 || answer.status >= 300) {

@@ -5,13 +5,14 @@ import {
   GatewayInternalAuthenticationError,
   GatewayInternalAuthenticationUnavailableError,
 } from "@langwatch/gateway-contract";
+import {
+  GATEWAY_SIGNATURE_HEADER,
+  GATEWAY_TIMESTAMP_HEADER,
+  gatewayInternalSignature,
+} from "@langwatch/process/gateway-internal-signature";
 import { nowInstant } from "@langwatch/time";
 
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-  GATEWAY_SIGNATURE_WINDOW_SECONDS,
-} from "../rules/gateway-internal-identity.rules.ts";
+import { GATEWAY_SIGNATURE_WINDOW_SECONDS } from "../rules/gateway-internal-identity.rules.ts";
 import { GatewayAuthDecisionService } from "./gateway-auth-decision.service.ts";
 
 /**
@@ -49,8 +50,8 @@ export class GatewayInternalIdentityService implements RestIdentity {
       throw new GatewayInternalAuthenticationUnavailableError();
     }
 
-    const presentedSig = request.headers.get("X-LangWatch-Gateway-Signature");
-    const presentedTs = request.headers.get("X-LangWatch-Gateway-Timestamp");
+    const presentedSig = request.headers.get(GATEWAY_SIGNATURE_HEADER);
+    const presentedTs = request.headers.get(GATEWAY_TIMESTAMP_HEADER);
     if (!presentedSig || !presentedTs) {
       this.decisions.record({
         request,
@@ -70,13 +71,13 @@ export class GatewayInternalIdentityService implements RestIdentity {
 
     const body = typeof rawBody === "string" ? rawBody : new TextDecoder().decode(rawBody);
     const url = new URL(request.url);
-    const canonical = buildGatewayCanonicalString({
+    const expected = gatewayInternalSignature({
+      secret,
       method: request.method,
       path: url.pathname,
       timestamp: presentedTs,
       body,
     });
-    const expected = computeGatewaySignature(secret, canonical);
 
     const a = Buffer.from(expected);
     const b = Buffer.from(presentedSig);

@@ -1,12 +1,14 @@
 package providers
 
 import (
+	"context"
 	"testing"
 	"time"
 
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
+	"go.uber.org/zap"
 )
 
 // @scenario "Upstream requests get a 14 minute timeout for every provider"
@@ -43,24 +45,36 @@ func TestVoyageClientSharesTimeoutCeiling(t *testing.T) {
 	assert.Equal(t, ProviderRequestTimeoutSeconds*time.Second, newVoyageClient().Timeout)
 }
 
-// @scenario "A provider on a private address is dispatched to only with the private-network guard off"
-func TestGetConfigForProviderFollowsEgressPolicyForPrivateNetwork(t *testing.T) {
+// @scenario "A provider on a private address is dispatched to only when the egress policy admits its host"
+func TestEveryProviderConnectsThroughTheEgressPolicy(t *testing.T) {
 	cases := []struct {
 		name      string
 		opts      BifrostOptions
 		wantAllow bool
 	}{
 		{name: "guard off", opts: BifrostOptions{BlockLocalHTTPCalls: false}, wantAllow: true},
-		{name: "guard on with allowlist", opts: BifrostOptions{BlockLocalHTTPCalls: true, AllowedEndpointHosts: []string{"llm-proxy.internal"}}, wantAllow: false},
+		{name: "guard on, host allowlisted", opts: BifrostOptions{BlockLocalHTTPCalls: true, AllowedEndpointHosts: []string{"llm-proxy.internal"}}, wantAllow: true},
 		{name: "guard on without allowlist", opts: BifrostOptions{BlockLocalHTTPCalls: true}, wantAllow: false},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			a := &account{allowPrivateNetwork: tc.opts.allowsPrivateNetwork()}
+			tc.opts.Logger = zap.NewNop()
+			router, err := NewBifrostRouter(context.Background(), tc.opts)
+			require.NoError(t, err)
+			t.Cleanup(router.Close)
+
+			a := &account{egressProxy: router.egressProxy}
 			for _, provider := range []bfschemas.ModelProvider{bfschemas.VLLM, bfschemas.OpenAI, bfschemas.Anthropic} {
 				cfg, err := a.GetConfigForProvider(provider)
 				require.NoError(t, err)
-				assert.Equal(t, tc.wantAllow, cfg.NetworkConfig.AllowPrivateNetwork, "provider %s", provider)
+				require.NotNil(t, cfg.ProxyConfig, "provider %s must dial through the egress proxy", provider)
+				assert.Equal(t, router.egressProxy.URL(), cfg.ProxyConfig.URL.GetValue(), "provider %s", provider)
+			}
+			err = router.endpointPolicy.egress.CheckDial("10.0.0.5:443", "llm-proxy.internal")
+			if tc.wantAllow {
+				assert.NoError(t, err)
+			} else {
+				assert.Error(t, err)
 			}
 		})
 	}

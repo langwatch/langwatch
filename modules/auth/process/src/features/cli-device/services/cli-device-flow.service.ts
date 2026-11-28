@@ -16,6 +16,7 @@ import {
   posted,
   type CliDeviceFlowAnswer,
 } from "../rules/cli-device-flow.rules.ts";
+import { CliDeviceAccessService, type CliAccessSessionRead } from "./cli-device-access.service.ts";
 import {
   type CliDeviceApprovalFrame,
   CliDeviceApprovalService,
@@ -103,6 +104,7 @@ export class CliDeviceFlowService {
   readonly #approvals: CliDeviceApprovalService;
   readonly #exchange: CliDeviceExchangeService;
   readonly #rotation: CliDeviceRotationService;
+  readonly #access: CliDeviceAccessService;
   readonly #approve: CliDeviceApproveService;
 
   private constructor(flow: CliDeviceFlowCollaborators) {
@@ -111,6 +113,7 @@ export class CliDeviceFlowService {
     const keys = CliDeviceKeysService.create({ flow });
     this.#exchange = CliDeviceExchangeService.create({ flow, keys });
     this.#rotation = CliDeviceRotationService.create({ flow });
+    this.#access = CliDeviceAccessService.create({ flow });
     this.#approve = CliDeviceApproveService.create({ flow, keys });
   }
 
@@ -148,7 +151,11 @@ export class CliDeviceFlowService {
   }
 
   getAccessProject(input: { authorization: string }): Promise<CliAccessProject> {
-    return this.#rotation.getAccessProject(input);
+    return this.#access.getAccessProject(input);
+  }
+
+  getAccessSession(input: { authorization: string }): Promise<CliAccessSessionRead> {
+    return this.#access.getAccessSession(input);
   }
 
   lookupDeviceCode(input: CliDeviceCodeLookup): Promise<CliDeviceFlowAnswer> {

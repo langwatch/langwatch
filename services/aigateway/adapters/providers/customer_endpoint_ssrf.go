@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"net"
 	"net/url"
+	"regexp"
 	"strings"
 
+	"github.com/langwatch/langwatch/pkg/ssrf"
 	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -34,6 +36,21 @@ func newCustomerEndpointPolicy(blockLocal, requireHTTPS bool, allowedHosts []str
 		requireHTTPS: requireHTTPS,
 		resolve:      defaultEndpointResolver,
 	}
+}
+
+// withLookup resolves through lookup for the endpoint check and the egress
+// dialer alike (tests).
+func (p customerEndpointPolicy) withLookup(lookup ssrf.Lookup) customerEndpointPolicy {
+	p.egress = p.egress.WithLookup(lookup)
+	p.resolve = func(ctx context.Context, host string) ([]net.IP, error) {
+		addrs, err := lookup(ctx, host)
+		ips := make([]net.IP, 0, len(addrs))
+		for _, addr := range addrs {
+			ips = append(ips, net.IP(addr.AsSlice()))
+		}
+		return ips, err
+	}
+	return p
 }
 
 func defaultEndpointResolver(ctx context.Context, host string) ([]net.IP, error) {
@@ -68,12 +85,11 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 		return fmt.Errorf("customer endpoint host is reserved for cloud metadata")
 	}
 
-	allowlisted := policy.egress.Allowlisted(host)
 	if policy.requireHTTPS && scheme != "https" {
 		return fmt.Errorf("customer endpoint must use https")
 	}
 	if parsed := net.ParseIP(host); parsed != nil {
-		return egress.AddressError(parsed, policy.egress.BlockLocal, allowlisted)
+		return policy.egress.AddressError(parsed, host)
 	}
 
 	addresses, err := policy.resolve(ctx, host)
@@ -84,17 +100,27 @@ func validateCustomerEndpoint(ctx context.Context, rawURL string, policy custome
 		return fmt.Errorf("customer endpoint host has no address records")
 	}
 	for _, address := range addresses {
-		if err := egress.AddressError(address, policy.egress.BlockLocal, allowlisted); err != nil {
+		if err := policy.egress.AddressError(address, host); err != nil {
 			return err
 		}
 	}
 	return nil
 }
 
+// awsRegion is an AWS region identifier (us-east-1, us-gov-east-1), the same
+// pattern bifrost accepts as a model prefix. Bedrock hosts are built from the
+// region, so this keeps every Bedrock connection on AWS's regional endpoints.
+var awsRegion = regexp.MustCompile(`^[a-z]{2,3}(?:-[a-z]+)+-\d+$`)
+
 func validateCredentialEndpoints(ctx context.Context, cred domain.Credential, policy customerEndpointPolicy) error {
 	if baseURL := credBaseURL(cred); baseURL != "" {
 		if err := validateCustomerEndpoint(ctx, baseURL, policy); err != nil {
 			return fmt.Errorf("base_url rejected: %w", err)
+		}
+	}
+	if cred.ProviderID == domain.ProviderBedrock {
+		if region := credExtra(cred, "region", "aws_region_name"); region != "" && !awsRegion.MatchString(region) {
+			return fmt.Errorf("bedrock region is not an AWS region identifier")
 		}
 	}
 	if cred.ProviderID == domain.ProviderAzure {

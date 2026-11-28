@@ -101,3 +101,18 @@ func clientDroppingCrossOriginReferer(client *http.Client) *http.Client {
 	}
 	return &scoped
 }
+
+// clientJudgingEachHop copies client so a redirect the caller's policy would
+// follow also passes the destination policy, within the request's deadline,
+// before it is sent; a hop sent through a proxy is judged as a direct one.
+func clientJudgingEachHop(client *http.Client, opts SSRFOptions) *http.Client {
+	scoped := *client
+	prior := client.CheckRedirect
+	scoped.CheckRedirect = func(req *http.Request, via []*http.Request) error {
+		if err := followPrior(prior, req, via); err != nil {
+			return err
+		}
+		return checkURL(req.Context(), req.URL.String(), opts)
+	}
+	return &scoped
+}

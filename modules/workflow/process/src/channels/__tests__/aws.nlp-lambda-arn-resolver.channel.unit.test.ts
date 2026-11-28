@@ -10,6 +10,7 @@ import {
   UpdateFunctionCodeCommand,
   UpdateFunctionConfigurationCommand,
 } from "@aws-sdk/client-lambda";
+import { NLP_INTERNAL_SECRET_ENV } from "@langwatch/process/nlp-internal-secret";
 import { describe, expect, it } from "vitest";
 
 import {
@@ -188,6 +189,28 @@ describe("given a project whose studio engine needs a function", () => {
       expect(variables.CACHE_BUCKET).toBe("langwatch-nlp-cache");
     });
 
+    it("drops the engine hop's shared secret a function carries out of band", async () => {
+      const carrying = deployed({
+        Environment: {
+          Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand", UNMANAGED: "keep-me" },
+        },
+      });
+      const { sent, subject } = resolver({
+        reads: [
+          { Configuration: carrying },
+          { Code: { ImageUri: CONFIG.imageUri }, Configuration: carrying },
+          { Configuration: READY },
+        ],
+      });
+
+      await subject.resolve({ projectId: "project-1" });
+
+      expect(updates(sent)).toHaveLength(1);
+      expect(
+        (updates(sent)[0]!.input.Environment as { Variables: Record<string, string> }).Variables,
+      ).toEqual({ ...desired, UNMANAGED: "keep-me" });
+    });
+
     /** @scenario "A Lambda still on the old 1024 MB default is raised to 2048" */
     it("raises a 1024 MB function to 2048", async () => {
       const small = deployed({ MemorySize: 1024 });
@@ -267,6 +290,25 @@ describe("given a project whose studio engine needs a function", () => {
 
       expect(arn.arn).toBe(ARN);
       expect(updates(sent)).toHaveLength(1);
+    });
+
+    /** @scenario "A function AWS will not reconcile mid-update is resolved again soon" */
+    it("marks the resolution unprotected while the shared secret could not be dropped", async () => {
+      const carrying = deployed({
+        Environment: { Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand" } },
+      });
+      const { subject } = resolver({
+        reads: [
+          { Configuration: carrying },
+          { Code: { ImageUri: CONFIG.imageUri }, Configuration: carrying },
+        ],
+        rejectUpdateWith: new Error("An update is in progress for resource"),
+      });
+
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+        unprotected: true,
+      });
     });
 
     /** @scenario "AWS errors are matched by exception name, not message text" */
@@ -383,6 +425,60 @@ describe("given pods of two releases serving the same project during a rollout",
     });
   });
 
+  describe("when Lambda cannot return the tags of a function carrying the shared secret", () => {
+    const carrying = (revision: string) => {
+      const configuration = {
+        ...READY,
+        RevisionId: revision,
+        Environment: {
+          Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand", UNMANAGED: "keep-me" },
+        },
+      };
+      return [
+        { Configuration: configuration },
+        {
+          Code: { ImageUri: "registry/nlp:v10" },
+          Configuration: configuration,
+          TagsError: { ErrorCode: "AccessDeniedException", Message: "lambda:ListTags" },
+        },
+      ];
+    };
+
+    /** @scenario "A function whose order cannot be read still loses the shared secret" */
+    it("drops only the secret, against the revision it read", async () => {
+      const { sent, subject } = resolver({ config: ORDERED, reads: carrying("rev-1") });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toMatchObject({ arn: ARN, unprotected: true });
+      expect(writes(sent)).toEqual(["UpdateFunctionConfigurationCommand"]);
+      expect(
+        sent.find((call) => call.name === "UpdateFunctionConfigurationCommand")!.input,
+      ).toEqual({
+        FunctionName: "langwatch_nlp-project-1",
+        RevisionId: "rev-1",
+        Environment: { Variables: { ...desired, UNMANAGED: "keep-me" } },
+      });
+    });
+
+    /** @scenario "A function whose order cannot be read still loses the shared secret" */
+    it("still answers when AWS refuses the removal", async () => {
+      class Moved extends Error {
+        override readonly name = "PreconditionFailedException";
+      }
+      const { subject } = resolver({
+        config: ORDERED,
+        reads: carrying("rev-1"),
+        rejectUpdateWith: new Moved("the revision moved"),
+      });
+
+      await expect(subject.resolve({ projectId: "project-1" })).resolves.toMatchObject({
+        arn: ARN,
+        unprotected: true,
+      });
+    });
+  });
+
   describe("when Lambda refuses to record the pod's order", () => {
     /** @scenario "A pod that cannot record its order does not move the image" */
     it("leaves the image and configuration as they are", async () => {
@@ -396,6 +492,37 @@ describe("given pods of two releases serving the same project during a rollout",
 
       expect(resolution).toMatchObject({ arn: ARN, imageUri: CONFIG.imageUri, unprotected: true });
       expect(writes(sent)).toEqual(["TagResourceCommand"]);
+    });
+
+    /** @scenario "A pod that cannot record its order does not move the image" */
+    it("still removes the shared secret alone, against the revision it read", async () => {
+      const configuration = {
+        ...READY,
+        RevisionId: "rev-7",
+        Environment: {
+          Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand", UNMANAGED: "keep-me" },
+        },
+      };
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: [
+          { Configuration: configuration },
+          { Code: { ImageUri: "registry/nlp:v8" }, Configuration: configuration },
+        ],
+        rejectTagWith: new Error("not authorized to perform lambda:TagResource"),
+      });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toMatchObject({ arn: ARN, unprotected: true });
+      expect(writes(sent)).toEqual(["TagResourceCommand", "UpdateFunctionConfigurationCommand"]);
+      expect(
+        sent.find((call) => call.name === "UpdateFunctionConfigurationCommand")!.input,
+      ).toEqual({
+        FunctionName: "langwatch_nlp-project-1",
+        RevisionId: "rev-7",
+        Environment: { Variables: { ...desired, UNMANAGED: "keep-me" } },
+      });
     });
   });
 

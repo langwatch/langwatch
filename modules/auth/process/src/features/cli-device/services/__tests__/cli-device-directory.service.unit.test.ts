@@ -4,6 +4,7 @@
  */
 import { MemberNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import type { AuthDirectoryRepository } from "../../../../repositories/auth-directory.repository.ts";
@@ -22,15 +23,33 @@ const PROJECT = {
   kind: "application",
 };
 
+function personWith({ deactivatedAt }: { deactivatedAt: Date | null }): UserProfile {
+  return {
+    id: "u",
+    name: "Jane",
+    email: "jane@example.test",
+    emailVerified: true,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    lastLoginAt: null,
+    deactivatedAt,
+  };
+}
+
 function directoryOver({
   organizations = {},
   projects = {},
+  users = {},
 }: {
   organizations?: Partial<OrganizationApi>;
   projects?: Partial<CliDeviceProjects>;
+  users?: Partial<UserApi>;
 }) {
   return CliDeviceDirectoryService.create({
     people: createApiFixture<AuthDirectoryRepository>(),
+    users: createApiFixture<UserApi>(users),
     organizations: createApiFixture<OrganizationApi>(organizations),
     projects: createApiFixture<CliDeviceProjects>(projects),
   });
@@ -56,6 +75,52 @@ describe("CliDeviceDirectoryService", () => {
       await expect(directory.getOrganization("org_gone")).rejects.toMatchObject({
         code: "organization_not_found",
       });
+    });
+  });
+
+  describe("when asked whether a person still stands in the organization", () => {
+    it("answers true for an active person with an enabled seat", async () => {
+      const directory = directoryOver({
+        organizations: { isMember: async () => true },
+        users: { findById: async () => personWith({ deactivatedAt: null }) },
+      });
+
+      await expect(
+        directory.hasActiveMembership({ userId: "u", organizationId: "o" }),
+      ).resolves.toBe(true);
+    });
+
+    it("answers false for a deactivated person whose seat is still enabled", async () => {
+      const directory = directoryOver({
+        organizations: { isMember: async () => true },
+        users: { findById: async () => personWith({ deactivatedAt: new Date(1) }) },
+      });
+
+      await expect(
+        directory.hasActiveMembership({ userId: "u", organizationId: "o" }),
+      ).resolves.toBe(false);
+    });
+
+    it("answers false for a person the user module no longer holds", async () => {
+      const directory = directoryOver({
+        organizations: { isMember: async () => true },
+        users: { findById: async () => null },
+      });
+
+      await expect(
+        directory.hasActiveMembership({ userId: "u", organizationId: "o" }),
+      ).resolves.toBe(false);
+    });
+
+    it("answers false for a disabled or removed seat", async () => {
+      const directory = directoryOver({
+        organizations: { isMember: async () => false },
+        users: { findById: async () => personWith({ deactivatedAt: null }) },
+      });
+
+      await expect(
+        directory.hasActiveMembership({ userId: "u", organizationId: "o" }),
+      ).resolves.toBe(false);
     });
   });
 

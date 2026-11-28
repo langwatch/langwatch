@@ -130,6 +130,28 @@ Feature: Optimization studio execution on a per-project Lambda
     Then the function's configuration is reconciled
     And anything an operator set outside this code is left alone
 
+  @unit @regression
+  Scenario: A function resolved before the shared secret was dropped is resolved again
+    Given a function resolved and cached by a release that left the engine hop's shared secret on it
+    When a pod of this release reads that cached function
+    Then the entry reads stale and the function is reconciled before it is invoked
+
+  @unit @regression
+  Scenario: A function AWS will not reconcile mid-update is resolved again soon
+    Given a function whose configuration differs from the deployment's
+    And AWS refuses the configuration update because another update is in flight
+    When a studio run resolves where to execute
+    Then the run still gets the function
+    And the resolution is cached only for the short retry window
+
+  @unit @regression
+  Scenario: A function whose order cannot be read still loses the shared secret
+    Given a function carrying the engine hop's shared secret
+    And Lambda cannot return the function's tags
+    When a studio run resolves where to execute
+    Then the secret alone is removed, only if the function is unchanged since it was read
+    And the run still gets the function when AWS refuses that removal
+
   @unit
   Scenario: A resolved function is shared across every pod through Redis
     Given a deployment that composed a shared Redis-backed function cache

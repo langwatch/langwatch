@@ -38,8 +38,8 @@ type SSRFOptions struct {
 	//
 	// Cloud metadata is refused regardless of this setting.
 	StrictPublicOnly bool
-	// AllowLocal permits the private, loopback and link-local destinations
-	// that are otherwise refused. It is what BLOCK_LOCAL_HTTP_CALLS=false
+	// AllowLocal permits the private and loopback destinations that are
+	// otherwise refused. It is what BLOCK_LOCAL_HTTP_CALLS=false
 	// means for this service, and it is the whole reason an on-prem install
 	// can point a workflow at a service on its own network.
 	//
@@ -52,8 +52,9 @@ type SSRFOptions struct {
 	// it (cmd/root.go, from the operator's variable).
 	//
 	// StrictPublicOnly still wins: it exists to say "globally routable only",
-	// and a private address is not globally routable. Cloud metadata is
-	// refused either way.
+	// and a private address is not globally routable. Cloud metadata and
+	// link-local are refused either way, and loopback needs a loopback name
+	// or the allowlist (see loopbackThroughAnotherName).
 	AllowLocal bool
 	// Logger receives egress refusals and strict-mode previews. nil is
 	// safe and discards them.
@@ -96,6 +97,11 @@ var blockedHosts = map[string]struct{}{
 // resolves to a public IP at check time but a private IP at dial time
 // (DNS rebinding) cannot slip past.
 func CheckURL(raw string, opts SSRFOptions) error {
+	return checkURL(context.Background(), raw, opts)
+}
+
+// checkURL is CheckURL with its lookup bound to ctx.
+func checkURL(ctx context.Context, raw string, opts SSRFOptions) error {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return ErrSSRFBlocked
@@ -110,22 +116,28 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	}
 	if allow {
 		// A name that does not resolve is left to fail at dial time, as below.
-		if ips, err := addrsOf(host, opts); err == nil && anyMetadata(ips, opts, host) {
+		if ips, err := addrsOf(ctx, host, opts); err == nil && anyNeverPermitted(ips, opts, host) {
 			return ErrSSRFBlocked
 		}
 		return nil
 	}
-	if ip := net.ParseIP(host); ip != nil {
+	if ip := literalIP(host); ip != nil {
 		if ipBlocked(ip, opts, host) {
 			return ErrSSRFBlocked
 		}
 		return nil
 	}
-	ips, err := resolveHost(host, opts)
+	return checkName(ctx, host, opts)
+}
+
+// checkName judges what a name resolves to. A failed lookup is left to fail
+// at the connection, so the caller sees the real network error.
+func checkName(ctx context.Context, host string, opts SSRFOptions) error {
+	ips, err := resolveHost(ctx, host, opts)
+	if errors.Is(err, ErrSSRFBlocked) {
+		return err
+	}
 	if err != nil {
-		// DNS failed — let the actual request fail with a network
-		// error so the customer sees a real upstream message instead
-		// of a misleading SSRF reject.
 		return nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	for _, ip := range ips {
@@ -136,94 +148,121 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	return nil
 }
 
-// SafeDialer returns a DialContext function that re-runs the SSRF
-// policy at dial time and dials against the validated IP rather than
-// the hostname. This closes the DNS-rebinding TOCTOU: net/http would
-// otherwise resolve the host a second time inside the standard library
-// and could connect to a different IP than what CheckURL validated.
-//
-// allow-listed hosts skip the private-range check but not the metadata
-// one: the name is resolved, refused if any address is cloud metadata,
-// and dialed at the address that was checked.
+// SafeDialer returns a DialContext function that re-runs the SSRF policy at
+// dial time and connects only to an address it checked (ssrf.PinnedDialer,
+// shared with the AI gateway). This closes the DNS-rebinding TOCTOU: net/http
+// would otherwise resolve the host again and could connect to an address
+// CheckURL never saw. Allow-listed hosts skip the private-range check but
+// not the metadata one.
 func SafeDialer(opts SSRFOptions) func(ctx context.Context, network, addr string) (net.Conn, error) {
-	base := &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second}
+	pinned := ssrf.PinnedDialer{
+		Dialer: &net.Dialer{Timeout: 30 * time.Second, KeepAlive: 30 * time.Second},
+		Lookup: opts.lookup(),
+		Check: func(host string, addrs []netip.Addr) error {
+			return checkResolved(strings.ToLower(host), addrs, opts)
+		},
+	}
 	return func(ctx context.Context, network, addr string) (net.Conn, error) {
-		host, port, err := net.SplitHostPort(addr)
+		host, _, err := net.SplitHostPort(addr)
 		if err != nil {
 			return nil, err
 		}
-		host = strings.ToLower(host)
-		allow, deny := hostPolicy(host, opts)
-		if deny {
+		// The static deny list answers before DNS, as CheckURL does.
+		if _, deny := hostPolicy(strings.ToLower(host), opts); deny {
 			return nil, ErrSSRFBlocked
 		}
-		if allow {
-			ips, err := addrsOf(host, opts)
-			if err != nil {
-				return nil, err
-			}
-			if len(ips) == 0 || anyMetadata(ips, opts, host) {
-				return nil, ErrSSRFBlocked
-			}
-			return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
-		}
-		ips, err := addrsOf(host, opts)
-		if err != nil {
-			return nil, err
-		}
-		if len(ips) == 0 {
-			return nil, ErrSSRFBlocked
-		}
-		for _, ip := range ips {
-			if ipBlocked(ip, opts, host) {
-				return nil, ErrSSRFBlocked
-			}
-		}
-		// Dial against the IPs we just validated — net/http's internal
-		// resolver can't redirect us to an unchecked address.
-		return checkedAddrs{ips: ips, port: port}.dial(ctx, base, network)
+		return pinned.DialContext(ctx, network, addr)
 	}
 }
 
-// checkedAddrs are addresses the policy has already passed, on one port.
-type checkedAddrs struct {
-	ips  []net.IP
-	port string
+// checkResolved applies the policy to every address one dial resolved.
+func checkResolved(host string, addrs []netip.Addr, opts SSRFOptions) error {
+	allow, deny := hostPolicy(host, opts)
+	if deny || len(addrs) == 0 {
+		return ErrSSRFBlocked
+	}
+	ips := make([]net.IP, 0, len(addrs))
+	for _, addr := range addrs {
+		ips = append(ips, net.IP(addr.AsSlice()))
+	}
+	if allow {
+		if anyNeverPermitted(ips, opts, host) {
+			return ErrSSRFBlocked
+		}
+		return nil
+	}
+	for _, ip := range ips {
+		if ipBlocked(ip, opts, host) {
+			return ErrSSRFBlocked
+		}
+	}
+	return nil
 }
 
-// dial tries each checked address in turn, falling back as a dial by name
-// would, and never reaches an address that was not checked.
-func (c checkedAddrs) dial(ctx context.Context, base *net.Dialer, network string) (net.Conn, error) {
-	// Each remaining address gets an equal share of the time left, as Go's own
-	// serial dial does, so one silent address cannot spend the whole timeout.
-	deadline := time.Now().Add(base.Timeout)
-	if d, ok := ctx.Deadline(); ok && d.Before(deadline) {
-		deadline = d
+// lookup adapts the injected Resolver to ssrf.Lookup; nil means system DNS.
+func (o SSRFOptions) lookup() ssrf.Lookup {
+	if o.Resolver == nil {
+		return ssrf.SystemLookup
 	}
-	var lastErr error
-	for i, ip := range c.ips {
-		attemptCtx, cancel := context.WithTimeout(ctx, time.Until(deadline)/time.Duration(len(c.ips)-i))
-		conn, err := base.DialContext(attemptCtx, network, net.JoinHostPort(ip.String(), c.port))
-		cancel()
-		if err == nil {
-			return conn, nil
+	return func(ctx context.Context, host string) ([]netip.Addr, error) {
+		type answer struct {
+			ips []net.IP
+			err error
 		}
-		lastErr = err
+		answered := make(chan answer, 1)
+		go func() {
+			ips, err := o.Resolver(host)
+			answered <- answer{ips, err}
+		}()
+		var a answer
+		select {
+		case a = <-answered:
+		case <-ctx.Done():
+			return nil, ctx.Err()
+		}
+		if a.err != nil {
+			return nil, a.err
+		}
+		return judgeableAddrs(a.ips)
 	}
-	return nil, lastErr
+}
+
+// judgeableAddrs converts a resolver's answer; one entry the policy cannot
+// judge refuses the whole answer.
+func judgeableAddrs(ips []net.IP) ([]netip.Addr, error) {
+	addrs := make([]netip.Addr, 0, len(ips))
+	for _, ip := range ips {
+		addr, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			return nil, ErrSSRFBlocked
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
 }
 
 // addrsOf is the literal address, or what the name resolves to.
-func addrsOf(host string, opts SSRFOptions) ([]net.IP, error) {
-	if ip := net.ParseIP(host); ip != nil {
+func addrsOf(ctx context.Context, host string, opts SSRFOptions) ([]net.IP, error) {
+	if ip := literalIP(host); ip != nil {
 		return []net.IP{ip}, nil
 	}
-	return resolveHost(host, opts)
+	return resolveHost(ctx, host, opts)
 }
 
-// anyMetadata reports whether an allow-listed host reaches cloud metadata,
-// which the allow-list never lifts. An unparseable address counts, failing closed.
-func anyMetadata(ips []net.IP, opts SSRFOptions, host string) bool {
+// literalIP is host as an address literal, a scoped IPv6 one included, the
+// way the connection parses it; nil when host is a name.
+func literalIP(host string) net.IP {
+	addr, err := netip.ParseAddr(host)
+	if err != nil {
+		return nil
+	}
+	return net.IP(addr.WithZone("").AsSlice())
+}
+
+// anyNeverPermitted reports whether an allow-listed host reaches cloud metadata
+// or a link-local address, which the allow-list never lifts. An unparseable
+// address counts, failing closed.
+func anyNeverPermitted(ips []net.IP, opts SSRFOptions, host string) bool {
 	for _, ip := range ips {
 		addr, ok := netip.AddrFromSlice(ip)
 		if !ok {
@@ -240,8 +279,21 @@ func anyMetadata(ips []net.IP, opts SSRFOptions, host string) bool {
 			)
 			return true
 		}
+		if linkLocal(addr.Unmap()) {
+			opts.logger().Warn("ssrf_refused",
+				zap.String("host", host),
+				zap.String("reason", "allowlisted_host_resolves_to_link_local"),
+			)
+			return true
+		}
 	}
 	return false
+}
+
+// linkLocal is the range platform services live on (cloud metadata, the AWS
+// Lambda runtime API), never a workflow's destination, as in the AI gateway.
+func linkLocal(addr netip.Addr) bool {
+	return addr.IsLinkLocalUnicast() || addr.IsLinkLocalMulticast()
 }
 
 // ErrSSRFBlocked is returned when SSRF policy rejects a destination.
@@ -299,7 +351,7 @@ func allowsLocal(opts SSRFOptions) bool {
 //     StrictPublicOnly. See that field for why it is opt-in.
 //
 // The AllowedHosts escape hatch bypasses this check, except for cloud metadata
-// (see anyMetadata), so an operator who does need one of these addresses
+// (see anyNeverPermitted), so an operator who does need one of these addresses
 // has a way through without widening the policy for every workflow.
 func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 	addr, ok := netip.AddrFromSlice(ip)
@@ -331,9 +383,20 @@ func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 		return true
 	}
 
+	if linkLocal(addr) {
+		opts.logger().Warn("ssrf_refused",
+			zap.String("host", host),
+			zap.String("address", addr.String()),
+			zap.String("range", ssrf.Describe(addr)),
+			zap.String("reason", "link_local"),
+			zap.String("hint", "link-local addresses carry platform services and are never a permitted destination, whatever BLOCK_LOCAL_HTTP_CALLS says"),
+		)
+		return true
+	}
+
 	if legacyBlocked(addr) {
 		if allowsLocal(opts) {
-			return false
+			return loopbackThroughAnotherName(opts, host, addr)
 		}
 		opts.logger().Warn("ssrf_refused",
 			zap.String("host", host),
@@ -364,6 +427,23 @@ func ipBlocked(ip net.IP, opts SSRFOptions, host string) bool {
 	return false
 }
 
+// loopbackThroughAnotherName refuses loopback reached through a name that is
+// not a loopback name, even with local calls allowed: otherwise a public name
+// rebound to 127.0.0.1 reaches this service's own listeners. Loopback stays
+// reachable as a literal, as localhost or *.localhost, or via the allowlist.
+func loopbackThroughAnotherName(opts SSRFOptions, host string, addr netip.Addr) bool {
+	if !addr.IsLoopback() || ssrf.NamesLoopback(host) {
+		return false
+	}
+	opts.logger().Warn("ssrf_refused",
+		zap.String("host", host),
+		zap.String("address", addr.String()),
+		zap.String("reason", "loopback_through_non_loopback_name"),
+		zap.String("hint", "only a loopback literal, localhost or a .localhost name reaches loopback; add this host to ALLOWED_PROXY_HOSTS if it is intended"),
+	)
+	return true
+}
+
 // legacyBlocked is the deny set that applies whether or not strict egress is
 // on: loopback, link-local, RFC1918/unique-local and the unspecified address.
 // Kept as an explicit predicate rather than folded into pkg/ssrf because it is
@@ -389,13 +469,17 @@ func logWouldRefuse(opts SSRFOptions, host string, addr netip.Addr) {
 	)
 }
 
-// resolveHost looks up every address for host, falling back to the system
-// resolver when the options carry none. Tests inject their own resolver here to
-// exercise multi-answer and DNS-rebinding sequences without real DNS.
-func resolveHost(host string, opts SSRFOptions) ([]net.IP, error) {
-	r := opts.Resolver
-	if r == nil {
-		r = net.LookupIP
+// resolveHost looks up every address for host through the same lookup the
+// dialer uses, bound to ctx. Tests inject their own resolver to exercise
+// multi-answer and DNS-rebinding sequences without real DNS.
+func resolveHost(ctx context.Context, host string, opts SSRFOptions) ([]net.IP, error) {
+	addrs, err := opts.lookup()(ctx, host)
+	if err != nil {
+		return nil, err
 	}
-	return r(host)
+	ips := make([]net.IP, 0, len(addrs))
+	for _, addr := range addrs {
+		ips = append(ips, net.IP(addr.WithZone("").AsSlice()))
+	}
+	return ips, nil
 }

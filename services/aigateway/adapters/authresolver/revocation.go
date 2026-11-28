@@ -304,13 +304,45 @@ type served struct {
 	bundle    *domain.Bundle
 	authStart time.Time
 	stale     string
+	// until is the last moment a cached answer may serve; zero derives it
+	// from the bundle (servesUntil).
+	until time.Time
 }
 
-// admit is the last check before a resolved bundle serves. It refuses a key the
-// change feed revoked after its confirmation began, and, when FailClosedAfter
-// is set, a key nothing confirmed recently while its org's feed is silent.
+// servesUntil is the later of the answer's soft expiry and hard cap, as
+// classifyEntry reads them: past both, nothing serves it.
+func (s *Service) servesUntil(in served) time.Time {
+	if !in.until.IsZero() {
+		return in.until
+	}
+	soft, hard := entryDeadlines(in.bundle, s.hardGrace)
+	return later(soft, hard)
+}
+
+func later(a, b time.Time) time.Time {
+	if a.After(b) {
+		return a
+	}
+	return b
+}
+
+// admit is the last check before a resolved bundle serves. It refuses a key
+// past its expiration date, a previous secret past its grace, an answer past
+// its own lifetime, one the feed revoked after its confirmation began, and,
+// with FailClosedAfter, a key unconfirmed while its org's feed is silent. A key
+// past KeyRecheckAfter under a silent feed comes back with errKeyRecheckDue.
 func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
 	b, authStart := in.bundle, in.authStart
+	now := time.Now()
+	if b.KeyExpired(now) {
+		return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
+	}
+	if b.SecretEnded(now) {
+		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+	}
+	if now.After(s.servesUntil(in)) {
+		return nil, errCachedUnservable(ctx)
+	}
 	if b.VirtualKeyID != "" {
 		if _, ok := s.denied.Peek(b.VirtualKeyID); ok {
 			if d, kept := s.liftDenialBefore(b.VirtualKeyID, authStart, "confirmation"); kept {
@@ -318,14 +350,86 @@ func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bun
 			}
 		}
 	}
-	if s.failClosedAfter > 0 && s.feedSilent(b.OrganizationID) &&
+	if s.failClosedAfter > 0 && s.feedSilentFor(b.OrganizationID, s.failClosedAfter) &&
 		time.Since(authStart) > s.failClosedAfter {
 		// Resolve counts this refusal once the key re-check has had its say.
 		return nil, herr.New(ctx, domain.ErrAuthUpstream, herr.M{
 			"message": "control plane unreachable and this gateway refuses keys it cannot re-check; retry shortly",
 		}).WithRetryable(true)
 	}
+	if s.keyRecheckAfter > 0 && time.Since(authStart) > s.keyRecheckAfter &&
+		s.feedSilentFor(b.OrganizationID, s.keyRecheckAfter) {
+		return b, errKeyRecheckDue
+	}
 	return b, nil
+}
+
+// presentedKey is a credential as presented, the hash it is cached under, and
+// the invalidation generation when its request read the cached answer.
+type presentedKey struct {
+	key    domain.PresentedKey
+	h      [64]byte
+	readAt uint64
+}
+
+// errKeyRecheckDue is admit's answer for a key neither the control plane nor
+// its org's change feed vouched for within KeyRecheckAfter: Resolve checks it
+// once more before it serves (recheckKey).
+var errKeyRecheckDue = errors.New("key re-check due")
+
+// recheckKey checks a key the change feed has not vouched for lately. A
+// refusal stands, also one ready as the wait ends or recorded since the cached
+// answer was read (k.readAt). A check that cannot reach the control plane, or runs
+// past keyRecheckWait, hands back the cached answer for Resolve to admit again.
+func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served) (served, error) {
+	keepCached := func() (served, error) { return s.cachedAfterRecheck(ctx, k, cached) }
+	call := s.joinReconfirm(k.key, k.h)
+	if call == nil {
+		return keepCached()
+	}
+	timer := time.NewTimer(keyRecheckWait)
+	defer timer.Stop()
+	select {
+	case <-call.done:
+	case <-timer.C:
+	case <-ctx.Done():
+	}
+	select {
+	case <-call.done:
+	default:
+		return keepCached()
+	}
+	switch {
+	case call.err == nil:
+		return call.answer, nil
+	case classifyRefreshError(call.err) == classTransportFailure:
+		return keepCached()
+	default:
+		return served{}, call.err
+	}
+}
+
+// cachedAfterRecheck hands back the cached answer once the key check could not
+// settle it. A refusal recorded since the read stands; one the bounded record
+// can no longer rule out fails as the control plane being unreachable, with
+// the answer kept for Resolve's bookkeeping.
+func (s *Service) cachedAfterRecheck(ctx context.Context, k presentedKey, cached served) (served, error) {
+	refused, unknown := s.refusalSince(k.h, k.readAt)
+	if refused {
+		return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+	}
+	if unknown {
+		return cached, errCachedUnservable(ctx)
+	}
+	return cached, nil
+}
+
+// errCachedUnservable is the fail-closed answer for a cached key nothing can
+// vouch for while the control plane is unreachable.
+func errCachedUnservable(ctx context.Context) error {
+	return herr.New(ctx, domain.ErrAuthUpstream, herr.M{
+		"message": "control plane unreachable and this key's cached answer cannot be served; retry shortly",
+	}).WithRetryable(true)
 }
 
 // errPendingDenial is admit's answer when a pending denial voided the
@@ -363,6 +467,9 @@ func (s *Service) reaskVoided(ctx context.Context, key domain.PresentedKey, h [6
 		return nil, err
 	}
 	bundle, err := s.admit(ctx, h, answer)
+	if errors.Is(err, errKeyRecheckDue) {
+		err = nil // the answer is the re-check
+	}
 	if errors.Is(err, errPendingDenial) {
 		return nil, errReaskUnavailable(ctx, err)
 	}
@@ -498,29 +605,43 @@ func (s *Service) keepCachedConfig(h [64]byte, in cachedConfigKeep) served {
 	}
 	e.mu.Unlock()
 	s.publishFetched(h, kept, since)
-	return served{bundle: &merged, authStart: start}
+	return served{bundle: &merged, authStart: start, until: later(soft, hard)}
 }
 
-// dropRejected evicts both cached copies of a key the control plane refused.
+// dropRejected evicts both cached copies of a key the control plane refused,
+// and fences the credential so a fetch begun before the refusal cannot
+// publish it again.
 func (s *Service) dropRejected(h [64]byte, err error) {
-	s.l1.Remove(h)
-	s.lastKnown.Remove(h)
+	s.recordInvalidation(invalidation{keys: []string{presentedScope(h)}}, func() {
+		s.l1.Remove(h)
+		s.lastKnown.Remove(h)
+	})
 	s.logger.Error("auth_cache_hard_evict", zap.String("reason", "reconfirm_rejection"), zap.Error(err))
 }
 
-// FailClosedReconfirmInterval bounds the re-checks fail closed makes per key.
+// FailClosedReconfirmInterval bounds the re-checks fail closed and the key
+// re-check make per key.
 const FailClosedReconfirmInterval = 5 * time.Second
 
-// feedSilent reports whether the org's change feed has gone without an answer
-// for longer than FailClosedAfter.
-func (s *Service) feedSilent(orgID string) bool {
+// DefaultKeyRecheckAfter is the KeyRecheckAfter used when none is set: a
+// disable or revoke the change feed could not carry lands within about this
+// long, as long as the control plane answers.
+const DefaultKeyRecheckAfter = 60 * time.Second
+
+// keyRecheckWait is how long a request waits on a key re-check before it
+// serves the cached key, so a slow control plane adds bounded latency.
+const keyRecheckWait = 2 * time.Second
+
+// feedSilentFor reports whether the org's change feed has gone without an
+// answer for longer than limit.
+func (s *Service) feedSilentFor(orgID string, limit time.Duration) bool {
 	v, ok := s.activeOrgs.Load(orgID)
 	if !ok {
 		return true
 	}
 	c, _ := v.(*orgCursor)
 	polled := c.polledAt.Load()
-	return polled == 0 || time.Duration(monoStamp(0)-polled) > s.failClosedAfter
+	return polled == 0 || time.Duration(monoStamp(0)-polled) > limit
 }
 
 // refusalIfDenied answers a credential the change feed denied, and that nothing

@@ -69,6 +69,7 @@ func keyScope(id string) string        { return "vk:" + id }
 func projectScope(id string) string    { return "project:" + id }
 func orgScope(id string) string        { return "org:" + id }
 func credentialScope(id string) string { return "credential:" + id }
+func presentedScope(h [64]byte) string { return "presented:" + string(h[:]) }
 
 // guardKeys lists the identities a bundle can be reached by.
 func guardKeys(b *domain.Bundle) []string {
@@ -135,7 +136,7 @@ func (s *Service) publishFetched(h [64]byte, stored *entry, since uint64) bool {
 	g := s.invalidations
 	g.mu.Lock()
 	defer g.mu.Unlock()
-	keys := guardKeys(stored.bundle)
+	keys := append(guardKeys(stored.bundle), presentedScope(h))
 	if g.evicted.reachedSince(keys, since) {
 		s.logger.Debug("auth_cache_publish_dropped_stale",
 			zap.String("vk_id", stored.bundle.VirtualKeyID))
@@ -150,6 +151,19 @@ func (s *Service) publishFetched(h [64]byte, stored *entry, since uint64) bool {
 	}
 	s.publishL1(h, stored)
 	return true
+}
+
+// refusalSince reports whether the control plane refused the presented
+// credential h after generation since (dropRejected). unknown means its stamp
+// may have been pushed out of the bounded set since, so it cannot tell.
+func (s *Service) refusalSince(h [64]byte, since uint64) (refused, unknown bool) {
+	g := s.invalidations
+	g.mu.Lock()
+	defer g.mu.Unlock()
+	if gen, ok := g.evicted.stamps.Peek(presentedScope(h)); ok {
+		return gen > since, false
+	}
+	return false, g.evicted.epoch > since
 }
 
 // revokedSince reports whether an event after since made the bundle's key

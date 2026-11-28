@@ -1,6 +1,6 @@
 import type { ApiKeyApi } from "@langwatch/api-key-contract";
 import type { AuditLogApi } from "@langwatch/audit-log-contract";
-import { cliAccessTokenKey } from "@langwatch/auth-contract";
+import { cliAccessTokenKey, cliRefreshTokenKey } from "@langwatch/auth-contract";
 import type { AuthzApi } from "@langwatch/authz-contract";
 import type { SsoApi } from "@langwatch/enterprise-sso-contract";
 import type { EntitlementApi } from "@langwatch/entitlement-contract";
@@ -12,7 +12,7 @@ import { ResourceScope } from "@langwatch/process";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { ScopedSecrets } from "@langwatch/secrets";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
-import type { UserApi } from "@langwatch/user-contract";
+import type { UserApi, UserProfile } from "@langwatch/user-contract";
 import { describe, expect, it } from "vitest";
 
 import { MemoryAuthChannels } from "../../channels/memory/memory.auth.channels.ts";
@@ -22,8 +22,31 @@ import { NO_SIGN_IN_PROVIDERS } from "./support/sign-in-providers.ts";
 
 const ACCESS_TOKEN = "lw_at_active";
 const AUTHORIZATION = `Bearer ${ACCESS_TOKEN}`;
+const REFRESH_TOKEN = "lw_rt_active";
 
-async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<AuthModule> {
+/** The bearer's person as the user module stores them; `deactivatedAt` is the switch. */
+function person({ deactivatedAt = null }: { deactivatedAt?: Date | null } = {}): UserProfile {
+  return {
+    id: "user-1",
+    name: "Jane",
+    email: "jane@example.test",
+    emailVerified: true,
+    image: null,
+    pendingSsoSetup: false,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    lastLoginAt: null,
+    deactivatedAt,
+  };
+}
+
+/** Where the bearer's person stands: switched off, and whether their seat still counts. */
+type Standing = { deactivatedAt?: Date | null; activeMember?: boolean };
+
+async function appForCliSessions(
+  repositories: MemoryAuthRepositories,
+  { deactivatedAt = null, activeMember = true }: Standing = {},
+): Promise<AuthModule> {
   return AuthModule.create({
     config: {
       sessionUrl: undefined,
@@ -49,13 +72,18 @@ async function appForCliSessions(repositories: MemoryAuthRepositories): Promise<
     repositories,
     dependencies: {
       projects: createApiFixture<ProjectApi>(),
-      users: createApiFixture<UserApi>(),
+      users: createApiFixture<UserApi>({
+        findById: async () => person({ deactivatedAt }),
+      }),
       apiKeys: createApiFixture<ApiKeyApi>(),
       featureFlags: createApiFixture<FeatureFlagApi>(),
       identity: createApiFixture<IdentityApi>({
         createStorageAdapter: ({ legacyEngine }) => legacyEngine,
       }),
-      organizations: createApiFixture<OrganizationApi>(),
+      organizations: createApiFixture<OrganizationApi>({
+        isMember: async () => activeMember,
+        getSessionPolicy: async () => ({ maxSessionDurationDays: 0 }),
+      }),
       entitlements: createApiFixture<EntitlementApi>(),
       notifications: createApiFixture<NotificationService>(),
       sso: createApiFixture<SsoApi>(),
@@ -156,5 +184,68 @@ describe("the Auth CLI access-session peer", () => {
     expect(repositories.cliSessions.tokenIndexes.get("lwcli:user:user-1:tokens")).toEqual(
       new Set(),
     );
+  });
+
+  describe("when the bearer's person no longer stands in the organization", () => {
+    const switchedOff: readonly [string, Standing][] = [
+      ["a deactivated person", { deactivatedAt: new Date(1) }],
+      ["a disabled or removed membership", { activeMember: false }],
+    ];
+
+    async function seedSession(repositories: MemoryAuthRepositories): Promise<void> {
+      const record = {
+        user_id: "user-1",
+        organization_id: "organization-1",
+        project_id: "project-1",
+        issued_at: 0,
+        expires_at: Date.now() + 60_000,
+      };
+      await repositories.cliSessions.set({
+        key: cliAccessTokenKey(ACCESS_TOKEN),
+        value: JSON.stringify(record),
+        ttlSeconds: 60,
+      });
+      await repositories.cliSessions.set({
+        key: cliRefreshTokenKey(REFRESH_TOKEN),
+        value: JSON.stringify(record),
+        ttlSeconds: 60,
+      });
+    }
+
+    it.each(switchedOff)(
+      "refuses the access session of %s as invalid credentials",
+      async (_label, standing) => {
+        const repositories = MemoryAuthRepositories.create();
+        await seedSession(repositories);
+        const app = await appForCliSessions(repositories, standing);
+
+        await expect(
+          app.getCliAccessSession({ authorization: AUTHORIZATION }),
+        ).rejects.toMatchObject({ code: "invalid_credentials" });
+      },
+    );
+
+    it.each(switchedOff)(
+      "refuses the project-bound access of %s as invalid credentials",
+      async (_label, standing) => {
+        const repositories = MemoryAuthRepositories.create();
+        await seedSession(repositories);
+        const app = await appForCliSessions(repositories, standing);
+
+        await expect(
+          app.getCliAccessProject({ authorization: AUTHORIZATION }),
+        ).rejects.toMatchObject({ code: "invalid_credentials" });
+      },
+    );
+
+    it.each(switchedOff)("refuses to rotate the session of %s", async (_label, standing) => {
+      const repositories = MemoryAuthRepositories.create();
+      await seedSession(repositories);
+      const app = await appForCliSessions(repositories, standing);
+
+      await expect(app.refreshCliSession({ refreshToken: REFRESH_TOKEN })).rejects.toMatchObject({
+        code: "cli_device_flow_refused",
+      });
+    });
   });
 });

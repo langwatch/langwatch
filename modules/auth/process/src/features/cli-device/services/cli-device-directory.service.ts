@@ -1,6 +1,7 @@
 import { HandledError } from "@langwatch/handled-error";
 import { OrganizationNotFoundError, type OrganizationApi } from "@langwatch/organization-contract";
 import { type Project, ProjectNotFoundError } from "@langwatch/project-contract";
+import type { UserApi } from "@langwatch/user-contract";
 
 import type { AuthDirectoryRepository } from "../../../repositories/auth-directory.repository.ts";
 
@@ -24,6 +25,7 @@ export interface CliDeviceDirectory {
   getOrganization(organizationId: string): Promise<{ id: string; name: string; slug: string }>;
   /** Zero, or an unknown organization, is unbounded. */
   maxSessionDurationDays(organizationId: string): Promise<number>;
+  /** An enabled seat held by a person who is not deactivated: what every CLI credential needs. */
   hasActiveMembership(params: { userId: string; organizationId: string }): Promise<boolean>;
   /** The seat an enabled member holds here; null for a stranger or a disabled seat. */
   findActiveMemberRole(params: { userId: string; organizationId: string }): Promise<string | null>;
@@ -41,6 +43,8 @@ export interface CliDeviceDirectory {
 
 interface CliDeviceDirectoryServiceDeps {
   people: AuthDirectoryRepository;
+  /** The person's standing, as the browser session reads it: a set `deactivatedAt` is off. */
+  users: Pick<UserApi, "findById">;
   organizations: Pick<
     OrganizationApi,
     "findBySsoDomain" | "findProvisioningSummary" | "getSessionPolicy" | "isMember" | "getMember"
@@ -89,8 +93,12 @@ export class CliDeviceDirectoryService implements CliDeviceDirectory {
     return policy.maxSessionDurationDays;
   }
 
-  hasActiveMembership(params: { userId: string; organizationId: string }): Promise<boolean> {
-    return this.deps.organizations.isMember(params);
+  async hasActiveMembership(params: { userId: string; organizationId: string }): Promise<boolean> {
+    const [person, member] = await Promise.all([
+      this.deps.users.findById({ id: params.userId }),
+      this.deps.organizations.isMember(params),
+    ]);
+    return member && person !== null && person.deactivatedAt === null;
   }
 
   async findActiveMemberRole(params: {

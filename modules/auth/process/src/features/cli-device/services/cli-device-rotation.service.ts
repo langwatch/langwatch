@@ -1,16 +1,13 @@
 /**
- * Rotating, re-scoping and reading the CLI sessions a device grant minted.
+ * Rotating and re-scoping the CLI sessions a device grant minted.
  * @see specs/ai-gateway/governance/cli-login.feature
  */
 
-import { ProjectInvalidCredentialsError } from "@langwatch/api";
 import { type CliSessionRevocationCause } from "@langwatch/api-key-contract";
 import { CliDeviceFlowRefusedError, refreshRequestSchema } from "@langwatch/auth-contract";
-import { HandledError } from "@langwatch/handled-error";
 import { createLogger } from "@langwatch/observability";
 import { nowInstant } from "@langwatch/time";
 
-import type { CliAccessProject } from "../../../services/api-rest-credentials.service.ts";
 import {
   posted,
   isProjectGone,
@@ -414,44 +411,7 @@ async function issueLockedProjectSession({
   });
 }
 
-/**
- * The person and live project behind a bound access bearer; anything else is
- * `invalid_credentials`.
- */
-async function accessProjectOf({
-  flow,
-  authorization,
-}: {
-  flow: CliDeviceFlowCollaborators;
-  authorization: string;
-}): Promise<CliAccessProject> {
-  const record = await flow
-    .sessions()
-    .getAccessToken(authorization)
-    .catch((error: unknown) => {
-      if (HandledError.isHandled(error) && error.code === "cli_session_record_not_found") {
-        throw new ProjectInvalidCredentialsError();
-      }
-      throw error;
-    });
-  if (!record.project_id) throw new ProjectInvalidCredentialsError();
-
-  const project = await flow
-    .directory()
-    .getLiveProject({ projectId: record.project_id, organizationId: record.organization_id })
-    .catch((error: unknown) => {
-      if (isProjectGone(error)) throw new ProjectInvalidCredentialsError();
-      throw error;
-    });
-
-  return {
-    userId: record.user_id,
-    organizationId: record.organization_id,
-    project: { ...project, organizationId: record.organization_id },
-  };
-}
-
-/** Rotating, re-scoping and reading the CLI sessions a device grant minted. */
+/** Rotating and re-scoping the CLI sessions a device grant minted. */
 export class CliDeviceRotationService {
   static create({ flow }: { flow: CliDeviceFlowCollaborators }): CliDeviceRotationService {
     return new CliDeviceRotationService(flow);
@@ -471,10 +431,6 @@ export class CliDeviceRotationService {
     input: WithoutFlow<Parameters<typeof issueLockedProjectSession>[0]>,
   ): Promise<CliMintedSession> {
     return issueLockedProjectSession({ flow: this.flow, ...input });
-  }
-
-  getAccessProject({ authorization }: { authorization: string }): Promise<CliAccessProject> {
-    return accessProjectOf({ flow: this.flow, authorization });
   }
 }
 

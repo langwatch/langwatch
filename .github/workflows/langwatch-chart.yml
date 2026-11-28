@@ -252,6 +252,10 @@ jobs:
         if: "!cancelled()"
         run: ./tests/langevals-sizing.sh
 
+      - name: "assert the evaluations service's outbound policy"
+        if: "!cancelled()"
+        run: ./tests/langevals-egress.sh
+
       - name: "assert the redis-valkey overlay swaps only the image"
         if: "!cancelled()"
         run: ./tests/redis-valkey.sh

@@ -282,6 +282,7 @@ import { ScenarioApi } from "@langwatch/scenario-contract";
 import {
   credentialsSecret,
   credentialsSecretPrevious,
+  gatewayInternalSecret,
   sessionSecret,
 } from "@langwatch/secrets/shared-secrets";
 import { ShareApi, type ShareApi as ShareApiContract } from "@langwatch/share-contract";
@@ -854,6 +855,8 @@ export class OpsModule implements OpsApi {
     credentials: credentialsSecret,
     credentialsFallback: sessionSecret,
     credentialsPrevious: credentialsSecretPrevious,
+    /** Signs the checkup's GET of the gateway's `/internal/control-plane`. */
+    gatewayInternal: gatewayInternalSecret,
   } as const;
   static readonly publicConfig = opsBrowserConfig.project;
 
@@ -924,6 +927,10 @@ export class OpsModule implements OpsApi {
         cloudNotices: repositories.cloudNotices,
       },
       channels: setup.channels,
+      gatewayInternalSecret: await setup.secrets.into(
+        OpsModule.secrets.gatewayInternal,
+        (secret) => secret,
+      ),
       // Read only when a report is taken, by which time `app` below exists.
       opsHealth: OpsHealthService.create({
         findDashboardData: () => app.findDashboardData(),

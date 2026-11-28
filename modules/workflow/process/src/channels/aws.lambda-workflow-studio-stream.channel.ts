@@ -8,7 +8,6 @@ import {
   readLwaPreludeStatus,
 } from "@langwatch/aws-client";
 import { createLogger } from "@langwatch/observability";
-import { nlpInternalSecretHeaders } from "@langwatch/process/nlp-internal-secret";
 import { nowInstant } from "@langwatch/time";
 import { WorkflowExecutionFailedError } from "@langwatch/workflow-contract";
 
@@ -43,12 +42,11 @@ type LambdaWorkflowStudioStreamOptions = Readonly<{
   staging?: NlpPayloadStaging | undefined;
   stagingThresholdBytes: number;
   stagingTtlSeconds: number;
-  /** The engine hop's shared credential, as the process resolved it. */
-  internalSecret?: string | undefined;
   /** Main's `S3_KEY_SALT`; unset sends no per-project cache key. */
   cacheKeySalt?: string | undefined;
 }>;
 
+/** Carries no shared engine secret: user code in the project's function can read its invokes. */
 export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
   static create(options: LambdaWorkflowStudioStreamOptions): LambdaWorkflowStudioStreamChannel {
     return new LambdaWorkflowStudioStreamChannel(options);
@@ -61,7 +59,6 @@ export class LambdaWorkflowStudioStreamChannel implements WorkflowStudioStream {
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
       "X-LangWatch-Origin": input.origin,
-      ...nlpInternalSecretHeaders({ secret: this.options.internalSecret }),
       ...s3CacheKeyHeaders({
         projectId: input.projectId,
         salt: this.options.cacheKeySalt,

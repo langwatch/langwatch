@@ -13948,13 +13948,15 @@ The receiver compares the signature in constant time before it checks the timest
 
 ## Egress controls
 
-A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to start unless the first two guards below are on. Turn them on for any deployment that reaches the public internet.
+A gateway whose `ENVIRONMENT` is set to anything other than `local` refuses to start unless the first two guards below are on. Every provider connection resolves the host once, checks each address and connects only to one it checked, so a name cannot pass the check on one address and connect to another. Turn them on for any deployment that reaches the public internet.
+
+Bedrock is the exception: its client connects on its own, so a Bedrock credential reaches only AWS regional hosts or a host on `ALLOWED_PROXY_HOSTS`, and its region must be an AWS region identifier such as `eu-west-1`. That keeps PrivateLink endpoints on private addresses working.
 
 | Variable                         | Effect                                                                                                                        |
 | -------------------------------- | ----------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | Refuses a customer-configured provider endpoint that resolves to a private or link-local address                              |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuses a customer-configured provider endpoint that is plain HTTP                                                            |
-| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that pass the endpoint check on a private address while the guard is on. Chat dispatch still refuses private addresses until the guard is off. Cloud metadata and link-local destinations stay refused |
+| `ALLOWED_PROXY_HOSTS`            | Exact hostnames that may reach a private address while the guard is on, at the endpoint check and at dispatch. Cloud metadata and link-local destinations stay refused |
 
 ## Calling the gateway from a browser
 
@@ -14050,10 +14052,12 @@ These apply to the base URLs customers configure on their own provider credentia
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off. See the matching rule below |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed to reach a private address while `BLOCK_LOCAL_HTTP_CALLS` is on, at the endpoint check and at dispatch. See the matching rule below |
 | `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
 
 An `ALLOWED_PROXY_HOSTS` entry matches the host a URL names, as written: a hostname entry admits that hostname and every address it resolves to, and an IP address entry admits a URL whose host is that IP address. The address a hostname resolves to is never matched, so listing `127.0.0.1` admits `https://127.0.0.1` but not `https://localhost`. Provider endpoints and A2A targets follow the same rule.
+
+With `BLOCK_LOCAL_HTTP_CALLS` off, loopback is still reached only through a URL that names it: `127.0.0.1`, `::1`, `localhost` or a name under `.localhost`. A public hostname that resolves to `127.0.0.1` is refused unless `ALLOWED_PROXY_HOSTS` lists it, so a name cannot be pointed at the gateway's own listeners.
 
 ## A2A proxy
 
@@ -14086,6 +14090,8 @@ Once the replica has caught up, the revocation list refuses the keys the history
 Rotating a key is not a revocation. The old secret keeps working through its grace period, and the gateway asks the control plane about it.
 
 A replica that cannot reach the control plane cannot learn about a revocation made during that outage. Set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` to bound that window. Once a key's last check and its organization's change feed are both older than the limit, the gateway checks the key with the control plane once, at most every 5 seconds per key. If that check fails, the key gets a retryable `auth_upstream_unavailable` error.
+
+A disable or revoke still takes effect within about a minute while the change feed is down and the control plane answers: a cached key that neither the control plane nor its organization's change feed confirmed in the last 60 seconds is checked once, at most every 5 seconds per key, and a disabled or revoked key gets its `403`. When that check cannot reach the control plane, the key keeps serving inside the stale-serving window.
 
 The limit is off by default, so an outage does not stop traffic. When set, it must be at least 30 seconds, because a healthy change feed can hold a poll open for about 10 seconds.
 
@@ -14317,7 +14323,7 @@ The `/health` call returns `{"status":"ok","checks":{"gateway":"ok","control_pla
 | `/v1` | `Prefix` | `/v1/chat/completions`, `/v1/messages`, `/v1/responses`, `/v1/embeddings`, `/v1/audio/*`, `/v1/images/*`, `/v1/models`, the realtime and ElevenLabs routes |
 | `/health` | `Exact` | The public status endpoint for uptime monitors |
 
-`/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` stay in-cluster. Metrics are on their own port (`9464`). The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
+`/healthz`, `/readyz`, `/startupz` and `/internal/*` stay in-cluster. Metrics are on their own port (`9464`). The Gemini-native routes under `/v1beta` are outside the `/v1` prefix and are not published by the chart Ingress. To publish them, route `/v1beta` to the gateway Service with your own route, as described in [Routing and ingress controllers](/self-hosting/deployment/routing).
 
 ## Cloud load balancer in front of the Service
 
@@ -14363,7 +14369,7 @@ kubectl -n langwatch get svc langwatch-gateway \
   -o jsonpath='{.status.loadBalancer.ingress[0].hostname}'
 ```
 
-A Service of type `LoadBalancer` publishes every route, including the probes and `/debug/control-plane`, which returns the resolved `LW_GATEWAY_BASE_URL` and takes no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
+A Service of type `LoadBalancer` publishes every route, including the probes and `/internal/*`. The `/internal/*` routes refuse any request not signed with `LW_GATEWAY_INTERNAL_SECRET`, and the probes take no key. Put a load balancer listener rule or a security group in front of it when the address is public. Set `service.internal.enabled: true` to also render a ClusterIP Service named `langwatch-gateway-internal` for in-cluster callers, so they do not go out through the load balancer.
 
 ## Other ingress controllers
 
@@ -14398,7 +14404,7 @@ TLS in front of the gateway is one boundary. The other is the provider endpoints
 | -------------------------------------- | -------------------------------- | ------------------------------------------------------------------------------------------- |
 | `security.requireHTTPSCustomEndpoints` | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | Refuse a provider base URL with an `http://` scheme                                         |
 | `security.blockLocalHTTPCalls`         | `BLOCK_LOCAL_HTTP_CALLS`         | Refuse a provider base URL that resolves to a private, loopback or other non-public address |
-| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that pass the endpoint check on a private address while the block is on. Chat dispatch still refuses them |
+| `security.allowedProxyHosts`           | `ALLOWED_PROXY_HOSTS`            | Hostnames that may reach a private address while the block is on                           |
 
 Both switches default to `false`, so a self-hosted install can route to a model server on the cluster network. Cloud metadata addresses, `0.0.0.0`, `::` and link-local ranges are refused with every setting. Setting `ENVIRONMENT` to anything other than `local` requires both switches to be `true`.
 
@@ -14426,7 +14432,7 @@ The chart mounts it at `/etc/langwatch/ca` and sets `SSL_CERT_DIR` to that path.
 | Streamed responses arrive all at once | Buffering is on at the proxy | With `ingress.className: nginx` the chart adds `proxy-buffering: "off"` to the gateway Ingress; on another controller, set the equivalent in `ingress.gateway.annotations` |
 | A long stream stops at 60 seconds | The load balancer idle timeout is shorter than the stream | Raise the controller's idle or read timeout |
 | CLI users get `http://localhost:5563` as the gateway URL | The control plane has no `LW_GATEWAY_PUBLIC_URL` | Set `ingress.gateway.host`, or `gateway.publicUrl` |
-| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Set `BLOCK_LOCAL_HTTP_CALLS` to `false`. `ALLOWED_PROXY_HOSTS` gets the host past the endpoint check, but chat dispatch refuses private addresses while the block is on |
+| A provider credential with a private base URL fails to dispatch | `BLOCK_LOCAL_HTTP_CALLS` is on | Add the base URL's host to `ALLOWED_PROXY_HOSTS`. Turning `BLOCK_LOCAL_HTTP_CALLS` off is open only where `ENVIRONMENT` is `local` |
 | A provider call fails with `x509: certificate signed by unknown authority` | The endpoint's certificate comes from a private CA | Set `gateway.security.extraCACertsConfigMap` (see [Provider endpoints on a private CA](#provider-endpoints-on-a-private-ca)) |
 
 More symptoms are on [Troubleshooting](/ai-gateway/troubleshooting).
@@ -14452,9 +14458,8 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/startupz`            | `startupProbe`                       | Startup is complete. The process marks startup complete before it opens the listener, so this endpoint answers 200 on the first request that reaches it |
 | `/health`              | Uptime monitors, through the ingress | The process is up and the control plane answered the signed probe within the last 60 seconds                                                            |
 | `/metrics` on port 9464 | Prometheus                          | When the metrics listener is enabled, with the bearer `METRICS_API_KEY`. See [Observability](/ai-gateway/observability#metrics-prometheus)               |
-| `/debug/control-plane` | Operators, in-cluster                | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL`                                                                  |
 
-None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
+None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them. The control-plane URL the gateway resolved is not among them: the app reads it over the signed `/internal/control-plane` route for **Settings > Checkup**.
 
 ## Probe responses
 
@@ -14560,7 +14565,7 @@ On failure, read the `X-LangWatch-Gateway-Request-Id` response header and search
 
 | Symptom                                                         | Cause                                                                                        | First step                                                                                                  |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `/healthz` 200, `/v1/*` answers `503 auth_upstream_unavailable` | The gateway cannot reach the control plane                                                   | `curl /debug/control-plane` in-cluster and compare the URL with the app Service                             |
+| `/healthz` 200, `/v1/*` answers `503 auth_upstream_unavailable` | The gateway cannot reach the control plane                                                   | Compare `LW_GATEWAY_BASE_URL` in the gateway ConfigMap with the app Service                                 |
 | `/health` 503 with `control_plane: unreachable for Ns`          | Control plane down, unroutable, or `LW_GATEWAY_INTERNAL_SECRET` differs between the two pods | Compare the value on both Deployments, then read `statusprobe_control_plane_unreachable` in the gateway log |
 | `/health` 503 while completions succeed                         | Control plane outage longer than 60 seconds; warm keys still serve from the auth cache       | Fix the control plane. `/readyz` stays 200 on purpose                                                       |
 | `/readyz` flips to 503 mid-life                                 | The pod received `SIGTERM`                                                                   | `kubectl describe pod` for the termination reason                                                           |
@@ -14877,14 +14882,14 @@ Expected:
 
 A `503` with `"control_plane":"unreachable for Ns"` means one of two things: the gateway cannot reach `LW_GATEWAY_BASE_URL`, or `LW_GATEWAY_INTERNAL_SECRET` differs between the app and the gateway pods. The probe runs every 15 seconds and the verdict flips after 60 seconds without a success, so wait one minute after a fix before you read it again. The log line `statusprobe_control_plane_unreachable` on the gateway pod carries the underlying error.
 
-Confirm which control plane URL the pod resolved:
+Confirm which control plane URL the gateway is configured with:
 
 ```bash
-kubectl -n langwatch run curl --rm -it --image=curlimages/curl --restart=Never \
-  -- curl -sS http://langwatch-gateway/debug/control-plane
+kubectl -n langwatch get configmap langwatch-gateway \
+  -o jsonpath='{.data.LW_GATEWAY_BASE_URL}'
 ```
 
-Expected: `{"control_plane_base_url":"http://langwatch-app:5560"}`.
+Expected: `http://langwatch-app:5560`. The gateway row in **Settings > Checkup** asks the running gateway the same question over the signed internal channel.
 
 ## 4. The public hostname serves TLS
 
@@ -15465,7 +15470,7 @@ Rotations, revocations, budget edits, routing changes and cache-rule edits all t
 
 **Confirm the feed is running:** the pod log carries an `auth_cache_change_evict` line with the change kind and the key id when a change lands. A `change_feed_poll_failed` line instead means the pod cannot reach the control plane, and every cached key stays as it is until the poll recovers.
 
-**Fix:** restore the route to the control plane. `curl http://langwatch-gateway/debug/control-plane` inside the cluster prints the URL the pod resolved. A rolling restart clears every cache at once when you need the change now.
+**Fix:** restore the route to the control plane. The gateway row in **Settings > Checkup** compares the URL the running gateway resolved with this app, and `LW_GATEWAY_BASE_URL` in the gateway ConfigMap shows the configured one. A rolling restart clears every cache at once when you need the change now.
 
 ## Spend does not appear on the key
 
@@ -79371,7 +79376,7 @@ LangWatch uses two hostnames. Browsers and SDKs reach the app. LLM clients and c
 
 `<release>` is the Helm release name. The gateway Service forwards its port to container port 5563. Port 80 is the default; if you set `gateway.service.port`, use that port in every route that names the gateway Service.
 
-Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz`, `/debug/control-plane` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. `/a2a` is the agent-to-agent proxy; route it if agents call A2A targets through the gateway. Gemini-native clients also need `/v1beta`. Add it as another Prefix rule if you use them.
+Do not expose any other gateway path. `/healthz`, `/readyz`, `/startupz` and `/internal/*` are for in-cluster use only. Metrics are served on a separate port (`9464`) and are not part of the gateway Service. `/a2a` is the agent-to-agent proxy; route it if agents call A2A targets through the gateway. Gemini-native clients also need `/v1beta`. Add it as another Prefix rule if you use them.
 
 `/api/internal` on the app is the private control plane that the gateway and the Langy agent call over cluster DNS. The chart Ingress blocks it by default with `ingress.blockedPaths`. Your own routes must block it too. See [Security](/self-hosting/security#private-control-plane-paths-are-blocked-at-the-ingress).
 

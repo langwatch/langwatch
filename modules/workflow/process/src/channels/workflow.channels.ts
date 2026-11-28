@@ -38,7 +38,6 @@ type WorkflowLambdaEngine = Readonly<{
   configFingerprint: string;
   stagingThresholdBytes: number;
   stagingTtlSeconds: number;
-  internalSecret: string | undefined;
   cacheKeySalt: string | undefined;
   /** Releases the AWS clients the channels share. */
   close(): void;

@@ -1,8 +1,9 @@
 /**
  * `GET /api/image-proxy?url=` - a picture at an outside address, fetched behind the egress fence
  * and served with stored-object's read headers, so trace and dataset views can show it.
+ * Only a signed-in browser reaches it: the app's own `<img>` sends the session cookie.
  */
-import { publicRoute } from "@langwatch/api/access";
+import { anyAuthenticated } from "@langwatch/api/access";
 import { defineRestRouter, MANAGEMENT_API_VERSION } from "@langwatch/api/rest";
 import { moduleApi } from "@langwatch/module";
 import { type ImageProxyRequest, imageProxyQuerySchema } from "@langwatch/stored-object-contract";
@@ -18,13 +19,15 @@ export const storedObjectImageProxyRest = defineRestRouter(StoredObjectImageProx
   .withNamespace("image-proxy")
   .withVersion(MANAGEMENT_API_VERSION)
   .withAddressing("literal", { v1Twin: false })
+  .withCredential("browser")
 
   .get("/api/image-proxy", "proxyExternalImage")
   .withQuery(imageProxyQuerySchema)
   .withAccess(
-    publicRoute({
+    anyAuthenticated({
       reason:
-        "an <img> fires with no credential; every address is fenced by the SSRF egress policy",
+        "the address names no project or organization, so a signed-in session is the whole gate; " +
+        "every address is still fenced by the SSRF egress policy",
     }),
   )
   .withResponse("forwarded", {

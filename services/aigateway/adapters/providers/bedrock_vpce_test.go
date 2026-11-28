@@ -11,6 +11,7 @@ import (
 	bfschemas "github.com/maximhq/bifrost/core/schemas"
 	"github.com/tidwall/gjson"
 
+	"github.com/langwatch/langwatch/pkg/herr"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
 
@@ -461,5 +462,37 @@ func TestMapBedrockToolConfig_ForwardsForcedToolChoice(t *testing.T) {
 	}
 	if tool.Value.Name == nil || *tool.Value.Name != "lw_so_ClassifierRelevance" {
 		t.Fatalf("expected forced tool name lw_so_ClassifierRelevance, got %v", tool.Value.Name)
+	}
+}
+
+// @scenario "A Bedrock credential reaches only AWS regional hosts"
+func TestBedrockRegionMustBeAnAWSRegion(t *testing.T) {
+	policy := newCustomerEndpointPolicy(true, true, nil)
+	bedrock := func(region string) domain.Credential {
+		return domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{
+			"access_key": "k", "secret_key": "s", "region": region,
+		}}
+	}
+	for _, region := range []string{"eu-west-1", "us-gov-east-1", "ap-southeast-2"} {
+		if err := validateCredentialEndpoints(context.Background(), bedrock(region), policy); err != nil {
+			t.Errorf("region %q refused: %v", region, err)
+		}
+	}
+	for _, region := range []string{"evil.example/", "s3", "us-east-1.evil", "eu-west-1#", "US-EAST-1"} {
+		if err := validateCredentialEndpoints(context.Background(), bedrock(region), policy); err == nil {
+			t.Errorf("region %q builds a host outside AWS's regional endpoints and must be refused", region)
+		}
+	}
+	aliased := domain.Credential{ProviderID: domain.ProviderBedrock, Extra: map[string]string{"aws_region_name": "evil.example/"}}
+	if err := validateCredentialEndpoints(context.Background(), aliased, policy); err == nil {
+		t.Error("the aws_region_name spelling is held to the same rule")
+	}
+	router := &BifrostRouter{endpointPolicy: policy}
+	req := &domain.Request{Type: domain.RequestTypeChat, Model: "anthropic.claude-3-5-sonnet-20240620-v1:0"}
+	if _, err := router.Dispatch(context.Background(), req, bedrock("evil.example/")); !herr.IsCode(err, domain.ErrBadRequest) {
+		t.Errorf("Dispatch: got %v, want a bad-request refusal before any connection", err)
+	}
+	if _, err := router.DispatchStream(context.Background(), req, bedrock("evil.example/")); !herr.IsCode(err, domain.ErrBadRequest) {
+		t.Errorf("DispatchStream: got %v, want a bad-request refusal before any connection", err)
 	}
 }

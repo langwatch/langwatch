@@ -116,3 +116,15 @@ func TestUnmapKeepsOrdinaryIPv6(t *testing.T) {
 		}
 	}
 }
+
+func TestZonedAddressClassifiesAsItsUnzonedForm(t *testing.T) {
+	for _, in := range []string{"fd00:ec2::254%eth0", "fe80::1%eth0"} {
+		addr := netip.MustParseAddr(in)
+		if got, want := Classify(addr), Classify(addr.WithZone("")); got != want {
+			t.Errorf("Classify(%s) = %v, want %v", in, got, want)
+		}
+	}
+	if !Blocked(netip.MustParseAddr("fd00:ec2::254%eth0"), false) {
+		t.Fatal("a zoned metadata address must be refused with local calls allowed")
+	}
+}

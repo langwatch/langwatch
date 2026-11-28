@@ -33,6 +33,8 @@ import (
 	"go.uber.org/zap"
 
 	"github.com/langwatch/langwatch/pkg/herr"
+	"github.com/langwatch/langwatch/pkg/ssrf"
+	"github.com/langwatch/langwatch/services/aigateway/adapters/egress"
 	"github.com/langwatch/langwatch/services/aigateway/app/pipeline"
 	"github.com/langwatch/langwatch/services/aigateway/domain"
 )
@@ -42,6 +44,8 @@ import (
 type BifrostRouter struct {
 	bf     *bifrost.Bifrost
 	logger *zap.Logger
+	// egressProxy carries Bifrost's provider connections (see account).
+	egressProxy *egress.ConnectProxy
 	// voyageClient is the single HTTP client reused for every direct
 	// Voyage request so connection pooling actually works. Building a
 	// new http.Client per request would defeat keep-alive and risk
@@ -109,15 +113,13 @@ type BifrostOptions struct {
 	// provider, so tests can drive the real Responses stream pipeline against
 	// a local server.
 	OpenAIBackendURL string
+	// lookup replaces the system resolver for the endpoint check and the
+	// egress proxy alike (tests only).
+	lookup ssrf.Lookup
 }
 
-// allowsPrivateNetwork reports whether bifrost may dial private addresses:
-// only with the guard off. Bifrost's setting is per provider, and every
-// custom endpoint shares one, so ALLOWED_PROXY_HOSTS cannot be applied here
-// without lifting the refusal for hosts outside it too.
-func (o BifrostOptions) allowsPrivateNetwork() bool {
-	return !o.BlockLocalHTTPCalls
-}
+// egressProxyDialTimeout bounds one provider connection through the proxy.
+const egressProxyDialTimeout = 30 * time.Second
 
 // NewBifrostRouter creates a provider router backed by bifrost.
 func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter, error) {
@@ -126,17 +128,30 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 		pool = 1000
 	}
 	compatEndpoints := newAnthropicCompatRegistry(anthropicCompatMaxEndpoints)
+	endpointPolicy := newCustomerEndpointPolicy(
+		opts.BlockLocalHTTPCalls,
+		opts.RequireHTTPSCustomerEndpoints,
+		opts.AllowedEndpointHosts,
+	)
+	if opts.lookup != nil {
+		endpointPolicy = endpointPolicy.withLookup(opts.lookup)
+	}
+	egressProxy, err := egress.StartConnectProxy(endpointPolicy.egress.Dialer(egressProxyDialTimeout), opts.Logger)
+	if err != nil {
+		return nil, fmt.Errorf("egress proxy: %w", err)
+	}
 	bf, err := bifrost.Init(ctx, bfschemas.BifrostConfig{
 		Account: &account{
-			anthropicCompat:     compatEndpoints,
-			openAIBaseURL:       opts.OpenAIBackendURL,
-			logger:              opts.Logger,
-			allowPrivateNetwork: opts.allowsPrivateNetwork(),
+			anthropicCompat: compatEndpoints,
+			openAIBaseURL:   opts.OpenAIBackendURL,
+			logger:          opts.Logger,
+			egressProxy:     egressProxy,
 		},
 		InitialPoolSize: pool,
 		Logger:          &bifrostLogger{logger: opts.Logger},
 	})
 	if err != nil {
+		egressProxy.Close()
 		return nil, fmt.Errorf("bifrost init: %w", err)
 	}
 	// Assigned after Init because the callback needs the bifrost instance;
@@ -159,13 +174,9 @@ func NewBifrostRouter(ctx context.Context, opts BifrostOptions) (*BifrostRouter,
 	if codexURL == "" {
 		codexURL = codexBackendDefaultURL
 	}
-	endpointPolicy := newCustomerEndpointPolicy(
-		opts.BlockLocalHTTPCalls,
-		opts.RequireHTTPSCustomerEndpoints,
-		opts.AllowedEndpointHosts,
-	)
 	return &BifrostRouter{
 		bf:              bf,
+		egressProxy:     egressProxy,
 		logger:          opts.Logger,
 		voyageClient:    newVoyageClient(),
 		endpointPolicy:  endpointPolicy,
@@ -196,6 +207,7 @@ func (r *BifrostRouter) Close() {
 		return
 	}
 	r.bf.Shutdown()
+	r.egressProxy.Close()
 }
 
 func (r *BifrostRouter) validateCredentialEndpoints(ctx context.Context, cred domain.Credential) error {
@@ -1345,9 +1357,10 @@ type account struct {
 	// number of distinct Azure credential IDs seen over this process's
 	// lifetime, not by request volume.
 	warnedAzureAPIVersionIDs sync.Map
-	// allowPrivateNetwork lifts bifrost's own dial-time private-IP refusal
-	// (see BifrostOptions.allowsPrivateNetwork); link-local stays refused.
-	allowPrivateNetwork bool
+	// egressProxy carries every provider connection. Bifrost's own dialer
+	// resolves the host again and always admits loopback; a proxy dial
+	// replaces it, so the egress policy is the only rule (allowlist included).
+	egressProxy *egress.ConnectProxy
 }
 
 func (a *account) GetConfiguredProviders() ([]bfschemas.ModelProvider, error) {
@@ -1443,10 +1456,10 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 	// anything.
 	cfg.NetworkConfig.DefaultRequestTimeoutInSeconds = ProviderRequestTimeoutSeconds
 	cfg.NetworkConfig.StreamIdleTimeoutInSeconds = ProviderRequestTimeoutSeconds
-	cfg.NetworkConfig.AllowPrivateNetwork = a.allowPrivateNetwork
 	if provider == bfschemas.OpenAI && a.openAIBaseURL != "" {
 		cfg.NetworkConfig.BaseURL = a.openAIBaseURL
 	}
+	cfg.ProxyConfig = a.egressProxyConfig()
 	if proxyURL := os.Getenv("LW_GATEWAY_OUTBOUND_PROXY"); proxyURL != "" {
 		// Debug-only: route outbound provider traffic through an HTTP proxy
 		// (e.g. `http://localhost:8888` for mitmproxy). Lets operators
@@ -1463,6 +1476,16 @@ func (a *account) GetConfigForProvider(provider bfschemas.ModelProvider) (*bfsch
 	}
 	cfg.CheckAndSetDefaults()
 	return cfg, nil
+}
+
+// egressProxyConfig points Bifrost at the in-process egress proxy; nil (bare
+// test accounts) leaves Bifrost's own dialer.
+func (a *account) egressProxyConfig() *bfschemas.ProxyConfig {
+	if a.egressProxy == nil {
+		return nil
+	}
+	proxyURL, user, password := envVar(a.egressProxy.URL()), envVar(a.egressProxy.Username()), envVar(a.egressProxy.Password())
+	return &bfschemas.ProxyConfig{Type: bfschemas.HTTPProxy, URL: &proxyURL, Username: &user, Password: &password}
 }
 
 // warnIgnoredAzureAPIVersion logs when a caller supplied an Azure api_version

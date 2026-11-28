@@ -31,10 +31,10 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
   # control-plane URL the same way start.sh does
   # (dev/scripts/lib/derive-gateway-base-url.sh), the gateway tracks and
   # logs whether its control-plane URL was explicitly configured or fell
-  # back to the compatibility default, and it exposes the resolved target
-  # on an unauthenticated debug endpoint so dev tooling can verify a
-  # reused process before trusting it, warning loudly on any mismatch or
-  # on a process too old to answer at all.
+  # back to the compatibility default, and it reports the resolved target
+  # on the signed internal channel so the app's checkup can verify it.
+  # The target is usually an in-cluster hostname, so an unsigned caller
+  # (a LoadBalancer Service publishes every route) learns nothing.
 
   # --- Standalone `make service` / `make service-watch` ---
 
@@ -102,34 +102,40 @@ Feature: AI Gateway control-plane target cannot silently default to the wrong wo
   # --- Verifying a reused gateway before trusting it ---
 
   @unit
-  Scenario: the gateway exposes its resolved control-plane target on an unauthenticated debug endpoint
+  Scenario: the gateway reports its resolved control-plane target to a signed internal request
     Given a running gateway with a resolved control-plane URL
-    When something requests its control-plane debug endpoint
+    When the control plane requests GET /internal/control-plane signed with the gateway internal secret
     Then it reports that exact URL
-    And the endpoint requires no credential, matching the k8s probes and the metrics endpoint
 
-  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  @unit
+  Scenario: an unsigned request learns nothing about the control plane's address
+    Given a running gateway whose control-plane URL is an in-cluster hostname
+    When an unsigned request asks for /internal/control-plane or the old /debug/control-plane path
+    Then the gateway refuses it
+    And the answer does not contain the control-plane hostname
+
+  # Gap: pnpm dev asks no reused gateway for its control-plane target; dev-stack.sh does no check, and main had none.
   @unit @unimplemented
   Scenario: a reused gateway pointed at the right control plane raises no warning
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
-    And that gateway's debug endpoint reports the same control-plane URL this worktree expects
+    And that gateway's control-plane endpoint reports the same control-plane URL this worktree expects
     When pnpm dev evaluates whether to trust the reused gateway
     Then it raises no warning
 
-  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  # Gap: pnpm dev asks no reused gateway for its control-plane target; dev-stack.sh does no check, and main had none.
   @unit @unimplemented
   Scenario: a reused gateway pointed at a different control plane raises a loud, actionable warning
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
-    And that gateway's debug endpoint reports a control-plane URL different from what this worktree expects
+    And that gateway's control-plane endpoint reports a control-plane URL different from what this worktree expects
     When pnpm dev evaluates whether to trust the reused gateway
     Then it raises a multi-line warning naming both the expected and the actual control-plane URL
     And the warning states how to fix it
 
-  # Gap: pnpm dev asks no reused gateway for /debug/control-plane; dev-stack.sh does no check, and main had none.
+  # Gap: pnpm dev asks no reused gateway for its control-plane target; dev-stack.sh does no check, and main had none.
   @unit @unimplemented
   Scenario: a reused gateway whose control-plane target cannot be verified is treated as suspect, not silently trusted
     Given pnpm dev finds a gateway already listening on the port it would have started its own on
-    And that gateway's debug endpoint cannot be reached, for instance because it predates this check
+    And that gateway's control-plane endpoint cannot be reached, for instance because it predates this check
     When pnpm dev evaluates whether to trust the reused gateway
     Then it raises a warning saying the control-plane target could not be verified
     And it does not claim the reused gateway is safe

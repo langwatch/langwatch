@@ -39,10 +39,12 @@ These apply to the base URLs customers configure on their own provider credentia
 | -------------------------------- | ------- | ----------------------------------------------------------------------------------------------------------------------------------- |
 | `BLOCK_LOCAL_HTTP_CALLS`         | `false` | Refuse a provider endpoint that resolves to a private, loopback or otherwise non-public address                                     |
 | `REQUIRE_HTTPS_CUSTOM_ENDPOINTS` | `false` | Refuse a provider endpoint with an `http://` scheme                                                                                 |
-| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed past the endpoint check on a private address while `BLOCK_LOCAL_HTTP_CALLS` is on. Chat dispatch still refuses private addresses until the block is off. See the matching rule below |
+| `ALLOWED_PROXY_HOSTS`            | empty   | Comma-separated hosts, matched case-insensitively, allowed to reach a private address while `BLOCK_LOCAL_HTTP_CALLS` is on, at the endpoint check and at dispatch. See the matching rule below |
 | `SSL_CERT_DIR`                   | unset   | Colon-separated directories of PEM CA certificates trusted beside the public roots, for provider endpoints on a private CA            |
 
 An `ALLOWED_PROXY_HOSTS` entry matches the host a URL names, as written: a hostname entry admits that hostname and every address it resolves to, and an IP address entry admits a URL whose host is that IP address. The address a hostname resolves to is never matched, so listing `127.0.0.1` admits `https://127.0.0.1` but not `https://localhost`. Provider endpoints and A2A targets follow the same rule.
+
+With `BLOCK_LOCAL_HTTP_CALLS` off, loopback is still reached only through a URL that names it: `127.0.0.1`, `::1`, `localhost` or a name under `.localhost`. A public hostname that resolves to `127.0.0.1` is refused unless `ALLOWED_PROXY_HOSTS` lists it, so a name cannot be pointed at the gateway's own listeners.
 
 ## A2A proxy
 
@@ -75,6 +77,8 @@ Once the replica has caught up, the revocation list refuses the keys the history
 Rotating a key is not a revocation. The old secret keeps working through its grace period, and the gateway asks the control plane about it.
 
 A replica that cannot reach the control plane cannot learn about a revocation made during that outage. Set `LW_GATEWAY_AUTH_CACHE_FAIL_CLOSED_AFTER_SECONDS` to bound that window. Once a key's last check and its organization's change feed are both older than the limit, the gateway checks the key with the control plane once, at most every 5 seconds per key. If that check fails, the key gets a retryable `auth_upstream_unavailable` error.
+
+A disable or revoke still takes effect within about a minute while the change feed is down and the control plane answers: a cached key that neither the control plane nor its organization's change feed confirmed in the last 60 seconds is checked once, at most every 5 seconds per key, and a disabled or revoked key gets its `403`. When that check cannot reach the control plane, the key keeps serving inside the stale-serving window.
 
 The limit is off by default, so an outage does not stop traffic. When set, it must be at least 30 seconds, because a healthy change feed can hold a poll open for about 10 seconds.
 

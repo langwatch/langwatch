@@ -577,6 +577,97 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And a cached key last confirmed 3 hours ago with a silent change feed
       Then the key serves
 
+  Rule: A disabled or revoked key is refused within a minute even while the change feed is down
+    The change feed is how a disable or revoke reaches a replica. While an
+    organization's feed is silent, a cached key nothing confirmed in the last
+    60 seconds is checked with the control plane once more before it serves.
+    A check that cannot reach the control plane keeps the outage grace above.
+
+    @unit
+    Scenario: with the change feed down, a disabled or revoked key is refused within a minute
+      Given a cached key last confirmed 2 minutes ago whose organization's change feed has not answered for 2 minutes
+      When the key is disabled or revoked on the control plane
+      Then the next request checks the key once and is refused as disabled or revoked
+      And the request after it is refused too
+
+    @unit
+    Scenario: with the change feed and the control plane down, a cached key keeps serving
+      Given a cached key last confirmed 2 minutes ago whose organization's change feed has not answered for 2 minutes
+      When the key check cannot reach the control plane
+      Then the key serves inside the stale-while-error window
+
+    @unit
+    Scenario: a key the change feed vouches for is not re-checked
+      Given a cached key last confirmed 2 minutes ago whose organization's change feed answered just now
+      When a request arrives
+      Then the key serves and the control plane is not asked
+
+    @unit
+    Scenario: a key confirmed within the limit serves from the cache with no key check
+      Given a cached key confirmed just now and a silent change feed
+      When a request arrives while the control plane is down
+      Then the key serves and the control plane is not asked
+
+    @unit
+    Scenario: a negative key re-check limit turns the re-check off
+      Given the key re-check limit is negative
+      And a cached key last confirmed 2 minutes ago under a silent change feed
+      Then the key serves and the control plane is not asked
+
+    @unit
+    Scenario: a disable or revoke that lands while the key check waits is refused
+      Given a cached key last confirmed 2 minutes ago under a silent change feed
+      When the key is revoked while its key check is still waiting on the control plane
+      And the request stops waiting before the check answers
+      Then the request is refused as revoked, not served from the cache
+
+    @unit
+    Scenario: a key whose expiration date passes while the key check waits is refused as expired
+      Given a cached key last confirmed 2 minutes ago under a silent change feed
+      When the key's expiration date passes while its key check is still waiting
+      Then the request is refused as expired, not served from the cache
+
+    @unit
+    Scenario: a key check slower than the limit still serves its answer
+      Given a key re-check limit shorter than the key check takes
+      And a cached key last confirmed 2 minutes ago under a silent change feed
+      When the control plane confirms the key
+      Then the key serves
+
+    @unit
+    Scenario: a fetch begun before the control plane refused a key cannot cache it again
+      Given a fetch for a cached key is in flight
+      When a key check finds the key refused and evicts it
+      Then the fetch's answer is not published to the cache
+
+    @unit
+    Scenario: a previous secret whose grace ends while the key check waits is refused
+      Given a cached key presented with its previous secret, last confirmed 2 minutes ago under a silent change feed
+      When the previous secret's grace ends while its key check is still waiting
+      Then the request is refused as an invalid key, not served from the cache
+
+    @unit
+    Scenario: a refusal that lands as the key check's wait ends is refused
+      Given a cached key last confirmed 2 minutes ago under a silent change feed
+      When the key check refuses the key just as the request stops waiting
+      Then the request is refused, not served from the cache
+
+    @unit
+    Scenario: a refusal recorded after a request read its cached key is refused
+      Given a cached key last confirmed 2 minutes ago under a silent change feed
+      And a request has read the key from the cache
+      When another request's key check refuses the key and evicts it, leaving no check to wait on
+      Then the first request is refused, not served from the cache
+      And when later changes have pushed that refusal out of the gateway's bounded record, the request fails as the control plane being unreachable rather than serving the cached key
+
+    @unit
+    Scenario: a cached key whose hard cap passes while the key check waits is not served
+      Given a key re-check grace that puts the hard cap before the key's token expiry
+      And a cached key last confirmed 2 minutes ago under a silent change feed
+      When the token expiry and the hard cap pass while its key check is still waiting
+      Then the request fails as the control plane being unreachable, not served from the cache
+      And the request does not wait on the key check a second time
+
   Rule: A change-feed backlog refuses a key locally only for the state it ends in
 
     # A gateway that starts reads its organization's whole change history from

@@ -107,19 +107,12 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
     return nlpProxyBaseUrl(input);
   }
 
+  /** The single shared service, the one engine that checks the shared secret. */
   static create(options: {
-    /**
-     * Where the engine answers: `http://127.0.0.1:5561`, or the ARN of a
-     * per-project Lambda when the deployment fronts the engine with one.
-     */
+    /** Where the engine answers (`http://127.0.0.1:5561`); a project's function is not this. */
     serviceUrl: string;
     /** Injected so a test drives the wire without a listener. */
     fetch?: typeof fetch;
-    /** Composed only where the engine is reached by ARN; see the transport. */
-    lambda?: NlpLambdaInvoke | undefined;
-    /** Where an oversized ARN invoke is parked; absent, such an invoke refuses by name. */
-    staging?: NlpPayloadStaging | undefined;
-    stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
     /** The engine hop's shared credential, as the process resolved it. */
     internalSecret?: string | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
@@ -131,19 +124,22 @@ export class HttpWorkflowNlpRuntimeAdapter implements WorkflowNlpRuntime {
     });
   }
 
-  /** Each project's engine on its own function, as main's `nlpgoFetch` reaches it. */
+  /**
+   * Each project's engine on its own function, as main's `nlpgoFetch` reaches it. No shared
+   * engine secret: the IAM invoke authorises it, and user code there can read its invokes.
+   */
   static onProjectFunctions(options: {
     functions: NlpLambdaFunctionReader;
     lambda: NlpLambdaInvoke;
     staging?: NlpPayloadStaging | undefined;
     stagingConfig?: Partial<NlpInvokeStagingConfig> | undefined;
-    /** The engine hop's shared credential, as the process resolved it. */
-    internalSecret?: string | undefined;
   }): HttpWorkflowNlpRuntimeAdapter {
-    const { functions, ...rest } = options;
+    const { functions, lambda, staging, stagingConfig } = options;
 
     return new HttpWorkflowNlpRuntimeAdapter({
-      ...rest,
+      lambda,
+      staging,
+      stagingConfig,
       targetFor: (projectId) => functions.arnFor({ projectId }),
     });
   }

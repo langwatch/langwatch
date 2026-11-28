@@ -153,6 +153,7 @@ function checkupService(): OpsCheckupService {
       usageReport: MemoryUsageReportChannel.create(),
       probes: MemoryCheckupProbeChannel.create(),
     },
+    gatewayInternalSecret: undefined,
   });
 }
 

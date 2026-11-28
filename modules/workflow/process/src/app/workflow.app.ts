@@ -360,7 +360,7 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
     arnFor: ({ projectId }) => arns.resolveArn(projectId),
   };
   const staging = setup.repositories.payloadStaging;
-  const { stagingThresholdBytes, stagingTtlSeconds, internalSecret, cacheKeySalt } = engine;
+  const { stagingThresholdBytes, stagingTtlSeconds, cacheKeySalt } = engine;
 
   return {
     stream: LambdaWorkflowStudioStreamChannel.create({
@@ -369,7 +369,6 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
       staging,
       stagingThresholdBytes,
       stagingTtlSeconds,
-      internalSecret,
       cacheKeySalt,
     }),
     runtime: HttpWorkflowNlpRuntimeAdapter.onProjectFunctions({
@@ -377,7 +376,6 @@ function composeEngine(setup: WorkflowSetup): WorkflowEngine {
       lambda: engine.invoke,
       staging,
       stagingConfig: { stagingThresholdBytes, stagingTtlSeconds },
-      internalSecret,
     }),
     fleet: engine.fleet,
     perProjectEngines: true,

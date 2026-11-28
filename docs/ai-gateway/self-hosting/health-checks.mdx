@@ -15,9 +15,8 @@ The gateway serves its probes on the same port as the API (`5563`, the container
 | `/startupz`            | `startupProbe`                       | Startup is complete. The process marks startup complete before it opens the listener, so this endpoint answers 200 on the first request that reaches it |
 | `/health`              | Uptime monitors, through the ingress | The process is up and the control plane answered the signed probe within the last 60 seconds                                                            |
 | `/metrics` on port 9464 | Prometheus                          | When the metrics listener is enabled, with the bearer `METRICS_API_KEY`. See [Observability](/ai-gateway/observability#metrics-prometheus)               |
-| `/debug/control-plane` | Operators, in-cluster                | Always. Returns `{"control_plane_base_url":"..."}`, the resolved `LW_GATEWAY_BASE_URL`                                                                  |
 
-None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them, `/debug/control-plane` included.
+None of these endpoints requires a key. With the chart's ClusterIP Service and `ingress.gateway.host` set, `/health` is the only one published and the rest stay in-cluster. A Service of type `LoadBalancer` publishes all of them. The control-plane URL the gateway resolved is not among them: the app reads it over the signed `/internal/control-plane` route for **Settings > Checkup**.
 
 ## Probe responses
 
@@ -123,7 +122,7 @@ On failure, read the `X-LangWatch-Gateway-Request-Id` response header and search
 
 | Symptom                                                         | Cause                                                                                        | First step                                                                                                  |
 | --------------------------------------------------------------- | -------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| `/healthz` 200, `/v1/*` answers `503 auth_upstream_unavailable` | The gateway cannot reach the control plane                                                   | `curl /debug/control-plane` in-cluster and compare the URL with the app Service                             |
+| `/healthz` 200, `/v1/*` answers `503 auth_upstream_unavailable` | The gateway cannot reach the control plane                                                   | Compare `LW_GATEWAY_BASE_URL` in the gateway ConfigMap with the app Service                                 |
 | `/health` 503 with `control_plane: unreachable for Ns`          | Control plane down, unroutable, or `LW_GATEWAY_INTERNAL_SECRET` differs between the two pods | Compare the value on both Deployments, then read `statusprobe_control_plane_unreachable` in the gateway log |
 | `/health` 503 while completions succeed                         | Control plane outage longer than 60 seconds; warm keys still serve from the auth cache       | Fix the control plane. `/readyz` stays 200 on purpose                                                       |
 | `/readyz` flips to 503 mid-life                                 | The pod received `SIGTERM`                                                                   | `kubectl describe pod` for the termination reason                                                           |

@@ -24,6 +24,7 @@ from tenacity import (
 )
 from tqdm.auto import tqdm as tqdm_auto
 from concurrent.futures import FIRST_COMPLETED, ThreadPoolExecutor, wait
+from langevals_core.egress import EgressDestinationRefusedError
 from langevals_core.litellm_patch import (
     RequestEndpointWithoutKeyError,
     patch_litellm,
@@ -351,7 +352,10 @@ class BaseEvaluator(BaseModel, Generic[TEntry, TSettings, TResult], ABC):
                 # caller's request timeout, which turns a clear "content policy
                 # violation" into an opaque timeout. Fail fast and return the
                 # real error instead.
-                retry=retry_if_not_exception_type(litellm.BadRequestError),
+                # A refused destination is refused again on every attempt.
+                retry=retry_if_not_exception_type(
+                    (litellm.BadRequestError, EgressDestinationRefusedError)
+                ),
                 stop=stop_after_attempt(retries),
                 wait=wait_random_exponential(
                     multiplier=1,

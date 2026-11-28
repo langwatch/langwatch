@@ -10,6 +10,7 @@ import type {
 } from "@langwatch/gateway-contract";
 import type { ModelProviderApi } from "@langwatch/model-provider-contract";
 import type { EnabledGuardrailMonitor, MonitorApi } from "@langwatch/monitor-contract";
+import { gatewayInternalSignatureHeaders } from "@langwatch/process/gateway-internal-signature";
 import type { ProjectApi } from "@langwatch/project-contract";
 import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it, vi, type Mock } from "vitest";
@@ -22,10 +23,6 @@ import {
   type GatewayGuardrailCheckRow,
 } from "../../repositories/gateway-guardrail.repository.ts";
 import type { GatewayInternalStoreRepository } from "../../repositories/gateway-internal-store.repository.ts";
-import {
-  buildGatewayCanonicalString,
-  computeGatewaySignature,
-} from "../../rules/gateway-internal-identity.rules.ts";
 import { GatewayGuardrailEvaluationService } from "../../services/gateway-guardrail-evaluation.service.ts";
 import type { GatewaySpendCommandSender } from "../../services/gateway-internal-protocol.service.ts";
 import { gatewayInternalRest } from "../gateway-internal.rest.ts";
@@ -441,24 +438,16 @@ describe("the gateway internal control plane", () => {
     it("is refused 401 as a signature mismatch, reaching nothing", async () => {
       const changes = testChangeEvents();
       const app = mountGatewayInternalRest({ changes });
-      const timestamp = String(Math.floor(Date.now() / 1000));
-
       const response = await app.request(
         new Request(
           `http://api.test/api/internal/gateway/changes?organization_id=${ORGANIZATION_ID}`,
           {
-            headers: {
-              "X-LangWatch-Gateway-Signature": computeGatewaySignature(
-                "someone-else's-secret",
-                buildGatewayCanonicalString({
-                  method: "GET",
-                  path: "/api/internal/gateway/changes",
-                  timestamp,
-                  body: "",
-                }),
-              ),
-              "X-LangWatch-Gateway-Timestamp": timestamp,
-            },
+            headers: gatewayInternalSignatureHeaders({
+              secret: "someone-else's-secret",
+              method: "GET",
+              path: "/api/internal/gateway/changes",
+              nowMs: Date.now(),
+            }),
           },
         ),
       );
