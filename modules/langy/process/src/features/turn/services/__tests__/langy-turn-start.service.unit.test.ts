@@ -18,6 +18,9 @@ import {
   workerCredentials,
   conversationDetail,
 } from "../../../../__tests__/support/langy-turn-deps.ts";
+import { LangyMemoryStore } from "../../../../repositories/memory/langy-memory.store.ts";
+import { MemoryLangyTurnAdmissionRepository } from "../../../../repositories/memory/memory.langy-turn-admission.repository.ts";
+import { LangyTurnSharedService } from "../langy-turn-shared.service.ts";
 import { LangyTurnService, type StartConversationTurnInput } from "../langy-turn.service.ts";
 
 function makeFixture(
@@ -286,19 +289,34 @@ describe("LangyTurnStartService", () => {
   describe("given a copy of the send is still being prepared", () => {
     /** @scenario A send that clashes with a copy still being prepared is refused as Langy unavailable */
     it("refuses before minting, accepting or dispatching", async () => {
+      const twin = MemoryLangyTurnAdmissionRepository.create(LangyMemoryStore.create());
+      const sent = input();
+      const { turnId } = LangyTurnSharedService.create().langyTurnIdentity({
+        userId: "user-1",
+        idempotencyKey: sent.idempotencyKey,
+        messages: sent.messages,
+      });
+      const first = await twin.claim({
+        projectId: "project-1",
+        userId: "user-1",
+        idempotencyKey: sent.idempotencyKey,
+        conversationId: "conversation-1",
+        turnId,
+      });
+      expect(first.kind).toBe("claimed");
       const fixture = makeFixture({
         admission: {
-          claim: vi.fn(async () => ({ kind: "pending" as const })),
-          commit: vi.fn(async () => undefined),
-          confirmAccepted: vi.fn(async () => undefined),
-          abort: vi.fn(async () => undefined),
-          release: vi.fn(async () => undefined),
+          claim: twin.claim.bind(twin),
+          commit: twin.commit.bind(twin),
+          confirmAccepted: twin.confirmAccepted.bind(twin),
+          abort: twin.abort.bind(twin),
+          release: twin.release.bind(twin),
         },
       });
 
       await expect(
         LangyTurnService.create(fixture.deps).startConversationTurn(input()),
-      ).rejects.toMatchObject({ code: "langy_agent_unavailable" });
+      ).rejects.toBeInstanceOf(LangyAgentUnavailableError);
 
       expect(fixture.mint).not.toHaveBeenCalled();
       expect(fixture.acceptTurn).not.toHaveBeenCalled();
