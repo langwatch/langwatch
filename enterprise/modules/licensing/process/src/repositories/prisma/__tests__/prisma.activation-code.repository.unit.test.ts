@@ -2,6 +2,7 @@
  * @vitest-environment node
  * @see specs/self-hosting/connected-services/activation-codes.feature
  */
+import { prismaDouble } from "@langwatch/test-harness/client-doubles/prisma";
 import { nowInstant } from "@langwatch/time";
 import { describe, expect, it, vi } from "vitest";
 
@@ -12,10 +13,10 @@ describe("PrismaActivationCodeRepository.revoke", () => {
   it("decides the revocation in one conditional write", async () => {
     const executeRaw = vi.fn(async () => 1);
     const updateMany = vi.fn(async () => ({ count: 1 }));
-    const database = {
+    const database = prismaDouble({
       $executeRaw: executeRaw,
       activationCode: { updateMany },
-    } as unknown as Parameters<typeof PrismaActivationCodeRepository.create>[0];
+    });
     const repository = PrismaActivationCodeRepository.create(database);
     const at = nowInstant();
 
