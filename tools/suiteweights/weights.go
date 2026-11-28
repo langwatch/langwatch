@@ -14,9 +14,13 @@ import (
 // executed that script for real, so a cache hit never makes a suite look cheap.
 // A package no sampled run executed at all keeps its weight from `previous`,
 // the committed file, when it has one: its replays say nothing about its cost.
+// A package with a script only ever replayed, even in the older runs Collect
+// looked through, never weighs less than `previous` either: a pull request that
+// changes it runs that script for real. Once any run executes it, its measured
+// seconds count instead and the package's weight can drop.
 func Weigh(runs [][]Measurement, previous map[string]float64) map[string]float64 {
 	ran, replayed := byScript(runs)
-	executed := map[string]bool{}
+	executed, partlyReplayed := map[string]bool{}, map[string]bool{}
 	weights := map[string]float64{}
 	for k, seconds := range ran {
 		executed[k.pkg] = true
@@ -24,11 +28,13 @@ func Weigh(runs [][]Measurement, previous map[string]float64) map[string]float64
 	}
 	for k, seconds := range replayed {
 		if _, ranForReal := ran[k]; !ranForReal {
+			partlyReplayed[k.pkg] = true
 			weights[k.pkg] += median(seconds)
 		}
 	}
 	for pkg, seconds := range previous {
-		if _, measured := weights[pkg]; measured && !executed[pkg] {
+		measured, ok := weights[pkg]
+		if ok && (!executed[pkg] || (partlyReplayed[pkg] && seconds > measured)) {
 			weights[pkg] = seconds
 		}
 	}
@@ -87,6 +93,14 @@ func median(values []float64) float64 {
 // small contract packages measure, so listing them would only lengthen the file.
 const MinListedSeconds = 10
 
+func joinIDs(runIDs []int64) string {
+	ids := make([]string, len(runIDs))
+	for i, id := range runIDs {
+		ids[i] = fmt.Sprint(id)
+	}
+	return strings.Join(ids, ", ")
+}
+
 const fileHeader = `# How long each workspace package's suites take in the package-suites job, in
 # seconds, so ` + "`.github/scripts/run-package-suites.ts`" + ` can split them over the
 # shards by weight instead of by count. One package per line: ` + "`<package>  <seconds>`" + `.
@@ -105,13 +119,12 @@ const fileHeader = `# How long each workspace package's suites take in the packa
 
 // Render writes the weights file: the header naming the runs it was measured
 // from, then one line per package of at least MinListedSeconds, heaviest first.
-func Render(weights map[string]float64, runIDs []int64) string {
-	ids := make([]string, len(runIDs))
-	for i, id := range runIDs {
-		ids[i] = fmt.Sprint(id)
-	}
+func Render(weights map[string]float64, runIDs, olderIDs []int64) string {
 	var out strings.Builder
-	fmt.Fprintf(&out, fileHeader, MinListedSeconds, strings.Join(ids, ", "))
+	fmt.Fprintf(&out, fileHeader, MinListedSeconds, joinIDs(runIDs))
+	if len(olderIDs) > 0 {
+		fmt.Fprintf(&out, "# Scripts those runs only replayed from the cache are measured in runs %s.\n", joinIDs(olderIDs))
+	}
 	out.WriteString("\n")
 	names := make([]string, 0, len(weights))
 	for name, seconds := range weights {

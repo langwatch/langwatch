@@ -3,6 +3,7 @@
   "defaultBase": "origin/main",
   "defaultProject": "workspace",
   "namedInputs": {
+    "tsconfigReads": [],
     "sharedGlobals": [
       "{workspaceRoot}/tsconfig.base.json",
       "{workspaceRoot}/tsconfig.shared.json",
@@ -27,6 +28,8 @@
       "{workspaceRoot}/.oxlintrc.jsonc",
       "{workspaceRoot}/.oxlintrc.*.jsonc",
       "{workspaceRoot}/packages/oxlint-rules/**/*",
+      "{workspaceRoot}/dev/nx/lint.mjs",
+      "{workspaceRoot}/dev/nx/executors/**/*",
       "{workspaceRoot}/packages/architecture-enforcer/oxlint*",
       "{workspaceRoot}/modules/catalogue.json",
       "{workspaceRoot}/modules/*/*/package.json",
@@ -82,6 +85,7 @@
     "./dev/nx/npm-deps-plugin.mjs",
     "./dev/nx/helm-plugin.mjs",
     "./dev/nx/workspace-plugin.mjs",
+    "./dev/nx/typecheck-plugin.mjs",
     "./dev/nx/test-reads-plugin.mjs",
     "./dev/nx/haven-plugin.mjs",
     "./dev/nx/remote-cache-plugin.mjs"
@@ -297,21 +301,17 @@
     ],
     "lint:types": {
       "cache": true,
-      "dependsOn": [
-        "^build",
-        "^prisma:generate",
-        {
-          "projects": ["workspace"],
-          "target": "build:types"
-        }
-      ],
       "inputs": [
         "default",
         "^production",
+        "tsconfigReads",
         "lintGlobals",
         "npmDeps",
         {
           "externalDependencies": ["oxlint", "oxlint-tsgolint"]
+        },
+        {
+          "runtime": "node --version"
         }
       ],
       "outputs": []

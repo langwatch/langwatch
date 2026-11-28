@@ -40,7 +40,7 @@ sendMyTests(input: Operated): Promise<DigestMyTests>;
 
 #### `sendTestFor`
 
-Mails the operator, as tests, the person's week in each organization they are an active member of: what they would get, or the template forced, skipped where it has no data. An address no account has is refused with `digest_person_not_found`.
+Mails the operator, or with `deliverTo: "person"` the person at their own address, as tests, the person's week in each organization they are an active member of: what they would get, or the template forced, skipped where it has no data. An address no account has is refused with `digest_person_not_found`.
 
 ```typescript
 sendTestFor(input: DigestSendTestForInput & Operated): Promise<DigestTestsFor>;
@@ -106,7 +106,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-// Query: digestTokenQuerySchema, ../contract/src/digest.ts:141
+// Query: digestTokenQuerySchema, ../contract/src/digest.ts:153
 interface Query {
   token: string;
 }
@@ -123,7 +123,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/unsubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:141
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:153
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:76
 type Response = unknown;
 ```
@@ -137,7 +137,7 @@ Public: RFC 8058 one-click unsubscribe from the weekly digest: the email arrives
 Answers at `/api/digest/resubscribe`.
 
 ```typescript
-type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:141
+type Query = z.infer<typeof digestTokenQuerySchema>; // ../contract/src/digest.ts:153
 // Response: inline, src/transport/digest-unsubscribe.rest.ts:94
 type Response = unknown;
 ```
@@ -174,7 +174,7 @@ interface Input {
   organizationId: string;
   userId: string;
 }
-// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:136
+// Output: digestAcknowledgedSchema, ../contract/src/digest.ts:148
 interface Output {
   ok: true;
 }
@@ -182,10 +182,10 @@ interface Output {
 // digest.sendMyTests
 // Input: digestNoInputSchema, ../contract/src/digest.ts:48
 type Input = Record<string, unknown>;
-type Output = z.infer<typeof digestMyTestsSchema>; // ../contract/src/digest.ts:107
+type Output = z.infer<typeof digestMyTestsSchema>; // ../contract/src/digest.ts:111
 
 // digest.sendTestFor
-// Input: digestSendTestForInputSchema, ../contract/src/digest.ts:119
+// Input: digestSendTestForInputSchema, ../contract/src/digest.ts:131
 interface Input {
   email: string;
   template:
@@ -194,8 +194,9 @@ interface Input {
     | "digest-scenarios-trend"
     | "digest-coding-agent-week"
     | "digest-traces-week";
+  deliverTo?: "me" | "person";
 }
-type Output = z.infer<typeof digestTestsForSchema>; // ../contract/src/digest.ts:128
+type Output = z.infer<typeof digestTestsForSchema>; // ../contract/src/digest.ts:140
 
 // digest.getMyPreference
 type Input = z.infer<typeof digestNoInputSchema>; // ../contract/src/digest.ts:48

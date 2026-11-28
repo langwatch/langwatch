@@ -1,0 +1,11 @@
+{
+  "executors": {
+    "lint-types": {
+      "implementation": "./lint-types.mjs#run",
+      "batchImplementation": "./lint-types.mjs#batch",
+      "preferBatch": true,
+      "schema": "./lint-types.schema.json",
+      "description": "Type-aware oxlint over the projects Nx did not replay, in one run."
+    }
+  }
+}

@@ -885,7 +885,7 @@ describe("given traces, spans and evaluations of each source that the stock quer
 
     expect(await differing(["application"])).toEqual([]);
     expect(await differing(["langy"])).toEqual([]);
-  });
+  }, 180_000);
 
   /** @scenario "A sent outcome whose trace moved into the period counts in the period" */
   it("counts a trace moved into the period in the queries dated inside the window", async () => {

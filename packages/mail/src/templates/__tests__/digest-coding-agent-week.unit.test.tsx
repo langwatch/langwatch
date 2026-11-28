@@ -19,8 +19,8 @@ describe("renderDigestCodingAgentWeekEmail", () => {
     it("reads each total as at least what it kept", async () => {
       const { subject, html } = await renderLightUser({ totalsAtLeast: true });
 
-      expect(subject).toBe("Your coding agents this week: 5 sessions, at least $3.85");
-      expect(html).toContain("at least $3.85");
+      expect(subject).toBe("Your coding agents this week: 5 sessions, at least 420K tokens");
+      expect(html).not.toContain("Cost");
       expect(html).toContain("at least 420K");
       expect(html).toContain("at least 48 min active");
     });
@@ -31,8 +31,9 @@ describe("renderDigestCodingAgentWeekEmail", () => {
     it("shows its totals plainly", async () => {
       const { subject, html } = await renderLightUser({});
 
-      expect(subject).toBe("Your coding agents this week: 5 sessions, $3.85");
+      expect(subject).toBe("Your coding agents this week: 5 sessions, 420K tokens");
       expect(html).not.toContain("at least");
+      expect(html).not.toContain("Cost");
     });
   });
 });

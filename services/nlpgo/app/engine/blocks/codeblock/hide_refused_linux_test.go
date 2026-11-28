@@ -56,10 +56,10 @@ func seccompNumbers() (seccompNr, prctlNr, auditArch uint32, ok bool) {
 }
 
 // refusePrSetDumpable makes every thread of this process answer the given errno
-// to prctl(PR_SET_DUMPABLE) and nothing else: the one Lambda refusal the engine
-// depends on (Lambda also refuses PR_SET_CHILD_SUBREAPER and PR_SET_PDEATHSIG,
-// which the engine tolerates or does not use).
-func refusePrSetDumpable(refusal syscall.Errno) error {
+// to prctl(PR_SET_DUMPABLE) and prctl(PR_SET_CHILD_SUBREAPER), plus any further
+// prctl options named, and nothing else, as AWS Lambda does (it also refuses
+// PR_SET_PDEATHSIG, which nothing here uses).
+func refusePrSetDumpable(refusal syscall.Errno, alsoRefused ...uint32) error {
 	seccompNr, prctlNr, arch, ok := seccompNumbers()
 	if !ok {
 		return fmt.Errorf("unsupported architecture %s", runtime.GOARCH)
@@ -70,17 +70,20 @@ func refusePrSetDumpable(refusal syscall.Errno) error {
 		ret   = 0x06 // BPF_RET | BPF_K
 		allow = 0x7fff0000
 	)
-	errnoRet := uint32(0x00050000) | uint32(refusal) // SECCOMP_RET_ERRNO | errno
+	errnoRet := uint32(0x00050000) | uint32(refusal)   // SECCOMP_RET_ERRNO | errno
+	options := append([]uint32{4, 36}, alsoRefused...) // PR_SET_DUMPABLE, PR_SET_CHILD_SUBREAPER
+	n := uint8(len(options))
 	prog := []syscall.SockFilter{
-		{Code: ldAbs, K: 4},                   // 0 arch
-		{Code: jeq, Jt: 0, Jf: 4, K: arch},    // 1 other arch -> 6 allow
-		{Code: ldAbs, K: 0},                   // 2 syscall number
-		{Code: jeq, Jt: 0, Jf: 2, K: prctlNr}, // 3 not prctl -> 6 allow
-		{Code: ldAbs, K: 16},                  // 4 args[0], the prctl option
-		{Code: jeq, Jt: 1, Jf: 0, K: 4},       // 5 PR_SET_DUMPABLE -> 7 refuse
-		{Code: ret, K: allow},                 // 6
-		{Code: ret, K: errnoRet},              // 7
+		{Code: ldAbs, K: 4},                       // arch
+		{Code: jeq, Jt: 0, Jf: 2 + n, K: arch},    // other arch -> allow
+		{Code: ldAbs, K: 0},                       // syscall number
+		{Code: jeq, Jt: 0, Jf: 1 + n, K: prctlNr}, // not prctl -> allow
+		{Code: ldAbs, K: 16},                      // args[0], the prctl option
 	}
+	for i, option := range options {
+		prog = append(prog, syscall.SockFilter{Code: jeq, Jt: n - uint8(i), K: option}) // -> refuse
+	}
+	prog = append(prog, syscall.SockFilter{Code: ret, K: allow}, syscall.SockFilter{Code: ret, K: errnoRet})
 	fprog := syscall.SockFprog{Len: uint16(len(prog)), Filter: &prog[0]}
 
 	// no_new_privs is per thread: pin this goroutine so seccomp(2) runs on the
@@ -121,10 +124,17 @@ func childEnvFor(name string, extra ...string) []string {
 // parent with the child's output when the child's assertions fail.
 func runChild(t *testing.T, name string, extra ...string) {
 	t.Helper()
+	runChildBinary(t, os.Args[0], name, extra...)
+}
+
+// runChildBinary is runChild from a given copy of this test binary, which is
+// how a case runs the engine from an execute-only file.
+func runChildBinary(t *testing.T, binary, name string, extra ...string) {
+	t.Helper()
 	requirePython(t)
 	ctx, cancel := context.WithTimeout(context.Background(), childTimeout)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, os.Args[0], "-test.run=^TestHideRefusedChild$", "-test.v", "-test.timeout=80s") //nolint:gosec // re-executes this test binary, no external input
+	cmd := exec.CommandContext(ctx, binary, "-test.run=^TestHideRefusedChild$", "-test.v", "-test.timeout=80s") //nolint:gosec,nolintlint // this test binary or its copy; gosec taint flags it on some runs only
 	cmd.Env = childEnvFor(name, extra...)
 	var out bytes.Buffer
 	cmd.Stdout, cmd.Stderr = &out, &out
@@ -145,41 +155,52 @@ func TestHideRefused_StrictWhenPlatformAllowsIt(t *testing.T) {
 	runChild(t, "not-refused")
 }
 
-// @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed"
+// @scenario "a platform that refuses the hide step runs code blocks when the image ships the engine and python execute-only"
 // @scenario "the engine reports its hide mode once at start-up"
-func TestHideRefused_VisibleProcessWhenAllowed(t *testing.T) {
-	runChild(t, "refused-allowed")
+func TestHideRefused_StrictWhenTheImageIsExecuteOnly(t *testing.T) {
+	runExecOnly(t, "refused-exec-only", true)
 }
 
-// @scenario "a platform that refuses the hide step serves no code blocks unless visible-process is allowed"
+// @scenario "a platform that refuses the hide step serves no code blocks when the engine's binary is readable"
 // @scenario "the engine reports its hide mode once at start-up"
-func TestHideRefused_DisabledWhenNotAllowed(t *testing.T) {
-	runChild(t, "refused-unset")
+func TestHideRefused_DisabledWhenTheEngineIsReadable(t *testing.T) {
+	runChild(t, "refused-readable")
 }
 
-// @scenario "a platform that refuses the hide step with anything but EPERM serves no code blocks"
+// @scenario "a platform that refuses the hide step serves no code blocks when the interpreter is readable"
 // @scenario "the engine reports its hide mode once at start-up"
-func TestHideRefused_DisabledOnAnyOtherRefusal(t *testing.T) {
-	runChild(t, "refused-eacces-allowed")
+func TestHideRefused_DisabledWhenTheInterpreterIsReadable(t *testing.T) {
+	runExecOnly(t, "refused-readable-python", false)
 }
 
 // @scenario "a platform that lets the engine hide its process files runs code blocks in strict mode"
-func TestHideRefused_RunnerFailsWhenStrict(t *testing.T) {
-	t.Run("given prctl is refused and NLPGO_CODE_BLOCK_HIDE is unset", func(t *testing.T) {
-		t.Run("the runner exits 1 with the prctl message", func(t *testing.T) {
-			runChild(t, "runner-strict")
+func TestHideRefused_RunnerFailsWhenStillReadable(t *testing.T) {
+	t.Run("given prctl is refused and the interpreter is readable", func(t *testing.T) {
+		t.Run("the runner exits 1 with the hide message", func(t *testing.T) {
+			runChild(t, "runner-readable")
+		})
+		t.Run("the retired best-effort flag changes nothing", func(t *testing.T) {
+			runChild(t, "runner-readable-old-flag")
 		})
 	})
 }
 
-// @scenario "a platform that refuses the hide step with anything but EPERM serves no code blocks"
-func TestHideRefused_RunnerFailsOnOtherErrnoEvenWhenBestEffort(t *testing.T) {
-	runChild(t, "runner-best-effort-other-errno")
+// @scenario "a platform that refuses the hide step runs code blocks when the image ships the engine and python execute-only"
+func TestHideRefused_RunnerContinuesWhenExecuteOnly(t *testing.T) {
+	runExecOnly(t, "runner-exec-only", true)
 }
 
-// @scenario "a platform that refuses the hide step runs code blocks when visible-process is allowed"
-func TestHideRefused_RunnerContinuesWhenBestEffort(t *testing.T) {
-	runChild(t, "runner-best-effort")
+// runExecOnly runs a case from an execute-only copy of this test binary, with
+// python execute-only too when execOnlyPython says so.
+func runExecOnly(t *testing.T, name string, execOnlyPython bool) {
+	t.Helper()
+	requirePython(t)
+	requireUnprivilegedForExecOnly(t)
+	python := mustLookPath(t, "python3")
+	if execOnlyPython {
+		python = execOnlyCopy(t, python)
+	}
+	runChildBinary(t, execOnlyCopy(t, os.Args[0]), name, lambdaPythonEnv+"="+python)
 }
 
 // TestHideRefusedChild is the child entry point. It does nothing unless the
@@ -191,50 +212,36 @@ func TestHideRefusedChild(t *testing.T) {
 	}
 	if name == "not-refused" {
 		exitSkippedIfHostRefusesHide()
-	} else {
-		if err := refusePrSetDumpable(refusalFor(name)); err != nil {
-			fmt.Fprintf(os.Stderr, "seccomp install failed: %v\n", err)
-			os.Exit(skipExitCode)
-		}
+	} else if err := refusePrSetDumpable(syscall.EPERM, extraRefusals[name]...); err != nil {
+		fmt.Fprintf(os.Stderr, "seccomp install failed: %v\n", err)
+		os.Exit(skipExitCode)
 	}
 	if c := runnerCases[name]; c != nil {
 		runRunnerCase(t, *c)
+	} else if run := lambdaCases[name]; run != nil {
+		run(t)
 	} else {
 		runExecutorCase(t, name)
 	}
 }
 
-// runnerCase is one run of runner.py alone under a filter answering errno.
+// runnerCase is one run of runner.py alone under a filter answering EPERM.
 type runnerCase struct {
-	bestEffort  bool
+	oldFlag     bool
 	wantFailure bool
 }
 
 var runnerCases = map[string]*runnerCase{
-	"runner-strict":                  {bestEffort: false, wantFailure: true},
-	"runner-best-effort":             {bestEffort: true, wantFailure: false},
-	"runner-best-effort-other-errno": {bestEffort: true, wantFailure: true},
+	"runner-readable":          {wantFailure: true},
+	"runner-readable-old-flag": {oldFlag: true, wantFailure: true},
+	"runner-exec-only":         {wantFailure: false},
 }
 
-// refusals names the errno each case's filter answers; a case not listed is a
-// typo, so refusalFor fails on it.
-var refusals = map[string]syscall.Errno{
-	"refused-allowed":                syscall.EPERM,
-	"refused-unset":                  syscall.EPERM,
-	"refused-eacces-allowed":         syscall.EACCES,
-	"runner-strict":                  syscall.EPERM,
-	"runner-best-effort":             syscall.EPERM,
-	"runner-best-effort-other-errno": syscall.EACCES,
-}
+// extraRefusals names the cases whose platform refuses more prctl options.
+var extraRefusals = map[string][]uint32{}
 
-func refusalFor(name string) syscall.Errno {
-	errno, ok := refusals[name]
-	if !ok {
-		fmt.Fprintf(os.Stderr, "unknown hide case %q\n", name)
-		os.Exit(2)
-	}
-	return errno
-}
+// lambdaCases are the credential cases, registered by their own file.
+var lambdaCases = map[string]func(t *testing.T){}
 
 // exitSkippedIfHostRefusesHide ends the child with the skip code when this host
 // already refuses PR_SET_DUMPABLE, where strict mode cannot be expected.
@@ -246,15 +253,19 @@ func exitSkippedIfHostRefusesHide() {
 	}
 }
 
+// casePython is the interpreter the parent chose for this case.
+func casePython() string {
+	if python := os.Getenv(lambdaPythonEnv); python != "" {
+		return python
+	}
+	return "python3"
+}
+
 func runExecutorCase(t *testing.T, name string) {
 	t.Helper()
 	core, logs := observer.New(zapcore.DebugLevel)
-	opts := codeblock.Options{
-		AllowVisibleProcess: name == "refused-allowed" || name == "refused-eacces-allowed",
-		Logger:              zap.New(core),
-	}
-	exe, err := codeblock.New(opts)
-	require.NoError(t, err, "codeblock.New must never abort the engine over PR_SET_DUMPABLE")
+	exe, err := codeblock.New(codeblock.Options{Python: casePython(), Logger: zap.New(core)})
+	require.NoError(t, err, "codeblock.New must never abort the engine over the hide step")
 
 	assertHideModeLogged(t, logs, name)
 
@@ -263,62 +274,27 @@ func runExecutorCase(t *testing.T, name string) {
 		DeclaredOutputs: []string{"answer"},
 		Timeout:         30 * time.Second,
 	})
+	require.NoError(t, runErr)
+	require.NotNil(t, res)
 
 	switch name {
-	case "refused-eacces-allowed":
-		require.NoError(t, runErr)
-		require.NotNil(t, res)
+	case "refused-readable":
 		require.NotNil(t, res.Error)
-		assert.Contains(t, res.Error.Message, "code blocks are disabled")
-		assert.Contains(t, res.Error.Message, syscall.EACCES.Error())
-		assert.NotContains(t, res.Error.Message, codeblock.AllowVisibleProcessSetting)
-	case "refused-unset":
-		require.NoError(t, runErr)
-		require.NotNil(t, res)
-		require.NotNil(t, res.Error)
-		assert.Contains(t, res.Error.Message, codeblock.AllowVisibleProcessSetting)
+		assert.Contains(t, res.Error.Message, "code blocks are disabled: the engine's own process files are readable by user code")
+		assert.Contains(t, res.Error.Message, syscall.EPERM.Error())
 		assertOtherBlocksRunThroughEngine(t, exe)
+	case "refused-readable-python":
+		require.NotNil(t, res.Error)
+		assert.Contains(t, res.Error.Message, "code blocks are disabled: the interpreter cannot hide a run from user code")
 	default:
-		require.NoError(t, runErr)
-		require.NotNil(t, res)
-		require.Nil(t, res.Error, "expected success, got %+v", res.Error)
+		require.Nil(t, res.Error, "expected success, got %+v\nstderr: %s", res.Error, res.Stderr)
 		assert.EqualValues(t, 42, res.Outputs["answer"])
 	}
-	if name == "refused-allowed" {
-		assertRunnerDropsHideFlag(t, exe)
-	}
 }
 
-// assertRunnerDropsHideFlag runs user code in visible-process mode, where the
-// engine does set the flag, and checks neither the code nor a process it
-// starts can see it.
-func assertRunnerDropsHideFlag(t *testing.T, exe *codeblock.Executor) {
-	t.Helper()
-	const code = `import os, subprocess, sys
-
-def execute():
-    sub = subprocess.run(
-        [sys.executable, "-c", "import os; print(os.environ.get('NLPGO_CODE_BLOCK_HIDE'))"],
-        capture_output=True, text=True,
-    ).stdout.strip()
-    return {"own": os.environ.get("NLPGO_CODE_BLOCK_HIDE"), "sub": sub}
-`
-	res, err := exe.Execute(context.Background(), codeblock.Request{
-		Code:            code,
-		DeclaredOutputs: []string{"own", "sub"},
-		Timeout:         30 * time.Second,
-	})
-	require.NoError(t, err)
-	require.NotNil(t, res)
-	require.Nil(t, res.Error, "expected success, got %+v", res.Error)
-	assert.Nil(t, res.Outputs["own"], "user code must not see the hide flag")
-	assert.Equal(t, "None", res.Outputs["sub"], "a process user code starts must not see the hide flag")
-}
-
-// assertOtherBlocksRunThroughEngine builds an engine around this refused
+// assertOtherBlocksRunThroughEngine builds an engine around this disabled
 // executor and runs a code node and an HTTP node as Studio component runs: the
-// code node carries the error that names the setting while the HTTP node
-// still answers.
+// code node carries the disabled error while the HTTP node still answers.
 func assertOtherBlocksRunThroughEngine(t *testing.T, exe *codeblock.Executor) {
 	t.Helper()
 	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
@@ -363,26 +339,29 @@ func assertOtherBlocksRunThroughEngine(t *testing.T, exe *codeblock.Executor) {
 
 	codeState := run("code-1")
 	require.NotNil(t, codeState.Error, "node code-1 must carry the error")
-	assert.Contains(t, codeState.Error.Message, codeblock.AllowVisibleProcessSetting, "node code-1 error")
+	assert.Contains(t, codeState.Error.Message, "code blocks are disabled", "node code-1 error")
 }
 
 // assertHideModeLogged checks the one operator-facing record of the mode:
-// info when strict, a warning when the platform refused the hide step.
+// info when strict, a warning naming the exposure when disabled.
 func assertHideModeLogged(t *testing.T, logs *observer.ObservedLogs, name string) {
 	t.Helper()
 	want := map[string]struct {
 		mode  string
 		level zapcore.Level
 	}{
-		"not-refused":            {"strict", zapcore.InfoLevel},
-		"refused-allowed":        {"visible-process", zapcore.WarnLevel},
-		"refused-unset":          {"disabled", zapcore.WarnLevel},
-		"refused-eacces-allowed": {"disabled", zapcore.WarnLevel},
+		"not-refused":             {"strict", zapcore.InfoLevel},
+		"refused-exec-only":       {"strict", zapcore.InfoLevel},
+		"refused-readable":        {"disabled", zapcore.WarnLevel},
+		"refused-readable-python": {"disabled", zapcore.WarnLevel},
 	}[name]
 	entries := logs.FilterMessage("nlpgo_code_block_hide_mode").All()
 	require.Len(t, entries, 1, "the mode is logged exactly once")
 	assert.Equal(t, want.level, entries[0].Level)
 	assert.Equal(t, want.mode, entries[0].ContextMap()["mode"])
+	if want.mode == "disabled" {
+		assert.NotEmpty(t, entries[0].ContextMap()["exposure"], "a disabled mode names what is exposed")
+	}
 }
 
 func runRunnerCase(t *testing.T, c runnerCase) {
@@ -391,16 +370,16 @@ func runRunnerCase(t *testing.T, c runnerCase) {
 	require.NoError(t, err)
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	cmd := exec.CommandContext(ctx, "python3", "-c", string(source)) //nolint:gosec // fixed interpreter running the checked-in runner.py
+	cmd := exec.CommandContext(ctx, casePython(), "-c", string(source)) //nolint:gosec // fixed interpreter running the checked-in runner.py
 	cmd.Env = []string{"PATH=" + os.Getenv("PATH")}
-	if c.bestEffort {
+	if c.oldFlag {
 		cmd.Env = append(cmd.Env, hideModeEnv+"=best-effort")
 	}
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	runErr := cmd.Run()
 
-	const hideFailure = "prctl(PR_SET_DUMPABLE) failed"
+	const hideFailure = "this process is still readable"
 	if c.wantFailure {
 		exitErr, ok := runErr.(*exec.ExitError)
 		require.True(t, ok, "expected the runner to exit non-zero, got %v", runErr)
@@ -408,7 +387,7 @@ func runRunnerCase(t *testing.T, c runnerCase) {
 		assert.Contains(t, stderr.String(), hideFailure)
 		return
 	}
-	assert.NotContains(t, stderr.String(), hideFailure, "best-effort must continue past the refused prctl")
+	assert.NotContains(t, stderr.String(), hideFailure, "an execute-only interpreter is hidden by exec")
 	// The next thing the runner does is ask for its payload; this harness has none.
 	assert.Contains(t, stderr.String(), "runner: invalid JSON in the payload")
 }

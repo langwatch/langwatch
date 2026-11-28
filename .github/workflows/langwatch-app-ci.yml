@@ -43,9 +43,9 @@ env:
 concurrency:
   # A manual run (coverage, duration weights) has its own group, so a push cannot cancel it.
   group: langwatch-app-ci-${{ github.event_name }}-${{ github.ref }}
-  # A newer commit supersedes an older run, except a push to main: there
-  # package-suites runs as one long job (see `suites-one-job`), so a run finishes
-  # and the newest commit waits behind it. Guarded by tools/ciguard/mainsuites.go.
+  # A newer commit supersedes an older run, except a push to main: a main run
+  # finishes, so every red commit is reported, and the newest commit waits behind
+  # it. Guarded by tools/ciguard/mainsuites.go.
   cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}
 
 jobs:
@@ -59,9 +59,6 @@ jobs:
       # feature-parity only; `ci:full` lifts that. merge_group is never a draft and main
       # runs the full suite, so nothing lands without it.
       heavy: ${{ github.event_name != 'pull_request' || (github.event.pull_request.draft == false && !(startsWith(github.head_ref, 'release-please--') && github.event.pull_request.user.login == 'langwatch-agent')) || contains(github.event.pull_request.labels.*.name, 'ci:full') }}
-      # A push to main runs package-suites as one job: nobody waits on it, and one
-      # setup instead of eight saves about a fifth of its Actions minutes (#9146).
-      suites-one-job: ${{ github.event_name == 'push' }}
       # Coverage instrumentation costs ~45% of the run (measured: a unit subset
       # goes 3.7s -> 6.6s with --coverage). Nothing gates on it — there is no
       # codecov.yml, no codecov status check, and both uploads are
@@ -194,6 +191,8 @@ jobs:
               - '.github/actions/nx-remote-cache/**'
               - '.github/actions/prepare-generated-files/**'
               - '.github/actions/setup-pnpm-node/**'
+              - 'cmd/waitcontainers/**'
+              - 'tools/waitcontainers/**'
             # The parity scanner binds @scenario annotations from test files
             # across many roots, not just specs/. This list MUST
             # cover every root the scanner reads (DEFAULT_TEST_ROOTS,
@@ -415,10 +414,9 @@ jobs:
   # parity, OpenAPI clients, typecheck and the CI self-test. Each check is its
   # own step and every step runs even when an earlier one failed, so one run
   # reports every failure. They run in sequence, not in parallel: the
-  # type-aware lint reads the packages' dist declarations, so its Nx target runs
-  # workspace:typecheck (tsc -b) first, after the dist snapshot is restored; the
-  # typecheck step then replays that run. The CI self-test runs last: it stages
-  # a failing test in apps/api.
+  # type-aware lint reads the packages' dist declarations, so typecheck runs
+  # first, and the type-aware lint replays it. The CI self-test runs last: it
+  # stages a failing test in apps/api.
   checks:
     needs: changes
     if: needs.changes.outputs.relevant == 'true' || needs.changes.outputs.feature-parity == 'true'
@@ -694,80 +692,23 @@ jobs:
           BASE: ${{ steps.lint-scope.outputs.base }}
         run: pnpm lint ${BASE:+--base "$BASE"}
 
-      # Each package writes its own .tsbuildinfo beside its output, to
-      # dist/tsconfig.<stem>.tsbuildinfo, per the repo rule that every package
-      # tsconfig sets `incremental` and its own tsBuildInfoFile -- never under
-      # node_modules. The whole dist/ is the cached unit, not the stamp alone:
-      # tsc -b rebuilds a project whose declaration outputs are absent, so
-      # caching the stamp without them still runs cold. Same unit nx.json
-      # declares as typecheck's outputs.
-      #
-      # The restore key is pinned to the lockfile and the root compiler
-      # options: a snapshot built against other dependency types is never
-      # restored. Saved below, once the typecheck has run; a pull request keeps one copy.
-      - name: Restore TypeScript incremental build info
+      # One cached `typecheck` task per project (`tsc -b` in the package), after its
+      # dependencies' typecheck. No dist is restored from an older run: every declaration
+      # comes from an Nx run or replay, so a dependant's hash never depends on what a
+      # snapshot left. Unchanged projects replay; Nx runs every task not downstream of a
+      # failed one, and the job still fails.
+      - name: Run typecheck (every workspace package)
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        id: tsbuildinfo
-        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          # One level per package: a `**` walks every node_modules symlink below
-          # it, and the save then outlives the job's timeout.
-          path: |
-            packages/*/dist
-            modules/*/*/dist
-            enterprise/modules/*/*/dist
-            apps/*/dist
-            node_modules/.cache/typecheck-dist
-          key: ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-${{ github.sha }}
-          restore-keys: |
-            ${{ runner.os }}-pkg-dist-${{ hashFiles('pnpm-lock.yaml', 'pnpm-workspace.yaml', 'tsconfig.*.json') }}-
+        id: typecheck
+        run: pnpm run typecheck
 
-      # A restored dist is trusted only where the package and its workspace
-      # dependencies are unchanged since the snapshot: tsc 7 keeps a stale
-      # declaration once read and dependants re-emit it as up to date. Each
-      # changed package's dist and its dependants' are dropped and built cold
-      # (handoff: .claude/handoffs/ci-typecheck-stale-dist.md).
-      - name: Drop restored declarations whose sources changed
+      # Type-aware rules, one cached `lint:types` task per TypeScript project, after the
+      # typecheck above (replayed here), so the declarations it reads were built from
+      # hashed sources. Unchanged projects replay; the rest go to one oxlint run, split
+      # back per project (dev/nx/executors, ADR-150).
+      - name: Oxlint type-aware, every project (blocking)
         if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        run: |
-          manifest=node_modules/.cache/typecheck-dist/sources.txt
-          current="$RUNNER_TEMP/typecheck-dist-sources.txt"
-          pnpm ls -r --depth -1 --json | jq -r --arg root "$PWD/" '.[].path | select(startswith($root)) | ltrimstr($root)' | LC_ALL=C sort > "$RUNNER_TEMP/typecheck-packages.txt"
-          while read -r dir; do
-            hash=$(cd "$dir" && find . \( -name node_modules -o -name dist \) -prune -o -type f ! -name '*.tsbuildinfo' -print0 | LC_ALL=C sort -z | xargs -0 -r sha1sum | sha1sum | cut -d' ' -f1)
-            echo "$dir $hash"
-          done < "$RUNNER_TEMP/typecheck-packages.txt" > "$current"
-          if [ ! -f "$manifest" ]; then
-            echo "No snapshot restored; every project builds cold."
-          else
-            changed=$(LC_ALL=C comm -13 <(LC_ALL=C sort "$manifest") <(LC_ALL=C sort "$current") | cut -d' ' -f1)
-            wiped=0
-            if [ -n "$changed" ]; then
-              filters=()
-              for dir in $changed; do filters+=("--filter=...{./$dir}"); done
-              for dir in $(pnpm "${filters[@]}" ls --depth -1 --json | jq -r --arg root "$PWD/" '.[].path | ltrimstr($root)'); do
-                if [[ $dir =~ ^(packages/[^/]+|modules/[^/]+/[^/]+|enterprise/modules/[^/]+/[^/]+|apps/[^/]+)$ ]] && [ -d "$dir/dist" ]; then
-                  rm -rf "$dir/dist"
-                  wiped=$((wiped + 1))
-                fi
-              done
-            fi
-            echo "$(echo "$changed" | wc -w) packages changed since the snapshot; dropped $wiped restored dist directories (them and their dependants)."
-            # ensure:built's outputs live in these dist directories too.
-            if [ "$wiped" -gt 0 ]; then pnpm run ensure:built; fi
-          fi
-          mkdir -p "$(dirname "$manifest")"
-          cp "$current" "$manifest"
-
-      # Type-aware rules over the affected projects in one process (shared parse;
-      # ADR-150), beside the native and plugin processes its directive check needs.
-      # Its Nx target depends on workspace:typecheck, so the declarations it reads are
-      # built from the hashed sources first (or replayed); the typecheck step replays it.
-      - name: Oxlint type-aware, affected projects (blocking)
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        env:
-          BASE: ${{ steps.lint-scope.outputs.base }}
-        run: pnpm lint:types ${BASE:+--base "$BASE"}
+        run: pnpm lint:types
 
       # The SDK clients and the docs site copy against the OpenAPI document the
       # routes generate: regenerate them with `make sync-all-openapi` and fail
@@ -817,35 +758,6 @@ jobs:
             exit 1
           fi
 
-      # Not --no-bail: one package's failure should not hide the rest, and a
-      # migration in flight tends to break several at once. The job still fails.
-      # One pass: the step above leaves no stale declaration to re-check against.
-      - name: Run typecheck (every workspace package)
-        if: ${{ !cancelled() && needs.changes.outputs.relevant == 'true' && steps.prepare.outcome == 'success' }}
-        id: typecheck
-        run: pnpm run typecheck
-
-      # Saved even when the typecheck fails, so one red commit on main does not
-      # leave every later run cold. Safe: tsbuildinfo keeps the errors, and a
-      # fix changes the package's sources, which drops it and its dependants.
-      - name: Save TypeScript incremental build info
-        if: ${{ !cancelled() && steps.tsbuildinfo.outputs.cache-hit != 'true' && (steps.typecheck.outcome == 'success' || steps.typecheck.outcome == 'failure') && ((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
-        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
-        with:
-          path: |
-            packages/*/dist
-            modules/*/*/dist
-            enterprise/modules/*/*/dist
-            apps/*/dist
-            node_modules/.cache/typecheck-dist
-          key: ${{ steps.tsbuildinfo.outputs.cache-primary-key }}
-
-      # After the save, so a run that fails before saving keeps the previous copy.
-      - uses: ./.github/actions/prune-pr-caches
-        if: ${{ !cancelled() && steps.typecheck.outcome != 'skipped' }}
-        with:
-          prefix: ${{ runner.os }}-pkg-dist-
-
       # Proves the failure pipeline (vitest exit code + extract-failures.sh)
       # still reports a failing test.
       - name: Stage canary fixture inside vitest root
@@ -884,16 +796,22 @@ jobs:
       # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
       - name: Nx remote cache log
         if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        continue-on-error: true
         run: node dev/nx/remote-cache/launch.mjs report
 
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
@@ -985,11 +903,15 @@ jobs:
 
       - name: Extract test failures
         if: failure()
+        timeout-minutes: 2
+        continue-on-error: true
         working-directory: apps/${{ matrix.app == 'platform-api' && 'api' || matrix.app }}
         run: bash ../../.github/scripts/extract-failures.sh test-results.json test-failures.txt
 
       - name: Notify Slack on new failure
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}
@@ -998,6 +920,8 @@ jobs:
 
       - name: Upload unit test coverage to Codecov
         if: always() && hashFiles('apps/*/coverage/lcov.info') != ''
+        timeout-minutes: 3
+        continue-on-error: true
         uses: codecov/codecov-action@fb8b3582c8e4def4969c97caa2f19720cb33a72f # v5
         with:
           files: apps/api/coverage/lcov.info,apps/worker/coverage/lcov.info,apps/ui/coverage/lcov.info
@@ -1064,43 +988,33 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}
+        shard: [1, 2, 3, 4, 5, 6, 7, 8]
     name: package-suites (${{ matrix.shard }}/${{ strategy.job-total }})
     #
-    # It DOES have services. This job absorbed the datastore lane at the
-    # deployment cutover: `test-integration` existed to shard the monolith's
-    # 1,017 integration files, and that corpus is gone — what is left are
-    # package suites, which this job already discovers. Standing the datastores
-    # up here is what keeps their integration halves running for real instead
-    # of self-skipping into a green job.
-    timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}
-
-    services:
-      redis:
-        image: redis:alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-      postgres:
-        image: postgres:16
-        ports:
-          - 5432:5432
-        env:
-          POSTGRES_USER: langwatch_ci
-          POSTGRES_PASSWORD: ci_password
-          POSTGRES_DB: langwatch_test
-        options: >-
-          --health-cmd "PGPASSWORD=ci_password psql -U langwatch_ci -d langwatch_test -c 'select 1'"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    # It DOES stand up datastores, so the package suites' integration halves run
+    # for real instead of self-skipping into a green job. They start as plain
+    # containers, not a `services:` block (specs/ci/app-ci-datastores.feature).
+    timeout-minutes: 45
 
     steps:
+      # In the background: the image pulls overlap the checkout and install, and
+      # "Wait for Postgres and Redis" (cmd/waitcontainers) holds the first step that reads them.
+      # The Postgres check uses TCP: its first-boot init server listens only on the socket.
+      - name: Start Postgres and Redis in the background
+        timeout-minutes: 1
+        run: |
+          {
+            docker run -d --name postgres -p 5432:5432 \
+              -e POSTGRES_USER=langwatch_ci -e POSTGRES_PASSWORD=ci_password -e POSTGRES_DB=langwatch_test \
+              --health-cmd "PGPASSWORD=ci_password psql -h 127.0.0.1 -U langwatch_ci -d langwatch_test -c 'select 1'" \
+              --health-interval 2s --health-timeout 5s --health-retries 60 \
+              postgres:16 &
+            docker run -d --name redis -p 6379:6379 \
+              --health-cmd "redis-cli ping" --health-interval 2s --health-timeout 5s --health-retries 60 \
+              redis:alpine &
+            wait
+          } > "$RUNNER_TEMP/datastores.log" 2>&1 < /dev/null &
+
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v6
         with:
@@ -1167,6 +1081,16 @@ jobs:
       - name: Build workspace packages
         run: pnpm run ensure:built
 
+      - name: Set up Go for the container wait
+        uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
+        with:
+          go-version-file: go.work
+          cache-dependency-path: "*/go.sum"
+
+      - name: Wait for Postgres and Redis
+        timeout-minutes: 5
+        run: go run ./cmd/waitcontainers -start-log "$RUNNER_TEMP/datastores.log" -timeout 240s postgres redis
+
       # BUILD_TIME is set job-wide and the ClickHouse migrator returns early
       # under it, so the whole upgrade runs here with it unset, once.
       - name: Run the upgrade (Postgres and ClickHouse migrations)
@@ -1200,27 +1124,25 @@ jobs:
         run: pnpm exec nx run chart-langwatch:helm:deps --outputStyle=static
 
       # The suites' own Nx cache, apart from the build cache so it holds only test
-      # results and stays small. Per shard: a re-push to the same change splits alike.
-      # Main's one job saves under `all`, which a shard falls back to.
+      # results and stays small. Per shard: a re-push to the same change splits alike,
+      # and a pull request's shard falls back to main's shard of the same number.
       - name: Restore the package suite results
         if: ${{ !((github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]')) }}
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
-            ${{ runner.os }}-nx-suites-all-
+            ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
 
       - name: Restore the package suite results, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: .nx/suites
-          key: ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ github.sha }}
+          key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-nx-suites-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-
-            ${{ runner.os }}-nx-suites-all-
+            ${{ runner.os }}-nx-suites-${{ matrix.shard }}-
 
       - uses: ./.github/actions/prune-pr-caches
         with:
@@ -1238,7 +1160,7 @@ jobs:
       # hash is over the blob ids of the lockfile, every package.json and tsconfig,
       # and packages/vitest-config: the shared config is loaded from the package, so
       # vitest does not count its source (plugin options, React compiler) as a config file.
-      # Main's one job saves under `all`, which a shard falls back to: entries are keyed by content.
+      # A pull request's shard falls back to main's shard of the same number: entries are keyed by content.
       - name: Hash what a cached transform depends on besides its source
         id: transform-inputs
         run: echo "hash=$(git ls-files -s -- pnpm-lock.yaml '*package.json' '*tsconfig*.json' packages/vitest-config | sha256sum | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
@@ -1248,20 +1170,18 @@ jobs:
         uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
-            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
 
       - name: Restore the vitest transforms, saving them at the end of the job
         if: ${{ (github.ref == 'refs/heads/main' && github.event_name != 'pull_request_target') || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository && github.actor != 'dependabot[bot]') }}
         uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: node_modules/.vitest-cache
-          key: ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
+          key: ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-${{ github.sha }}
           restore-keys: |
-            ${{ runner.os }}-vitest-transforms-${{ needs.changes.outputs.suites-one-job == 'true' && 'all' || matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
-            ${{ runner.os }}-vitest-transforms-all-${{ steps.transform-inputs.outputs.hash }}-
+            ${{ runner.os }}-vitest-transforms-${{ matrix.shard }}-${{ steps.transform-inputs.outputs.hash }}-
 
       - uses: ./.github/actions/prune-pr-caches
         with:
@@ -1293,6 +1213,7 @@ jobs:
       # changes; this names the `reads` row that closes it. Runs after a red suite too.
       - name: Check suites declare what they read outside their package
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
         run: node --experimental-strip-types .github/scripts/check-test-reads.ts "$RUNNER_TEMP/test-reads"
 
       # Keeps the saved cache bounded. Nothing records which entry a run read: a
@@ -1302,11 +1223,15 @@ jobs:
       # past 400 MB is emptied, so the save stores a small one the next run restores.
       - name: Drop the vitest transforms before saving if they grew past 400 MB
         if: ${{ !cancelled() }}
+        timeout-minutes: 2
+        continue-on-error: true
         run: size=$(du -sm node_modules/.vitest-cache 2>/dev/null | cut -f1); if [ "${size:-0}" -gt 400 ]; then rm -rf node_modules/.vitest-cache && mkdir -p node_modules/.vitest-cache; fi
 
       # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
       - name: Nx remote cache log
         if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        continue-on-error: true
         run: node dev/nx/remote-cache/launch.mjs report
 
   # Its own job, so a run that times out (cancelled, no failed step) still posts.
@@ -1340,7 +1265,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           COMMIT_SUBJECT: ${{ github.event.head_commit.message }}
           COMMIT_AUTHOR: ${{ github.event.head_commit.author.name }}
-        run: go run ./cmd/slacknotify -job "package-suites (1/1)"
+        run: go run ./cmd/slacknotify -job "package-suites"
 
   build:
     needs: changes
@@ -1477,16 +1402,22 @@ jobs:
       # What the Nx cache server logged, plus a warning when it failed requests (ADR-206).
       - name: Nx remote cache log
         if: ${{ !cancelled() }}
+        timeout-minutes: 1
+        continue-on-error: true
         run: node dev/nx/remote-cache/launch.mjs report
 
       - name: Set up Go for the Slack notifier
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
         with:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - name: Notify Slack on failure
         if: failure() && github.ref == 'refs/heads/main'
+        timeout-minutes: 3
+        continue-on-error: true
         env:
           SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL: ${{ secrets.SLACK_RELEASE_NOTIFICATION_WEBHOOK_URL }}
           GH_TOKEN: ${{ github.token }}

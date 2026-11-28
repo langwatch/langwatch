@@ -227,7 +227,6 @@ describe("buildDigestTemplateProps()", () => {
         series: {
           input: series("token_usage", 1_000.4),
           output: series("token_usage", 200),
-          cost: series("cost_usage", 1.25),
           active: series("active_time", 3_600),
           lines: series("lines_of_code", 120),
           commits: series("commit", 4),
@@ -244,7 +243,6 @@ describe("buildDigestTemplateProps()", () => {
         preferencesUrl: UNSUBSCRIBE,
         sessions: 5,
         tokens: 1_200,
-        costUsd: 1.25,
         activeMinutes: 60,
         linesChanged: 120,
         commits: 4,
@@ -263,7 +261,6 @@ describe("buildDigestTemplateProps()", () => {
         preferencesUrl: UNSUBSCRIBE,
         sessions: 5,
         tokens: 0,
-        costUsd: 0,
         activeMinutes: 0,
         weekUrl: BASE,
       });
@@ -286,12 +283,12 @@ describe("buildDigestTemplateProps()", () => {
 
     /** @scenario "A person's week past its series cap reads its totals as floors" */
     it("marks the totals as floors when the week dropped series past its cap", () => {
-      const capped = userFold({ series: { cost: series("cost_usage", 2) }, seriesOverflow: 4 });
+      const capped = userFold({ series: { input: series("token_usage", 2) }, seriesOverflow: 4 });
 
       const { pick, props } = propsFor({ week: codingWeek(capped) });
 
       expect(parsedBy({ templateId: pick.template, props })).toMatchObject({
-        costUsd: 2,
+        tokens: 2,
         totalsAtLeast: true,
       });
     });

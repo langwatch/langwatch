@@ -45,8 +45,8 @@ func breakEach(t *testing.T, good string, cases map[string][2]string) {
 	}
 }
 
-// @scenario "A push to main runs the package suites as one job"
-func TestMainRunsThePackageSuitesAsOneQueuedJob(t *testing.T) {
+// @scenario "A push to main splits the package suites over eight jobs"
+func TestMainSplitsThePackageSuitesLikeAPullRequest(t *testing.T) {
 	good := realAppCI(t)
 	t.Run("this repository's workflow passes", func(t *testing.T) {
 		assert.Empty(t, mainSuitesProblems(t, good))
@@ -57,25 +57,29 @@ func TestMainRunsThePackageSuitesAsOneQueuedJob(t *testing.T) {
 			"cancel-in-progress: ${{ github.event_name != 'push' || github.ref != 'refs/heads/main' }}",
 			"cancel-in-progress: true",
 		},
-		"no one-job output": {
-			"suites-one-job: ${{ github.event_name == 'push' }}",
-			"suites-one-job: ${{ false }}",
+		"one shard on main": {
+			"shard: [1, 2, 3, 4, 5, 6, 7, 8]",
+			"shard: ${{ fromJSON(github.event_name == 'push' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}",
 		},
-		"eight shards on main": {
-			"needs.changes.outputs.suites-one-job == 'true' && '[1]'",
-			"needs.changes.outputs.suites-one-job == 'true' && '[1, 2, 3, 4, 5, 6, 7, 8]'",
+		"a split read from another job": {
+			"shard: [1, 2, 3, 4, 5, 6, 7, 8]",
+			"shard: ${{ fromJSON(needs.changes.outputs.shards) }}",
 		},
-		"the 45-minute cap on main": {
-			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
-			"timeout-minutes: 45",
+		"a longer timeout on main": {
+			"timeout-minutes: 45\n\n    steps:",
+			"timeout-minutes: ${{ github.ref == 'refs/heads/main' && 120 || 45 }}\n\n    steps:",
 		},
 		"a fixed shard total": {
 			"PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/${{ strategy.job-total }}",
 			"PACKAGE_SUITES_SHARD: ${{ matrix.shard }}/8",
 		},
-		"no shared cache fallback": {
-			"            ${{ runner.os }}-nx-suites-all-\n",
-			"",
+		"a suite-result cache keyed by the event": {
+			"key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}",
+			"key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.event_name }}-${{ github.sha }}",
+		},
+		"a suite-result cache shared by every shard": {
+			"key: ${{ runner.os }}-nx-suites-${{ matrix.shard }}-${{ github.sha }}",
+			"key: ${{ runner.os }}-nx-suites-all-${{ github.sha }}",
 		},
 	})
 }
@@ -87,17 +91,9 @@ func TestMainSuitesReportsRatherThanFailsOnOtherLegalShapes(t *testing.T) {
 			"concurrency:\n",
 			"concurrency: one-group\nx-old-concurrency:\n",
 		},
-		"a literal shard list": {
-			"shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}",
-			"shard: [1, 2, 3, 4, 5, 6, 7, 8]",
-		},
 		"a matrix that is one expression": {
-			"matrix:\n        shard: ${{ fromJSON(needs.changes.outputs.suites-one-job == 'true' && '[1]' || '[1, 2, 3, 4, 5, 6, 7, 8]') }}",
+			"matrix:\n        shard: [1, 2, 3, 4, 5, 6, 7, 8]",
 			"matrix: ${{ fromJSON(needs.changes.outputs.suites-matrix) }}",
-		},
-		"a numeric timeout": {
-			"timeout-minutes: ${{ needs.changes.outputs.suites-one-job == 'true' && 120 || 45 }}",
-			"timeout-minutes: 45",
 		},
 	} {
 		t.Run(name+" is a problem, not an error", func(t *testing.T) {
@@ -113,7 +109,7 @@ func TestARedOrTimedOutMainSuitesRunPostsToSlack(t *testing.T) {
 
 	breakEach(t, good, map[string][2]string{
 		"no Slack job": {
-			`go run ./cmd/slacknotify -job "package-suites (1/1)"`,
+			`go run ./cmd/slacknotify -job "package-suites"`,
 			"echo skipped",
 		},
 		"a timeout that does not post": {

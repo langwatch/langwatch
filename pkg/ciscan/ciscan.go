@@ -142,7 +142,9 @@ type Job struct {
 	TimeoutMinutes any               `yaml:"timeout-minutes"`
 	Permissions    Permissions       `yaml:"permissions"`
 	Env            map[string]string `yaml:"env"`
-	Steps          []Step            `yaml:"steps"`
+	// Services names the job's service containers; their settings are not modeled.
+	Services map[string]yaml.Node `yaml:"services"`
+	Steps    []Step               `yaml:"steps"`
 }
 
 // PullRequest is the `on.pull_request` trigger and the event types that fire

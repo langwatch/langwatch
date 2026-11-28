@@ -54,6 +54,12 @@ export const JOBS: NightlyJob[] = [
       "an invariant of the upgrade from the last release to head does not pass, other than B1, N4 or an inconclusive I5, which a hosted runner cannot pass yet",
   },
   {
+    id: "uncached-checks",
+    title: "Uncached typecheck and type-aware lint",
+    redWhen:
+      "typecheck or type-aware lint fails with no Nx cache, which means a cache key misses an input (skips from 2026-12-28)",
+  },
+  {
     id: "migration-compat",
     title: "Migration compatibility",
     redWhen: "the last release's image does not boot on the schema head migrated",
