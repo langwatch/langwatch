@@ -1,5 +1,27 @@
 # Changelog
 
+## [3.3.0](https://github.com/langwatch/langwatch/compare/mcp-server@v3.2.1...mcp-server@v3.3.0) (2026-11-28)
+
+
+### Features
+
+* **coding-agent:** record the subscription account on each call, queryable in LangWatchQL ([#10006](https://github.com/langwatch/langwatch/issues/10006)) ([17645a0](https://github.com/langwatch/langwatch/commit/17645a0b3e0ea3d8034fa13ced44670841254939))
+
+
+### Bug Fixes
+
+* **analytics:** attribution change widget memory no longer grows with trace history ([#9651](https://github.com/langwatch/langwatch/issues/9651)) ([b09d2db](https://github.com/langwatch/langwatch/commit/b09d2db81b04792772d549657e2e717a3d99372b))
+* **analytics:** read releases in the Release check and never count a Langy-only model ([#9903](https://github.com/langwatch/langwatch/issues/9903)) ([b865873](https://github.com/langwatch/langwatch/commit/b8658737e9d6a4d1da5bf6406307b141603d1e10))
+* **lwql,docs:** bare view names, keyset cursor aliases, SSO tier wording ([#8842](https://github.com/langwatch/langwatch/issues/8842)) ([f053227](https://github.com/langwatch/langwatch/commit/f05322776206d953afaf33a3ab05aa3275e5d974))
+* **security:** bump soupsieve, opentelemetry-api and tornado, drop unused arize-phoenix ([#9895](https://github.com/langwatch/langwatch/issues/9895)) ([95c5195](https://github.com/langwatch/langwatch/commit/95c5195023d83cab52121fea0098d2ff8db6b0cc))
+* **security:** raise JS floors for high alerts (undici, toml, effect, msal-node and more) ([#9784](https://github.com/langwatch/langwatch/issues/9784)) ([914b46c](https://github.com/langwatch/langwatch/commit/914b46c21fd712caa32d0aaba24e5b11595ed59c))
+* **security:** vitest 5.0.5, go-chi, scenario-go grpc, fastmcp-slim and the remaining uv floors ([#8995](https://github.com/langwatch/langwatch/issues/8995)) ([1349269](https://github.com/langwatch/langwatch/commit/1349269a6001241beaf31ed23855808f15a13d7b))
+
+
+### Miscellaneous
+
+* **main:** release langwatch 3.31.0 ([#10004](https://github.com/langwatch/langwatch/issues/10004)) ([1edc0e5](https://github.com/langwatch/langwatch/commit/1edc0e59ff48ffe7704527abe0d741d21a45604c))
+
 ## [3.2.1](https://github.com/langwatch/langwatch/compare/mcp-server@v3.2.0...mcp-server@v3.2.1) (2026-11-22)
 
 
