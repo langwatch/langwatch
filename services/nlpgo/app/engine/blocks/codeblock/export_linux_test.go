@@ -2,14 +2,17 @@
 
 package codeblock
 
-import "slices"
+import "github.com/langwatch/langwatch/pkg/cloudcredentials"
 
-// CarriesAmbientCredential exposes the environment-block check to the tests.
-var CarriesAmbientCredential = carriesAmbientCredential
+// CarriesAmbientCredential exposes the environment-block check, over the
+// variables production looks for, to the tests.
+func CarriesAmbientCredential(environ []byte) (string, bool) {
+	return carriesAmbientCredential(environ, cloudcredentials.Names())
+}
 
-// AlsoTreatAsAmbientCredential adds a variable the other-process check looks for.
-// A test whose stand-in process must be readable carries its credential under
-// this name, so the test binaries running beside it never see a real one.
-func AlsoTreatAsAmbientCredential(name string) {
-	ambientCredentialVariables = append(slices.Clone(ambientCredentialVariables), name)
+// LookOnlyForAmbientCredential replaces the variables the other-process check
+// looks for. The tests look for their own stand-in only: a developer's shell
+// that exports AWS_* is an ancestor of every test process and readable to it.
+func LookOnlyForAmbientCredential(names ...string) {
+	ambientCredentialVariables = names
 }

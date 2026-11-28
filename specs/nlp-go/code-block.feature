@@ -556,8 +556,9 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When a trivial code block runs
       Then it returns its value
       And the runner finds itself hidden by exec and continues
+      And user code finds a value a readable process holds under a name the check ignores, and is refused that process's memory
 
-    @integration
+    @regression @integration
     Scenario: a platform that refuses the hide step serves no code blocks when the engine's binary is readable
       Given the platform refuses PR_SET_DUMPABLE
       And the engine's binary is readable
@@ -565,13 +566,37 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       Then the result carries an error saying the engine's process files are readable by user code
       And the other block types keep working
 
-    @integration
+    @regression @integration
     Scenario: a platform that refuses the hide step serves no code blocks when the interpreter is readable
       Given the platform refuses PR_SET_DUMPABLE
       And the engine is execute-only but the interpreter is readable
       When a code block runs
       Then the result carries an error saying the interpreter cannot hide a run
       And the runner on its own still fails its hide step
+
+    @integration
+    Scenario: a platform that refuses the hide step and PR_GET_DUMPABLE still tells a hidden process from a readable one
+      Given the platform refuses PR_SET_DUMPABLE and PR_GET_DUMPABLE
+      When the engine and the runner check their outcome by who owns their /proc files
+      Then an execute-only engine and interpreter run code blocks in strict mode
+      And a readable engine disables code blocks, and a readable runner fails its run
+
+    # A shell or IDE that exports AWS_* is readable to code blocks too, and no
+    # execute-only binary fixes that, so the reason says what does.
+    @regression @integration
+    Scenario: a credential in the environment that starts the engine disables code blocks with advice to unset it
+      Given the platform accepts PR_SET_DUMPABLE
+      And the process that started the engine holds a cloud credential in its environment
+      When a code block runs
+      Then the result carries an error naming that process and the variable
+      And the advice is to unset the variable where the engine is started
+
+    @regression @integration
+    Scenario: a credential held in another PID namespace disables code blocks with advice that fits it
+      Given a readable process in another PID namespace holds a cloud credential in its environment
+      When a code block runs
+      Then the result carries an error naming that process and the variable
+      And the advice is to stop it or run the engine in a PID namespace of its own
 
     @integration
     Scenario: the engine reports its hide mode once at start-up
@@ -592,20 +617,20 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When a code block lists its own environment
       Then it finds no AWS_ variable and no credential value
 
-    @integration
+    @regression @integration
     Scenario: on AWS Lambda, user code cannot read the runner's process files
       Given the engine runs on AWS Lambda from a readable binary
       When the code block executor is built
       Then code blocks refuse to run, so no code reads the engine's environment or memory
 
-    @integration
+    @regression @integration
     Scenario: on AWS Lambda, user code cannot read another process that holds the credentials
       Given the engine and python are execute-only
       And the web adapter runs beside the engine from a readable binary with the role's credentials
       When the code block executor is built
       Then code blocks refuse to run, naming the process and the variable it holds
 
-    @unit
+    @regression @unit
     Scenario: on AWS Lambda, the web adapter starts without the role's credentials
       Given the image starts the web adapter through a readable launcher in /opt/extensions
       When Lambda starts the extension with the role's credentials in its environment
@@ -614,32 +639,33 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # Lambda also refuses PR_SET_CHILD_SUBREAPER, so an orphan lands on PID 1
     # and the sweep cannot claim one that scrubbed the run's marks; the run is
     # kept in its process group instead.
-    @integration
+    @regression @integration
     Scenario: on AWS Lambda, nothing user code starts outlives its run
       Given the platform refuses PR_SET_CHILD_SUBREAPER
-      When user code starts a process in a session of its own, or double forks one
-      Then the new session is refused
+      When user code starts a process in a session of its own, in a process group of its own, or double forks one
+      Then the new session and the new process group are refused
       And the process is gone once the run returns
+      And a runner on a machine it has no syscall table for refuses to confine the run rather than guess
 
     # AWS Lambda also refuses PR_SET_NO_NEW_PRIVS, so the runner cannot install
     # the filter; the engine probes this once at start-up and sweeps instead.
-    @integration
+    @regression @integration
     Scenario: on AWS Lambda, a run the platform will not confine still leaves nothing behind
       Given the platform refuses PR_SET_CHILD_SUBREAPER, PR_SET_NO_NEW_PRIVS and the seccomp filter
       When user code starts a process in a session of its own, with no mark of the run it can be read by
       Then the run still runs and the new session is allowed
       And the process is gone once the run returns, and once it times out
-      And user code still reads no process that holds the role's credentials
+      And user code still reads no process that holds the role's credentials, though it reads one that holds the value under another name
 
     # A sweep kills orphans by age, which is safe only in a sandbox that holds
     # nothing else of this user's, as Lambda's does.
-    @unit
+    @regression @unit
     Scenario: off AWS Lambda, teardown never sweeps for strays
       Given the platform refuses both adopting orphans and confining a run
       When the engine runs anywhere but AWS Lambda
       Then runs are torn down by their process group alone, never by a sweep
 
-    @unit
+    @regression @unit
     Scenario: teardown signals a swept process only while its pid still names it
       Given teardown read a process to kill
       When that pid now names a process that started at another time
@@ -650,13 +676,13 @@ Feature: Code block — execute user Python with isolated subprocess and structu
       When the code block executor is built
       Then nlpgo_code_block_hide_mode names the answer to PR_SET_DUMPABLE, PR_SET_CHILD_SUBREAPER and the prctl that refused confinement
 
-    @unit
+    @regression @unit
     Scenario: the web adapter launcher strips every credential the exposure check looks for
       Given the variables the engine counts as a workload credential
       When the launcher starts the adapter with each of them set
       Then the adapter gets none of them
 
-    @unit
+    @regression @unit
     Scenario: only the Lambda image ships the code-block interpreter execute-only
       Given infra/docker/Dockerfile.go-services
       Then the lambda stage copies python3.11 with a mode that leaves others no read
@@ -673,7 +699,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     # A second layer: the boundary is that an invocation carries only the
     # project's own run. The hook shares the interpreter with user code, so
     # code that rewrites the hook's own objects gets past it (contract §7).
-    @integration
+    @regression @integration
     Scenario: on AWS Lambda, the runner refuses user code the usual routes to the Lambda runtime API
       Given AWS_LAMBDA_RUNTIME_API names a listener on this machine
       When user code tries urllib, a socket by address and by name, TCP fast open, the unspecified address, a link-local address, a socket subclass that lies about its family, a patched address parser, ctypes, another program, a shell, a forked, multiprocessing or spawned child, a sub-interpreter and the unaudited fork_exec (also from a re-created built-in or a renamed extension module)
@@ -683,6 +709,7 @@ Feature: Code block — execute user Python with isolated subprocess and structu
     @integration
     Scenario: on AWS Lambda, the runner's loopback listener serves no credential and no debug route
       Given the engine serves its routes on loopback
-      When a code block requests /env, /debug/pprof/, /metrics and every health and version route
+      When a code block requests /env, /debug/pprof/, /metrics, /healthz, /readyz, /startupz and /go/version
       Then no response carries a credential
       And /env, /debug/pprof/ and /metrics are not served
+      And /healthz, /readyz, /startupz and /go/version each reach their handler
