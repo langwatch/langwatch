@@ -6,6 +6,7 @@
 import {
   activeTraceContext,
   HandledError,
+  PROVIDER_UNSUPPORTED_PARAMETER_REASONS,
   type SerializedHandledError,
 } from "@langwatch/handled-error";
 
@@ -131,11 +132,18 @@ const AGENT_ERRORED_WITHOUT_CAUSE_TIPS = [
 export class LangyAgentErroredError extends HandledError {
   declare readonly code: "langy_agent_errored";
 
-  constructor(options: { reasons?: readonly Error[]; retryable?: boolean } = {}) {
+  constructor(
+    options: {
+      reasons?: readonly Error[];
+      retryable?: boolean;
+      fault?: "provider" | "platform";
+    } = {},
+  ) {
     const hasCause = (options.reasons?.length ?? 0) > 0;
     super("langy_agent_errored", "agent reported the turn failed", {
       httpStatus: 502,
-      fault: hasCause ? "provider" : "platform",
+      // A provider refusing a setting the platform itself sent is the platform's fault (#9442).
+      fault: options.fault ?? (hasCause ? "provider" : "platform"),
       retryable: options.retryable === true || !hasCause,
       ...(hasCause
         ? remediation("langy_agent_errored")
@@ -280,10 +288,17 @@ export class LangyTurnErrors {
       }
 
       if (cause.code === "agent_error") {
+        const refusedOurSetting = [...PROVIDER_UNSUPPORTED_PARAMETER_REASONS].some((reason) =>
+          LangyTurnErrors.domainErrorChainHas(cause, reason),
+        );
         // Any retryable captured cause makes the failure worth another try.
         const retryable =
           cause.retryable || reasons.some((r) => r instanceof HandledError && r.retryable);
-        return new LangyAgentErroredError({ reasons, retryable });
+        return new LangyAgentErroredError({
+          reasons,
+          retryable,
+          ...(refusedOurSetting ? { fault: "platform" as const } : {}),
+        });
       }
     }
 

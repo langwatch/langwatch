@@ -563,6 +563,45 @@ describe("explainHandledError", () => {
       );
     });
 
+    /** @scenario "A model the endpoint has no deployment of says so" */
+    it("says a missing Azure deployment is not deployed on the endpoint, and names the model as the thing to change", () => {
+      const presentation = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason("DeploymentNotFound")] }),
+      );
+      expect(presentation.title).toBe("This model isn't available on this provider");
+      expect(presentation.description).toBe(
+        "This model isn't deployed on your provider's endpoint. Pick a model you have deployed, or deploy this one and list it as a custom model in Settings, then Model Providers.",
+      );
+    });
+    /** @scenario "A model the endpoint has no deployment of says so" */
+    it.each(["upstream_not_found", "model_not_found", "not_found_error"])(
+      "gives a %s reason the specific title but keeps its own description",
+      (code) => {
+        const presentation = explainHandledError(
+          shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+        );
+        expect(presentation.title).toBe("This model isn't available on this provider");
+        expect(presentation.description).not.toContain("deployed");
+      },
+    );
+    /** @scenario "A setting the model does not take is not blamed on the customer's model choice" */
+    it.each(["unsupported_parameter", "unsupported_value"])(
+      "does not blame the customer's model choice for a %s refusal",
+      (code) => {
+        const presentation = explainHandledError(
+          shape({ code: "llm_upstream_error", reasons: [reason(code)] }),
+        );
+        expect(presentation.title).toBe("This model can't take a setting Langy sent");
+        expect(presentation.description).toContain("not your choice of model");
+        expect(presentation.description).toContain("share the trace with support");
+      },
+    );
+    it("keeps the generic headline for a malformed request that names no setting", () => {
+      const presentation = explainHandledError(
+        shape({ code: "llm_upstream_error", reasons: [reason("invalid_request_error")] }),
+      );
+      expect(presentation.title).toBe("The model provider rejected that");
+    });
     /** @scenario "A provider that does not know the model gets its own remediation copy" */
     it.each([
       "upstream_not_found",

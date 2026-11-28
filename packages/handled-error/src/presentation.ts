@@ -1,3 +1,4 @@
+import { PROVIDER_UNSUPPORTED_PARAMETER_REASONS } from "./provider-rejection-reasons.ts";
 import type {
   HandledErrorFault,
   SerializedHandledError,
@@ -424,6 +425,8 @@ export const PROVIDER_MODEL_MISSING_REASONS: ReadonlySet<string> = new Set([
   "model_not_found",
   "not_found_error",
   "ResourceNotFoundException",
+  // Azure OpenAI's 404 for a model the resource has no deployment of (#9442).
+  "DeploymentNotFound",
 ]);
 
 /*
@@ -439,6 +442,8 @@ const PROVIDER_RATE_LIMIT_REASONS: ReadonlySet<string> = new Set([
   "RESOURCE_EXHAUSTED",
 ]);
 
+/** A model missing because the endpoint has no deployment of it, which has its own remedy. */
+const DEPLOYMENT_MISSING_REASONS: ReadonlySet<string> = new Set(["DeploymentNotFound"]);
 const PROVIDER_OUTAGE_REASONS: ReadonlySet<string> = new Set([
   "upstream_unavailable",
   "upstream_timeout",
@@ -458,6 +463,8 @@ export const PROVIDER_INVALID_REQUEST_REASONS: ReadonlySet<string> = new Set([
   "upstream_unprocessable_entity",
   "invalid_request_error",
   "ValidationException",
+  // A setting the model does not take is an invalid request that the same request repeats.
+  ...PROVIDER_UNSUPPORTED_PARAMETER_REASONS,
 ]);
 
 /**
@@ -6746,8 +6753,16 @@ const presentations = {
       if (hasReasonCode(error.reasons, PROVIDER_ALLOWANCE_REASONS)) {
         return "This provider account is out of credit";
       }
-      return hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)
-        ? "This provider rejected the API key"
+      if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
+        return "This provider rejected the API key";
+      }
+      // The two failures #9442 found, each behind the same vague headline: a model the endpoint
+      // does not serve, and a setting the platform sent that the model does not take.
+      if (hasReasonCode(error.reasons, PROVIDER_UNSUPPORTED_PARAMETER_REASONS)) {
+        return "This model can't take a setting Langy sent";
+      }
+      return hasReasonCode(error.reasons, PROVIDER_MODEL_MISSING_REASONS)
+        ? "This model isn't available on this provider"
         : undefined;
     },
     describe: (error) => {
@@ -6756,6 +6771,12 @@ const presentations = {
       }
       if (hasReasonCode(error.reasons, PROVIDER_CREDENTIAL_REASONS)) {
         return "The model provider refused this key or its permissions for this model. Check the credential configured for it and that it has access to the model, or pick a different model.";
+      }
+      if (hasReasonCode(error.reasons, PROVIDER_UNSUPPORTED_PARAMETER_REASONS)) {
+        return "This model doesn't accept a setting Langy sent with the request. That is a LangWatch problem, not your choice of model. Pick a different model for now, and share the trace with support.";
+      }
+      if (hasReasonCode(error.reasons, DEPLOYMENT_MISSING_REASONS)) {
+        return "This model isn't deployed on your provider's endpoint. Pick a model you have deployed, or deploy this one and list it as a custom model in Settings, then Model Providers.";
       }
       if (hasReasonCode(error.reasons, PROVIDER_MODEL_MISSING_REASONS)) {
         return "The model provider does not serve this model to this key. Check the model name, or pick a different model.";

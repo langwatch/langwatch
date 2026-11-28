@@ -42,3 +42,5 @@ export type {
   SerializedHandledError,
   SerializedReason,
 } from "./serialized-handled-error.ts";
+
+export { PROVIDER_UNSUPPORTED_PARAMETER_REASONS } from "./provider-rejection-reasons.ts";

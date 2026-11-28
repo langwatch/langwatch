@@ -111,6 +111,43 @@ describe("LangyTurnErrors.fromFrame", () => {
         ]);
       });
 
+      /** @scenario "A setting the model does not take is not blamed on the customer's model choice" */
+      it.each(["unsupported_parameter", "unsupported_value"])(
+        "files a provider's %s refusal as the platform's fault, since the request was ours",
+        (reasonCode) => {
+          const cause = handledErrorFromHerr({
+            type: "agent_error",
+            message: "the agent hit an error before finishing",
+            reasons: [
+              {
+                type: "llm_upstream_error",
+                message: "upstream",
+                meta: { http_status: 400 },
+                reasons: [{ type: reasonCode, message: "refused", meta: {} }],
+              },
+            ],
+          });
+          const error = LangyTurnErrors.fromErrorFrame({ code: "agent_error", cause });
+          expect(error).toBeInstanceOf(LangyAgentErroredError);
+          expect((error as LangyAgentErroredError).fault).toBe("platform");
+        },
+      );
+      it("keeps the provider as the fault for a refusal that names no setting of ours", () => {
+        const cause = handledErrorFromHerr({
+          type: "agent_error",
+          message: "the agent hit an error before finishing",
+          reasons: [
+            {
+              type: "llm_upstream_error",
+              message: "upstream",
+              meta: { http_status: 404 },
+              reasons: [{ type: "DeploymentNotFound", message: "no deployment", meta: {} }],
+            },
+          ],
+        });
+        const error = LangyTurnErrors.fromErrorFrame({ code: "agent_error", cause });
+        expect((error as LangyAgentErroredError).fault).toBe("provider");
+      });
       it("keeps an unrecognised agent_error chain on the agent-errored kind with the reasons attached", () => {
         const cause = handledErrorFromHerr({
           type: "agent_error",

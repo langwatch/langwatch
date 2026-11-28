@@ -589,6 +589,24 @@ describe("explainLangyError", () => {
     });
   });
 
+  describe("given a provider refusal the same request will repeat", () => {
+    /** @scenario "A model the endpoint has no deployment of says so" */
+    it.each(["DeploymentNotFound", "unsupported_parameter", "unsupported_value"])(
+      "offers the model settings and no retry for a %s refusal",
+      (kind) => {
+        const presentation = explainLangyError(
+          domain({
+            code: "langy_agent_errored",
+            reasons: [{ kind: "llm_upstream_error", reasons: [{ kind }] }],
+          }),
+        );
+        expect(presentation.action).toEqual({
+          label: "Configure model",
+          kind: "configure-model",
+        });
+      },
+    );
+  });
   describe("given an agent failure whose model no provider serves", () => {
     describe("when the failure is explained", () => {
       /** @scenario A model with no provider connected reads as a model to change */
