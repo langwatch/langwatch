@@ -367,8 +367,8 @@ jobs:
           PR_NUMBER: ${{ github.event.pull_request.number }}
           HEAD_SHA: ${{ github.event.pull_request.head.sha }}
         run: |
-          jq -n --arg c "channel_000000DRyU6OWikL71eevp2qhm9wW" \
-            --arg t "@LangWatch PR Review Bot review langwatch/langwatch#${PR_NUMBER} at ${HEAD_SHA:0:7}" \
+          jq -n --arg c "channel_000000DS08HpOve0vz6RzGSu0ZAC8" \
+            --arg t "review langwatch/langwatch#${PR_NUMBER} at ${HEAD_SHA:0:7}" \
             '{channel: $c, body: $t}' |
             curl -fsS -X POST https://laze.so/api/agents/me/messages \
               -H "Authorization: Bearer ${LAZE_WAKE_KEY}" \
