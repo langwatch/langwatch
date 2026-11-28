@@ -324,12 +324,39 @@ describe("SignUpPolicyService", () => {
       ).resolves.toEqual({ allowed: true, via: "invitation" });
     });
 
+    /** @scenario "A disposable domain listed in SIGN_UP_ALLOWED_DOMAINS is admitted" */
     it("admits a disposable domain the operator lists in SIGN_UP_ALLOWED_DOMAINS", async () => {
       settings = { ...settings, allowedDomains: ["euploading.com"] };
 
       await expect(
         policy().checkSignUp({ email: "sam@euploading.com", hasAnyAccount: accounts > 0 }),
       ).resolves.toEqual({ allowed: true, via: "open" });
+    });
+
+    /** @scenario "An address in ADMIN_EMAILS on a disposable domain is admitted" */
+    it("admits a disposable address the operator lists in ADMIN_EMAILS", async () => {
+      settings = { ...settings, adminEmails: ["Ops@EUploading.com"] };
+
+      await expect(
+        policy().checkSignUp({ email: "ops@euploading.com", hasAnyAccount: accounts > 0 }),
+      ).resolves.toEqual({ allowed: true, via: "instance_admin" });
+    });
+
+    describe("when an invite-only installation with no ADMIN_EMAILS has no accounts", () => {
+      beforeEach(() => {
+        settings = { ...settings, mode: "invite_only" };
+        accounts = 0;
+      });
+
+      /** @scenario "The first account on an empty invite-only installation is refused on a disposable domain" */
+      it("refuses a disposable first account before the first-account window", async () => {
+        await expect(
+          policy().checkSignUp({ email: "founder@euploading.com", hasAnyAccount: accounts > 0 }),
+        ).resolves.toEqual({ allowed: false, reason: "disposable_email" });
+        await expect(
+          policy().checkSignUp({ email: "founder@acme.com", hasAnyAccount: accounts > 0 }),
+        ).resolves.toEqual({ allowed: true, via: "first_account" });
+      });
     });
   });
 
