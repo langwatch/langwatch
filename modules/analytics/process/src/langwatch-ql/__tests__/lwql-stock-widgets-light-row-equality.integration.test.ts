@@ -681,10 +681,8 @@ describe("given traces, spans and evaluations of each source that the stock quer
     const labels: string[] = [];
     for (const query of MAIN.filter(({ label }) => !ON_TRACE_EVALUATIONS.has(label))) {
       const { label } = query;
-      const [now, before] = await Promise.all([
-        run({ sql: STOCK.get(label) ?? "", list }),
-        run({ sql: mainOver({ query, list }), list }),
-      ]);
+      const now = await run({ sql: STOCK.get(label) ?? "", list });
+      const before = await run({ sql: mainOver({ query, list }), list });
       expect(now.error, `${label} now`).toBeUndefined();
       expect(before.error, `${label} before`).toBeUndefined();
       if (now.rows !== before.rows) labels.push(label);
