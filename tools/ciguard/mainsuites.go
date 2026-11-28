@@ -112,11 +112,7 @@ func stepProblems(steps []suitesStep) []string {
 		}
 		if strings.Contains(step.With["restore-keys"], shardCacheKey) && strings.Contains(step.With["key"], shardCacheKey) {
 			cached++
-			for _, fragment := range eventDependent {
-				if strings.Contains(step.With["key"], fragment) || strings.Contains(step.With["restore-keys"], fragment) {
-					problems = append(problems, "the suite-result cache must key alike on every event, not by "+fragment)
-				}
-			}
+			problems = append(problems, cacheKeyProblems(step)...)
 		}
 	}
 	if !sharded {
@@ -124,6 +120,18 @@ func stepProblems(steps []suitesStep) []string {
 	}
 	if cached != 2 {
 		problems = append(problems, fmt.Sprintf("both suite-result caches must key on and fall back to %s, %d do", shardCacheKey, cached))
+	}
+
+	return problems
+}
+
+// cacheKeyProblems wants a suite-result cache keyed alike on every event.
+func cacheKeyProblems(step suitesStep) []string {
+	var problems []string
+	for _, fragment := range eventDependent {
+		if strings.Contains(step.With["key"], fragment) || strings.Contains(step.With["restore-keys"], fragment) {
+			problems = append(problems, "the suite-result cache must key alike on every event, not by "+fragment)
+		}
 	}
 
 	return problems
