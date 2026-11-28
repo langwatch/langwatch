@@ -8,6 +8,9 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, it } from "node:test";
 
+import { blockUnder } from "./guard-path-filters.ts";
+import { jobBlocks } from "./guard-pull-request-target.ts";
+
 const workflows = join(import.meta.dirname, "..", "workflows");
 const read = (name: string): string => readFileSync(join(workflows, name), "utf8");
 
@@ -23,6 +26,62 @@ const ABSORBED: Record<string, string[]> = {
   "npx-server-smoke.yml": ["workflow_dispatch", "push"],
   "gateway-matrix.yaml": ["workflow_dispatch", "pull_request"],
 };
+
+const LEVEL = { none: 0, read: 1, write: 2 } as const;
+
+/**
+ * Every `permissions:` map in a file, top-level and per job, merged to the highest level asked per
+ * scope. Throws on a map it cannot read in full, so a stray line never reads as "asks for nothing".
+ */
+const requested = (text: string): Map<string, keyof typeof LEVEL> => {
+  const asked = new Map<string, keyof typeof LEVEL>();
+  const lines = text.split("\n");
+  lines.forEach((line, index) => {
+    const key = /^( *)permissions:(.*)$/.exec(line);
+    if (!key) return;
+    assert.match(
+      key[2],
+      /^\s*(?:#.*)?$/,
+      `a \`permissions:\` key is not followed by a map: ${line}`,
+    );
+    // Comments may sit at any indent, so only a line with content ends the map.
+    const map = blockUnder(lines, index, key[1].length).filter((next) => {
+      const trimmed = next.trim();
+      return trimmed !== "" && !trimmed.startsWith("#");
+    });
+    const entries = map.flatMap((entry) => {
+      const match = /^\s+([a-z-]+): (none|read|write)$/.exec(entry);
+      return match ? [match] : [];
+    });
+    assert.ok(map.length > 0, `a \`permissions:\` key is not followed by a map: ${line}`);
+    assert.equal(
+      entries.length,
+      map.length,
+      `unreadable line in a permissions map:\n${map.join("\n")}`,
+    );
+    for (const [, scope, level] of entries) {
+      const have = asked.get(scope) ?? "none";
+      if (LEVEL[level as keyof typeof LEVEL] > LEVEL[have]) {
+        asked.set(scope, level as keyof typeof LEVEL);
+      }
+    }
+  });
+  return asked;
+};
+
+/**
+ * The jobs of nightly.yml that call a reusable workflow: job name -> called file and the job's own
+ * grant.
+ */
+const calls = (
+  text: string,
+): { job: string; file: string; granted: Map<string, keyof typeof LEVEL> }[] =>
+  jobBlocks(text.split("\n")).flatMap(({ name: job, lines }) => {
+    const block = lines.join("\n");
+    const file = /^ +uses: \.\/\.github\/workflows\/(\S+)/m.exec(block)?.[1];
+    if (!file) return [];
+    return [{ job, file, granted: requested(block) }];
+  });
 
 void describe("given the nightly workflow", () => {
   const nightly = read("nightly.yml");
@@ -61,6 +120,23 @@ void describe("given the nightly workflow", () => {
         const onlyForPullRequestsOrPushes =
           setting === "false" || /github\.event_name == '(pull_request|push)'/.test(setting);
         assert.ok(onlyForPullRequestsOrPushes, `${name} cancels with ${setting}`);
+      }
+    });
+  });
+
+  void describe("when the permissions of each call are read", () => {
+    /** @scenario "Each nightly call grants every permission its called workflow asks for" */
+    void it("grants at least what the called workflow's jobs request", () => {
+      const found = calls(nightly);
+      assert.ok(found.length >= Object.keys(ABSORBED).length, "no calls found");
+      for (const { job, file, granted } of found) {
+        for (const [scope, level] of requested(read(file))) {
+          const has = granted.get(scope) ?? "none";
+          assert.ok(
+            LEVEL[has] >= LEVEL[level],
+            `${job} grants ${scope}: ${has} but ${file} requests ${scope}: ${level}`,
+          );
+        }
       }
     });
   });
