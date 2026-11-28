@@ -14,9 +14,11 @@ import (
 // executed that script for real, so a cache hit never makes a suite look cheap.
 // A package no sampled run executed at all keeps its weight from `previous`,
 // the committed file, when it has one: its replays say nothing about its cost.
+// A package with a script only ever replayed never weighs less than `previous`
+// either: a pull request that changes it runs that script for real.
 func Weigh(runs [][]Measurement, previous map[string]float64) map[string]float64 {
 	ran, replayed := byScript(runs)
-	executed := map[string]bool{}
+	executed, partlyReplayed := map[string]bool{}, map[string]bool{}
 	weights := map[string]float64{}
 	for k, seconds := range ran {
 		executed[k.pkg] = true
@@ -24,11 +26,13 @@ func Weigh(runs [][]Measurement, previous map[string]float64) map[string]float64
 	}
 	for k, seconds := range replayed {
 		if _, ranForReal := ran[k]; !ranForReal {
+			partlyReplayed[k.pkg] = true
 			weights[k.pkg] += median(seconds)
 		}
 	}
 	for pkg, seconds := range previous {
-		if _, measured := weights[pkg]; measured && !executed[pkg] {
+		measured, ok := weights[pkg]
+		if ok && (!executed[pkg] || (partlyReplayed[pkg] && seconds > measured)) {
 			weights[pkg] = seconds
 		}
 	}

@@ -248,25 +248,55 @@ Feature: A package's integration suite runs in CI when it declares one
       Then it runs through pnpm, every time
 
   # Bound by tools/ciguard/mainsuites_test.go (the workflow's shape) and
-  # tools/slacknotify/slacknotify_test.go (the post) (#9146).
-  Rule: Main runs every suite in one job and tells Slack when it fails
+  # tools/slacknotify/slacknotify_test.go (the post). One unsplit job runs every
+  # integration suite one after another, about three times a shard's wall time.
+  Rule: Main splits the suites like a pull request and tells Slack when they fail
 
     @unit
-    Scenario: A push to main runs the package suites as one job
+    Scenario: A push to main splits the package suites over eight jobs
       Given a merge to main
       When langwatch-app-ci runs for that commit
-      Then package-suites runs as one job holding every suite
+      Then package-suites runs as eight jobs, the same split a pull request gets
       And a newer merge waits for that run instead of cancelling it
-      And a pull request still splits its suites over eight jobs
 
     @unit
     Scenario: A red package-suites run on main posts to Slack
-      Given package-suites fails or times out on main and was not red in the previous finished run
+      Given a package-suites shard fails or times out on main and no shard was red in the previous finished run
       When the run reaches its Slack job
       Then Slack gets the job, the commit and a link to the run
 
     @unit
     Scenario: A repeat failure or timeout on main posts once
-      Given package-suites failed or was cancelled in the previous finished run on main
-      When it is red again
+      Given a package-suites shard failed or was cancelled in the previous finished run on main
+      When any shard is red again
       Then Slack gets nothing new
+
+  # Bound by packages/clickhouse-client/src/__tests__/clickhouse-test-templates.integration.test.ts.
+  # Replaying the shipped migrations takes about sixteen seconds and holds the
+  # machine-wide schema lock, so files that each replay them queue behind one another.
+  Rule: A suite that needs the shipped ClickHouse schema builds it once per server
+
+    @integration
+    Scenario: A migrated schema is built once and copied into each file's database
+      Given two test files that each need the same template database on one server
+      When both provision their own database at the same time
+      Then the template is built once
+      And each file's database gets every table, view and row the template holds
+
+    @integration
+    Scenario: A copied materialised view writes into its own database
+      Given a copy whose materialised view reads one of the copy's tables
+      When that table receives rows
+      Then the copy's own target gets them and the template and the other copies stay empty
+
+    @unit
+    Scenario: A copied statement keeps its string literals
+      Given a template view whose query holds the template's name in a string literal
+      When it is copied into a file's database
+      Then its qualifiers name the copy and the literal reads as before
+
+    @unit
+    Scenario: The template is named by the migrations it holds
+      Given the shipped migration files
+      When one file's content changes
+      Then the digest naming the template changes

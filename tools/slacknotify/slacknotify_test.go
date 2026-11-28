@@ -15,7 +15,7 @@ import (
 	"github.com/langwatch/langwatch/tools/slacknotify"
 )
 
-const job = "package-suites (1/1)"
+const job = "package-suites"
 
 var failing = slacknotify.Run{
 	Repository: "langwatch/langwatch", Workflow: "langwatch-app-ci.yml", RunID: 30, Job: job,
@@ -57,7 +57,10 @@ func (f *fake) start(t *testing.T) slacknotify.Notifier {
 		case r.URL.Path == "/repos/langwatch/langwatch/actions/runs/20/jobs":
 			_ = json.NewEncoder(w).Encode(map[string]any{"jobs": []map[string]any{
 				{"name": "lint", "conclusion": "success"},
-				{"name": job, "conclusion": f.previous},
+				{"name": "package-suites-notify", "conclusion": "failure"},
+				{"name": job + " (1/8)", "conclusion": "success"},
+				{"name": job + " (3/8)", "conclusion": f.previous},
+				{"name": job + " (8/8)", "conclusion": "success"},
 			}})
 		default:
 			http.NotFound(w, r)
