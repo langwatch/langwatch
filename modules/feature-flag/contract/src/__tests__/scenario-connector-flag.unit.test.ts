@@ -17,4 +17,12 @@ describe("the release_scenario_connector_steps flag", () => {
       defaultValue: false,
     });
   });
+
+  /** @scenario "The connector release flag is off by default on every deployment" */
+  it("is off by default on a self-hosted install", () => {
+    const flag = pickFlagDefinition("release_scenario_connector_steps");
+
+    // A self-hosted install falls back to defaultValue when no self-hosted default is declared.
+    expect(flag?.selfHostedDefaultValue ?? flag?.defaultValue).toBe(false);
+  });
 });

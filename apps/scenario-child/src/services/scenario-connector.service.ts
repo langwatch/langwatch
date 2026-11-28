@@ -26,6 +26,7 @@ import {
   scrubbedJson,
   scrubbedText,
 } from "../rules/connector-block.rules.ts";
+import { capErrorDetail } from "../rules/execution-error.rules.ts";
 import type { ScenarioHookCaller } from "./scenario-run-hooks.service.ts";
 
 type HookKind = Exclude<ConnectorBlockKind, "call">;
@@ -140,7 +141,7 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
     if (refusal !== undefined && kind === "teardown") {
       return new ConnectorBlockError({
         message: "The connector was refused before any block ran, so teardown did not run.",
-        code: "hook_not_run",
+        code: "hook_refused",
       });
     }
     return new ConnectorBlockError({
@@ -190,13 +191,14 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
     return connectorBlockOutputs({ kind, rawBody });
   }
 
+  /** Errors reach here uncut: a cut before the scrub could leave a secret's first characters. */
   private async scrubbingFailures<T>(run: () => Promise<T>): Promise<T> {
     try {
       return await run();
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const code = error instanceof ConnectorBlockError ? error.code : "hook_failed";
-      throw new ConnectorBlockError({ message: this.scrub(message), code });
+      throw new ConnectorBlockError({ message: capErrorDetail(this.scrub(message)), code });
     }
   }
 

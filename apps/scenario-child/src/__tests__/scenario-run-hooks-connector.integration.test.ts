@@ -331,6 +331,18 @@ describe("ScenarioRunHooksService over a connector agent", () => {
       expect(setup?.error).not.toContain("http://nlpgo:5562");
     });
 
+    /** @scenario "A secret across a connector error's length limit leaves none of itself in the record" */
+    it("scrubs a non-2xx answer whole, so a secret across its old cut leaves nothing", async () => {
+      const setup = await setupFailureFor({
+        status: 502,
+        body: `${"e".repeat(492)}${ADMIN_KEY}${"f".repeat(3_000)}`,
+      });
+
+      expect(setup?.status).toBe("failed");
+      expect(setup?.error).not.toContain(ADMIN_KEY);
+      expect(setup?.error).not.toContain(ADMIN_KEY.slice(0, 8));
+    });
+
     /** @scenario "A connector block whose code runner fails records failed without internal addresses" */
     it("records failed when the code runner cannot be reached", async () => {
       const setup = await setupFailureFor({

@@ -121,13 +121,7 @@ function ConversationSection({ detail }: { detail: RunDetail }) {
       {hooks.setup && <SetupBand result={hooks.setup} onOpenTrace={openHookTrace} />}
       {hooks.noHooks && <NoHooksBand />}
       <ConversationBody detail={detail} hooks={hooks} />
-      {hooks.teardown && (
-        <TeardownBand
-          result={hooks.teardown}
-          setupStatus={hooks.setup?.status}
-          onOpenTrace={openHookTrace}
-        />
-      )}
+      {hooks.teardown && <TeardownBand result={hooks.teardown} onOpenTrace={openHookTrace} />}
     </>
   );
 }

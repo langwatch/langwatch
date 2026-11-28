@@ -312,6 +312,33 @@ describe("ScenarioConnectorService", () => {
     });
   });
 
+  describe("when a block's error is longer than the error kept", () => {
+    const secret = "shop-admin-key-value";
+
+    /** @scenario "A secret across a connector error's length limit leaves none of itself in the record" */
+    it("scrubs the whole traceback before cutting it", async () => {
+      const traceback = `${"x".repeat(1_990)}${secret}${"y".repeat(3_000)}`;
+      const channel: ConnectorBlockChannel = {
+        post: async () => JSON.stringify({ status: "error", error: { type: "boom", traceback } }),
+      };
+      const connector = ScenarioConnectorService.create({
+        config,
+        channel,
+        projectApiKey: "sk-lw-run-key-value",
+      });
+
+      const failure = await connector
+        .callHook({ kind: "setup", timeoutMs: 1_000 })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(Error);
+      const { message } = failure as Error;
+      expect(message).toContain("truncated");
+      expect(message).not.toContain(secret);
+      expect(message).not.toContain(secret.slice(0, 8));
+    });
+  });
+
   describe("when the call block returns no reply", () => {
     it("fails the turn naming the { reply } shape", async () => {
       const { connector } = connectorWith({}, { call: { answer: "hi" } });
@@ -336,7 +363,7 @@ describe("ScenarioConnectorService", () => {
 
       expect(posts).toEqual([]);
       expect(recorded.setup).toMatchObject({ status: "failed", error: refusal });
-      expect(recorded.teardown?.status).toBe("not_run");
+      expect(recorded.teardown).toMatchObject({ status: "not_run", refused: true });
       expect(recorded.teardown?.error).not.toContain(refusal);
     });
 

@@ -8,7 +8,7 @@ import { CONNECTOR_SECRET_NAME_PATTERN, STATE_MAX_BYTES } from "@langwatch/agent
 import type { ConnectorBlockData, RunParameterValues } from "@langwatch/scenario-contract";
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 
-import { cleanErrorDetail, redactInternalAddresses } from "./execution-error.rules.ts";
+import { redactInternalAddresses, stripErrorNoise } from "./execution-error.rules.ts";
 import * as ScenarioSecretReferenceAdapter from "./scenario-secret-reference.rules.ts";
 
 export type ConnectorBlockKind = "setup" | "call" | "teardown";
@@ -31,10 +31,11 @@ export const CODE_TIMEOUT_HEADROOM_MS = 5_000;
 const CODE_BLOCK_TIMEOUT = "code_block_timeout";
 
 /**
- * How the hook service records a block error: `agent_call_timeout` as "timed out", `hook_not_run`
- * (a teardown on a connector refused before any block ran) as "not run", `hook_failed` as "failed".
+ * How the hook service records a block error: `agent_call_timeout` as "timed out", `hook_refused`
+ * (a teardown on a connector refused before any block ran) as "not run" and refused, `hook_failed`
+ * as "failed".
  */
-export type ConnectorBlockErrorCode = "agent_call_timeout" | "hook_not_run" | "hook_failed";
+export type ConnectorBlockErrorCode = "agent_call_timeout" | "hook_refused" | "hook_failed";
 
 /** A block that did not answer with what it must, or that was never run. */
 export class ConnectorBlockError extends Error {
@@ -215,7 +216,10 @@ function byteLength(value: unknown): number {
   return Buffer.byteLength(JSON.stringify(value), "utf8");
 }
 
-/** The block's outputs from the engine's answer. @throws ConnectorBlockError when it failed. */
+/**
+ * The block's outputs from the engine's answer.
+ * @throws ConnectorBlockError when it failed, its detail uncut so it is scrubbed before it is cut.
+ */
 export function connectorBlockOutputs({
   kind,
   rawBody,
@@ -235,7 +239,7 @@ export function connectorBlockOutputs({
     const error = answer.nodes?.[CONNECTOR_BLOCK_NODE_ID]?.error ?? answer.error;
     const code = error?.type === CODE_BLOCK_TIMEOUT ? "agent_call_timeout" : "hook_failed";
     const rawDetail = error?.traceback || error?.message || error?.type || "no error detail";
-    const detail = redactInternalAddresses(cleanErrorDetail(rawDetail));
+    const detail = redactInternalAddresses(stripErrorNoise(rawDetail));
     throw new ConnectorBlockError({ message: `The ${kind} block failed: ${detail}`, code });
   }
   const outputs = answer.nodes?.[CONNECTOR_BLOCK_NODE_ID]?.outputs;

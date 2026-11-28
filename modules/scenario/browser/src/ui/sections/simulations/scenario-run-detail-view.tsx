@@ -296,13 +296,7 @@ export function RunDetailView({
           </RunDetailSection>
         )}
 
-        {hooks.teardown && (
-          <TeardownBand
-            result={hooks.teardown}
-            setupStatus={hooks.setup?.status}
-            onOpenTrace={openHookTrace}
-          />
-        )}
+        {hooks.teardown && <TeardownBand result={hooks.teardown} onOpenTrace={openHookTrace} />}
 
         <RunDetailSection
           value="results"

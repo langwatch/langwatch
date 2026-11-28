@@ -4,13 +4,13 @@
  * @see modules/agent/specs/scenario-connector-agent.feature
  */
 
-import { Drawer } from "@langwatch/design-system/drawer";
+import { Drawer, type DrawerFooterProps } from "@langwatch/design-system/drawer";
 import { Text } from "@langwatch/design-system/primitives";
-import { SkeletonRows } from "@langwatch/design-system/skeletons";
 
 import {
   useConnectorAgentEditor,
   type AgentConnectorEditorDrawerProps,
+  type ConnectorAgentEditor,
 } from "../../behavior/use-connector-agent-editor.ts";
 import { ConnectorAgentForm } from "../blocks/connector-agent-form.tsx";
 
@@ -25,29 +25,19 @@ export function AgentConnectorEditorDrawer(props: AgentConnectorEditorDrawerProp
       backButtonTestId="back-button"
       size="lg"
       title={editor.agentId ? "Edit Scenario Connector" : "New Scenario Connector"}
-      body={editor.isEnabled ? "flush" : "padded"}
-      bodyScroll={editor.isEnabled ? "content" : "frame"}
-      footer={
-        editor.isEnabled
-          ? {
-              cancel: { onClick: editor.close },
-              primaryAction: {
-                label: editor.agentId ? "Save Changes" : "Create Agent",
-                onClick: editor.save,
-                loading: editor.isSaving,
-                "data-testid": "save-agent-button",
-              },
-            }
-          : void 0
-      }
+      body={editor.isEnabled && !editor.readError ? "flush" : "padded"}
+      bodyScroll={editor.isEnabled && !editor.readError ? "content" : "frame"}
+      loading={editor.isEnabled && editor.isLoading}
+      {...(editor.isEnabled && editor.readError ? { error: editor.readError } : {})}
+      busy={editor.isSaving}
+      footer={editor.isEnabled ? footerOf(editor) : void 0}
     >
       {!editor.isEnabled && (
         <Text data-testid="connector-agents-disabled-message">
           Scenario Connector agents are not enabled for this project.
         </Text>
       )}
-      {editor.isEnabled && editor.isLoading && <SkeletonRows rows={4} />}
-      {editor.isEnabled && !editor.isLoading && (
+      {editor.isEnabled && (
         <ConnectorAgentForm
           form={editor.form}
           errors={editor.errors}
@@ -59,4 +49,19 @@ export function AgentConnectorEditorDrawer(props: AgentConnectorEditorDrawerProp
       )}
     </Drawer>
   );
+}
+
+/** No Save while the stored config failed to load: saving the starters would overwrite it. */
+function footerOf(editor: ConnectorAgentEditor): DrawerFooterProps {
+  const cancel = { onClick: editor.close };
+  if (editor.readError) return { cancel };
+  return {
+    cancel,
+    primaryAction: {
+      label: editor.agentId ? "Save Changes" : "Create Agent",
+      onClick: editor.save,
+      loading: editor.isSaving,
+      "data-testid": "save-agent-button",
+    },
+  };
 }

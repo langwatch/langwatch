@@ -267,29 +267,20 @@ const TEARDOWN_FRAME: Record<ScenarioHookResult["status"], BandFrame> = {
 };
 
 /**
- * Whether a teardown left the run's test data in place: it failed, or it did not run after a
- * setup that succeeded (or none was recorded). A refusal before setup left nothing to remove.
+ * Whether a teardown left the run's test data in place: it failed, or it did not run, even after
+ * a setup that failed part way. Only a connector refused before any block ran made no data.
  */
-function mayLeaveDataBehind({
-  result,
-  setupStatus,
-}: {
-  result: ScenarioHookResult;
-  setupStatus: ScenarioHookResult["status"] | undefined;
-}): boolean {
+function mayLeaveDataBehind({ result }: { result: ScenarioHookResult }): boolean {
   if (result.status === "failed" || result.status === "timed_out") return true;
-  return result.status === "not_run" && (setupStatus === undefined || setupStatus === "ok");
+  return result.status === "not_run" && result.refused !== true;
 }
 
 /** The teardown band: what it returned, or the error, the state it was given and the warning. */
 export function TeardownBand({
   result,
-  setupStatus,
   onOpenTrace,
 }: {
   result: ScenarioHookResult;
-  /** How the run's setup ended; nothing when it recorded no setup. */
-  setupStatus?: ScenarioHookResult["status"];
   onOpenTrace?: (traceId: string) => void;
 }) {
   const frame = TEARDOWN_FRAME[result.status];
@@ -329,7 +320,7 @@ export function TeardownBand({
       {failed && result.stateTooLarge && <TooLarge what="The state given to teardown" />}
       {result.error && result.status !== "ok" && !notRun && <HookError error={result.error} />}
       {result.error && notRun && <Note>{result.error}</Note>}
-      {mayLeaveDataBehind({ result, setupStatus }) && <Note>{LEFT_BEHIND}</Note>}
+      {mayLeaveDataBehind({ result }) && <Note>{LEFT_BEHIND}</Note>}
       {result.status === "skipped" && <Note>Rerun and keep data: test data left in place.</Note>}
     </HookBand>
   );

@@ -25,16 +25,24 @@ export function resetConnectorState(): void {
   vi.clearAllMocks();
   connectorState.flagOn = true;
   connectorState.agentById = void 0;
+  connectorState.agentByIdError = void 0;
+  connectorState.savePending = false;
   connectorState.secrets = [];
   connectorState.datasets = [];
 }
 
+/** Renders the drawer open; `rerender` changes its props, as the routed drawer does. */
 export function renderConnectorDrawer(props: Partial<AgentConnectorEditorDrawerProps> = {}) {
   const host = new ConnectorTestHost();
-  renderWithDesignSystem(
+  const drawer = (next: Partial<AgentConnectorEditorDrawerProps>) => (
     <AgentManagementHostProvider value={host}>
-      <AgentConnectorEditorDrawer open={true} {...props} />
-    </AgentManagementHostProvider>,
+      <AgentConnectorEditorDrawer open={true} {...next} />
+    </AgentManagementHostProvider>
   );
-  return host;
+  const rendered = renderWithDesignSystem(drawer(props));
+  return {
+    host,
+    rerender: (next: Partial<AgentConnectorEditorDrawerProps>) =>
+      rendered.rerender(drawer({ ...props, ...next })),
+  };
 }

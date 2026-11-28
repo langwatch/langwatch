@@ -5,7 +5,7 @@
 
 import { fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterAll, beforeEach, describe, expect, it, type Mock, vi } from "vitest";
 
 vi.mock(
   "../../../../../behavior/agent-api.ts",
@@ -36,7 +36,7 @@ vi.resetModules();
 afterAll(() => {
   vi.resetModules();
 });
-const { connectorState, createMock, updateMock, SAVED_CONNECTOR } =
+const { connectorState, createMock, refetchAgentMock, updateMock, SAVED_CONNECTOR } =
   await import("./connector-editor-doubles.test-helpers.tsx");
 const { renderConnectorDrawer, resetConnectorState } =
   await import("./connector-editor.test-helpers.tsx");
@@ -148,6 +148,96 @@ describe("AgentConnectorEditorDrawer", () => {
         name: "Shop connector",
         config: SAVED_CONNECTOR.config,
       });
+    });
+  });
+
+  describe("given a saved connector whose read fails", () => {
+    /** @scenario "A connector whose saved config cannot be read shows the error and nothing to save" */
+    it("shows the failure with Try again, and no form or Save", async () => {
+      const user = userEvent.setup();
+      connectorState.agentByIdError = new Error("read failed");
+      renderConnectorDrawer({ agentId: SAVED_CONNECTOR.id });
+
+      expect(await screen.findByText("Couldn't load this connector")).toBeInTheDocument();
+      expect(screen.queryByTestId("connector-agent-name-input")).not.toBeInTheDocument();
+      expect(screen.queryByTestId("save-agent-button")).not.toBeInTheDocument();
+
+      await user.click(screen.getByRole("button", { name: "Try again" }));
+
+      expect(refetchAgentMock).toHaveBeenCalledOnce();
+    });
+  });
+
+  describe("given a save is in flight", () => {
+    /** @scenario "A connector editor cannot be closed while its save is in flight" */
+    it("disables Cancel and the drawer's close button", async () => {
+      connectorState.savePending = true;
+      renderConnectorDrawer();
+
+      expect(await screen.findByRole("button", { name: "Cancel" })).toBeDisabled();
+      expect(screen.getByRole("button", { name: "Close" })).toBeDisabled();
+    });
+  });
+
+  describe("when a save answers", () => {
+    type Saved = { id: string; name: string };
+
+    /** Holds the next update back until the test answers it. */
+    function holdUpdate() {
+      let answer: (agent: Saved) => void = () => undefined;
+      updateMock.mockImplementationOnce(
+        () =>
+          new Promise<Saved>((resolve) => {
+            answer = resolve;
+          }),
+      );
+      return (agent: Saved) => answer(agent);
+    }
+
+    let answer: (agent: Saved) => void;
+    let onSave: Mock<() => void>;
+    let onClose: Mock<() => void>;
+
+    beforeEach(() => {
+      answer = holdUpdate();
+      onSave = vi.fn<() => void>();
+      onClose = vi.fn<() => void>();
+    });
+
+    async function saveSavedConnector(props: { onSave: () => void; onClose: () => void }) {
+      const user = userEvent.setup();
+      connectorState.agentById = SAVED_CONNECTOR;
+      const drawer = renderConnectorDrawer({ agentId: SAVED_CONNECTOR.id, ...props });
+      await waitFor(() =>
+        expect(screen.getByTestId<HTMLInputElement>("connector-agent-name-input").value).toBe(
+          "Shop connector",
+        ),
+      );
+      await user.click(screen.getByTestId("save-agent-button"));
+      return drawer;
+    }
+
+    /** @scenario "A connector save that answers after its editor closed closes nothing" */
+    it("calls neither onSave nor onClose when its editor closed first", async () => {
+      const drawer = await saveSavedConnector({ onSave, onClose });
+
+      drawer.rerender({ open: false });
+      answer(SAVED_CONNECTOR);
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(updateMock).toHaveBeenCalledOnce();
+      expect(onSave).not.toHaveBeenCalled();
+      expect(onClose).not.toHaveBeenCalled();
+    });
+
+    /** @scenario "A connector save that answers after its editor closed closes nothing" */
+    it("closes its editor and reports the agent while the editor is still open", async () => {
+      await saveSavedConnector({ onSave, onClose });
+
+      answer(SAVED_CONNECTOR);
+
+      await waitFor(() => expect(onClose).toHaveBeenCalledOnce());
+      expect(onSave).toHaveBeenCalledExactlyOnceWith(SAVED_CONNECTOR);
     });
   });
 

@@ -486,15 +486,23 @@ Feature: Scenario run hooks: setup and teardown
       Given a connector agent with a teardown block that is refused before it runs
       When a scenario runs against it
       Then setup records "failed" with the refusal
-      And teardown records "not_run"
+      And teardown records "not_run", marked refused
       And the code runner is not called
 
     @integration
     Scenario: A refused connector run shows only the refusal as a failure
       Given a connector run refused before any block ran, so setup failed and teardown did not run
+      And teardown is recorded as refused
       Then the run shows "Setup failed" with the refusal
       And teardown's reason reads as a note, not as an error
       And the run does not show "Test data may be left behind."
+
+    @integration
+    Scenario: A failed setup followed by a teardown that did not run still warns
+      Given a run whose setup failed after it made test data
+      And whose teardown did not run because the agent went offline
+      Then the run shows "Teardown not run"
+      And the run shows "Test data may be left behind."
 
     @integration
     Scenario: A connector agent is offered as a scenario run target
@@ -528,6 +536,13 @@ Feature: Scenario run hooks: setup and teardown
     Scenario: A secret in a connector block's error is scrubbed
       Given a teardown block whose traceback prints a secret it was given
       Then the teardown error holds "[redacted]" in its place
+
+    @unit
+    Scenario: A secret across a connector error's length limit leaves none of itself in the record
+      Given a block traceback or a code runner answer longer than the error a run keeps
+      And a secret the block was given that starts before that length and ends after it
+      When the error is recorded
+      Then it holds neither the secret nor its first 8 characters
 
     @integration
     Scenario: A failed connector teardown leaves the verdict unchanged

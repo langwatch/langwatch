@@ -12,7 +12,7 @@ import {
   ConnectorBlockError,
   connectorTimeoutMessage,
 } from "../../rules/connector-block.rules.ts";
-import { cleanErrorDetail, redactInternalAddresses } from "../../rules/execution-error.rules.ts";
+import { redactInternalAddresses, stripErrorNoise } from "../../rules/execution-error.rules.ts";
 import type { ConnectorBlockChannel } from "../connector-block.channel.ts";
 import type { ExecuteSyncTransport } from "../execute-sync.channel.ts";
 
@@ -53,7 +53,7 @@ export class HttpConnectorBlockChannel implements ConnectorBlockChannel {
       const rawBody = await response.text();
       if (!response.ok) {
         throw new ConnectorBlockError({
-          message: `The code runner answered the ${kind} block with HTTP ${response.status}: ${redactInternalAddresses(cleanErrorDetail(rawBody.slice(0, 500)))}`,
+          message: `The code runner answered the ${kind} block with HTTP ${response.status}: ${redactInternalAddresses(stripErrorNoise(rawBody))}`,
         });
       }
       return rawBody;

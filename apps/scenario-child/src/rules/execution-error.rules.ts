@@ -157,6 +157,11 @@ export function classifyHttpFailure(args: {
  * want the full blob.
  */
 export function cleanErrorDetail(raw: string): string {
+  return capErrorDetail(stripErrorNoise(raw));
+}
+
+/** Strip noise patterns + ANSI escapes + collapse blank lines, without cutting the text. */
+export function stripErrorNoise(raw: string): string {
   let cleaned = raw.replace(ANSI_ESCAPE, "");
   cleaned = cleaned.replace(ENGINE_HARNESS_FRAME, "");
   for (const pattern of NOISE_PATTERNS) {
@@ -164,15 +169,14 @@ export function cleanErrorDetail(raw: string): string {
   }
   // A stripped noise line leaves its newline behind, so collapse 2+ blank
   // lines (not 3+) or a two-line noise block leaves a gap mid-traceback.
-  cleaned = cleaned.replace(/\n[ \t]*\n[ \t]*\n*/g, "\n\n").trim();
-  if (cleaned.length > MAX_DETAIL_LENGTH) {
-    // Report the length of what was actually withheld, not `raw.length` —
-    // noise this function already deleted is not text anyone can go read.
-    cleaned =
-      cleaned.slice(0, MAX_DETAIL_LENGTH) +
-      `\n... (truncated, original was ${cleaned.length} chars)`;
-  }
-  return cleaned;
+  return cleaned.replace(/\n[ \t]*\n[ \t]*\n*/g, "\n\n").trim();
+}
+
+/** Text cut to the detail length shown, marked with how long it was. Cut only after scrubbing. */
+export function capErrorDetail(text: string): string {
+  if (text.length <= MAX_DETAIL_LENGTH) return text;
+  // The cleaned length, not the raw one: stripped noise is not text anyone can go read.
+  return text.slice(0, MAX_DETAIL_LENGTH) + `\n... (truncated, original was ${text.length} chars)`;
 }
 
 /** The customer-facing rendering of a user-code failure. */

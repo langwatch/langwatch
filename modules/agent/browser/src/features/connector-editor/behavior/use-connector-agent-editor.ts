@@ -42,11 +42,25 @@ export function useConnectorAgentEditor(props: AgentConnectorEditorDrawerProps) 
   const saving = useSaveConnectorAgent({
     projectId,
     agentId,
+    isOpen,
     form,
     onSave: props.onSave,
     onClose,
     onFailure: (failure) => host.failed(failure),
   });
+  // Without the stored config the form holds starters, and saving it would overwrite the connector.
+  const readError =
+    agentId && agentQuery.isError
+      ? {
+          title: host.describeFailure({
+            error: agentQuery.error,
+            fallbackTitle: "Couldn't load this connector",
+          }),
+          description:
+            "Its saved config is not shown until it loads, so nothing here can replace it.",
+          onRetry: () => void agentQuery.refetch(),
+        }
+      : undefined;
 
   return {
     isEnabled,
@@ -62,6 +76,7 @@ export function useConnectorAgentEditor(props: AgentConnectorEditorDrawerProps) 
     datasets:
       datasetsQuery.data?.map((dataset) => ({ id: dataset.id, name: dataset.name })) ?? NO_DATASETS,
     isLoading: Boolean(agentId) && agentQuery.isLoading,
+    readError,
     ...saving,
   };
 }

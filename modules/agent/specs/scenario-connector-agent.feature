@@ -81,6 +81,25 @@ Feature: Scenario Connector agent
       Then the form holds its call, setup and teardown code and its picks, not the starter code
 
     @integration
+    Scenario: A connector whose saved config cannot be read shows the error and nothing to save
+      Given a saved connector whose read fails
+      When a user opens it
+      Then the editor shows the failure with "Try again", which reads the connector again
+      And it shows no form and no Save, so the stored config cannot be overwritten
+
+    @integration
+    Scenario: A connector editor cannot be closed while its save is in flight
+      Given a user has saved a connector and the save has not answered
+      Then Cancel and the drawer's close button are disabled
+
+    @integration
+    Scenario: A connector save that answers after its editor closed closes nothing
+      Given a user saved a connector and its editor closed before the save answered
+      When the save answers
+      Then neither the editor's onSave nor its onClose is called
+      And a save that answers while its editor is still open closes it and reports the agent
+
+    @integration
     Scenario: A connector agent's card opens its editor
       Given the Agents page lists a connector agent
       When a user opens or edits its card

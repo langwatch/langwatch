@@ -302,6 +302,7 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
             status: "not_run",
             durationMs: 0,
             error: "The connector was refused before any block ran, so teardown did not run.",
+            refused: true,
           },
         },
       });
@@ -316,6 +317,26 @@ describe("<ScenarioRunDetailDrawer/> setup and teardown", () => {
       expect(teardown).toHaveTextContent("The connector was refused before any block ran");
       expect(within(teardown).queryByTestId("hook-error")).toBeNull();
       expect(teardown).not.toHaveTextContent("Test data may be left behind.");
+    });
+  });
+
+  describe("given a setup that failed and a teardown that did not run because the agent went offline", () => {
+    /** @scenario "A failed setup followed by a teardown that did not run still warns" */
+    it("marks teardown not run and warns that test data may be left behind", () => {
+      mocks.runState = buildRunState({
+        status: ScenarioRunStatus.ERROR,
+        results: null,
+        hooks: {
+          setup: { status: "failed", durationMs: 300, error: "Order service answered 500" },
+          teardown: { status: "not_run", durationMs: 0, error: "No instance answered" },
+        },
+      });
+
+      renderDrawer();
+
+      const teardown = screen.getByTestId("hook-band-teardown");
+      expect(teardown).toHaveTextContent("not run");
+      expect(teardown).toHaveTextContent("Test data may be left behind.");
     });
   });
 
