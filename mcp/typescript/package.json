@@ -1,6 +1,6 @@
 {
   "name": "@langwatch/mcp-server",
-  "version": "3.2.1",
+  "version": "3.3.0",
   "description": "An MCP server for Langwatch.",
   "license": "MIT",
   "author": "",
