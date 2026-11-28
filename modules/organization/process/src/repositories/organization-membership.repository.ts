@@ -405,6 +405,13 @@ export abstract class OrganizationMembershipRepository {
   /** The member's role version: every role write moves it by one. Throws `MemberNotFoundError`. */
   abstract getRoleVersion(params: { organizationId: string; userId: string }): Promise<number>;
 
+  /** Whether the member's newest role write applied this paid change (`lastRoleChangeId`). */
+  abstract isRoleChangeApplied(params: {
+    organizationId: string;
+    userId: string;
+    changeId: string;
+  }): Promise<boolean>;
+
   // listAllMembers and the members through updateTeamMemberRole below are
   // function-typed properties, not method shorthand, so test mocks can be
   // asserted on directly without tripping `unbound-method`.

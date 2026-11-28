@@ -1863,6 +1863,19 @@ export class PrismaOrganizationMembershipRepository implements OrganizationMembe
     return membership.roleVersion;
   }
 
+  async isRoleChangeApplied(params: {
+    organizationId: string;
+    userId: string;
+    changeId: string;
+  }): Promise<boolean> {
+    const { organizationId, userId, changeId } = params;
+    const membership = await this.prisma.organizationUser.findUnique({
+      where: { userId_organizationId: { userId, organizationId } },
+      select: { lastRoleChangeId: true },
+    });
+    return membership?.lastRoleChangeId === changeId;
+  }
+
   async findActiveAdministratorIds(params: { organizationId: string }): Promise<string[]> {
     const rows = await this.prisma.organizationUser.findMany({
       where: {

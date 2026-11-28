@@ -54,8 +54,8 @@ type ChangeInput = Readonly<{
 
 type Dependencies = {
   changeMemberRole: RoleChange;
-  /** The member's role version: every role write moves it, so a paid change sees a newer one. */
-  memberships: Pick<OrganizationMembershipRepository, "getRoleVersion">;
+  /** The member's role version, which every role write moves, and the paid change it applied. */
+  memberships: Pick<OrganizationMembershipRepository, "getRoleVersion" | "isRoleChangeApplied">;
   billing: Pick<BillingApi, "addFullSeat" | "settleSeatPayment" | "recordBlockedSeatChange">;
   /** The member's name as the members page shows it. */
   memberName: (input: { organizationId: string; userId: string }) => Promise<string>;
@@ -402,6 +402,16 @@ export class MemberRoleSeatPurchaseService {
     // A claim that expired during the checks has passed to another applier, which acts instead.
     const stillHeld = () => this.dependencies.pending.renew({ organizationId, id, token });
     const waitingOutcome: SeatRoleChangeOutcome = { status: "waiting", reason: null };
+    // A retry whose own role write already landed settles applied, whatever the admin may now do.
+    if (
+      await this.dependencies.memberships.isRoleChangeApplied({
+        organizationId,
+        userId,
+        changeId: id,
+      })
+    ) {
+      return settle("applied");
+    }
     if (!(await this.dependencies.canManage({ organizationId, userId: by.id }))) {
       if (!(await stillHeld())) return waitingOutcome;
       return settle("seat_only", "the admin who asked can no longer change roles");

@@ -105,7 +105,10 @@ function world({
   let ids = 0;
   const service = MemberRoleSeatPurchaseService.create({
     changeMemberRole,
-    memberships: { getRoleVersion: async () => state.roleVersion },
+    memberships: {
+      getRoleVersion: async () => state.roleVersion,
+      isRoleChangeApplied: async ({ changeId }) => state.lastRoleChangeId === changeId,
+    },
     billing: createApiFixture<BillingApi>(
       { addFullSeat, settleSeatPayment, recordBlockedSeatChange },
       "BillingApi",
@@ -839,6 +842,29 @@ describe("MemberRoleSeatPurchaseService", () => {
       await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
         "database down",
       );
+      await service.paymentPaid({ organizationId: ORG, payment: INVOICE });
+
+      expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({
+        status: "applied",
+      });
+      expect(state.roles.get(SAM)).toBe("ADMIN");
+      expect(state.roleWrites).toBe(1);
+    });
+
+    /** @scenario "A landed paid change stays applied when its admin lost the right before the retry" */
+    it("settles applied on retry although the admin who asked can no longer change roles", async () => {
+      const { state, service, pay, pending } = await waiting();
+      pay("in_seat");
+      const settle = pending.settle.bind(pending);
+      vi.spyOn(pending, "settle").mockImplementationOnce(async (input) => {
+        if (input.status === "applied") throw new Error("database down");
+        return settle(input);
+      });
+      await expect(service.paymentPaid({ organizationId: ORG, payment: INVOICE })).rejects.toThrow(
+        "database down",
+      );
+      state.adminCanManage = false;
+
       await service.paymentPaid({ organizationId: ORG, payment: INVOICE });
 
       expect(await service.pendingFor({ organizationId: ORG, userId: SAM })).toMatchObject({

@@ -211,6 +211,15 @@ Feature: Adding a seat with a role change
       When "Kim" is admitted, twice at once
       Then "Kim" is admitted once and the role version moves, so an older paid change is replaced
 
+    @unit
+    Scenario: A landed paid change stays applied when its admin lost the right before the retry
+      Given "Sam" waits to become an Admin on a seat invoice
+      And billing records that the seat invoice was paid
+      And "Sam" becomes an Admin, but marking the change applied fails
+      And the admin who asked can no longer change roles
+      When billing delivers the paid fact again
+      Then the waiting change ends as applied, not seat only
+
     @unit @integration
     Scenario: A paid change whose role write landed but whose settling failed ends as applied
       Given "Sam" waits to become an Admin on a seat invoice

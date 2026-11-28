@@ -510,6 +510,14 @@ export class MemoryOrganizationMembershipRepository implements OrganizationMembe
     return row.roleVersion ?? 0;
   }
 
+  async isRoleChangeApplied(params: {
+    organizationId: string;
+    userId: string;
+    changeId: string;
+  }): Promise<boolean> {
+    return this.membershipRow(params)?.lastRoleChangeId === params.changeId;
+  }
+
   async getMembership(params: {
     organizationId: string;
     userId: string;
