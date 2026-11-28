@@ -49,35 +49,100 @@ func suiteJobs(jobs []Job) ([]Job, bool) {
 	return found, total > 0 && len(found) == total
 }
 
+// Lookback is how many older green runs Collect reads for a script the newest
+// runs only replayed from the cache, before its weight falls back to the file.
+const Lookback = 10
+
 // Collect measures the newest `want` runs on main whose package-suites shards
-// all passed, and returns their ids with every measurement of each.
-func Collect(src Source, want int) ([]int64, [][]Measurement, error) {
+// all passed, and returns their ids with every measurement of each. A script
+// all of them only replayed is then looked for in up to Lookback older green
+// runs; each one that ran it for real adds that measurement alone, as one more
+// run, and its id to `older`.
+func Collect(src Source, want int) (ids, older []int64, measured [][]Measurement, err error) {
 	if want < 1 {
-		return nil, nil, fmt.Errorf("asked for %d runs; take the median over at least one", want)
+		return nil, nil, nil, fmt.Errorf("asked for %d runs; take the median over at least one", want)
 	}
 	runs, err := src.MainRuns()
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	var ids []int64
-	var measured [][]Measurement
-	for _, run := range runs {
+	ids, measured, rest, err := newestGreen(src, runs, want)
+	if err != nil {
+		return nil, nil, nil, err
+	}
+	if len(ids) < want {
+		return nil, nil, nil, fmt.Errorf("found %d main runs with every package-suites shard green, wanted %d", len(ids), want)
+	}
+	older, measured, err = lookBack(src, rest, measured)
+	return ids, older, measured, err
+}
+
+// newestGreen measures runs until `want` of them had every shard green, and
+// returns the runs after the last one it read.
+func newestGreen(src Source, runs []int64, want int) (ids []int64, measured [][]Measurement, rest []int64, err error) {
+	for i, run := range runs {
 		if len(ids) == want {
-			break
+			return ids, measured, runs[i:], nil
 		}
 		got, ok, err := measureRun(src, run)
 		if err != nil {
-			return nil, nil, err
+			return nil, nil, nil, err
 		}
 		if ok {
 			ids = append(ids, run)
 			measured = append(measured, got)
 		}
 	}
-	if len(ids) < want {
-		return nil, nil, fmt.Errorf("found %d main runs with every package-suites shard green, wanted %d", len(ids), want)
+	return ids, measured, nil, nil
+}
+
+// lookBack reads up to Lookback green runs of `runs` while a script is only
+// replayed, adding each one's real measurements of those scripts as a run.
+func lookBack(src Source, runs []int64, measured [][]Measurement) ([]int64, [][]Measurement, error) {
+	var older []int64
+	looked := 0
+	for _, run := range runs {
+		missing := onlyReplayed(measured)
+		if looked == Lookback || len(missing) == 0 {
+			break
+		}
+		got, ok, err := measureRun(src, run)
+		if err != nil {
+			return nil, nil, err
+		}
+		if !ok {
+			continue
+		}
+		looked++
+		if found := realRunsOf(got, missing); len(found) > 0 {
+			older = append(older, run)
+			measured = append(measured, found)
+		}
 	}
-	return ids, measured, nil
+	return older, measured, nil
+}
+
+// onlyReplayed is every script no run executed for real.
+func onlyReplayed(runs [][]Measurement) map[scriptKey]bool {
+	ran, replayed := byScript(runs)
+	missing := map[scriptKey]bool{}
+	for k := range replayed {
+		if _, ok := ran[k]; !ok {
+			missing[k] = true
+		}
+	}
+	return missing
+}
+
+// realRunsOf is the measurements of `run` that executed one of `scripts`.
+func realRunsOf(run []Measurement, scripts map[scriptKey]bool) []Measurement {
+	var found []Measurement
+	for _, m := range run {
+		if !m.Cached && scripts[scriptKey{m.Package, m.Script}] {
+			found = append(found, m)
+		}
+	}
+	return found
 }
 
 func measureRun(src Source, run int64) ([]Measurement, bool, error) {

@@ -46,10 +46,18 @@ Feature: The package-suites weights are refreshed by a command
     # lane ran but whose unit lane only replayed read as a few seconds.
     @unit
     Scenario: A package partly replayed from the cache never weighs less than its committed weight
-      Given a package one of whose scripts every sampled run replayed from the cache
+      Given a package one of whose scripts every sampled run, and every older run looked through, replayed from the cache
       And the committed weights file names it at more than the measured sum
       When the weights are computed
       Then it keeps the committed weight
+
+    @unit
+    Scenario: A script the newest runs only replayed is measured in an older run
+      Given a script the newest green runs only replayed from the cache
+      And an older green run that executed it
+      When runs are collected
+      Then that older run's seconds for the script count, and nothing else from that run
+      And the package can weigh less than its committed weight
 
     @unit
     Scenario: A package's weight is the median of its runs, summed over its scripts
