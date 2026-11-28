@@ -276,6 +276,8 @@ jobs:
           go-version-file: go.work
           cache-dependency-path: "*/go.sum"
       - uses: ./.github/actions/go-build-cache
+        with:
+          suffix: memory-ceilings
       - run: go test -count=1 -run 'TestLargePlanWalkStaysUnder256MB' ./tools/seedgen/
 
   lint:
