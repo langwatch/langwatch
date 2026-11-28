@@ -29,6 +29,12 @@ Feature: Scenario Connector agent
     Then it is refused
 
   @unit
+  Scenario: A connector's call timeout is at most 300 seconds
+    Given a connector config whose call timeout is over 300 seconds
+    When it is parsed
+    Then it is refused, so the editor shows the limit instead of the run cutting it silently
+
+  @unit
   Scenario: A connector config keeps every field it is saved with
     Given a connector config with setup, call, teardown, secret names, a fixtures dataset and a timeout
     When it is parsed for the connector agent type

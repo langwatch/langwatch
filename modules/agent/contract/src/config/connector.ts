@@ -7,6 +7,7 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
+import { MAX_CALL_TIMEOUT_MS } from "../connected-agent.constants.ts";
 import { baseAgentConfigSchema } from "./code.ts";
 
 /** The languages the code runner offers for a block; JavaScript and TypeScript wait on ADR-183. */
@@ -73,7 +74,15 @@ const connectorAgentConfigSchemaDefinition = z.object({
   /** The dataset whose rows every block receives as `rows`. */
   fixturesDatasetId: z.string().min(1).optional(),
   /** The call block's budget per turn, in milliseconds. */
-  timeoutMs: z.number().int().positive().optional(),
+  timeoutMs: z
+    .number()
+    .int()
+    .positive()
+    .max(
+      MAX_CALL_TIMEOUT_MS,
+      `A connector's call timeout is at most ${MAX_CALL_TIMEOUT_MS / 1000} seconds.`,
+    )
+    .optional(),
 });
 export interface ConnectorAgentConfigSchema extends Named<
   typeof connectorAgentConfigSchemaDefinition

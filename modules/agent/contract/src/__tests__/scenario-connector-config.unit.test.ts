@@ -8,9 +8,10 @@ import { describe, expect, it } from "vitest";
 import {
   CONNECTOR_BLOCK_MAX_BYTES,
   CONNECTOR_SECRET_NAMES_MAX,
+  MAX_CALL_TIMEOUT_MS,
   connectorAgentConfigSchema,
   parseAgentConfig,
-} from "../config/index.ts";
+} from "../index.ts";
 
 const block = (code = "def execute(input):\n    return {'reply': 'hi'}\n") => ({
   language: "python",
@@ -87,6 +88,19 @@ describe("connectorAgentConfigSchema", () => {
       expect(connectorAgentConfigSchema.validate({ call: block(), secretNames: names(50) })).toBe(
         true,
       );
+    });
+  });
+
+  describe("given a call timeout over the call limit", () => {
+    /** @scenario "A connector's call timeout is at most 300 seconds" */
+    it("refuses one millisecond over 300 seconds and accepts 300 seconds", () => {
+      expect(MAX_CALL_TIMEOUT_MS).toBe(300_000);
+      expect(
+        connectorAgentConfigSchema.validate({ call: block(), timeoutMs: MAX_CALL_TIMEOUT_MS + 1 }),
+      ).toBe(false);
+      expect(
+        connectorAgentConfigSchema.validate({ call: block(), timeoutMs: MAX_CALL_TIMEOUT_MS }),
+      ).toBe(true);
     });
   });
 });

@@ -1,4 +1,8 @@
-import { connectorAgentConfigSchema, type ConnectorAgentConfig } from "@langwatch/agent-contract";
+import {
+  connectorAgentConfigSchema,
+  MAX_CALL_TIMEOUT_MS,
+  type ConnectorAgentConfig,
+} from "@langwatch/agent-contract";
 import { FrontendFlags } from "@langwatch/feature-flag-contract";
 
 import { CALL_STARTER } from "./connector-starters.ts";
@@ -69,7 +73,7 @@ export type ConnectorFormCheck =
   | { ok: true; config: ConnectorAgentConfig }
   | { ok: false; errors: ConnectorFormErrors };
 
-const TIMEOUT_MESSAGE = "The timeout is a number of seconds above zero.";
+const TIMEOUT_MESSAGE = `The timeout is a number of seconds above zero and at most ${MAX_CALL_TIMEOUT_MS / 1000}.`;
 
 /** Whitespace alone is no code, so it meets the schema's "needs code" refusal. */
 function blockOf(code: string) {
