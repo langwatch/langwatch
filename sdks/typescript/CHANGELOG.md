@@ -1,5 +1,30 @@
 # Changelog
 
+## [2.4.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.3.0...typescript-sdk@v2.4.0) (2026-11-28)
+
+
+### Features
+
+* **experiments:** opt-in CI gate on evaluator failures; TS run() sends every input ([#9501](https://github.com/langwatch/langwatch/issues/9501)) ([eff2dac](https://github.com/langwatch/langwatch/commit/eff2dac43c18163cd5fac4f3cf850a55d9587d8c))
+* **nurturing:** send langy_start, backfill the onboarding path, and retry a key's first request ([#9893](https://github.com/langwatch/langwatch/issues/9893)) ([fbb0277](https://github.com/langwatch/langwatch/commit/fbb0277e6592191cda34928f4f2bc42b26706714))
+* **staff-access:** copy an organization's projects into another organization ([#9538](https://github.com/langwatch/langwatch/issues/9538)) ([7abf0c5](https://github.com/langwatch/langwatch/commit/7abf0c5335e079eec12250f52aca603df516fb25))
+* **staff-access:** passkey-approved one-hour agent access for operators ([#9267](https://github.com/langwatch/langwatch/issues/9267)) ([26bb2bf](https://github.com/langwatch/langwatch/commit/26bb2bffbd7b03f91b7e4205d058aba307317a02))
+* **trace:** store trace media by default and accept 64 MiB trace exports ([#9767](https://github.com/langwatch/langwatch/issues/9767)) ([aed8b00](https://github.com/langwatch/langwatch/commit/aed8b008f0270cd55794e5393124b2dfa25d0935))
+
+
+### Bug Fixes
+
+* **gateway:** settle the A2A proxy review follow-ups ([#9824](https://github.com/langwatch/langwatch/issues/9824)) ([5714ee1](https://github.com/langwatch/langwatch/commit/5714ee1d46c4768290d8bb1f233542f22579dfdd))
+* **lwql,docs:** bare view names, keyset cursor aliases, SSO tier wording ([#8842](https://github.com/langwatch/langwatch/issues/8842)) ([f053227](https://github.com/langwatch/langwatch/commit/f05322776206d953afaf33a3ab05aa3275e5d974))
+* **security:** raise zod to 4.6.6 in the SDK examples and move AG-UI to 1.0 ([#9897](https://github.com/langwatch/langwatch/issues/9897)) ([0a9c1a3](https://github.com/langwatch/langwatch/commit/0a9c1a3f22711ba5a72bc4289bfbe0e1ed6b59ea))
+* **security:** vitest 5.0.5, go-chi, scenario-go grpc, fastmcp-slim and the remaining uv floors ([#8995](https://github.com/langwatch/langwatch/issues/8995)) ([1349269](https://github.com/langwatch/langwatch/commit/1349269a6001241beaf31ed23855808f15a13d7b))
+* **skills:** the CLI skills bundle keeps the login steps Langy's render leaves out ([#9829](https://github.com/langwatch/langwatch/issues/9829)) ([cad58b0](https://github.com/langwatch/langwatch/commit/cad58b0dbe761ba531e33d3900efee0ff1b18b51))
+
+
+### Miscellaneous
+
+* **main:** release langwatch 3.31.0 ([#10004](https://github.com/langwatch/langwatch/issues/10004)) ([1edc0e5](https://github.com/langwatch/langwatch/commit/1edc0e59ff48ffe7704527abe0d741d21a45604c))
+
 ## [2.3.0](https://github.com/langwatch/langwatch/compare/typescript-sdk@v2.2.0...typescript-sdk@v2.3.0) (2026-11-23)
 
 
