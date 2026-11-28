@@ -262,7 +262,7 @@ def execute(spool):
             os.write(write, f"{how}:{os.getpid()}".encode())
             time.sleep(120)
             os._exit(0)
-        os._exit(0)
+        os._exit(1)  # the intermediate child: its exit code is never read
     how, pid = os.read(read, 64).decode().split(":")
     time.sleep(0.2)
     with open(spool, "w") as handle:

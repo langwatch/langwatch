@@ -58,6 +58,7 @@ var (
 		"tools/thuishaven",
 		"tools/herrgen",
 		"tools/ciguard",
+		"cmd/lambdaextension",
 		"tools/waitforchecks",
 		"tools/waitcontainers",
 		"tools/deployimpact",

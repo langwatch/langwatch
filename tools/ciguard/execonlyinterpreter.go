@@ -49,21 +49,26 @@ func execOnlyInterpreterStages(dockerfile string) []string {
 		if len(fields) == 0 {
 			continue
 		}
-		switch strings.ToUpper(fields[0]) {
-		case "FROM":
+		if strings.EqualFold(fields[0], "FROM") {
 			stage = fromStage(fields[1:]).name
-		case "COPY":
-			if copiesExecOnlyInterpreter(fields[1:]) {
-				stages = append(stages, stage)
-			}
-		case "RUN":
-			if chmodsExecOnlyInterpreter(fields[1:]) {
-				stages = append(stages, stage)
-			}
+		} else if leavesInterpreterExecOnly(fields) {
+			stages = append(stages, stage)
 		}
 	}
 
 	return stages
+}
+
+// leavesInterpreterExecOnly judges one COPY or RUN instruction.
+func leavesInterpreterExecOnly(fields []string) bool {
+	switch strings.ToUpper(fields[0]) {
+	case "COPY":
+		return copiesExecOnlyInterpreter(fields[1:])
+	case "RUN":
+		return chmodsExecOnlyInterpreter(fields[1:])
+	}
+
+	return false
 }
 
 // joinedInstructions splits a Dockerfile into instructions, joining a line

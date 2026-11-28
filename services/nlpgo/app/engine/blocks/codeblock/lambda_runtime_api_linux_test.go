@@ -102,8 +102,8 @@ def execute(api, other):
         fresh.fork_exec
 
     def extension_loader():
-        import glob, importlib.machinery as machinery, importlib.util as util
-        paths = glob.glob("/usr/**/_posixsubprocess*.so", recursive=True)
+        import glob, importlib.machinery as machinery, importlib.util as util, sysconfig
+        paths = glob.glob(f"{sysconfig.get_path('platstdlib')}/lib-dynload/_posixsubprocess*.so")
         if not paths:
             raise ImportError("_posixsubprocess is built in here")
         spec = util.spec_from_loader("pkg._posixsubprocess", machinery.ExtensionFileLoader("pkg._posixsubprocess", paths[0]))
@@ -180,7 +180,7 @@ func runRuntimeAPIFence(t *testing.T) {
 	api, reachedAPI := countingListener(t)
 	other, _ := countingListener(t)
 	_, otherPort, _ := net.SplitHostPort(other)
-	require.NoError(t, os.Setenv("AWS_LAMBDA_RUNTIME_API", api))
+	t.Setenv("AWS_LAMBDA_RUNTIME_API", api)
 
 	exe, err := codeblock.New(codeblock.Options{Python: os.Getenv(lambdaPythonEnv)})
 	require.NoError(t, err)
