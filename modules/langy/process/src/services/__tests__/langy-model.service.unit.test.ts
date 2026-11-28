@@ -12,7 +12,6 @@ import { describe, expect, it } from "vitest";
 
 import { LangyModelService } from "../langy-model.service.ts";
 
-/** A connected model-provider execution record, enabled or not. */
 function executionProvider(input: { provider: string; enabled: boolean }): ModelProviderExecution {
   return {
     id: `mp_${input.provider}`,
