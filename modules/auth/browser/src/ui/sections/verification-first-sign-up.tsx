@@ -933,7 +933,19 @@ function PostLinkRoutingFailure({
       ) : (
         <Text>We couldn't check how this address should sign in.</Text>
       )}
-      <FrontDoorPrimaryButton onClick={() => void onRetry()}>Try again</FrontDoorPrimaryButton>
+      {refused ? (
+        // The same address gets the same refusal, so the way on is a new sign-up.
+        <FrontDoorPrimaryButton
+          onClick={() => {
+            forgetHeldAddressProof();
+            hardRedirect("/auth/signup");
+          }}
+        >
+          Use a different email
+        </FrontDoorPrimaryButton>
+      ) : (
+        <FrontDoorPrimaryButton onClick={() => void onRetry()}>Try again</FrontDoorPrimaryButton>
+      )}
     </AuthCard>
   );
 }

@@ -706,6 +706,10 @@ describe("given the sign-up screen", () => {
       expect(await screen.findByTestId("post-link-routing-failure")).toBeTruthy();
       expect(await screen.findByText("Please use a permanent email address")).toBeTruthy();
       expect(screen.queryByText("Your email is confirmed")).toBeNull();
+      expect(screen.queryByRole("button", { name: "Try again" })).toBeNull();
+
+      await userEvent.click(screen.getByRole("button", { name: "Use a different email" }));
+      expect(hardRedirectMock).toHaveBeenCalledWith("/auth/signup");
     });
 
     /** @scenario Post-link routing still governs credential enrollment */

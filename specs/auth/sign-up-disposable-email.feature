@@ -109,6 +109,7 @@ Feature: Sign-up refuses disposable email addresses
     And the sign-up policy now refuses that address as a disposable address
     When the sign-up screen shows the refusal
     Then it does not read "Your email is confirmed"
+    And it offers to start again with a different email address
 
   @unit
   Scenario: The sign-up screen asks for a permanent email address

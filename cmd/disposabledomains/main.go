@@ -12,6 +12,7 @@ import (
 	"github.com/langwatch/langwatch/tools/disposabledomains"
 )
 
+// no-test: a thin wrapper over disposabledomains.Run; tools/disposabledomains tests the refresh.
 func main() {
 	os.Exit(disposabledomains.Run(os.Args[1:], os.Stdout, os.Stderr))
 }
