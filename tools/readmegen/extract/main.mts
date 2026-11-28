@@ -109,14 +109,12 @@ async function readModules(): Promise<ModuleFacts[]> {
   return catalogue.flatMap((entry) => byId.get(entry.id) ?? []);
 }
 
-/** A macrotask turn: only at the end of one may V8 free a WeakRef's target that was read during it. */
+/** A macrotask turn: only after one may V8 free a WeakRef target read during it. */
 const turn = () => new Promise((resolve) => setImmediate(resolve));
 
 /**
- * One worker's modules. The enforcer holds syntax trees by WeakRef, and a
- * WeakRef keeps what it reads alive until the current job ends, so a slice
- * read in one synchronous pass held every tree it parsed (1.3 GB live in one
- * worker). Reading module by module, a turn apart, frees each module's trees.
+ * One worker's modules, read a turn apart: a WeakRef keeps each syntax tree it
+ * reads alive until the job ends, so one synchronous pass held every tree.
  * Table access is read per module root, so a slice keeps its rows whole.
  */
 async function readSlice({ slice, of }: Slice): Promise<ModuleFacts[]> {
