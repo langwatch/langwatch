@@ -43,9 +43,6 @@ export const PASSKEY_SIGNUP_VERIFICATION_REQUIRED = "VERIFICATION_REQUIRED";
 /** A signed-in browser ran the sign-up ceremony for some other address. */
 export const PASSKEY_SIGNUP_ALREADY_SIGNED_IN = "ALREADY_SIGNED_IN";
 
-/** The installation restricts who may create an account, and this address is not admitted. */
-export const PASSKEY_SIGNUP_RESTRICTED = "auth_sign_up_restricted";
-
 /** Main's code for an address that must use its organization's sign-in method. */
 export const PASSKEY_SIGNUP_NOT_LOCAL = "REGISTRATION_NOT_ALLOWED";
 

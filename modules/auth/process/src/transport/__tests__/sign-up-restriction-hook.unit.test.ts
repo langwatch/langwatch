@@ -9,10 +9,7 @@
 import type { SignUpVerdict } from "@langwatch/organization-contract";
 import { describe, expect, it, vi } from "vitest";
 
-import {
-  createBeforeUserCreateHook,
-  SIGN_UP_RESTRICTED_CODE,
-} from "../../channels/http/http.better-auth-hooks.channel.ts";
+import { createBeforeUserCreateHook } from "../../channels/http/http.better-auth-hooks.channel.ts";
 
 function userCreateBefore({
   verdict,
@@ -44,7 +41,7 @@ describe("user.create.before", () => {
       const { create, checkSignUp } = userCreateBefore({ verdict: REFUSED });
 
       await expect(create("stranger@example.com")).rejects.toMatchObject({
-        body: { code: SIGN_UP_RESTRICTED_CODE },
+        body: { code: "auth_sign_up_restricted" },
       });
       expect(checkSignUp).toHaveBeenCalledWith({ email: "stranger@example.com" });
     });

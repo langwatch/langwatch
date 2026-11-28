@@ -305,7 +305,13 @@ export type SignUpMode = "open" | "invite_only";
 export const signUpDisposableEmailsSchema = z.enum(["refuse", "allow"]);
 export type SignUpDisposableEmails = z.infer<typeof signUpDisposableEmailsSchema>;
 
-export type SignUpRefusalReason = "invite_only" | "domain_not_allowed" | "disposable_email";
+/** Why the sign-up policy refused an address; `disposable_email` has its own handled error. */
+export const signUpRefusalReasonSchema = z.enum([
+  "invite_only",
+  "domain_not_allowed",
+  "disposable_email",
+]);
+export type SignUpRefusalReason = z.infer<typeof signUpRefusalReasonSchema>;
 
 export type SignUpVerdict =
   | {

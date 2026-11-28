@@ -6,7 +6,6 @@ import {
   PASSKEY_SIGNUP_EMAIL_INVALID,
   PASSKEY_SIGNUP_EMAIL_TAKEN,
   PASSKEY_SIGNUP_NOT_LOCAL,
-  PASSKEY_SIGNUP_RESTRICTED,
   PASSKEY_SIGNUP_VERIFICATION_REQUIRED,
   passkeySignUpRegistration,
   type PasskeyCeremonyCaller,
@@ -153,7 +152,7 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("refuses to start the ceremony with the restricted code", async () => {
       await expect(
         resolveUser({ ctx: fakeContext().ctx, context: signUp("someone@example.com") }),
-      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_RESTRICTED } });
+      ).rejects.toMatchObject({ body: { code: "auth_sign_up_restricted" } });
       expect(checkSignUp).toHaveBeenCalledWith({ email: "someone@example.com" });
     });
 
@@ -161,9 +160,21 @@ describe("given passkey sign-up, which creates an account with no session", () =
     it("refuses after the ceremony too, spending no proof and writing no account", async () => {
       await expect(
         afterVerification({ ctx: fakeContext().ctx, context: signUp("someone@example.com") }),
-      ).rejects.toMatchObject({ body: { code: PASSKEY_SIGNUP_RESTRICTED } });
+      ).rejects.toMatchObject({ body: { code: "auth_sign_up_restricted" } });
       expect(journal).toEqual([]);
       expect(createPasskeyUser).not.toHaveBeenCalled();
+    });
+
+    describe("when the refusal is for a disposable email domain", () => {
+      beforeEach(() => {
+        checkSignUp.mockResolvedValue({ allowed: false, reason: "disposable_email" });
+      });
+
+      it("refuses the ceremony with the disposable code", async () => {
+        await expect(
+          resolveUser({ ctx: fakeContext().ctx, context: signUp("someone@example.com") }),
+        ).rejects.toMatchObject({ body: { code: "auth_sign_up_disposable_email" } });
+      });
     });
 
     it("does not answer a caller holding no valid address proof", async () => {

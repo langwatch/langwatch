@@ -121,15 +121,17 @@ async function refuseRestrictedSignUp({
   if (verdict.allowed) return;
   if ((await findGoverningConnections({ email })).length > 0) return;
 
-  logger.warn({ reason: verdict.reason }, "Refused sign-up: the installation restricts it");
+  logger.warn(
+    { reason: verdict.reason },
+    verdict.reason === "disposable_email"
+      ? "Refused sign-up: the address is on a disposable email domain"
+      : "Refused sign-up: the installation restricts it",
+  );
   // Thrown rather than returned false, so Better Auth carries the code to the
   // sign-in screen as `?error=`.
   const { code } = signUpRefusalFor({ reason: verdict.reason });
   throw APIError.from("FORBIDDEN", { code, message: code });
 }
-
-/** The code the sign-in screen and the passkey ceremony read a restricted sign-up by. */
-export const SIGN_UP_RESTRICTED_CODE = "auth_sign_up_restricted";
 
 /**
  * Success-side announcements once the membership landed: the log line, the
