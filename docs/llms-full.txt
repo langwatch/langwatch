@@ -3880,7 +3880,8 @@ Create an agent adapter that calls your agent, then run a scenario against it. F
                         then provide a complete recipe. Keep your responses concise and focused.
                     """,
                 },
-                *messages,
+                # Scenario adds a trace_id to each message; send only role and content
+                *({"role": m["role"], "content": m["content"]} for m in messages),
             ],
         )
         return response.choices[0].message
