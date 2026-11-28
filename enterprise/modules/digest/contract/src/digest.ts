@@ -2,27 +2,16 @@
 import type { Named } from "@langwatch/module";
 import { z } from "zod";
 
-/** The five templates, in the order a person's one weekly email is picked from. */
-export const DIGEST_TEMPLATE_IDS = [
-  "digest-plan-pressure",
-  "digest-scenarios-trend",
-  "digest-coding-agent-week",
-  "digest-traces-week",
-  "digest-whats-new",
-] as const;
+/** The weekly digest's one template: a feed of rows picked from the person's week. */
+export const DIGEST_TEMPLATE_IDS = ["digest-week"] as const;
 export const digestTemplateIdSchema = z.enum(DIGEST_TEMPLATE_IDS);
 export type DigestTemplateId = z.infer<typeof digestTemplateIdSchema>;
 
-/** The templates a staff test can force; "what's new" never sends, so it is not one of them. */
-export const DIGEST_FORCEABLE_TEMPLATE_IDS = [
-  "digest-plan-pressure",
-  "digest-scenarios-trend",
-  "digest-coding-agent-week",
-  "digest-traces-week",
-] as const satisfies readonly DigestTemplateId[];
-
-/** A staff test's template: "auto" is what the person would get today; an id forces that one. */
-export const DIGEST_TEST_TEMPLATES = ["auto", ...DIGEST_FORCEABLE_TEMPLATE_IDS] as const;
+/**
+ * A staff test's rows: "auto" is what the person would get today; "every-row" lifts the
+ * thresholds and the five-row cap, so every row with data for the person is sent, for review.
+ */
+export const DIGEST_TEST_TEMPLATES = ["auto", "every-row"] as const;
 export const digestTestTemplateSchema = z.enum(DIGEST_TEST_TEMPLATES);
 export type DigestTestTemplate = z.infer<typeof digestTestTemplateSchema>;
 
@@ -74,7 +63,7 @@ export const DIGEST_MY_TEST_SKIP_REASONS = [
   "deactivated",
   /** Delivery to the person was asked for, and they have no email address. */
   "no_address",
-  /** A forced template had no data to show for the person here. */
+  /** An every-row test had no row with data for the person here. */
   "no_data_for_template",
 ] as const;
 
@@ -116,7 +105,7 @@ export const digestTestDeliverySchema = z.enum(["me", "person"]);
 export type DigestTestDelivery = z.infer<typeof digestTestDeliverySchema>;
 
 /**
- * The person whose digests the operator tests, by address, which template to send and where it
+ * The person whose digests the operator tests, by address, which rows to send and where it
  * goes. Only the operator or that person can receive it, never an address typed in.
  */
 const digestSendTestForInputSchemaDefinition = z.object({

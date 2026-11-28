@@ -55,7 +55,8 @@ describe("given the mail template registry", () => {
       const barrel = readFileSync(resolve(templatesDir, "index.ts"), "utf8");
       const componentFiles = readdirSync(templatesDir)
         .filter((entry) => entry.endsWith(".tsx"))
-        .filter((entry) => entry !== "email-layout.tsx");
+        // Shared parts, not messages: nothing to register.
+        .filter((entry) => !["email-layout.tsx", "digest-parts.tsx"].includes(entry));
 
       const unreached = componentFiles.filter((file) => !barrel.includes(`"./${file}"`));
 

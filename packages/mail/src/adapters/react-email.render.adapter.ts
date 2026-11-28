@@ -1,20 +1,5 @@
 import { MailRender } from "../mail-render.ts";
-import {
-  type DigestCodingAgentWeekProps,
-  renderDigestCodingAgentWeekEmail,
-} from "../templates/digest-coding-agent-week.tsx";
-import {
-  type DigestPlanPressureProps,
-  renderDigestPlanPressureEmail,
-} from "../templates/digest-plan-pressure.tsx";
-import {
-  type DigestScenariosTrendProps,
-  renderDigestScenariosTrendEmail,
-} from "../templates/digest-scenarios-trend.tsx";
-import {
-  type DigestTracesWeekProps,
-  renderDigestTracesWeekEmail,
-} from "../templates/digest-traces-week.tsx";
+import { type DigestWeekProps, renderDigestWeekEmail } from "../templates/digest-week.tsx";
 import {
   renderJoinRequestExpiredEmail,
   renderJoinRequestReminderEmail,
@@ -91,25 +76,7 @@ export class ReactEmailMailRenderer extends MailRender {
     return renderPlatformOperatorChangeEmail(input);
   }
 
-  renderDigestPlanPressure(
-    input: DigestPlanPressureProps,
-  ): Promise<{ subject: string; html: string }> {
-    return renderDigestPlanPressureEmail(input);
-  }
-
-  renderDigestScenariosTrend(
-    input: DigestScenariosTrendProps,
-  ): Promise<{ subject: string; html: string }> {
-    return renderDigestScenariosTrendEmail(input);
-  }
-
-  renderDigestCodingAgentWeek(
-    input: DigestCodingAgentWeekProps,
-  ): Promise<{ subject: string; html: string }> {
-    return renderDigestCodingAgentWeekEmail(input);
-  }
-
-  renderDigestTracesWeek(input: DigestTracesWeekProps): Promise<{ subject: string; html: string }> {
-    return renderDigestTracesWeekEmail(input);
+  renderDigestWeek(input: DigestWeekProps): Promise<{ subject: string; html: string }> {
+    return renderDigestWeekEmail(input);
   }
 }

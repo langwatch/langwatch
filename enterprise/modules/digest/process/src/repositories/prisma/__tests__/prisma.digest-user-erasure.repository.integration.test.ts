@@ -61,7 +61,7 @@ describe.skipIf(!databaseUrl)("given digest rows naming two people in two organi
           userId,
           organizationId,
           isoWeek: sendWeek,
-          templateId: "digest-coding-agent-week",
+          templateId: "digest-week",
           sentAt: AT,
         });
         const key = `${organizationId}:${userId}:${ISO_WEEK}`;

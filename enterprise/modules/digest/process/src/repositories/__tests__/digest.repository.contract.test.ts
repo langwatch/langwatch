@@ -338,10 +338,10 @@ describe.each(backends)("given the $name digest repositories", (backend) => {
           await sends.claim({
             ...claim,
             organizationId: first,
-            templateId: "digest-coding-agent-week",
+            templateId: "digest-week",
           }),
-          await sends.claim({ ...claim, organizationId: first, templateId: "digest-traces-week" }),
-          await sends.claim({ ...claim, organizationId: second, templateId: "digest-traces-week" }),
+          await sends.claim({ ...claim, organizationId: first, templateId: "digest-week" }),
+          await sends.claim({ ...claim, organizationId: second, templateId: "digest-week" }),
         ];
 
         expect(results).toEqual([true, false, true]);
@@ -370,7 +370,7 @@ describe.each(backends)("given the $name digest repositories", (backend) => {
             userId,
             organizationId,
             isoWeek,
-            templateId: "digest-coding-agent-week",
+            templateId: "digest-week",
             sentAt: AT,
           });
         await claimFor(forgotten, first, "2001-W30");

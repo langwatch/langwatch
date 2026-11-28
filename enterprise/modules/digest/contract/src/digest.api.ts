@@ -32,7 +32,7 @@ export interface DigestApi {
   /**
    * Mails the operator, or with `deliverTo: "person"` the person at their own address, as tests,
    * the person's week in each organization they are an active member of: what they would get,
-   * or the template forced, skipped where it has no data. An address no account has is refused
+   * or every row with data ("every-row"), skipped where it has none. An address no account has is refused
    * with `digest_person_not_found`.
    */
   sendTestFor(input: DigestSendTestForInput & Operated): Promise<DigestTestsFor>;

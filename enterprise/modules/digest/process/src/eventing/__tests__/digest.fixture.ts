@@ -325,18 +325,13 @@ export function installDigest(
     weeks,
     organizations,
     projects: createApiFixture<
-      Pick<
-        ProjectApi,
-        "findSummaryById" | "listNamesByIds" | "findLiveNonGovernanceIdsByOrganization"
-      >
+      Pick<ProjectApi, "listNamesByIds" | "findLiveNonGovernanceIdsByOrganization">
     >(
       {
         findLiveNonGovernanceIdsByOrganization: async ({ organizationId }) =>
           (organizationId === OTHER_ORGANIZATION ? [OTHER_PROJECT] : world.projects).filter(
             (id) => !world.archivedProjects.has(id) && !world.governanceProjects.has(id),
           ),
-        findSummaryById: async (projectId) =>
-          knownProject(projectId) ? { name: "Support bot", slug: "support-bot" } : null,
         listNamesByIds: async ({ projectIds }) =>
           projectIds
             .filter(knownProject)

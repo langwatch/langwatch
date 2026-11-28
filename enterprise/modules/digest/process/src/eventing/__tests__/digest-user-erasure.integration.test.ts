@@ -68,7 +68,7 @@ async function rowsForBoth() {
       userId,
       organizationId: ORGANIZATION,
       isoWeek: SENT_WEEK,
-      templateId: "digest-coding-agent-week",
+      templateId: "digest-week",
       sentAt: WAKE_AT,
     });
     await sessionOf(userId);

@@ -1,6 +1,6 @@
 # digest
 
-Weekly digest emails, on for every organization: folds each organization's week, picks a template per person and organization and sends it. One email per person per organization; one opt-out per person.
+Weekly digest emails, on for every organization: folds each organization's week, picks up to five rows per person and organization and sends them as one feed email. One email per person per organization; one opt-out per person.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 

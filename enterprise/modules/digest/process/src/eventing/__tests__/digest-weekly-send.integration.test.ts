@@ -156,7 +156,7 @@ describe("the weekly digest send", () => {
       for (const userId of MEMBERS) {
         const mail = digest.mail.find((sent) => sent.to === emailOf(userId));
         expect(mail).toMatchObject({
-          templateId: "digest-plan-pressure",
+          templateId: "digest-week",
           idempotencyKey: `digest:${userId}:${ORGANIZATION}:${SENT_WEEK}`,
           test: false,
           email: {
@@ -374,23 +374,24 @@ describe("the weekly digest send", () => {
 
   describe("when the organization is at 90% of its monthly limit", () => {
     /** @scenario "An organization admin near the plan limit is sent the plan's numbers" */
-    it("mails its admin plan-pressure with the plan's numbers, and not its members", async () => {
+    it("leads its admin's email with the plan row, and gives its members none", async () => {
       await arm();
       digest.world.usage = { currentMonthMessagesCount: 900, maxMonthlyUsageLimit: 1_000 };
 
       await carryOutAll(await planAndCollect({ expected: 3 }));
 
       expect(recipients()).toEqual([emailOf(ADMIN)]);
-      expect(digest.mail[0]).toMatchObject({
-        templateId: "digest-plan-pressure",
-        props: { organizationName: "Acme", usagePercentage: 90, used: 900, limit: 1_000 },
-      });
+      const [mail] = digest.mail;
+      expect(mail?.props.rows).toEqual([
+        expect.objectContaining({ kind: "plan", used: 900, limit: 1_000 }),
+      ]);
+      expect(mail?.email.subject).toBe("Acme: You have used 90% of this month's traces");
     });
   });
 
   describe("when a member had five coding-agent sessions in two repositories", () => {
     /** @scenario "A member with coding-agent sessions is sent their coding-agent week" */
-    it("mails them coding-agent-week with their totals and busiest repository", async () => {
+    it("mails them a coding-agent row with their totals and busiest repository, and no cost", async () => {
       await arm();
       const repositories = ["acme/api", "acme/web", "acme/api", "acme/web", "acme/api"];
       for (const [index, repository] of repositories.entries()) {
@@ -417,25 +418,30 @@ describe("the weekly digest send", () => {
 
       expect(recipients()).toEqual([emailOf(MEMBER)]);
       const [mail] = digest.mail;
-      expect(mail?.templateId).toBe("digest-coding-agent-week");
-      expect(mail?.props).toEqual({
-        weekLabel: "Nov 9 to 15",
-        preferencesUrl: `${BASE_URL}/settings/profile#email-preferences`,
-        sessions: 5,
-        tokens: 1_200,
-        activeMinutes: 30,
-        linesChanged: 140,
-        commits: 3,
-        pullRequests: 1,
-        topRepo: "acme/api",
-        weekUrl: BASE_URL,
-      });
+      expect(mail?.templateId).toBe("digest-week");
+      expect(mail?.props.rows).toEqual([
+        {
+          kind: "coding",
+          sessions: 5,
+          tokens: 1_200,
+          commits: 3,
+          pullRequests: 1,
+          topRepository: { name: "acme/api", sessions: 3 },
+          totalsAtLeast: false,
+          url: BASE_URL,
+        },
+      ]);
+      expect(mail?.props.weekLabel).toBe("Nov 9 to 15");
+      // The week cost $2.50; react-email's own `<!--$-->` markers are the only "$" left.
+      expect(mail?.email.html.replaceAll(/<!--\/?\$-->/g, "")).not.toContain("$");
+      expect(mail?.email.html).not.toMatch(/cost/i);
+      expect(mail?.email.subject).toBe("Acme: Your coding agents ran 5 sessions");
     });
   });
 
-  describe("when a member's pick is the what's new fallback", () => {
-    /** @scenario "A member whose pick has nothing to show this week is sent nothing" */
-    it("mails them nothing and records no send, since no card is published", async () => {
+  describe("when a member's week has nothing to show", () => {
+    /** @scenario "A member whose week has nothing to show is sent nothing" */
+    it("mails them nothing and records no send", async () => {
       await arm();
 
       await carryOutAll(await planAndCollect({ expected: 3 }));
@@ -738,7 +744,7 @@ describe("an operator's test send", () => {
       const [mail] = digest.mail;
       expect(mail).toMatchObject({
         to: emailOf(OPERATOR),
-        templateId: "digest-plan-pressure",
+        templateId: "digest-week",
         test: true,
       });
       expect(mail?.idempotencyKey).toBeUndefined();

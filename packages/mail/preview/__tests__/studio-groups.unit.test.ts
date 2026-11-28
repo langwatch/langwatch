@@ -165,8 +165,7 @@ describe("filterTemplates", () => {
 describe("isWeeklyDigest", () => {
   /** @scenario "The weekly digests sit only on their own tab" */
   it("picks out the weekly digests, which have their own tab", () => {
-    expect(isWeeklyDigest("digest-plan-pressure")).toBe(true);
-    expect(isWeeklyDigest("digest-whats-new")).toBe(true);
+    expect(isWeeklyDigest("digest-week")).toBe(true);
   });
 
   /** @scenario "The weekly digests sit only on their own tab" */

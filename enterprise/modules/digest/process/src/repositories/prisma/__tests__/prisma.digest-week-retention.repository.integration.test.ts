@@ -95,7 +95,7 @@ describe.skipIf(!databaseUrl)("given digest weeks around a cutoff in two organiz
         userId,
         organizationId,
         isoWeek: SENT_WEEK,
-        templateId: "digest-coding-agent-week",
+        templateId: "digest-week",
         sentAt: AT,
       });
     }

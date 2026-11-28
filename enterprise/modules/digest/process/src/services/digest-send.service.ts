@@ -30,13 +30,12 @@ import type {
 import type { DigestAudienceRepository } from "../repositories/digest-audience.repository.ts";
 import type { DigestSendRepository } from "../repositories/digest-send.repository.ts";
 import {
-  buildDigestTemplateProps,
+  buildDigestWeekProps,
   digestMessageId,
+  type DigestProjectName,
   digestSendKey,
-  digestTemplateInput,
   type DigestTemplateProps,
   type OrganizationWeek,
-  pickFocusProject,
 } from "../rules/digest-email.rules.ts";
 import {
   DIGEST_EMAIL_PREFERENCES_PATH,
@@ -44,10 +43,6 @@ import {
   type DigestMailRender,
   renderDigestMail,
 } from "../rules/digest-mail.rules.ts";
-import {
-  type DigestTemplatePick,
-  pickDigestTemplatesToTry,
-} from "../rules/digest-template.rules.ts";
 import { plannableWeek, sendableWeek } from "../rules/digest-week.rules.ts";
 import type { DigestUnsubscribeService } from "./digest-unsubscribe.service.ts";
 import type { DigestWeekService } from "./digest-week.service.ts";
@@ -87,11 +82,8 @@ type Deps = Readonly<{
     /** Organization ids a page at a time, the install's hidden system one left out. */
     listAllIds: OrganizationApi["listAllIds"];
   }>;
-  /** A project's name, and each project's team, which is what its access is decided on. */
-  projects: Pick<
-    ProjectApi,
-    "findSummaryById" | "listNamesByIds" | "findLiveNonGovernanceIdsByOrganization"
-  >;
+  /** Each live project's name and team, which is what its access is decided on. */
+  projects: Pick<ProjectApi, "listNamesByIds" | "findLiveNonGovernanceIdsByOrganization">;
   /** Which of the week's projects a member may view; the email shows no other. */
   access: Pick<AuthzApi, "canBatchByIds">;
   /** The address an email goes to, read when it is sent and never stored. */
@@ -109,6 +101,12 @@ type Deps = Readonly<{
   now: () => number;
 }>;
 
+/** The member's week, and the names of the projects in it, read in the one visibility pass. */
+type MemberWeek = Readonly<{
+  week: OrganizationWeek;
+  projects: ReadonlyMap<string, DigestProjectName>;
+}>;
+
 /** One email ready to hand to the mail channel. */
 type Composed = Readonly<{
   template: DigestTemplateProps;
@@ -120,7 +118,7 @@ type Composed = Readonly<{
 /**
  * The weekly send, on for every organization. A plan asks one send per member of each
  * organization, so a person in three gets three emails, each about that organization's week and
- * naming it; each send picks the member's template for that organization, renders it through `@langwatch/mail` and sends it through our own mailer
+ * naming it; each send picks the member's rows for that organization, renders them through `@langwatch/mail` and sends them through our own mailer
  * (`NotificationApi.sendEmail`), with a one-click unsubscribe the digest's own route honours.
  */
 export class DigestSendService {
@@ -215,14 +213,14 @@ export class DigestSendService {
     const user = await this.deps.users.findById({ id: userId });
     if (!user?.email) return skip("member has no email address");
     if (user.deactivatedAt !== null) return skip("member is deactivated");
-    const week = await this.#weekOf({ organizationId, isoWeek, userId });
+    const memberWeek = await this.#weekOf({ organizationId, isoWeek, userId });
     const composed = await this.#compose({
-      week,
+      memberWeek,
       member: { userId, admin: membership.admin },
       recipient: { userId, sendId: digestSendKey(sendKey) },
       template: "auto",
     });
-    if (!composed) return skip("no template has anything to show");
+    if (!composed) return skip("no row has anything to show");
     // Rendered and checked before the claim: a refusal fails this attempt and leaves the week
     // unclaimed, so the retry can still send it.
     const rendered = await renderDigestMail({
@@ -250,7 +248,7 @@ export class DigestSendService {
   /**
    * A member's last week in one organization, mailed to the operator alone, its signed unsubscribe
    * header naming the operator; no send is recorded. It respects opt-out like the weekly send, but not
-   * arming, so a test can come first. A forced `template` is sent in place of the member's pick.
+   * arming, so a test can come first. `template: "every-row"` sends every row with data, uncapped.
    * With `deliverTo: "person"` it goes to the member instead, its unsubscribe header naming them.
    */
   async sendTest({
@@ -284,9 +282,9 @@ export class DigestSendService {
     }
     const isoWeek = sendableWeek(this.deps.now());
     // The member's own view: the operator sees what the member would be sent.
-    const week = await this.#weekOf({ organizationId, isoWeek, userId });
+    const memberWeek = await this.#weekOf({ organizationId, isoWeek, userId });
     const composed = await this.#compose({
-      week,
+      memberWeek,
       member,
       recipient: { userId: recipientId, sendId: `test:${isoWeek}` },
       template,
@@ -358,18 +356,23 @@ export class DigestSendService {
     organizationId: string;
     isoWeek: string;
     userId: string;
-  }): Promise<OrganizationWeek> {
-    const projectIds = await this.#visibleProjectIds({ organizationId, userId });
-    return this.deps.weeks.organizationWeek({ organizationId, isoWeek, projectIds });
+  }): Promise<MemberWeek> {
+    const visible = await this.#visibleProjects({ organizationId, userId });
+    const week = await this.deps.weeks.organizationWeek({
+      organizationId,
+      isoWeek,
+      projectIds: visible.map(({ id }) => id),
+    });
+    return { week, projects: new Map(visible.map(({ id, name, slug }) => [id, { name, slug }])) };
   }
 
-  async #visibleProjectIds({
+  async #visibleProjects({
     organizationId,
     userId,
   }: {
     organizationId: string;
     userId: string;
-  }): Promise<string[]> {
+  }): Promise<readonly Readonly<{ id: string; name: string; slug: string }>[]> {
     const liveIds = await this.deps.projects.findLiveNonGovernanceIdsByOrganization({
       organizationId,
     });
@@ -387,17 +390,17 @@ export class DigestSendService {
       teams: [...new Set(identities.map(({ teamId }) => teamId))].map((teamId) => ({ teamId })),
       projects: identities.map(({ id, teamId }) => ({ projectId: id, teamId })),
     });
-    return identities.filter(({ id }) => decided.projects.get(id) === true).map(({ id }) => id);
+    return identities.filter(({ id }) => decided.projects.get(id) === true);
   }
 
-  /** The member's pick (or a forced template) with props; the unsubscribe is the recipient's. */
+  /** The member's rows (or every row, for a staff test) as props; the unsubscribe is the recipient's. */
   async #compose({
-    week,
+    memberWeek: { week, projects },
     member,
     recipient,
     template,
   }: {
-    week: OrganizationWeek;
+    memberWeek: MemberWeek;
     member: Member;
     recipient: Readonly<{ userId: string; sendId: string }>;
     template: DigestTestTemplate;
@@ -405,46 +408,23 @@ export class DigestSendService {
     const baseUrl = this.#baseUrl();
     const organizationName =
       (await this.deps.organizations.findProvisioningSummary(week.organizationId))?.name ?? null;
+    const props = buildDigestWeekProps({
+      week,
+      userId: member.userId,
+      admin: member.admin,
+      mode: template,
+      organizationName,
+      projects,
+      baseUrl,
+      preferencesUrl: `${baseUrl}${DIGEST_EMAIL_PREFERENCES_PATH}`,
+      now: this.deps.now(),
+    });
+    if (!props) return null;
     // The footer opens the person's email preferences; the signed link is only the one-click header.
-    const oneClickUrl = `${baseUrl}${DIGEST_UNSUBSCRIBE_PATH}?token=${encodeURIComponent(
+    const oneClick = `${baseUrl}${DIGEST_UNSUBSCRIBE_PATH}?token=${encodeURIComponent(
       this.deps.unsubscribes.token(recipient),
     )}`;
-    const preferencesUrl = `${baseUrl}${DIGEST_EMAIL_PREFERENCES_PATH}`;
-    // The first eligible template whose props build: one that cannot (a name not found) must
-    // not cost the member the email a lower-ranked template could send.
-    const input = digestTemplateInput({ week, ...member });
-    for (const pick of pickDigestTemplatesToTry({ template, input })) {
-      const template = buildDigestTemplateProps({
-        pick,
-        week,
-        userId: member.userId,
-        names: await this.#names({ week, pick, organizationName }),
-        baseUrl,
-        preferencesUrl,
-        now: this.deps.now(),
-      });
-      if (template) return { template, oneClick: oneClickUrl, organizationName };
-    }
-    return null;
-  }
-
-  /** Only the names the picked template shows are read. */
-  async #names({
-    week,
-    pick,
-    organizationName,
-  }: {
-    week: OrganizationWeek;
-    pick: DigestTemplatePick;
-    organizationName: string | null;
-  }) {
-    if (pick.template === "digest-plan-pressure") return { organizationName, project: null };
-    const focus = pickFocusProject(week);
-    const showsProject =
-      pick.template === "digest-scenarios-trend" || pick.template === "digest-traces-week";
-    const project =
-      showsProject && focus ? await this.deps.projects.findSummaryById(focus.projectId) : null;
-    return { organizationName: null, project };
+    return { template: { templateId: "digest-week", props }, oneClick, organizationName };
   }
 
   #baseUrl(): string {

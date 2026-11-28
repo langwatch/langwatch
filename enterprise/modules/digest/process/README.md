@@ -1,6 +1,6 @@
 # @langwatch/enterprise-digest-process
 
-The server half of [digest](../README.md). Weekly digest emails: folds the week's usage, picks a template per person and sends it.
+The server half of [digest](../README.md). Weekly digest emails: folds the week's usage, picks each person's rows and sends one feed email.
 
 <!-- readme:generated:start (tools/readmegen; edit the code, then `pnpm generate:readmes`) -->
 

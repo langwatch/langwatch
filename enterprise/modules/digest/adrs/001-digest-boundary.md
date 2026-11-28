@@ -1,6 +1,6 @@
 # ADR-001: Digest owns the weekly email and sends it through our own mailer
 
-**Status:** Accepted (2026-11-19). Amended 2026-11-26 by [ADR-002](./002-per-organization-email-for-everyone.md): no enrolment, one email per organization, a settings switch.
+**Status:** Accepted (2026-11-19). Amended 2026-11-26 by [ADR-002](./002-per-organization-email-for-everyone.md): no enrolment, one email per organization, a settings switch. Amended 2026-11-27 by [ADR-003](./003-one-feed-email.md): one feed email of capped rows replaces the five templates.
 
 **Behavioural contract:** [Weekly digest emails](../specs/digest.feature)
 
