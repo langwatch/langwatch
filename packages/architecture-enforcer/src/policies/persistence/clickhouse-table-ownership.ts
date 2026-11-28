@@ -7,6 +7,7 @@ import type { ArchitectureViolation, FeatureCatalogueEntry } from "../../types.t
 import { getAnchor } from "../../workspace/anchors.ts";
 import { listFiles } from "../../workspace/layout.ts";
 import {
+  defineTreeFacts,
   mentionMatcher,
   sourceFile,
   sourceText,
@@ -358,54 +359,68 @@ type ConstantScope = {
 
 const MAX_IMPORT_DEPTH = 8;
 
-function importedNames(statement: ts.ImportDeclaration): { local: string; imported: string }[] {
-  const bindings = statement.importClause?.namedBindings;
-  if (!bindings || !ts.isNamedImports(bindings)) return [];
+/** A name a file takes from another: imported, or re-exported under `local`. */
+type Binding = { local: string; imported: string };
 
-  return bindings.elements.map((element) => ({
+/** One import or re-export by specifier; `all` is `export * from`. */
+type Link = { specifier: string; names: readonly Binding[] | "all" };
+
+function bindingsOf(elements: readonly (ts.ImportSpecifier | ts.ExportSpecifier)[]): Binding[] {
+  return elements.map((element) => ({
     local: element.name.text,
     imported: (element.propertyName ?? element.name).text,
   }));
 }
 
-type Through = (specifier: string) => ReadonlyMap<string, string>;
+function linkOf(statement: ts.Statement): Link | undefined {
+  if (ts.isImportDeclaration(statement) && ts.isStringLiteralLike(statement.moduleSpecifier)) {
+    const bindings = statement.importClause?.namedBindings;
+    const elements = bindings && ts.isNamedImports(bindings) ? bindings.elements : [];
+
+    return { specifier: statement.moduleSpecifier.text, names: bindingsOf(elements) };
+  }
+
+  if (!ts.isExportDeclaration(statement) || !statement.moduleSpecifier) return void 0;
+  if (!ts.isStringLiteralLike(statement.moduleSpecifier)) return void 0;
+
+  const clause = statement.exportClause;
+  if (!clause) return { specifier: statement.moduleSpecifier.text, names: "all" };
+
+  const elements = ts.isNamedExports(clause) ? clause.elements : [];
+
+  return { specifier: statement.moduleSpecifier.text, names: bindingsOf(elements) };
+}
+
+/**
+ * A file's own table-name constants and its links, kept instead of its tree:
+ * the import chain reaches whole generated clients, and a cached tree outlives
+ * the synchronous pass that read it.
+ */
+const topLevelOf = defineTreeFacts({
+  accept: () => false,
+  derive: ({ source }) => ({
+    constants: literalConstants(source),
+    links: source.statements.flatMap((statement) => linkOf(statement) ?? []),
+  }),
+});
 
 function addMissing(constants: Map<string, string>, name: string, value: string | undefined): void {
   if (value !== undefined && !constants.has(name)) constants.set(name, value);
 }
 
-function addImports(constants: Map<string, string>, statement: ts.Statement, through: Through) {
-  if (!ts.isImportDeclaration(statement) || !ts.isStringLiteralLike(statement.moduleSpecifier))
-    return;
-
-  const target = through(statement.moduleSpecifier.text);
-
-  for (const { local, imported } of importedNames(statement))
-    addMissing(constants, local, target.get(imported));
-}
-
-function addReExports(constants: Map<string, string>, statement: ts.Statement, through: Through) {
-  if (!ts.isExportDeclaration(statement) || !statement.moduleSpecifier) return;
-
-  if (!ts.isStringLiteralLike(statement.moduleSpecifier)) return;
-
-  const target = through(statement.moduleSpecifier.text);
-  const clause = statement.exportClause;
-
-  if (!clause) {
+/** The constants a link brings in from the file it names; a name already bound keeps its value. */
+function addLinked(
+  constants: Map<string, string>,
+  names: Link["names"],
+  target: ReadonlyMap<string, string>,
+): void {
+  if (names === "all") {
     for (const [name, value] of target) addMissing(constants, name, value);
 
     return;
   }
 
-  if (!ts.isNamedExports(clause)) return;
-
-  for (const element of clause.elements)
-    addMissing(
-      constants,
-      element.name.text,
-      target.get((element.propertyName ?? element.name).text),
-    );
+  for (const { local, imported } of names) addMissing(constants, local, target.get(imported));
 }
 
 /**
@@ -432,17 +447,16 @@ function constantsOf({
   }
 
   const cutBefore = scope.cut.count;
-  const source = sourceFile({ file });
-  const constants = literalConstants(source);
-  const through: Through = (specifier) => {
-    const target = scope.resolver.resolve({ specifier, file });
+  const { constants: own, links } = topLevelOf(file);
+  const constants = new Map(own);
 
-    return target ? constantsOf({ file: target, scope, trail: [...trail, file] }) : new Map();
-  };
+  for (const { specifier, names } of links) {
+    const resolved = scope.resolver.resolve({ specifier, file });
+    const target = resolved
+      ? constantsOf({ file: resolved, scope, trail: [...trail, file] })
+      : new Map<string, string>();
 
-  for (const statement of source.statements) {
-    addImports(constants, statement, through);
-    addReExports(constants, statement, through);
+    addLinked(constants, names, target);
   }
 
   if (scope.cut.count === cutBefore) scope.scopes.set(file, constants);

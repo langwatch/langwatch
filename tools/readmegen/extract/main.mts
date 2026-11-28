@@ -2,7 +2,7 @@
 // facts syntactically, booting nothing, and writes one JSON manifest the Go
 // renderer decodes. Usage: node --experimental-transform-types main.mts <out> <root> [part]
 // where part is "facts" (the modules' facts) or "routes" (the mounted api and the zod
-// schemas), else both; Go runs the two parts at once and merges their manifests.
+// schemas), else both; Go runs the two parts in turn and merges their manifests.
 import { writeFileSync } from "node:fs";
 import { availableParallelism } from "node:os";
 import { join, relative, sep } from "node:path";
@@ -89,7 +89,9 @@ function moduleOfFile(file: string): string {
   return owner?.feature ?? "";
 }
 
-const WORKERS = Math.max(1, Math.min(6, availableParallelism() - 2));
+// Each worker is an isolate with its own copy of typescript and the enforcer,
+// ~0.4 GB apiece; past two the run gets no faster, only bigger.
+const WORKERS = Math.max(1, Math.min(2, availableParallelism() - 2));
 
 /** Every module's facts, read in slices on worker threads running this file. */
 async function readModules(): Promise<ModuleFacts[]> {
@@ -107,8 +109,17 @@ async function readModules(): Promise<ModuleFacts[]> {
   return catalogue.flatMap((entry) => byId.get(entry.id) ?? []);
 }
 
-/** One worker's modules; table access is read per module root, so a slice keeps its rows whole. */
-function readSlice({ slice, of }: Slice): ModuleFacts[] {
+/** A macrotask turn: only at the end of one may V8 free a WeakRef's target that was read during it. */
+const turn = () => new Promise((resolve) => setImmediate(resolve));
+
+/**
+ * One worker's modules. The enforcer holds syntax trees by WeakRef, and a
+ * WeakRef keeps what it reads alive until the current job ends, so a slice
+ * read in one synchronous pass held every tree it parsed (1.3 GB live in one
+ * worker). Reading module by module, a turn apart, frees each module's trees.
+ * Table access is read per module root, so a slice keeps its rows whole.
+ */
+async function readSlice({ slice, of }: Slice): Promise<ModuleFacts[]> {
   const tokensByModule = new Map(
     catalogue.map((entry) => [
       entry.id,
@@ -120,8 +131,14 @@ function readSlice({ slice, of }: Slice): ModuleFacts[] {
   );
   const mine = catalogue.filter((_, index) => index % of === slice);
   const access = collectAccess(root, mine, clickhouseTables(root));
+  const read: ModuleFacts[] = [];
 
-  return mine.map((entry) => factsOf({ entry, tokensByModule, moduleOfToken, access }));
+  for (const entry of mine) {
+    await turn();
+    read.push(factsOf({ entry, tokensByModule, moduleOfToken, access }));
+  }
+
+  return read;
 }
 
 function factsOf({
@@ -215,7 +232,7 @@ const routes = async () => ({
 });
 
 if (job) {
-  parentPort?.postMessage(readSlice(job));
+  parentPort?.postMessage(await readSlice(job));
 } else {
   const manifest = {
     ...(part === "routes" ? {} : await facts()),
