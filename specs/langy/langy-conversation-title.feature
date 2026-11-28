@@ -138,13 +138,6 @@ Feature: Langy conversation titles are derived, then generated once by a cheap m
     Then the failure is raised so the process outbox retries it
 
   @unit
-  Scenario: A Codex title model with no cheap default is not retried
-    Given the project's model for titles is a Codex model
-    And the cheap default model cannot be asked either
-    When the title is generated
-    Then no title is produced and nothing is retried
-
-  @unit
   Scenario: A conversation with nothing to read is not retried
     Given a conversation whose transcript holds no text
     When the title is generated

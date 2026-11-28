@@ -1,6 +1,5 @@
 import { LANGY_TITLE_GENERATION } from "@langwatch/langy-contract";
 import {
-  ModelProviderUnavailableError,
   type ModelDefaultResolveInput,
   type ModelProviderApi,
   type ModelProviderTextGenerationInput,
@@ -168,20 +167,6 @@ describe("given a conversation the customer never named", () => {
       });
 
       await expect(service.generate(call)).rejects.toThrow("provider down");
-    });
-
-    /** @scenario "A Codex title model with no cheap default is not retried" */
-    it("leaves the title unchanged when the cheap default's provider is not connected", async () => {
-      const { service } = generatorOver({
-        records,
-        resolvedModel: "openai_codex/gpt-5.6-terra",
-        generateFailure: new ModelProviderUnavailableError({
-          providerKey: "openai",
-          reason: "not_configured",
-        }),
-      });
-
-      await expect(service.generate(call)).resolves.toEqual({ outcome: "unchanged" });
     });
   });
 });

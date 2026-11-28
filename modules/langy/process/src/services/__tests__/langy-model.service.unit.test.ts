@@ -1,4 +1,8 @@
-import { LANGY_CHAT_FEATURE_KEY, type ModelProviderApi } from "@langwatch/model-provider-contract";
+import {
+  LANGY_CHAT_FEATURE_KEY,
+  type ModelProviderApi,
+  type ModelProviderExecution,
+} from "@langwatch/model-provider-contract";
 /**
  * @vitest-environment node
  * @see specs/langy/langy-model-selection.feature
@@ -7,7 +11,34 @@ import { createApiFixture } from "@langwatch/test-harness/api-fixture";
 import { describe, expect, it } from "vitest";
 
 import { LangyModelService } from "../langy-model.service.ts";
-import { executionProvider } from "./execution-provider.fixture.ts";
+
+/** A connected model-provider execution record, enabled or not. */
+function executionProvider(input: { provider: string; enabled: boolean }): ModelProviderExecution {
+  return {
+    id: `mp_${input.provider}`,
+    organizationId: "org_1",
+    provider: input.provider,
+    name: input.provider,
+    enabled: input.enabled,
+    routingHandle: null,
+    scopes: [],
+    customKeys: null,
+    customModels: [],
+    customEmbeddingsModels: [],
+    extraHeaders: [],
+    rateLimitRpm: null,
+    rateLimitTpm: null,
+    rateLimitRpd: null,
+    fallbackPriorityGlobal: null,
+    providerConfig: null,
+    createdAt: new Date(0),
+    updatedAt: new Date(0),
+    models: null,
+    embeddingsModels: null,
+    isSystem: false,
+    embeddingsUnsupported: false,
+  };
+}
 
 function modelProvidersResolving(input: { model: string; enabled: boolean }): ModelProviderApi {
   const provider = input.model.split("/")[0] ?? "";
