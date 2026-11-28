@@ -10,19 +10,19 @@ import {
 
 describe("resolvePanelWidthBounds", () => {
   /** @scenario "The width stays within a usable range" */
-  it("bounds the floating card by its minimum and a share of a desktop viewport", () => {
+  it("bounds the floating card by its minimum and the width the window can show", () => {
     expect(resolvePanelWidthBounds({ placement: "floating", viewportWidth: 1_440 })).toEqual({
       min: 340,
-      max: 760,
+      max: 1_416,
       default: 432,
     });
   });
 
   /** @scenario "The width stays within a usable range" */
-  it("bounds the sidebar to half a laptop viewport, defaulting to the dock width", () => {
+  it("bounds the sidebar to the width the window can show, defaulting to the dock width", () => {
     expect(resolvePanelWidthBounds({ placement: "sidebar", viewportWidth: 1_000 })).toEqual({
       min: 320,
-      max: 500,
+      max: 976,
       default: 392,
     });
   });
@@ -34,9 +34,9 @@ describe("resolvePanelWidthBounds", () => {
   });
 
   /** @scenario "The width stays within a usable range" */
-  it("uses the absolute caps until the viewport has been measured", () => {
+  it("caps at the default until the viewport has been measured", () => {
     expect(resolvePanelWidthBounds({ placement: "sidebar", viewportWidth: 0 })).toMatchObject({
-      max: 640,
+      max: 392,
       default: 392,
     });
   });
@@ -61,7 +61,7 @@ describe("clampPanelWidth", () => {
   it("stops at the minimum and the maximum", () => {
     const base = { placement: "floating", viewportWidth: 1_440 } as const;
     expect(clampPanelWidth({ ...base, width: 100 })).toBe(340);
-    expect(clampPanelWidth({ ...base, width: 5_000 })).toBe(760);
+    expect(clampPanelWidth({ ...base, width: 5_000 })).toBe(1_416);
     expect(clampPanelWidth({ ...base, width: 500.4 })).toBe(500);
   });
 });
@@ -77,7 +77,7 @@ describe("resolvePanelWidth", () => {
   it("re-clamps a stored width to a narrower window without losing the choice", () => {
     const stored = 700;
     expect(resolvePanelWidth({ placement: "floating", viewportWidth: 1_440, stored })).toBe(700);
-    expect(resolvePanelWidth({ placement: "floating", viewportWidth: 800, stored })).toBe(592);
+    expect(resolvePanelWidth({ placement: "floating", viewportWidth: 600, stored })).toBe(576);
     expect(stored).toBe(700);
   });
 });

@@ -181,7 +181,7 @@ Feature: Langy panel layout modes
     Given a viewport of a known width
     When I drag the panel narrower than its minimum or wider than its maximum
     Then the width stops at the minimum, which keeps the composer usable
-    And it stops at the maximum, a share of the viewport that leaves the page usable
+    And it stops at the maximum, the width the window can show (the window minus its edge gutter)
 
   @unit
   Scenario: A window resize re-clamps the chosen width
