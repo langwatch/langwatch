@@ -544,6 +544,13 @@ Feature: Scenario run hooks: setup and teardown
       When the error is recorded
       Then it holds neither the secret nor its first 8 characters
 
+    @unit
+    Scenario: A secret holding an address is scrubbed before addresses are redacted
+      Given a secret the block was given that holds an internal address
+      And a block error that echoes that secret
+      When the error is recorded
+      Then it holds no part of the secret
+
     @integration
     Scenario: A failed connector teardown leaves the verdict unchanged
       Given a passing run whose teardown block raises

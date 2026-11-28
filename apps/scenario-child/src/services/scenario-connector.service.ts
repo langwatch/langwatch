@@ -26,7 +26,11 @@ import {
   scrubbedJson,
   scrubbedText,
 } from "../rules/connector-block.rules.ts";
-import { capErrorDetail } from "../rules/execution-error.rules.ts";
+import {
+  capErrorDetail,
+  redactInternalAddresses,
+  stripErrorNoise,
+} from "../rules/execution-error.rules.ts";
 import type { ScenarioHookCaller } from "./scenario-run-hooks.service.ts";
 
 type HookKind = Exclude<ConnectorBlockKind, "call">;
@@ -198,7 +202,9 @@ export class ScenarioConnectorService implements ScenarioHookCaller {
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
       const code = error instanceof ConnectorBlockError ? error.code : "hook_failed";
-      throw new ConnectorBlockError({ message: capErrorDetail(this.scrub(message)), code });
+      // Secrets go first: noise stripping and address redaction alter text a secret could match.
+      const shown = redactInternalAddresses(stripErrorNoise(this.scrub(message)));
+      throw new ConnectorBlockError({ message: capErrorDetail(shown), code });
     }
   }
 

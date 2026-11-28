@@ -339,6 +339,32 @@ describe("ScenarioConnectorService", () => {
     });
   });
 
+  describe("when a block's error echoes a secret that holds an address", () => {
+    /** @scenario "A secret holding an address is scrubbed before addresses are redacted" */
+    it("leaves no part of the secret", async () => {
+      const secret = "shop-key@10.4.2.11";
+      const traceback = `ConnectionError: could not reach ${secret}`;
+      const channel: ConnectorBlockChannel = {
+        post: async () => JSON.stringify({ status: "error", error: { type: "boom", traceback } }),
+      };
+      const connector = ScenarioConnectorService.create({
+        config: { ...config, secrets: { SHOP_URL: secret } },
+        channel,
+        projectApiKey: "sk-lw-run-key-value",
+      });
+
+      const failure = await connector
+        .callHook({ kind: "setup", timeoutMs: 1_000 })
+        .catch((error: unknown) => error);
+
+      expect(failure).toBeInstanceOf(Error);
+      const { message } = failure as Error;
+      expect(message).toContain("[redacted]");
+      expect(message).not.toContain("shop-key");
+      expect(message).not.toContain("10.4.2.11");
+    });
+  });
+
   describe("when the call block returns no reply", () => {
     it("fails the turn naming the { reply } shape", async () => {
       const { connector } = connectorWith({}, { call: { answer: "hi" } });

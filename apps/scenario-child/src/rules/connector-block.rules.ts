@@ -8,7 +8,6 @@ import { CONNECTOR_SECRET_NAME_PATTERN, STATE_MAX_BYTES } from "@langwatch/agent
 import type { ConnectorBlockData, RunParameterValues } from "@langwatch/scenario-contract";
 import { LATEST_SPEC_VERSION } from "@langwatch/workflow-contract";
 
-import { redactInternalAddresses, stripErrorNoise } from "./execution-error.rules.ts";
 import * as ScenarioSecretReferenceAdapter from "./scenario-secret-reference.rules.ts";
 
 export type ConnectorBlockKind = "setup" | "call" | "teardown";
@@ -239,8 +238,8 @@ export function connectorBlockOutputs({
     const error = answer.nodes?.[CONNECTOR_BLOCK_NODE_ID]?.error ?? answer.error;
     const code = error?.type === CODE_BLOCK_TIMEOUT ? "agent_call_timeout" : "hook_failed";
     const rawDetail = error?.traceback || error?.message || error?.type || "no error detail";
-    const detail = redactInternalAddresses(stripErrorNoise(rawDetail));
-    throw new ConnectorBlockError({ message: `The ${kind} block failed: ${detail}`, code });
+    // Left raw: the service scrubs secrets first, then strips noise and redacts addresses.
+    throw new ConnectorBlockError({ message: `The ${kind} block failed: ${rawDetail}`, code });
   }
   const outputs = answer.nodes?.[CONNECTOR_BLOCK_NODE_ID]?.outputs;
   return isObject(outputs) ? outputs : {};
