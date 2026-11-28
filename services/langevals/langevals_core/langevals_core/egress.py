@@ -16,6 +16,7 @@ from functools import wraps
 from typing import Iterator, Literal, Optional
 from urllib.parse import urlsplit
 
+import httpcore
 import httpx
 
 Category = Literal["global", "metadata", "special"]
@@ -116,7 +117,8 @@ def classify(ip: str) -> Category:
     return "global"
 
 
-def _bare_host(host: str) -> str:
+def bare_host(host: str) -> str:
+    """A host as the policy compares it: lower case, unbracketed, no trailing dot."""
     host = host.strip().lower()
     if host.startswith("[") and host.endswith("]"):
         host = host[1:-1]
@@ -139,7 +141,7 @@ def server_egress_policy() -> EgressPolicy:
     return EgressPolicy(
         block_local=block in ("1", "true"),
         allowed_hosts=frozenset(
-            _bare_host(host) for host in allowed.split(",") if host.strip()
+            bare_host(host) for host in allowed.split(",") if host.strip()
         ),
     )
 
@@ -184,7 +186,7 @@ class Fence:
     admitted_hosts: frozenset[str] = frozenset()
 
     def judge_host(self, host: str) -> Destination:
-        host = _bare_host(host)
+        host = bare_host(host)
         if host in _METADATA_HOSTS:
             raise _refuse_metadata()
         return self.judge_addresses(host, _addresses_of(host))
@@ -277,7 +279,7 @@ def _pinned_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     """A pinned name answers with its checked addresses, so a second lookup cannot rebind it."""
     name = host.decode("ascii", "ignore") if isinstance(host, bytes) else host
     with _pins_lock:
-        entry = _pins.get(_bare_host(name)) if isinstance(name, str) else None
+        entry = _pins.get(bare_host(name)) if isinstance(name, str) else None
         addresses = entry[0] if entry else None
     if addresses is None:
         return _system_getaddrinfo(host, port, family, type, proto, flags)
@@ -296,6 +298,12 @@ def _pinned_getaddrinfo(host, port, family=0, type=0, proto=0, flags=0):
     return answers
 
 
+# The fence and host of the request being sent, for the connection it lands on.
+_current_request: ContextVar[Optional[tuple[Fence, str]]] = ContextVar(
+    "langevals_egress_request", default=None
+)
+
+
 @contextmanager
 def _guarded(url: httpx.URL) -> Iterator[None]:
     """Judge one outgoing request under the active fence and pin its host while it connects."""
@@ -309,8 +317,64 @@ def _guarded(url: httpx.URL) -> Iterator[None]:
             "unresolvable_host",
             f"Could not resolve the model endpoint host {destination.host}",
         )
-    with _pinned(fence, destination):
-        yield
+    token = _current_request.set((fence, destination.host))
+    try:
+        with _pinned(fence, destination):
+            yield
+    finally:
+        _current_request.reset(token)
+
+
+def _judge_reused(connection, request: httpcore.Request) -> None:
+    """A kept-alive connection serves a request only if that request's fence admits its peer."""
+    current = _current_request.get()
+    peer = getattr(connection, "_egress_peer", None)
+    if current is None or peer is None:
+        return
+    fence, host = current
+    if bare_host(request.url.host.decode("ascii")) == host:
+        fence.judge_addresses(host, (peer,))
+
+
+def _remember_peer(connection, response: httpcore.Response) -> None:
+    if getattr(connection, "_egress_peer", None) is not None:
+        return
+    stream = response.extensions.get("network_stream")
+    address = stream.get_extra_info("server_addr") if stream is not None else None
+    if address:
+        connection._egress_peer = str(address[0])
+
+
+def _fence_sync_connection() -> None:
+    original = httpcore.HTTPConnection.__dict__["handle_request"]
+    if getattr(original, "_egress_fenced", False):
+        return
+
+    @wraps(original)
+    def handle(self, request):
+        _judge_reused(self, request)
+        response = original(self, request)
+        _remember_peer(self, response)
+        return response
+
+    handle._egress_fenced = True  # type: ignore[attr-defined]
+    httpcore.HTTPConnection.handle_request = handle
+
+
+def _fence_async_connection() -> None:
+    original = httpcore.AsyncHTTPConnection.__dict__["handle_async_request"]
+    if getattr(original, "_egress_fenced", False):
+        return
+
+    @wraps(original)
+    async def handle(self, request):
+        _judge_reused(self, request)
+        response = await original(self, request)
+        _remember_peer(self, response)
+        return response
+
+    handle._egress_fenced = True  # type: ignore[attr-defined]
+    httpcore.AsyncHTTPConnection.handle_async_request = handle
 
 
 def fence_sync_transport(transport_class: type, method: str = "handle_request") -> None:
@@ -348,3 +412,5 @@ def install_egress_fence() -> None:
     socket.getaddrinfo = _pinned_getaddrinfo
     fence_sync_transport(httpx.HTTPTransport)
     fence_async_transport(httpx.AsyncHTTPTransport)
+    _fence_sync_connection()
+    _fence_async_connection()

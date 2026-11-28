@@ -214,11 +214,7 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
 
     // Filed under this pod's own image so its cache serves it until the short retry window ends.
     const unprotected = { current, ...this.ownImage(), unprotected: true };
-    if (standing === "unknown") {
-      this.options.logger?.warn(
-        { projectId: input.projectId, tagsError: details.TagsError },
-        "could not read the studio Lambda's tags; leaving it as it is",
-      );
+    const leftUnmoved = async () => {
       await this.dropRemovedEnvironment({
         functionName: input.functionName,
         projectId: input.projectId,
@@ -226,6 +222,14 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
       });
 
       return unprotected;
+    };
+    if (standing === "unknown") {
+      this.options.logger?.warn(
+        { projectId: input.projectId, tagsError: details.TagsError },
+        "could not read the studio Lambda's tags; leaving it as it is",
+      );
+
+      return leftUnmoved();
     }
 
     // Recorded before the image moves, so a pod still on the older release
@@ -235,7 +239,7 @@ export class AwsNlpLambdaArnResolverChannel implements NlpLambdaArnResolver {
         functionArn: details.Configuration?.FunctionArn ?? input.existing.FunctionArn,
         projectId: input.projectId,
       });
-      if (!tagged) return unprotected;
+      if (!tagged) return leftUnmoved();
     }
 
     const deployedImage = details.Code?.ImageUri;

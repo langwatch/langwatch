@@ -493,6 +493,37 @@ describe("given pods of two releases serving the same project during a rollout",
       expect(resolution).toMatchObject({ arn: ARN, imageUri: CONFIG.imageUri, unprotected: true });
       expect(writes(sent)).toEqual(["TagResourceCommand"]);
     });
+
+    /** @scenario "A pod that cannot record its order does not move the image" */
+    it("still removes the shared secret alone, against the revision it read", async () => {
+      const configuration = {
+        ...READY,
+        RevisionId: "rev-7",
+        Environment: {
+          Variables: { ...desired, [NLP_INTERNAL_SECRET_ENV]: "set-by-hand", UNMANAGED: "keep-me" },
+        },
+      };
+      const { sent, subject } = resolver({
+        config: ORDERED,
+        reads: [
+          { Configuration: configuration },
+          { Code: { ImageUri: "registry/nlp:v8" }, Configuration: configuration },
+        ],
+        rejectTagWith: new Error("not authorized to perform lambda:TagResource"),
+      });
+
+      const resolution = await subject.resolve({ projectId: "project-1" });
+
+      expect(resolution).toMatchObject({ arn: ARN, unprotected: true });
+      expect(writes(sent)).toEqual(["TagResourceCommand", "UpdateFunctionConfigurationCommand"]);
+      expect(
+        sent.find((call) => call.name === "UpdateFunctionConfigurationCommand")!.input,
+      ).toEqual({
+        FunctionName: "langwatch_nlp-project-1",
+        RevisionId: "rev-7",
+        Environment: { Variables: { ...desired, UNMANAGED: "keep-me" } },
+      });
+    });
   });
 
   describe("when the function runs an older release's image", () => {

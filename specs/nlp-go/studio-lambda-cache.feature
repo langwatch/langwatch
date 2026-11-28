@@ -146,7 +146,8 @@ Feature: Per-project NLP Lambda resolution
     Given a function on an older release's image
     And Lambda refuses the TagResource call
     When the pod resolves that project
-    Then it sends no UpdateFunctionCode or UpdateFunctionConfiguration call
+    Then it sends no UpdateFunctionCode call, and no UpdateFunctionConfiguration call beyond
+      removing the engine hop's shared secret alone from a function that carries it
 
   @unit
   Scenario: An ImageOrder tag that is not a whole number counts as no order

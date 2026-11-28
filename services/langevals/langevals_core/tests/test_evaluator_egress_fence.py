@@ -53,11 +53,13 @@ def _completion_body(model: str) -> dict:
 class _Provider:
     """An OpenAI-compatible stand-in on loopback that counts what reaches it."""
 
-    def __init__(self, redirect_to: str | None = None):
+    def __init__(self, redirect_to: str | None = None, keep_alive: bool = False):
         self.hits: list[str] = []
         provider = self
 
         class Handler(BaseHTTPRequestHandler):
+            protocol_version = "HTTP/1.1" if keep_alive else "HTTP/1.0"
+
             def log_message(self, *args):
                 pass
 
@@ -364,6 +366,38 @@ class TestADestinationThePolicyAdmits:
         assert response.choices[0].message.content == "yes"
         assert provider.hits == ["/chat/completions"]
 
+    def test_a_server_endpoint_with_a_trailing_dot_is_admitted_by_host(
+        self, block_local, monkeypatch, provider, fake_dns
+    ):
+        fake_dns("inference.internal", ["127.0.0.1"])
+        monkeypatch.setenv("OPENAI_API_KEY", "server-key")
+        monkeypatch.setenv(
+            "OPENAI_BASE_URL", f"http://Inference.Internal.:{provider.port}"
+        )
+
+        response = complete({"X_LITELLM_temperature": "0"})
+
+        assert response.choices[0].message.content == "yes"
+        assert provider.hits == ["/chat/completions"]
+
+    def test_a_request_endpoint_cannot_redirect_onto_another_server_endpoint(
+        self, block_local, monkeypatch
+    ):
+        """Server endpoints are admitted only for a call that names no endpoint."""
+        target = _Provider()
+        hop = _Provider(redirect_to=f"http://127.0.0.1:{target.port}")
+        monkeypatch.setenv("ALLOWED_PROXY_HOSTS", "localhost")
+        monkeypatch.setenv("ANTHROPIC_API_BASE", f"http://127.0.0.1:{target.port}")
+        try:
+            code = refused(request_for(f"http://localhost:{hop.port}"))
+        finally:
+            hop.close()
+            target.close()
+
+        assert hop.hits == ["/chat/completions"]
+        assert target.hits == []
+        assert code == "private_address"
+
     def test_a_request_naming_the_servers_private_endpoint_is_still_refused(
         self, block_local, monkeypatch, provider
     ):
@@ -409,6 +443,52 @@ class TestTheConnectionItself:
             pass
 
         assert raised.value.code == "private_address"
+
+    def test_a_pooled_connection_is_reused_only_where_the_new_fence_admits_its_peer(
+        self, block_local, fake_dns
+    ):
+        """A kept-alive connection to a private peer is not reused once the name answers public."""
+        target = _Provider(keep_alive=True)
+        fake_dns("pool.provider.test", ["127.0.0.1"], [PUBLIC_IP])
+        policy = egress.server_egress_policy()
+        url = f"http://pool.provider.test:{target.port}/chat/completions"
+        try:
+            with httpx.Client() as client:
+                with egress.Fence(policy, frozenset({"pool.provider.test"})).active():
+                    assert client.post(url, json={}).status_code == 200
+                with (
+                    egress.Fence(policy).active(),
+                    pytest.raises(egress.EgressDestinationRefusedError) as raised,
+                ):
+                    client.post(url, json={})
+        finally:
+            target.close()
+
+        assert raised.value.code == "private_address"
+        assert target.hits == ["/chat/completions"]
+
+    @pytest.mark.anyio
+    async def test_an_awaited_pooled_connection_is_reused_only_where_the_new_fence_admits_its_peer(
+        self, block_local, fake_dns
+    ):
+        target = _Provider(keep_alive=True)
+        fake_dns("pool.provider.test", ["127.0.0.1"], [PUBLIC_IP])
+        policy = egress.server_egress_policy()
+        url = f"http://pool.provider.test:{target.port}/chat/completions"
+        try:
+            async with httpx.AsyncClient() as client:
+                with egress.Fence(policy, frozenset({"pool.provider.test"})).active():
+                    assert (await client.post(url, json={})).status_code == 200
+                with (
+                    egress.Fence(policy).active(),
+                    pytest.raises(egress.EgressDestinationRefusedError) as raised,
+                ):
+                    await client.post(url, json={})
+        finally:
+            target.close()
+
+        assert raised.value.code == "private_address"
+        assert target.hits == ["/chat/completions"]
 
     def test_a_redirect_onto_the_local_network_is_refused(
         self, block_local, monkeypatch

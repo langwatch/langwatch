@@ -889,3 +889,70 @@ func TestSafeDialer_RefusesAResolverAnswerItCannotRead(t *testing.T) {
 	_, err = dial(context.Background(), "tcp", net.JoinHostPort("agent.localhost", port))
 	require.ErrorIs(t, err, httpblock.ErrSSRFBlocked)
 }
+
+// @scenario "A workflow HTTP call never reaches a link-local address"
+func TestExecute_AClientThatStopsAtARedirectKeepsItsAnswer(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://169.254.169.254/latest/meta-data/", http.StatusFound)
+	}))
+	defer srv.Close()
+
+	exec := httpblock.New(httpblock.Options{
+		Client: &http.Client{CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }},
+		SSRF:   httpblock.SSRFOptions{AllowLocal: true},
+	})
+	res, err := exec.Execute(context.Background(), httpblock.Request{Method: http.MethodGet, URL: srv.URL + "/start"})
+	require.NotErrorIs(t, err, httpblock.ErrSSRFBlocked, "a hop the client does not follow is never judged")
+	require.NotNil(t, res)
+	assert.Equal(t, http.StatusFound, res.StatusCode, "the redirect is answered, never followed")
+}
+
+// stallingResolver answers slow.example only after a few seconds, or when released.
+func stallingResolver(calls *int, release <-chan struct{}) func(string) ([]net.IP, error) {
+	return func(host string) ([]net.IP, error) {
+		if host != "slow.example" {
+			return nil, errors.New("no such host")
+		}
+		*calls++
+		select {
+		case <-release:
+		case <-time.After(3 * time.Second):
+		}
+		return []net.IP{net.ParseIP("93.184.216.34")}, nil
+	}
+}
+
+// @scenario "A workflow HTTP call never reaches a link-local address"
+func TestExecute_ARedirectCheckEndsWithTheRequestTimeout(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://slow.example/next", http.StatusFound)
+	}))
+	defer srv.Close()
+	release := make(chan struct{})
+	defer close(release)
+	var calls int
+
+	exec := httpblock.New(httpblock.Options{SSRF: httpblock.SSRFOptions{AllowLocal: true, Resolver: stallingResolver(&calls, release)}})
+	start := time.Now()
+	_, err := exec.Execute(context.Background(), httpblock.Request{Method: http.MethodGet, URL: srv.URL + "/start", TimeoutMS: 200})
+	require.Error(t, err)
+	assert.Less(t, time.Since(start), 2*time.Second, "the lookup ends with the request's timeout")
+}
+
+// @scenario "A workflow HTTP call never reaches a link-local address"
+func TestExecute_ACredentialedCrossOriginRedirectIsRefusedBeforeAnyLookup(t *testing.T) {
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		http.Redirect(w, r, "http://slow.example/next", http.StatusFound)
+	}))
+	defer srv.Close()
+	release := make(chan struct{})
+	defer close(release)
+	var calls int
+
+	exec := httpblock.New(httpblock.Options{SSRF: httpblock.SSRFOptions{AllowLocal: true, Resolver: stallingResolver(&calls, release)}})
+	_, err := exec.Execute(context.Background(), httpblock.Request{
+		Method: http.MethodGet, URL: srv.URL + "/start", Headers: map[string]string{"Authorization": "Bearer t"},
+	})
+	require.ErrorIs(t, err, httpblock.ErrCrossOriginRedirect)
+	assert.Zero(t, calls, "the redirect target is never looked up")
+}

@@ -155,6 +155,70 @@ func TestKeyRecheck_ExpiryDuringTheWaitIsRefused(t *testing.T) {
 	}
 }
 
+// @scenario "a previous secret whose grace ends while the key check waits is refused"
+func TestKeyRecheck_SecretGraceEndingDuringTheWaitIsRefused(t *testing.T) {
+	ends := time.Now().Add(50 * time.Millisecond)
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	res := &blockingResolver{hook: func() {
+		time.Sleep(time.Until(ends) + 10*time.Millisecond)
+		cancel()
+		<-release
+	}}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res})
+	key := domain.PresentedKey{Token: "vk-lw-rotated"}
+	b := orgBundle("vk_rotated", time.Now().Add(time.Hour))
+	b.SecretValidUntil = ends
+	svc.publishL1(hashKey(key), svc.newEntry(b, "", time.Now().Add(-2*time.Minute)))
+	staleFeed(svc)
+
+	if _, err := svc.Resolve(ctx, key); !errors.Is(err, domain.ErrInvalidAPIKey) {
+		t.Fatalf("a previous secret whose grace ended during the wait must be refused, got %v", err)
+	}
+}
+
+// @scenario "a refusal that lands as the key check's wait ends is refused"
+func TestKeyRecheck_RefusalReadyAsTheWaitEndsIsRefused(t *testing.T) {
+	svc, _ := newService(t, Options{Resolver: &hookResolver{}, ConfigFetcher: &hookResolver{}})
+	key := domain.PresentedKey{Token: "vk-lw-ready"}
+	h := hashKey(key)
+	staleKeyCheck(t, svc, key, "vk_ready")
+	done := &reconfirmCall{done: make(chan struct{}), err: herr.New(context.Background(), domain.ErrKeyRevoked, nil)}
+	close(done.done)
+	svc.reconfirms[h] = done
+	ctx, cancel := context.WithCancel(context.Background())
+	cancel()
+
+	// The wait's end and the refusal are both ready: the refusal must win every time.
+	for i := 0; i < 64; i++ {
+		if _, err := svc.Resolve(ctx, key); !errors.Is(err, domain.ErrKeyRevoked) {
+			t.Fatalf("attempt %d: a refusal ready as the wait ends must refuse the request, got %v", i, err)
+		}
+	}
+}
+
+// @scenario "a refusal that lands as the key check's wait ends is refused"
+func TestKeyRecheck_RefusalRecordedBeforeTheCheckAnswersIsRefused(t *testing.T) {
+	svc, _ := newService(t, Options{Resolver: &hookResolver{}, ConfigFetcher: &hookResolver{}})
+	key := domain.PresentedKey{Token: "vk-lw-fenced"}
+	h := hashKey(key)
+	staleKeyCheck(t, svc, key, "vk_fenced")
+	svc.reconfirms[h] = &reconfirmCall{done: make(chan struct{})}
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+	go func() {
+		time.Sleep(20 * time.Millisecond)
+		svc.dropRejected(h, herr.New(context.Background(), domain.ErrKeyRevoked, nil))
+		cancel()
+	}()
+
+	if _, err := svc.Resolve(ctx, key); !errors.Is(err, domain.ErrInvalidAPIKey) {
+		t.Fatalf("a credential the check refused must not serve from the cache, got %v", err)
+	}
+}
+
 // @scenario "a key check slower than the limit still serves its answer"
 func TestKeyRecheck_SlowCheckStillServes(t *testing.T) {
 	res := &hookResolver{

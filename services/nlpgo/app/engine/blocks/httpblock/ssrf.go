@@ -97,6 +97,11 @@ var blockedHosts = map[string]struct{}{
 // resolves to a public IP at check time but a private IP at dial time
 // (DNS rebinding) cannot slip past.
 func CheckURL(raw string, opts SSRFOptions) error {
+	return checkURL(context.Background(), raw, opts)
+}
+
+// checkURL is CheckURL with its lookup bound to ctx.
+func checkURL(ctx context.Context, raw string, opts SSRFOptions) error {
 	u, err := url.Parse(raw)
 	if err != nil {
 		return ErrSSRFBlocked
@@ -111,7 +116,7 @@ func CheckURL(raw string, opts SSRFOptions) error {
 	}
 	if allow {
 		// A name that does not resolve is left to fail at dial time, as below.
-		if ips, err := addrsOf(host, opts); err == nil && anyNeverPermitted(ips, opts, host) {
+		if ips, err := addrsOf(ctx, host, opts); err == nil && anyNeverPermitted(ips, opts, host) {
 			return ErrSSRFBlocked
 		}
 		return nil
@@ -122,11 +127,17 @@ func CheckURL(raw string, opts SSRFOptions) error {
 		}
 		return nil
 	}
-	ips, err := resolveHost(host, opts)
+	return checkName(ctx, host, opts)
+}
+
+// checkName judges what a name resolves to. A failed lookup is left to fail
+// at the connection, so the caller sees the real network error.
+func checkName(ctx context.Context, host string, opts SSRFOptions) error {
+	ips, err := resolveHost(ctx, host, opts)
+	if errors.Is(err, ErrSSRFBlocked) {
+		return err
+	}
 	if err != nil {
-		// DNS failed — let the actual request fail with a network
-		// error so the customer sees a real upstream message instead
-		// of a misleading SSRF reject.
 		return nil //nolint:nilerr // error is surfaced via the channel/result payload, not the function error return
 	}
 	for _, ip := range ips {
@@ -193,29 +204,49 @@ func (o SSRFOptions) lookup() ssrf.Lookup {
 	if o.Resolver == nil {
 		return ssrf.SystemLookup
 	}
-	return func(_ context.Context, host string) ([]netip.Addr, error) {
-		ips, err := o.Resolver(host)
-		if err != nil {
-			return nil, err
+	return func(ctx context.Context, host string) ([]netip.Addr, error) {
+		type answer struct {
+			ips []net.IP
+			err error
 		}
-		addrs := make([]netip.Addr, 0, len(ips))
-		for _, ip := range ips {
-			addr, ok := netip.AddrFromSlice(ip)
-			if !ok {
-				return nil, ErrSSRFBlocked // an answer the policy cannot judge is refused
-			}
-			addrs = append(addrs, addr)
+		answered := make(chan answer, 1)
+		go func() {
+			ips, err := o.Resolver(host)
+			answered <- answer{ips, err}
+		}()
+		var a answer
+		select {
+		case a = <-answered:
+		case <-ctx.Done():
+			return nil, ctx.Err()
 		}
-		return addrs, nil
+		if a.err != nil {
+			return nil, a.err
+		}
+		return judgeableAddrs(a.ips)
 	}
 }
 
+// judgeableAddrs converts a resolver's answer; one entry the policy cannot
+// judge refuses the whole answer.
+func judgeableAddrs(ips []net.IP) ([]netip.Addr, error) {
+	addrs := make([]netip.Addr, 0, len(ips))
+	for _, ip := range ips {
+		addr, ok := netip.AddrFromSlice(ip)
+		if !ok {
+			return nil, ErrSSRFBlocked
+		}
+		addrs = append(addrs, addr)
+	}
+	return addrs, nil
+}
+
 // addrsOf is the literal address, or what the name resolves to.
-func addrsOf(host string, opts SSRFOptions) ([]net.IP, error) {
+func addrsOf(ctx context.Context, host string, opts SSRFOptions) ([]net.IP, error) {
 	if ip := literalIP(host); ip != nil {
 		return []net.IP{ip}, nil
 	}
-	return resolveHost(host, opts)
+	return resolveHost(ctx, host, opts)
 }
 
 // literalIP is host as an address literal, a scoped IPv6 one included, the
@@ -438,13 +469,17 @@ func logWouldRefuse(opts SSRFOptions, host string, addr netip.Addr) {
 	)
 }
 
-// resolveHost looks up every address for host, falling back to the system
-// resolver when the options carry none. Tests inject their own resolver here to
-// exercise multi-answer and DNS-rebinding sequences without real DNS.
-func resolveHost(host string, opts SSRFOptions) ([]net.IP, error) {
-	r := opts.Resolver
-	if r == nil {
-		r = net.LookupIP
+// resolveHost looks up every address for host through the same lookup the
+// dialer uses, bound to ctx. Tests inject their own resolver to exercise
+// multi-answer and DNS-rebinding sequences without real DNS.
+func resolveHost(ctx context.Context, host string, opts SSRFOptions) ([]net.IP, error) {
+	addrs, err := opts.lookup()(ctx, host)
+	if err != nil {
+		return nil, err
 	}
-	return r(host)
+	ips := make([]net.IP, 0, len(addrs))
+	for _, addr := range addrs {
+		ips = append(ips, net.IP(addr.WithZone("").AsSlice()))
+	}
+	return ips, nil
 }

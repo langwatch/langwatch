@@ -307,14 +307,18 @@ type served struct {
 }
 
 // admit is the last check before a resolved bundle serves. It refuses a key
-// past its expiration date, one the change feed revoked after its confirmation
-// began, and, when FailClosedAfter
-// is set, a key nothing confirmed recently while its org's feed is silent. A
-// key past KeyRecheckAfter under a silent feed comes back with errKeyRecheckDue.
+// past its expiration date or a previous secret past its grace, one the change
+// feed revoked after its confirmation began, and, when FailClosedAfter is set,
+// a key nothing confirmed recently while its org's feed is silent. A key past
+// KeyRecheckAfter under a silent feed comes back with errKeyRecheckDue.
 func (s *Service) admit(ctx context.Context, h [64]byte, in served) (*domain.Bundle, error) {
 	b, authStart := in.bundle, in.authStart
-	if b.KeyExpired(time.Now()) {
+	now := time.Now()
+	if b.KeyExpired(now) {
 		return nil, herr.New(ctx, domain.ErrKeyExpired, herr.M{"message": domain.KeyExpiredMessage})
+	}
+	if b.SecretEnded(now) {
+		return nil, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
 	}
 	if b.VirtualKeyID != "" {
 		if _, ok := s.denied.Peek(b.VirtualKeyID); ok {
@@ -349,10 +353,11 @@ type presentedKey struct {
 var errKeyRecheckDue = errors.New("key re-check due")
 
 // recheckKey checks a key the change feed has not vouched for lately. A
-// refusal stands. A check that cannot reach the control plane, or that runs
-// past keyRecheckWait, hands back the cached answer for Resolve to admit again;
-// the check still evicts a key it finds refused, so the next request is refused.
+// refusal stands, also one ready or recorded as the wait ends. A check that
+// cannot reach the control plane, or runs past keyRecheckWait, hands back the
+// cached answer for Resolve to admit again.
 func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served) (served, error) {
+	since := s.fetchGeneration()
 	call := s.joinReconfirm(k.key, k.h)
 	if call == nil {
 		return cached, nil
@@ -362,8 +367,14 @@ func (s *Service) recheckKey(ctx context.Context, k presentedKey, cached served)
 	select {
 	case <-call.done:
 	case <-timer.C:
-		return cached, nil
 	case <-ctx.Done():
+	}
+	select {
+	case <-call.done:
+	default:
+		if s.rejectedSince(k.h, since) {
+			return served{}, herr.New(ctx, domain.ErrInvalidAPIKey, nil)
+		}
 		return cached, nil
 	}
 	switch {

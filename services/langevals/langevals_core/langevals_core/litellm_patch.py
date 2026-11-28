@@ -16,6 +16,7 @@ import json
 from langevals_core.egress import (
     EgressDestinationRefusedError,
     Fence,
+    bare_host,
     egress_refusal,
     fence_async_transport,
     install_egress_fence,
@@ -624,38 +625,43 @@ def refuse_request_endpoint_without_key(kwargs: dict, env: dict) -> None:
 _SERVER_ENDPOINT_SUFFIXES = ("_API_BASE", "_BASE_URL", "_ENDPOINT")
 
 
+def _endpoint_host(url: str) -> str:
+    """An http(s) endpoint's host as the fence compares it, or "" for anything else."""
+    try:
+        parts = urlsplit(url.strip())
+        host = parts.hostname or ""
+    except ValueError:
+        return ""
+    return bare_host(host) if parts.scheme.lower() in ("http", "https") else ""
+
+
 def _server_endpoint_hosts() -> set:
     """The hosts of the endpoints the server's own environment names."""
-    hosts = set()
-    for name, value in os.environ.items():
-        if not name.upper().endswith(_SERVER_ENDPOINT_SUFFIXES):
-            continue
-        try:
-            parts = urlsplit(value.strip())
-            host = parts.hostname
-        except ValueError:
-            continue
-        if parts.scheme.lower() in ("http", "https") and host:
-            hosts.add(host)
-    return hosts
+    return {
+        _endpoint_host(value)
+        for name, value in os.environ.items()
+        if name.upper().endswith(_SERVER_ENDPOINT_SUFFIXES)
+    }
 
 
 def egress_fence(kwargs: dict, env: dict) -> Fence:
     """The fence one call runs under; a request-chosen endpoint is judged up front.
 
-    A server-chosen endpoint, on the call or in the server's environment, is
-    admitted by host. Every connection the call makes, redirects included, is
-    judged again by the transport."""
+    A server-chosen endpoint is admitted by host: the one the call names, or,
+    for a call that names none, those the server's environment names, which
+    litellm falls back to. Every connection, redirects included, is judged again."""
     request_fence = Fence(policy=server_egress_policy())
-    admitted = _server_endpoint_hosts()
-    for argument in ENDPOINT_ARGUMENTS:
-        value = kwargs.get(argument)
-        if not isinstance(value, str) or value == "":
-            continue
+    endpoints = [
+        (argument, kwargs[argument])
+        for argument in ENDPOINT_ARGUMENTS
+        if isinstance(kwargs.get(argument), str) and kwargs[argument] != ""
+    ]
+    admitted = set() if endpoints else _server_endpoint_hosts()
+    for argument, value in endpoints:
         if _chosen_by_request(kwargs, env, argument):
             request_fence.judge_url(value)
         else:
-            admitted.add(urlsplit(value).hostname or "")
+            admitted.add(_endpoint_host(value))
     return Fence(policy=request_fence.policy, admitted_hosts=frozenset(admitted - {""}))
 
 

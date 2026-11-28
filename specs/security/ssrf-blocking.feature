@@ -293,7 +293,8 @@ Feature: SSRF blocking via BLOCK_LOCAL_HTTP_CALLS toggle (TS + Go parity)
       Given BLOCK_LOCAL_HTTP_CALLS is "false", or ALLOWED_PROXY_HOSTS names the host
       When a workflow HTTP call targets a link-local literal or a name resolving to one
       Then the check and the connection both refuse it with an SSRF block error
-      And a redirect to one is refused before it is sent, through an outbound proxy too
+      And a redirect the client would follow to one is refused before it is sent, through an outbound proxy too
+      But through an outbound proxy the proxy resolves the name itself, as the app's fenced fetch does, so its own policy governs what a name reaches
 
   Rule: Loopback is never reached by rebinding a name
     The early check and the connection each resolve the name, so a name can
