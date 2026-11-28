@@ -4152,6 +4152,7 @@ def seeded_regions(request):
 
     return customers
 
+@pytest.mark.agent_test
 @pytest.mark.asyncio
 @pytest.mark.parametrize("region", ["eu", "us"])
 async def test_support_agent_per_region(seeded_regions, region):
