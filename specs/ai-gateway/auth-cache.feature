@@ -666,6 +666,7 @@ Feature: Gateway auth cache — hot path is zero RTT after first hit
       And a cached key last confirmed 2 minutes ago under a silent change feed
       When the token expiry and the hard cap pass while its key check is still waiting
       Then the request fails as the control plane being unreachable, not served from the cache
+      And the request does not wait on the key check a second time
 
   Rule: A change-feed backlog refuses a key locally only for the state it ends in
 

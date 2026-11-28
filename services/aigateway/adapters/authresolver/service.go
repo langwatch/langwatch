@@ -751,7 +751,8 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 		return nil, err
 	}
 	bundle, err := s.admit(ctx, h, answer)
-	if errors.Is(err, errKeyRecheckDue) {
+	rechecked := errors.Is(err, errKeyRecheckDue)
+	if rechecked {
 		// Admit again after the wait: a denial or expiry may have landed in it.
 		if answer, err = s.recheckKey(ctx, presentedKey{key: key, h: h, readAt: readAt}, answer); err == nil {
 			if bundle, err = s.admit(ctx, h, answer); errors.Is(err, errKeyRecheckDue) {
@@ -759,7 +760,7 @@ func (s *Service) Resolve(ctx context.Context, key domain.PresentedKey) (*domain
 			}
 		}
 	}
-	if errors.Is(err, domain.ErrAuthUpstream) {
+	if errors.Is(err, domain.ErrAuthUpstream) && !rechecked { // a spent wait is not restarted
 		if call := s.joinReconfirm(key, h); call != nil {
 			select {
 			case <-call.done:

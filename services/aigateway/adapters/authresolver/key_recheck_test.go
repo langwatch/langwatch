@@ -358,3 +358,29 @@ func TestKeyRecheck_AnswerPastItsHardCapDuringTheWaitIsNotServed(t *testing.T) {
 		t.Fatalf("an answer past its expiry and hard cap after the wait must not serve, got %v", err)
 	}
 }
+
+// @scenario "a cached key whose hard cap passes while the key check waits is not served"
+func TestKeyRecheck_AnswerPastItsHardCapIsRefusedWithoutWaitingAgain(t *testing.T) {
+	expires := time.Now().Add(50 * time.Millisecond)
+	release := make(chan struct{})
+	t.Cleanup(func() { close(release) })
+	res := &blockingResolver{hook: func() { <-release }}
+	svc, _ := newService(t, Options{Resolver: res, ConfigFetcher: res, HardGrace: -time.Second})
+	key := domain.PresentedKey{Token: "vk-lw-past-cap-once"}
+	svc.publishL1(hashKey(key), svc.newEntry(orgBundle("vk_past_cap_once", expires), "", time.Now().Add(-2*time.Minute)))
+	staleFeed(svc)
+
+	done := make(chan error, 1)
+	go func() {
+		_, err := svc.Resolve(context.Background(), key)
+		done <- err
+	}()
+	select {
+	case err := <-done:
+		if !errors.Is(err, domain.ErrAuthUpstream) {
+			t.Fatalf("an answer past its hard cap after the wait must not serve, got %v", err)
+		}
+	case <-time.After(keyRecheckWait + time.Second):
+		t.Fatal("the request waited on the key check again after its wait was spent")
+	}
+}
