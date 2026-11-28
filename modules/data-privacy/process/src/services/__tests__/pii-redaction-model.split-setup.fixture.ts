@@ -151,7 +151,10 @@ function analysisOver({
           seen.priced.push(fact);
         },
       }),
-      metrics: { modelFellBack: (reason) => seen.fallbacks.push(reason) },
+      metrics: {
+        modelFellBack: (reason) => seen.fallbacks.push(reason),
+        modelRepeatsHeld: () => {},
+      },
       log: {
         info: (fields) => seen.usage.push(fields),
         warn: (fields, message) => {

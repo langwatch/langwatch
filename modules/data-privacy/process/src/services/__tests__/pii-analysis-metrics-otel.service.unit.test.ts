@@ -8,6 +8,7 @@ import {
   PII_ANALYSIS_STATUS_METRIC_NAME,
   PII_CHECKS_METRIC_NAME,
   PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME,
+  PII_REDACTION_MODEL_REPEATS_HELD_METRIC_NAME,
 } from "../pii-analysis-metrics-otel.service.ts";
 
 /**
@@ -105,5 +106,17 @@ describe("given the PII analysis metrics pushed over OTLP", () => {
     expect(PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME).toBe("pii_redaction_model_fallbacks");
     expect(metrics.valueOf("pii_redaction_model_fallbacks", { reason: "timeout" })).toBe(2);
     expect(metrics.valueOf("pii_redaction_model_fallbacks", { reason: "error" })).toBe(1);
+  });
+
+  /** @scenario "A long text sent again is cleared from the first answer, not sent to the model again" */
+  it("counts every text cleared from an earlier model answer", () => {
+    const adapter = PiiAnalysisMetricsOtelService.create();
+
+    adapter.modelRepeatsHeld(2);
+    adapter.modelRepeatsHeld(0);
+    adapter.modelRepeatsHeld(1);
+
+    expect(PII_REDACTION_MODEL_REPEATS_HELD_METRIC_NAME).toBe("pii_redaction_model_repeats_held");
+    expect(metrics.valueOf("pii_redaction_model_repeats_held", {})).toBe(3);
   });
 });

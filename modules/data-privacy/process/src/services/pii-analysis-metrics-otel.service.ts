@@ -19,6 +19,7 @@ export const PII_ANALYSIS_EVALUATOR_TYPE = "presidio/pii_detection";
 /** The PII redaction model's own label on the duration and status series. */
 export const PII_REDACTION_MODEL_EVALUATOR_TYPE = "pii_redaction_model";
 export const PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME = "pii_redaction_model_fallbacks";
+export const PII_REDACTION_MODEL_REPEATS_HELD_METRIC_NAME = "pii_redaction_model_repeats_held";
 
 /** Which analysis service answered a batch; each keeps its own label on the shared series. */
 export type PiiAnalysisMethod = "presidio" | "pii_redaction_model";
@@ -62,6 +63,11 @@ export class PiiAnalysisMetricsOtelService {
         name: PII_REDACTION_MODEL_FALLBACKS_METRIC_NAME,
         description: "Batches routed to the PII redaction model that went to Presidio, by reason",
       }),
+      modelRepeatsHeld: counter({
+        name: PII_REDACTION_MODEL_REPEATS_HELD_METRIC_NAME,
+        description:
+          "Texts the PII redaction model cleared from an earlier answer, in a cleared span",
+      }),
     });
   }
 
@@ -71,6 +77,7 @@ export class PiiAnalysisMetricsOtelService {
       duration: HistogramHandle;
       status: CounterHandle;
       modelFallbacks: CounterHandle;
+      modelRepeatsHeld: CounterHandle;
     },
   ) {}
 
@@ -88,5 +95,10 @@ export class PiiAnalysisMetricsOtelService {
 
   modelFellBack(reason: PiiRedactionModelFallbackReason): void {
     this.series.modelFallbacks.inc({ reason });
+  }
+
+  /** A span that held none adds nothing, so every cleared span may report its count. */
+  modelRepeatsHeld(texts: number): void {
+    if (texts > 0) this.series.modelRepeatsHeld.inc({}, texts);
   }
 }

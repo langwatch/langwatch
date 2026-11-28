@@ -485,6 +485,8 @@ Feature: Redacting personal data out of a span at ingestion
     Then the model is sent only the new message
     And the system prompt is cleared as the model cleared it the first time
     And each span is priced on all its characters, as it would be without the repeat
+    And each span leaves one usage line naming how many texts it held, and every held text is counted
+    And a span whose every text is held leaves its line marked held, with nothing sent
 
   @unit
   Scenario: A held text is reused only in the same scope and for ten minutes
