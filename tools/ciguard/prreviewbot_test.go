@@ -13,7 +13,8 @@ import (
 	"github.com/langwatch/langwatch/tools/ciguard"
 )
 
-// prReviewBotPermissionsBlock is the review job's `permissions:` block, kept as its own constant so it stays in sync with the tests that strip or replace it.
+// prReviewBotPermissionsBlock is the review job's `permissions:` block, kept as its own
+// constant so it stays in sync with the tests that strip or replace it.
 const prReviewBotPermissionsBlock = `    permissions:
       actions: read
       checks: read
@@ -755,7 +756,8 @@ func TestPRReviewBotRejectsAReviewJobWithoutTimeout(t *testing.T) {
 // prReviewBotWakeKeyLine is the wake step's own env entry for the secret.
 const prReviewBotWakeKeyLine = "          LAZE_WAKE_KEY: ${{ secrets.LAZE_WAKE_KEY }}\n"
 
-// reviewBotProblems runs the guard on a mutated good workflow, failing when the mutation did not apply.
+// reviewBotProblems runs the guard on a mutated good workflow; it fails the test when the
+// mutation did not apply.
 func reviewBotProblems(t *testing.T, broken string) string {
 	t.Helper()
 	require.NotEqual(t, goodPRReviewBotWorkflow, broken, "the mutation must apply")
@@ -793,11 +795,15 @@ func TestPRReviewBotWakesAfterTheWaitAndBeforeTheBot(t *testing.T) {
 // A step's `if:` cannot read that step's own env, so the skip has to live in the script.
 // @scenario "The Laze wake skips when its secret is empty"
 func TestPRReviewBotWakeSkipsInItsScript(t *testing.T) {
+	skip := `[ -n "$LAZE_WAKE_KEY" ] || { echo "LAZE_WAKE_KEY not set; skipping wake"; exit 0; }`
 	cases := map[string]struct{ broken, want string }{
 		"no skip line": {
-			broken: strings.Replace(goodPRReviewBotWorkflow,
-				`          [ -n "$LAZE_WAKE_KEY" ] || { echo "LAZE_WAKE_KEY not set; skipping wake"; exit 0; }`+"\n", "", 1),
-			want: "script does not start with",
+			broken: strings.Replace(goodPRReviewBotWorkflow, "          "+skip+"\n", "", 1),
+			want:   "write the skip exactly as: " + skip,
+		},
+		"another shape": {
+			broken: strings.Replace(goodPRReviewBotWorkflow, skip, `if [ -z "$LAZE_WAKE_KEY" ]; then exit 0; fi`, 1),
+			want:   "write the skip exactly as: " + skip,
 		},
 		"if on the key": {
 			broken: strings.Replace(goodPRReviewBotWorkflow,
@@ -828,7 +834,25 @@ func TestPRReviewBotWakeCannotFailTheJob(t *testing.T) {
 	}
 }
 
-// The bot step runs an LLM agent with a shell over untrusted PR content, so it must never see the key.
+// continue-on-error does not end a hung post; only the step's own timeout does.
+// @scenario "The Laze wake can never fail the review job"
+func TestPRReviewBotWakeHasAShortTimeout(t *testing.T) {
+	cases := map[string]string{
+		"unset":      "",
+		"too long":   "        timeout-minutes: 10\n",
+		"expression": "        timeout-minutes: ${{ vars.WAKE_TIMEOUT }}\n",
+	}
+	for name, replacement := range cases {
+		t.Run(name, func(t *testing.T) {
+			broken := strings.Replace(goodPRReviewBotWorkflow, "        timeout-minutes: 2\n", replacement, 1)
+
+			assert.Contains(t, reviewBotProblems(t, broken), "wake step has no whole-number timeout-minutes of at most 5")
+		})
+	}
+}
+
+// Defense in depth, not isolation: steps share a runner, so this keeps the chat:post key out
+// of every env, input and script but the wake step's.
 // @scenario "The Laze wake key is scoped to the wake step"
 func TestPRReviewBotScopesTheWakeKeyToTheWakeStep(t *testing.T) {
 	keyOnTheJob := strings.Replace(goodPRReviewBotWorkflow, prReviewBotWakeKeyLine, "", 1)
@@ -851,13 +875,25 @@ func TestPRReviewBotScopesTheWakeKeyToTheWakeStep(t *testing.T) {
 			broken: strings.Replace(goodPRReviewBotWorkflow,
 				"        with:\n          slack_notify:",
 				"        env:\n"+prReviewBotWakeKeyLine+"        with:\n          slack_notify:", 1),
-			want: []string{"langwatch/langwatch-pr-review-bot@", "can read LAZE_WAKE_KEY"},
+			want: []string{"langwatch/langwatch-pr-review-bot@", "is handed LAZE_WAKE_KEY"},
 		},
 		"bot step input": {
 			broken: strings.Replace(goodPRReviewBotWorkflow,
 				"          slack_notify: \"false\"\n",
 				"          slack_notify: \"false\"\n          laze_key: ${{ secrets.LAZE_WAKE_KEY }}\n", 1),
-			want: []string{"langwatch/langwatch-pr-review-bot@", "can read LAZE_WAKE_KEY"},
+			want: []string{"langwatch/langwatch-pr-review-bot@", "is handed LAZE_WAKE_KEY"},
+		},
+		"another step's script": {
+			broken: strings.Replace(goodPRReviewBotWorkflow,
+				"          go-version-file: go.work\n",
+				"          go-version-file: go.work\n      - run: echo '${{ secrets.LAZE_WAKE_KEY }}'\n", 1),
+			want: []string{`"echo '${{ secrets.LAZE_WAKE_KEY }}'" is handed LAZE_WAKE_KEY`},
+		},
+		"another step's if": {
+			broken: strings.Replace(goodPRReviewBotWorkflow,
+				"      - uses: langwatch/langwatch-pr-review-bot@",
+				"      - if: secrets.LAZE_WAKE_KEY != ''\n        uses: langwatch/langwatch-pr-review-bot@", 1),
+			want: []string{"langwatch/langwatch-pr-review-bot@", "is handed LAZE_WAKE_KEY"},
 		},
 	}
 	for name, tc := range cases {
@@ -866,6 +902,35 @@ func TestPRReviewBotScopesTheWakeKeyToTheWakeStep(t *testing.T) {
 			for _, want := range tc.want {
 				assert.Contains(t, problems, want)
 			}
+		})
+	}
+}
+
+// toJSON(secrets) hands a step every secret the job can reach, the wake key included.
+// @scenario "The Laze wake key is scoped to the wake step"
+func TestPRReviewBotRejectsAStepPassingEverySecret(t *testing.T) {
+	cases := map[string]struct{ broken, want string }{
+		"another job's script": {
+			broken: goodPRReviewBotWorkflow + `  dump:
+    runs-on: ubuntu-latest
+    steps:
+      - run: echo '${{ toJSON(secrets) }}'
+`,
+			want: `job "dump" step "echo '${{ toJSON(secrets) }}'" passes toJSON(secrets)`,
+		},
+		"the bot's input": {
+			broken: strings.Replace(goodPRReviewBotWorkflow,
+				"          slack_notify: \"false\"\n",
+				"          slack_notify: \"false\"\n          all: ${{ tojson( secrets ) }}\n", 1),
+			want: `job "review" step "langwatch/langwatch-pr-review-bot@`,
+		},
+	}
+	for name, tc := range cases {
+		t.Run(name, func(t *testing.T) {
+			problems := reviewBotProblems(t, tc.broken)
+
+			assert.Contains(t, problems, tc.want)
+			assert.Contains(t, problems, "passes toJSON(secrets)")
 		})
 	}
 }

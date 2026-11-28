@@ -357,10 +357,11 @@ jobs:
         # Above cmd/waitforchecks' own 45-minute deadline, so a slow CI ends
         # with the wait's message naming the pending checks.
         timeout-minutes: 50
-      # Wakes the Laze review bot once the required checks have passed. It
-      # never fails this job. The key is this step's alone: the bot step runs
-      # an LLM agent with a shell over PR content. An `if:` cannot see a
-      # step's own env, so the skip is in the script (tools/ciguard).
+      # Wakes the Laze review bot once the checks pass; it never fails this job.
+      # The chat:post key is in this step's env only, never the job's or another
+      # step's: defence in depth, as steps share one runner and the bot runs an
+      # LLM agent with a shell over PR content. An `if:` can't see a step's own
+      # env, so the skip is in the script (tools/ciguard).
       - name: Wake the Laze review bot
         continue-on-error: true
         timeout-minutes: 2

@@ -2,6 +2,7 @@ package ciguard
 
 import (
 	"fmt"
+	"maps"
 	"regexp"
 	"slices"
 	"sort"
@@ -284,17 +285,25 @@ const prReviewBotWakeEndpoint = "https://laze.so/api/agents/me/messages"
 // prReviewBotWakeKey is the secret the wake step posts with.
 const prReviewBotWakeKey = "LAZE_WAKE_KEY"
 
-// prReviewBotWakeSkip opens the wake script: with no key it exits 0 before posting.
-const prReviewBotWakeSkip = `[ -n "$LAZE_WAKE_KEY" ] ||`
+// prReviewBotWakeSkip is the wake script's first line: with no key it exits 0 before posting.
+const prReviewBotWakeSkip = `[ -n "$LAZE_WAKE_KEY" ] || { echo "LAZE_WAKE_KEY not set; skipping wake"; exit 0; }`
+
+// prReviewBotWakeTimeoutMax bounds the wake step's timeout-minutes, so a hung post
+// cannot hold up the review.
+const prReviewBotWakeTimeoutMax = 5
+
+// secretsDumpPattern matches toJSON(secrets), which hands a step every secret; GitHub
+// expression functions are case-insensitive.
+var secretsDumpPattern = regexp.MustCompile(`(?i)tojson\(\s*secrets\s*\)`)
 
 // prReviewBotWakeMention is the plain-text Laze mention that wakes the bot.
 const prReviewBotWakeMention = "@LangWatch PR Review Bot"
 
-// prReviewBotWake checks the step that wakes the Laze review bot: it posts
-// after the wait and before the bot, mentions the bot, skips in its script
-// when the key is empty, cannot fail the job, and alone can read the key. The
-// bot step runs an LLM agent with a shell over untrusted PR content, so a key
-// in the workflow or job env, or on any other step, would be readable by it.
+// prReviewBotWake checks the step that wakes the Laze review bot: it posts after
+// the wait and before the bot, mentions the bot, skips in its script when the key
+// is empty, cannot fail or hang the job, and alone is handed the key. Steps share
+// a runner, so this is defense in depth for a chat:post key, not isolation from
+// the bot's LLM agent and its shell over untrusted PR content.
 func prReviewBotWake(workflow *ciscan.Workflow) []string {
 	job, ok := workflow.Jobs[prReviewBotReviewJob]
 	if !ok { // prReviewBotGates reports a missing job
@@ -334,22 +343,27 @@ func wakeOrderProblems(steps []ciscan.Step, wake int) []string {
 	return nil
 }
 
-// wakeStepProblems reports a wake step that can fail the job, skips the wrong
-// way, mentions nobody, or does not carry the key itself.
+// wakeStepProblems reports a wake step that can fail or hang the job, skips the
+// wrong way, mentions nobody, or does not carry the key itself.
 func wakeStepProblems(step ciscan.Step) []string {
 	var problems []string
 	if fmt.Sprint(step.ContinueOnError) != "true" {
 		problems = append(problems, fmt.Sprintf(
 			"%s review job's wake step does not set continue-on-error: true, so a Laze outage would fail the review", PRReviewBotWorkflow))
 	}
+	if limit, ok := minutes(step.TimeoutMinutes); !ok || limit > prReviewBotWakeTimeoutMax {
+		problems = append(problems, fmt.Sprintf(
+			"%s review job's wake step has no whole-number timeout-minutes of at most %d, so a hung post holds up the review",
+			PRReviewBotWorkflow, prReviewBotWakeTimeoutMax))
+	}
 	if strings.Contains(step.If, prReviewBotWakeKey) {
 		problems = append(problems, fmt.Sprintf(
 			"%s review job's wake step gates on %s in its `if:`: the key belongs in the step's own env, which an `if:` cannot see, so the skip goes in the script",
 			PRReviewBotWorkflow, prReviewBotWakeKey))
 	}
-	if !strings.HasPrefix(strings.TrimSpace(step.Run), prReviewBotWakeSkip) {
+	if first, _, _ := strings.Cut(strings.TrimSpace(step.Run), "\n"); strings.TrimSpace(first) != prReviewBotWakeSkip {
 		problems = append(problems, fmt.Sprintf(
-			"%s review job's wake step script does not start with %s, so an empty key fails the post instead of skipping it",
+			"%s review job's wake step script does not open with the empty-key skip, so an empty key fails the post instead of skipping it; write the skip exactly as: %s",
 			PRReviewBotWorkflow, prReviewBotWakeSkip))
 	}
 	if !strings.Contains(step.Run, prReviewBotWakeMention) {
@@ -365,7 +379,9 @@ func wakeStepProblems(step ciscan.Step) []string {
 	return problems
 }
 
-// wakeKeyLeaks reports every place outside the wake step that can read the key.
+// wakeKeyLeaks reports every place outside the wake step that is handed the key:
+// the workflow or job env, another step's env, `with:`, `run:` or `if:`, and any
+// step in the workflow passing toJSON(secrets).
 func wakeKeyLeaks(workflow *ciscan.Workflow, job ciscan.Job, wake int) []string {
 	var problems []string
 	if envCarriesWakeKey(workflow.Env) {
@@ -378,11 +394,41 @@ func wakeKeyLeaks(workflow *ciscan.Workflow, job ciscan.Job, wake int) []string 
 	}
 	for i := range job.Steps {
 		step := &job.Steps[i]
-		if i == wake || (!envCarriesWakeKey(step.Env) && !strings.Contains(fmt.Sprint(step.With), prReviewBotWakeKey)) {
+		if i == wake || !stepIsHandedWakeKey(step) {
 			continue
 		}
 		problems = append(problems, fmt.Sprintf(
-			"%s review job's step %q can read %s; only the wake step may", PRReviewBotWorkflow, stepLabel(step, i), prReviewBotWakeKey))
+			"%s review job's step %q is handed %s; only the wake step's env may carry it",
+			PRReviewBotWorkflow, stepLabel(step, i), prReviewBotWakeKey))
+	}
+
+	return append(problems, secretsDumps(workflow)...)
+}
+
+// stepIsHandedWakeKey reports whether a step's env, `with:`, `run:` or `if:` carries the key.
+func stepIsHandedWakeKey(step *ciscan.Step) bool {
+	secret := "secrets." + prReviewBotWakeKey
+
+	return envCarriesWakeKey(step.Env) ||
+		strings.Contains(fmt.Sprint(step.With), prReviewBotWakeKey) ||
+		strings.Contains(step.Run, secret) ||
+		strings.Contains(step.If, secret)
+}
+
+// secretsDumps reports every step, in any job, that passes toJSON(secrets).
+func secretsDumps(workflow *ciscan.Workflow) []string {
+	var problems []string
+	for _, name := range slices.Sorted(maps.Keys(workflow.Jobs)) {
+		steps := workflow.Jobs[name].Steps
+		for i := range steps {
+			step := &steps[i]
+			if !secretsDumpPattern.MatchString(step.Run + "\n" + step.If + "\n" + fmt.Sprint(step.Env) + "\n" + fmt.Sprint(step.With)) {
+				continue
+			}
+			problems = append(problems, fmt.Sprintf(
+				"%s job %q step %q passes toJSON(secrets), which hands it every secret, %s included",
+				PRReviewBotWorkflow, name, stepLabel(step, i), prReviewBotWakeKey))
+		}
 	}
 
 	return problems
