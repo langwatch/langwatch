@@ -1,0 +1,78 @@
+{
+  "release": "3.32.0",
+  "previous": "3.31.0",
+  "cutAt": "2026-11-28T05:25:29+01:00",
+  "steps": [
+    {
+      "id": "prisma:20261126180000_dashboard_sidebar_order",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "dashboard",
+      "description": "Postgres schema: dashboard sidebar order"
+    },
+    {
+      "id": "prisma:20261126190000_staff_access",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "staff-access",
+      "description": "Postgres schema: staff access"
+    },
+    {
+      "id": "prisma:20261126190001_session_impersonation_expiry_index",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "auth",
+      "description": "Postgres schema: session impersonation expiry index"
+    },
+    {
+      "id": "prisma:20261126190002_trace_plan_limit_refusal",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": null,
+      "description": "Postgres schema: trace plan limit refusal"
+    },
+    {
+      "id": "prisma:20261127000000_organization_pii_redaction_model_acceptance",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "organization",
+      "description": "Postgres schema: organization pii redaction model acceptance"
+    },
+    {
+      "id": "prisma:20261127100000_staff_access_copy_ledger",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "staff-access",
+      "description": "Postgres schema: staff access copy ledger"
+    },
+    {
+      "id": "prisma:20261127100001_staff_access_copy_counterpart",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "staff-access",
+      "description": "Postgres schema: staff access copy counterpart"
+    },
+    {
+      "id": "prisma:20261127180000_retention_apply_status_shortened_by_category",
+      "kind": "postgres-schema",
+      "mode": "blocking",
+      "owner": "data-retention",
+      "description": "Postgres schema: retention apply status shortened by category"
+    },
+    {
+      "id": "clickhouse:00136",
+      "kind": "clickhouse-schema",
+      "mode": "blocking",
+      "owner": "coding-agent",
+      "description": "ClickHouse schema: coding agent session events account"
+    },
+    {
+      "id": "ops:fill-queue-tenant-claims",
+      "kind": "data",
+      "mode": "background",
+      "owner": "ops",
+      "description": "Lists the queue groups claimed before each tenant's claimed-groups index existed, so a projection replay can wait on the index instead of walking Redis.",
+      "needsOldWritersGone": true
+    }
+  ]
+}
