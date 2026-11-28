@@ -129,3 +129,44 @@ export function langyTabNotifies({
 }): boolean {
   return choice === "enabled" && pushDevice === "unavailable";
 }
+
+/** Why this browser could not be set up for Web Push. */
+export type LangyPushSetupFailure =
+  | "unsupported"
+  | "server_unreachable"
+  | "browser_refused"
+  | "save_failed"
+  | "push_service_refused";
+
+const TAB_ONLY = "Langy will only notify you while this tab stays open.";
+
+const PUSH_SETUP_PROBLEMS: Record<LangyPushSetupFailure, { line: string; retryable: boolean }> = {
+  unsupported: {
+    line: `This browser can't get notifications once the tab is closed. ${TAB_ONLY}`,
+    retryable: false,
+  },
+  server_unreachable: {
+    line: "Notifications are on, but this browser couldn't reach LangWatch to finish setting them up, so they may not arrive. Check your connection and try again.",
+    retryable: true,
+  },
+  browser_refused: {
+    line: `Your browser wouldn't sign up for notifications. Private windows and strict privacy settings do this. ${TAB_ONLY} Try again from a normal window.`,
+    retryable: true,
+  },
+  save_failed: {
+    line: "Notifications are on, but LangWatch couldn't save this browser for them, so they may not arrive. Try again in a moment.",
+    retryable: true,
+  },
+  push_service_refused: {
+    line: `LangWatch can't send to this browser's notification service. ${TAB_ONLY}`,
+    retryable: false,
+  },
+};
+
+/** What to tell the person about a failed setup, and whether trying again can help. */
+export function langyPushSetupProblem(failure: LangyPushSetupFailure): {
+  line: string;
+  retryable: boolean;
+} {
+  return PUSH_SETUP_PROBLEMS[failure];
+}

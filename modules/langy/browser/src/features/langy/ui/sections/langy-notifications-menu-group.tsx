@@ -5,8 +5,12 @@ import { Menu } from "@langwatch/design-system/menu";
  * Spec: specs/langy/langy-notifications.feature
  */
 import { Box, HStack, Text } from "@langwatch/design-system/primitives";
-import { Bell, BellOff, Check } from "lucide-react";
+import { Bell, BellOff, Check, RotateCw } from "lucide-react";
 
+import {
+  langyPushSetupProblem,
+  type LangyPushSetupFailure,
+} from "../../../../model/langy-notifications.ts";
 import { useLangyNotificationPreference } from "../../behavior/use-langy-notifications.ts";
 
 export const LANGY_NOTIFICATIONS_MENU_LABEL = "Notifications";
@@ -16,6 +20,19 @@ export const LANGY_NOTIFICATIONS_MENU_BLOCKED = "Blocked by your browser";
 export const LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT =
   "Click the icon beside the address, allow notifications for this site, then come back to this tab.";
 export const LANGY_NOTIFICATIONS_MENU_UNSUPPORTED = "Not supported in this browser";
+export const LANGY_NOTIFICATIONS_MENU_RETRY = "Try setting up again";
+
+function menuHint({
+  blocked,
+  failure,
+}: {
+  blocked: boolean;
+  failure: LangyPushSetupFailure | null;
+}) {
+  if (blocked) return LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT;
+  if (failure) return langyPushSetupProblem(failure).line;
+  return LANGY_NOTIFICATIONS_MENU_HINT;
+}
 
 function menuLabel({ blocked, unsupported }: { blocked: boolean; unsupported: boolean }) {
   if (blocked) return LANGY_NOTIFICATIONS_MENU_BLOCKED;
@@ -29,6 +46,8 @@ export function LangyNotificationsMenuGroup() {
   const blocked = permission === "denied";
   const unsupported = permission === "unsupported";
   const on = choice === "enabled" && permission === "granted";
+  const failure = on ? notifications.pushSetupFailure : null;
+  const retryable = failure !== null && langyPushSetupProblem(failure).retryable;
 
   const toggle = () => {
     if (on) {
@@ -52,8 +71,8 @@ export function LangyNotificationsMenuGroup() {
           </Box>
           <Box flex={1}>
             <Text textStyle="sm">{menuLabel({ blocked, unsupported })}</Text>
-            <Text textStyle="xs" color="fg.muted" whiteSpace="normal">
-              {blocked ? LANGY_NOTIFICATIONS_MENU_BLOCKED_HINT : LANGY_NOTIFICATIONS_MENU_HINT}
+            <Text textStyle="xs" color="fg.muted" whiteSpace="normal" maxWidth="20rem">
+              {menuHint({ blocked, failure })}
             </Text>
           </Box>
           {on ? (
@@ -63,6 +82,18 @@ export function LangyNotificationsMenuGroup() {
           ) : null}
         </HStack>
       </Menu.Item>
+      {retryable ? (
+        <Menu.Item
+          value="notifications-retry"
+          closeOnSelect={false}
+          onClick={() => void notifications.retryPushSetup()}
+        >
+          <HStack gap={2.5} width="full">
+            <RotateCw size={14} />
+            <Text textStyle="sm">{LANGY_NOTIFICATIONS_MENU_RETRY}</Text>
+          </HStack>
+        </Menu.Item>
+      ) : null}
     </Menu.ItemGroup>
   );
 }
