@@ -18,6 +18,7 @@ import { buildAuthHeaders } from "../../../internal/api/auth";
 import { LANGWATCH_SDK_VERSION } from "../../../internal/constants";
 import { langwatchFetch } from "../../../internal/http/langwatchFetch";
 import {
+  findEnvKey,
   type LoginElsewhere,
   loginElsewhereMessage as sessionElsewhereMessage,
   loginMadeElsewhere,
@@ -327,19 +328,107 @@ export type PersonCredentials = {
   projectId?: string;
 };
 
+/** The command's credentials and which login they came from: the device login or an env key. */
+export type SignedIn = PersonCredentials & { source: "device" | "env" };
+
 /**
- * The command's credentials: the device login only, never `LANGWATCH_API_KEY`, which names no
- * person. An unusable login runs the device login once; a login made against another address ends
- * the command.
+ * What LangWatch said of a key from the environment: personal, on a project; refused, by a 4xx;
+ * or unchecked, when a timeout, a dropped connection, a 408, a 429 or a 5xx said nothing of the key.
+ */
+export type KeyCheck =
+  | { kind: "personal"; projectId: string; projectName: string }
+  | { kind: "refused" }
+  | { kind: "unchecked" };
+
+/** Why an old-format project key in the environment is passed over. */
+export const PROJECT_KEY_IN_ENV_MESSAGE =
+  "LANGWATCH_API_KEY is a project key, which acts as the project and not as you, so it cannot answer Langy's request to you.";
+
+/** Why a new-format key LangWatch did not take as a person is passed over. */
+export const KEY_NOT_PERSONAL_MESSAGE =
+  "LangWatch did not take LANGWATCH_API_KEY as your personal key with Langy access, so it cannot answer Langy's request to you.";
+
+/** Why a key LangWatch could not be asked about is passed over this time. */
+export const KEY_UNCHECKED_MESSAGE =
+  "LangWatch could not be reached to check LANGWATCH_API_KEY, so it cannot answer Langy's request to you this time.";
+
+const envKeyLine = ({
+  projectName,
+  hadLogin,
+}: {
+  projectName: string;
+  hadLogin: boolean;
+}): string =>
+  `Using the personal key in LANGWATCH_API_KEY on project ${projectName}, ${
+    hadLogin
+      ? "since the login on this machine can no longer be used."
+      : "since this machine has no device login."
+  }`;
+
+const ME_PROJECT_PATH = "/api/v1/me/project";
+const KEY_CHECK_TIMEOUT_MS = 10_000;
+
+/** A 4xx about the key. A 408 or a 429 says the server was busy, not that it refused the key. */
+const isRefusal = (status: number | undefined): boolean =>
+  status !== undefined && status >= 400 && status < 500 && status !== 408 && status !== 429;
+
+/**
+ * Whether LangWatch takes a key from the environment as a person, and on which project. The key
+ * names its project, then the request list must answer on it: the server lists only for a key
+ * that acts as a person, and refuses a service key, which has none. Each request has a deadline.
+ */
+export async function checkPersonalKey(
+  candidate: PersonCredentials,
+  { fetchImpl = langwatchFetch }: { fetchImpl?: typeof fetch } = {},
+): Promise<KeyCheck> {
+  const { endpoint, apiKey, projectId } = candidate;
+  const timedFetch = ((input: Parameters<typeof fetch>[0], init?: RequestInit) =>
+    fetchImpl(input, {
+      ...init,
+      signal: AbortSignal.timeout(KEY_CHECK_TIMEOUT_MS),
+    })) as typeof fetch;
+  try {
+    const response = await timedFetch(`${endpoint}${ME_PROJECT_PATH}`, {
+      method: "GET",
+      headers: {
+        ...buildAuthHeaders({ apiKey, ...(projectId === undefined ? {} : { projectId }) }),
+        "User-Agent": `langwatch-cli/${LANGWATCH_SDK_VERSION}`,
+      },
+    });
+    if (!response.ok) return { kind: isRefusal(response.status) ? "refused" : "unchecked" };
+    const project = JSON.parse(await response.text()) as { id?: unknown; name?: unknown };
+    if (typeof project.id !== "string" || project.id === "") return { kind: "unchecked" };
+    await createControlApi({
+      endpoint,
+      apiKey,
+      projectId: project.id,
+      fetchImpl: timedFetch,
+    }).list();
+    const projectName =
+      typeof project.name === "string" && project.name !== "" ? project.name : project.id;
+    return { kind: "personal", projectId: project.id, projectName };
+  } catch (error) {
+    const status = error instanceof ShareControlError ? error.status : undefined;
+    return { kind: isRefusal(status) ? "refused" : "unchecked" };
+  }
+}
+
+/**
+ * The command's credentials: the device login first; with no usable login, a personal key in
+ * `LANGWATCH_API_KEY` that LangWatch takes as a person; otherwise the device login runs once. A
+ * login made against another address ends the command.
  */
 export async function ensureSignedIn({
   login,
   isAccepted = async () => true,
+  checkKey = checkPersonalKey,
 }: {
   login: (options: { device: boolean }) => Promise<void>;
   /** Whether the platform takes the login's key. Defaults to yes. */
   isAccepted?: (credentials: PersonCredentials) => Promise<boolean>;
-}): Promise<PersonCredentials> {
+  /** What LangWatch says of a key from the environment. */
+  checkKey?: (candidate: PersonCredentials) => Promise<KeyCheck>;
+}): Promise<SignedIn> {
   const elsewhere = loginMadeElsewhere();
   if (elsewhere) throw new ShareControlError(loginElsewhereMessage(elsewhere));
 
@@ -351,6 +440,8 @@ export async function ensureSignedIn({
   const hadLogin = hasDeviceSession();
   let credentials = await usableLogin();
   if (!credentials) {
+    const fromEnv = await personalEnvKey({ checkKey, hadLogin });
+    if (fromEnv) return fromEnv;
     await signInAgain({ login, hadLogin });
     credentials = await usableLogin();
     if (!credentials) throw new ShareControlError(SIGN_IN_FAILED_MESSAGE);
@@ -360,6 +451,41 @@ export async function ensureSignedIn({
     apiKey: credentials.apiKey,
     endpoint: credentials.endpoint,
     ...(credentials.projectId === undefined ? {} : { projectId: credentials.projectId }),
+    source: "device",
+  };
+}
+
+/** A personal key from the environment, with one line saying it is used or why it is not. */
+async function personalEnvKey({
+  checkKey,
+  hadLogin,
+}: {
+  checkKey: (candidate: PersonCredentials) => Promise<KeyCheck>;
+  hadLogin: boolean;
+}): Promise<SignedIn | undefined> {
+  const found = findEnvKey();
+  if (!found) return undefined;
+  if (found.kind === "project") {
+    console.log(chalk.gray(PROJECT_KEY_IN_ENV_MESSAGE));
+    return undefined;
+  }
+  const check = await checkKey({
+    apiKey: found.apiKey,
+    endpoint: found.endpoint,
+    ...(found.projectId === undefined ? {} : { projectId: found.projectId }),
+  });
+  if (check.kind !== "personal") {
+    console.log(
+      chalk.gray(check.kind === "refused" ? KEY_NOT_PERSONAL_MESSAGE : KEY_UNCHECKED_MESSAGE),
+    );
+    return undefined;
+  }
+  console.log(chalk.gray(envKeyLine({ projectName: check.projectName, hadLogin })));
+  return {
+    apiKey: found.apiKey,
+    endpoint: found.endpoint,
+    projectId: check.projectId,
+    source: "env",
   };
 }
 
