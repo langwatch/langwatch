@@ -651,3 +651,12 @@ Feature: Microsoft Copilot Studio conversations, read from Dataverse
   # measurement. No charts. No conversation history older than thirty days —
   # Microsoft deletes it on a schedule before then. Attribution shows the raw
   # account identifier until the identity work lands separately.
+
+  @unit
+  Scenario: A refused transcript sign-in keeps side reads but records a failed run
+    Given a Copilot Studio source whose seat read succeeds and advances its cursor
+    When Microsoft refuses the transcript sign-in before any transcript is read
+    Then the run is failed with the safe sign-in refusal visible on the source
+    And the successful side events and their cursor progress are kept for the next run
+    And the transcript position and last success and read-through times do not advance
+    And repeated refusals count towards the source's failing state

@@ -262,10 +262,12 @@ export class IngestionPullProcess {
   }): Settled {
     const wait = providerWaitFrom({ retryAfterMs: data.retryAfterMs, refusedAt: context.at });
     const held = state.cooldownUntil ?? null;
+    const current = state.currentRun?.runId === data.runId;
     return this.settle({
       state: {
         ...state,
-        currentRun: state.currentRun?.runId === data.runId ? null : state.currentRun,
+        cursor: current && data.nextCursor !== undefined ? data.nextCursor : state.cursor,
+        currentRun: current ? null : state.currentRun,
         cooldownUntil: wait.outcome === "no_wait" ? held : Math.max(wait.at, held ?? 0),
       },
       after: this.schedulingReference(context),
