@@ -1,5 +1,33 @@
 # Changelog
 
+## [2.1.0](https://github.com/langwatch/langwatch/compare/python-sdk@v2.0.1...python-sdk@v2.1.0) (2026-11-28)
+
+
+### Features
+
+* **experiments:** opt-in CI gate on evaluator failures; TS run() sends every input ([#9501](https://github.com/langwatch/langwatch/issues/9501)) ([eff2dac](https://github.com/langwatch/langwatch/commit/eff2dac43c18163cd5fac4f3cf850a55d9587d8c))
+* **governance:** agent kill switch to stop agents on Databricks, Bedrock and the gateway, with approval and restore ([#9628](https://github.com/langwatch/langwatch/issues/9628)) ([857cc0d](https://github.com/langwatch/langwatch/commit/857cc0dc254c2cc7e1a1bd0096e753086a53648c))
+* **governance:** discover agents on AWS, Google Cloud and ARD registries with shadow and dormant posture ([#9635](https://github.com/langwatch/langwatch/issues/9635)) ([46094f6](https://github.com/langwatch/langwatch/commit/46094f64f06b17f5de3b475af769140260e3a09c))
+* **governance:** ingest OCSF AI events from AWS Security Lake ([#9638](https://github.com/langwatch/langwatch/issues/9638)) ([0db90c2](https://github.com/langwatch/langwatch/commit/0db90c242a639ef1adaf89148e816950a430a5c8))
+* **langy:** measured changes, CI as the lab, traces always found, and a judge that reads long traces ([#9536](https://github.com/langwatch/langwatch/issues/9536)) ([a697ebd](https://github.com/langwatch/langwatch/commit/a697ebdf2403dc0aad86e3240fa7e00620d2395d))
+* **staff-access:** copy an organization's projects into another organization ([#9538](https://github.com/langwatch/langwatch/issues/9538)) ([7abf0c5](https://github.com/langwatch/langwatch/commit/7abf0c5335e079eec12250f52aca603df516fb25))
+* **staff-access:** passkey-approved one-hour agent access for operators ([#9267](https://github.com/langwatch/langwatch/issues/9267)) ([26bb2bf](https://github.com/langwatch/langwatch/commit/26bb2bffbd7b03f91b7e4205d058aba307317a02))
+
+
+### Bug Fixes
+
+* **coding-agent:** a Claude Code trace's conversation is its session, and a launcher can declare one session for all its runs ([#9758](https://github.com/langwatch/langwatch/issues/9758)) ([a4bda03](https://github.com/langwatch/langwatch/commit/a4bda03c3bd2933cadfa177d1bb142c20bdcae1b))
+* **dashboards:** widgets and graphs created without a size land readable; /api/graphs takes the grid's bounds ([#9737](https://github.com/langwatch/langwatch/issues/9737)) ([88d08a7](https://github.com/langwatch/langwatch/commit/88d08a739420c0d1c47f279d1087746f7fb3dddb))
+* **gateway:** settle the A2A proxy review follow-ups ([#9824](https://github.com/langwatch/langwatch/issues/9824)) ([5714ee1](https://github.com/langwatch/langwatch/commit/5714ee1d46c4768290d8bb1f233542f22579dfdd))
+* **governance:** follow-ups from the OCSF export review ([#9678](https://github.com/langwatch/langwatch/issues/9678)) ([d887971](https://github.com/langwatch/langwatch/commit/d88797186ee12ee5cc71c5eaa169b89d4db0fc8c))
+* **security:** bump soupsieve, opentelemetry-api and tornado, drop unused arize-phoenix ([#9895](https://github.com/langwatch/langwatch/issues/9895)) ([95c5195](https://github.com/langwatch/langwatch/commit/95c5195023d83cab52121fea0098d2ff8db6b0cc))
+* **security:** raise uv floors for nltk, pyasn1, pypdf, filelock, dnspython and joserfc ([#9783](https://github.com/langwatch/langwatch/issues/9783)) ([0e3f51f](https://github.com/langwatch/langwatch/commit/0e3f51f4c40b0f3ac3dc6d2376bf6e91912c8baf))
+
+
+### Miscellaneous
+
+* **main:** release langwatch 3.31.0 ([#10004](https://github.com/langwatch/langwatch/issues/10004)) ([1edc0e5](https://github.com/langwatch/langwatch/commit/1edc0e59ff48ffe7704527abe0d741d21a45604c))
+
 ## [2.0.1](https://github.com/langwatch/langwatch/compare/python-sdk@v2.0.0...python-sdk@v2.0.1) (2026-11-19)
 
 
