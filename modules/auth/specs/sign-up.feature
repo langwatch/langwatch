@@ -107,3 +107,15 @@ Feature: Sign-up
     When the sign-up form renders the refusal
     Then the first names the identity provider as the way to sign in
     And the second counts the minutes to wait from the seconds the refusal carries
+
+  @unit
+  Scenario: Two openings of one sign-up confirmation link spend it only once
+    Given a confirmation link opened twice at the same moment
+    When both openings check the address proof
+    Then the conditional write spends the row once and the other opening finds it spent
+
+  @integration
+  Scenario: A confirmation link spent while another claim waited keeps the first spender
+    Given a confirmation link moved into the spent namespace by an earlier writer
+    When a second claim that already read the live row reaches the write
+    Then the conditional write refuses the second claim and keeps the earlier identifier

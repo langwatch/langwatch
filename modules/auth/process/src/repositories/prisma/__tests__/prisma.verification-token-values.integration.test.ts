@@ -12,6 +12,8 @@ import {
   PrismaTenancyGuardService,
   type PrismaConnection,
 } from "@langwatch/prisma-client";
+import type { Prisma } from "@langwatch/prisma-client/generated";
+import { raceOnOneRow } from "@langwatch/test-harness/row-lock-race";
 import { Temporal } from "@langwatch/time";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
@@ -21,6 +23,7 @@ const databaseUrl = process.env.LANGWATCH_TEST_DATABASE_URL;
 const namespace = `test-auth-verification-${randomUUID()}`;
 const userId = `${namespace}-sam`;
 const expires = new Date("2030-01-01T00:00:00.000Z");
+const spentPrefix = "identity-signup-spent:";
 
 describe.skipIf(!databaseUrl)("VerificationToken values", () => {
   let connection: PrismaConnection;
@@ -36,7 +39,12 @@ describe.skipIf(!databaseUrl)("VerificationToken values", () => {
   afterAll(async () => {
     if (!connection) return;
     await connection.client.verificationToken.deleteMany({
-      where: { identifier: { startsWith: namespace } },
+      where: {
+        OR: [
+          { identifier: { startsWith: namespace } },
+          { identifier: { startsWith: `${spentPrefix}${namespace}` } },
+        ],
+      },
     });
     await connection.closeOnce();
   });
@@ -82,6 +90,90 @@ describe.skipIf(!databaseUrl)("VerificationToken values", () => {
       });
 
       expect(claim).toMatchObject({ claimed: true });
+    });
+  });
+
+  describe("given two openings of the same confirmation link", () => {
+    /** @scenario "Two openings of one sign-up confirmation link spend it only once" */
+    it("lets only one of the two openings spend the token", async () => {
+      const token = `${namespace}-race-confirm`;
+      const identifier = `${namespace}-identity-signup:race@example.com`;
+      const now = Temporal.Instant.from("2029-01-01T00:00:00Z");
+      const keepSpentUntil = Temporal.Instant.from("2031-01-01T00:00:00Z");
+
+      await PrismaSignUpVerificationTokenRepository.create({
+        prisma: connection.client,
+      }).issue({
+        identifier,
+        token,
+        expires: Temporal.Instant.from(expires.toISOString()),
+      });
+
+      const claim = (tx: Prisma.TransactionClient) =>
+        PrismaSignUpVerificationTokenRepository.create({ prisma: tx }).claim({
+          token,
+          now,
+          keepSpentUntil,
+        });
+      const answers = await raceOnOneRow({
+        prisma: connection.client,
+        table: "VerificationToken",
+        first: claim,
+        second: claim,
+      });
+
+      expect(answers.first.claimed !== answers.second.claimed).toBe(true);
+      const stored = await connection.client.verificationToken.findFirstOrThrow({
+        where: { token },
+      });
+      expect(stored.identifier).toBe(`${spentPrefix}${identifier}`);
+    });
+  });
+
+  describe("given a confirmation link spent by another writer during an opening", () => {
+    /** @scenario "A confirmation link spent while another claim waited keeps the first spender" */
+    it("does not spend a token moved into the spent namespace during the wait", async () => {
+      const token = `${namespace}-stolen-confirm`;
+      const identifier = `${namespace}-identity-signup:stolen@example.com`;
+      const spentIdentifier = `${spentPrefix}${identifier}`;
+      const now = Temporal.Instant.from("2029-01-01T00:00:00Z");
+      const keepSpentUntil = Temporal.Instant.from("2031-01-01T00:00:00Z");
+
+      await PrismaSignUpVerificationTokenRepository.create({
+        prisma: connection.client,
+      }).issue({
+        identifier,
+        token,
+        expires: Temporal.Instant.from(expires.toISOString()),
+      });
+
+      const answers = await raceOnOneRow({
+        prisma: connection.client,
+        table: "VerificationToken",
+        first: async (tx: Prisma.TransactionClient) => {
+          const updated = await tx.verificationToken.updateMany({
+            where: { token },
+            data: {
+              identifier: spentIdentifier,
+              expires: new Date("2031-01-01T00:00:00.000Z"),
+            },
+          });
+          return updated.count === 1 ? spentIdentifier : "not-spent";
+        },
+        second: (tx: Prisma.TransactionClient) =>
+          PrismaSignUpVerificationTokenRepository.create({ prisma: tx }).claim({
+            token,
+            now,
+            keepSpentUntil,
+          }),
+      });
+
+      expect(answers.first).toBe(spentIdentifier);
+      expect(answers.second.claimed).toBe(false);
+      const stored = await connection.client.verificationToken.findFirstOrThrow({
+        where: { token },
+      });
+      expect(stored.identifier).toBe(spentIdentifier);
     });
   });
 });
