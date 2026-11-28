@@ -46,6 +46,9 @@ export interface DatasetRecordRepository {
     datasetId: string;
     projectId: string;
     entries: (DatasetRecordInput & { id: string })[];
+    /** Leave rows whose id already exists instead of failing. */
+    skipDuplicates?: boolean;
+    verifyExisting?: boolean;
   }): Promise<DatasetRecord[]>;
   update(input: {
     id: string;

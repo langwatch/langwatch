@@ -43,6 +43,7 @@ function runtime(
     dispatchFails?: Record<string, Error>;
     claimFails?: ReadonlySet<string>;
     capAllows?: boolean;
+    alreadySent?: Set<string>;
   } = {},
 ) {
   const dispatched: string[] = [];
@@ -64,7 +65,7 @@ function runtime(
 
   const automation = {
     findActiveTraceTriggersForProject: vi.fn().mockResolvedValue([trigger]),
-    filterSendClaimed: vi.fn().mockResolvedValue(new Set<string>()),
+    filterSendClaimed: vi.fn(async () => new Set(options.alreadySent ?? [])),
     resolvePersistDailyCap: vi.fn().mockResolvedValue(1),
     consumePersistCapSlot: vi
       .fn()
@@ -88,7 +89,14 @@ function runtime(
   const run = (traceIds: string[]) =>
     service.dispatch({ projectId: "project-1", triggerId: "trigger-1", traceIds });
 
-  return { run, dispatched, claimed, capture, handlePersistCapBreach };
+  return {
+    run,
+    dispatched,
+    claimed,
+    capture,
+    handlePersistCapBreach,
+    alreadySent: options.alreadySent,
+  };
 }
 
 describe("given a page of settled matches dispatching together", () => {
@@ -169,6 +177,39 @@ describe("given a page of settled matches dispatching together", () => {
 
       expect(harness.dispatched).toEqual([]);
       expect(harness.handlePersistCapBreach).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  describe("when one trace's rows already landed and another fails retryably", () => {
+    /** @scenario "A retry of a page writes the rows that already landed once" */
+    it("retries only the failed trace and leaves the page alive", async () => {
+      const dispatchFails: Record<string, Error> = {
+        "trace-2": new DispatchError({ message: "dataset write timed out", retryable: true }),
+      };
+      const alreadySent = new Set<string>();
+      const harness = runtime({ dispatchFails, alreadySent });
+
+      // First delivery: trace-1's deterministic ids already exist, so its write succeeds and
+      // it is claimed; trace-2 fails retryably and makes the page retry.
+      await expect(harness.run(["trace-1", "trace-2"])).rejects.toThrow("dataset write timed out");
+      expect(harness.claimed).toContain("trace-1");
+      expect(harness.claimed).not.toContain("trace-2");
+
+      // The outbox redelivers the page: trace-1's claim is durable and trace-2 now succeeds.
+      alreadySent.add("trace-1");
+      delete dispatchFails["trace-2"];
+
+      await expect(harness.run(["trace-1", "trace-2"])).resolves.toBeUndefined();
+
+      // The retry only dispatched the trace that had failed; the landed trace was not re-run.
+      expect(harness.dispatched.filter((traceId) => traceId === "trace-1")).toHaveLength(1);
+      expect(harness.dispatched.filter((traceId) => traceId === "trace-2")).toHaveLength(1);
+      expect(harness.claimed.filter((traceId) => traceId === "trace-1")).toHaveLength(1);
+      expect(harness.claimed.filter((traceId) => traceId === "trace-2")).toHaveLength(1);
+      expect(harness.capture).not.toHaveBeenCalledWith(
+        expect.any(Error),
+        expect.objectContaining({ phase: "persist-dispatch-terminal" }),
+      );
     });
   });
 });

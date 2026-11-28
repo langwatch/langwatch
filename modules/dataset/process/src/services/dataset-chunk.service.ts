@@ -25,8 +25,10 @@ import {
   chunkMetaOf,
 } from "../rules/dataset-chunking.rules.ts";
 import { assertColumnsCurrent } from "../rules/dataset-columns.rules.ts";
+import { verifyExistingDatasetRecords } from "../rules/dataset-record-retry.rules.ts";
 import { DatasetChunkDeleteService } from "./dataset-chunk-delete.service.ts";
 import { DatasetChunkMaintenanceService } from "./dataset-chunk-maintenance.service.ts";
+import { DatasetChunkReadService } from "./dataset-chunk-read.service.ts";
 
 const logger = createLogger("langwatch:datasets:mutations");
 
@@ -54,10 +56,15 @@ export class DatasetChunkService {
 
   private readonly maintenance: DatasetChunkMaintenanceService;
 
+  private readonly reads = DatasetChunkReadService.create();
+
   private constructor(private readonly datasets: DatasetContentRepository) {
     this.deletes = DatasetChunkDeleteService.create({
       datasets,
-      locateIds: (input) => this.locateIds(input),
+      locateIds: async (input) => {
+        const hint = await this.reads.locateIds(input);
+        return hint.outcome === "located" ? hint : null;
+      },
     });
     this.maintenance = DatasetChunkMaintenanceService.create({ datasets });
   }
@@ -146,27 +153,68 @@ export class DatasetChunkService {
     entries,
     forcedIds,
     storage,
+    skipDuplicates,
+    readBackExisting,
+    verifyExisting,
   }: {
     dataset: DatasetMutationRecord;
     projectId: string;
     entries: unknown[];
     forcedIds?: (string | undefined)[];
     storage: DatasetChunkRepository;
-  }): Promise<{ appended: number }> {
+    skipDuplicates?: boolean;
+    readBackExisting?: boolean;
+    verifyExisting?: boolean;
+  }): Promise<{ appended: number; records?: ChunkLine[] }> {
     const datasetStorage = storage;
 
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
       const current = await tx.getOne({ id: dataset.id, projectId });
       assertReady(current);
 
-      return this.appendLines({
-        tx,
-        current,
+      if (!skipDuplicates && !readBackExisting && !verifyExisting) {
+        return this.appendLines({
+          tx,
+          current,
+          projectId,
+          entries,
+          forcedIds,
+          storage: datasetStorage,
+        });
+      }
+
+      const lines = toChunkLines(entries, { forcedIds, allowDuplicateIds: skipDuplicates });
+      const stored = await this.reads.findRecords({
+        dataset: current,
         projectId,
-        entries,
-        forcedIds,
+        ids: lines.map((line) => line.id),
         storage: datasetStorage,
       });
+      const existing = new Map(stored.map((record) => [record.id, record]));
+      if (verifyExisting) verifyExistingDatasetRecords({ records: lines, stored });
+      const acceptedIds = new Set(existing.keys());
+      const pending = skipDuplicates
+        ? lines.filter((line) => {
+            if (acceptedIds.has(line.id)) return false;
+            acceptedIds.add(line.id);
+            return true;
+          })
+        : lines;
+      if (pending.length > 0) {
+        await this.appendLines({
+          tx,
+          current,
+          projectId,
+          entries: pending.map((line) => line.entry),
+          forcedIds: pending.map((line) => line.id),
+          storage: datasetStorage,
+        });
+      }
+
+      return {
+        appended: pending.length,
+        records: readBackExisting ? lines.map((line) => existing.get(line.id) ?? line) : pending,
+      };
     });
   }
 
@@ -196,9 +244,9 @@ export class DatasetChunkService {
     // OFF the lock: locate the row's chunk so only that chunk is re-read under it.
     // Skipped unless the dataset looks ready — never do storage I/O ahead of the
     // readiness gate (the under-lock `assertReady` stays authoritative).
-    const hint =
+    const located =
       dataset.status === "ready"
-        ? await this.locateIds({
+        ? await this.reads.locateIds({
             storage: datasetStorage,
             projectId,
             datasetId: dataset.id,
@@ -206,6 +254,7 @@ export class DatasetChunkService {
             chunkCount: dataset.chunkCount ?? 0,
           })
         : null;
+    const hint = located?.outcome === "located" ? located : null;
 
     return this.datasets.withDatasetLock(dataset.id, async (tx) => {
       const current = await tx.getOne({ id: dataset.id, projectId });
@@ -434,54 +483,5 @@ export class DatasetChunkService {
     });
 
     return { appended: lines.length };
-  }
-
-  /**
-   * Pre-lock locate scan (no lock held): finds which chunk holds each of `ids`.
-   * A HINT, never authoritative — the caller re-validates under the lock and
-   * bails to a full scan on any discrepancy.
-   */
-  private async locateIds({
-    storage,
-    projectId,
-    datasetId,
-    ids,
-    chunkCount,
-  }: {
-    storage: DatasetChunkRepository;
-    projectId: string;
-    datasetId: string;
-    ids: Set<string>;
-    chunkCount: number;
-  }): Promise<{ affectedIndices: number[]; locatedIds: Set<string> } | null> {
-    const affected = new Set<number>();
-    const locatedIds = new Set<string>();
-    const remaining = new Set(ids);
-    for (let index = 0; index < chunkCount && remaining.size > 0; index++) {
-      let rows: unknown[];
-      try {
-        rows = await storage.readChunk({ projectId, datasetId, index });
-      } catch {
-        // Couldn't read this chunk off the lock (e.g. racing a rewrite). Abandon
-        // the hint so the caller uses the proven full in-lock scan instead of
-        // acting on a partial locate.
-        logger.warn(
-          { projectId, datasetId, index },
-          "off-lock chunk read failed during id locate; abandoning fast-path hint, falling back to full in-lock scan",
-        );
-
-        return null;
-      }
-
-      for (const line of rows) {
-        if (isChunkLine(line) && remaining.has(line.id)) {
-          affected.add(index);
-          locatedIds.add(line.id);
-          remaining.delete(line.id);
-        }
-      }
-    }
-
-    return { affectedIndices: [...affected].toSorted((a, b) => a - b), locatedIds };
   }
 }

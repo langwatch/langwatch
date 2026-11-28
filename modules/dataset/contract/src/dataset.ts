@@ -493,6 +493,18 @@ export type DatasetPageInput = z.input<typeof datasetPageInputSchema>;
 
 const createDatasetRecordsInputSchemaDefinition = datasetRecordLookupInputSchema.safeExtend({
   entries: z.array(datasetRecordInputSchema),
+  /**
+   * Treat a row whose id already exists as already written instead of failing the
+   * batch, for callers that write deterministic ids and may safely retry a page.
+   */
+  skipDuplicates: z.boolean().optional(),
+  /**
+   * Return every requested row this dataset holds after the write, not just the
+   * rows this batch created, so a retrying caller can compare stored content.
+   */
+  readBackExisting: z.boolean().optional(),
+  /** Reject conflicting content before any rows in this retry-safe batch are written. */
+  verifyExisting: z.boolean().optional(),
 });
 export interface CreateDatasetRecordsInputSchema extends Named<
   typeof createDatasetRecordsInputSchemaDefinition

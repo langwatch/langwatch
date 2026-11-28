@@ -125,20 +125,24 @@ export const mapPreviousColumnsToNewColumns = ({
  */
 export const toChunkLines = (
   entries: unknown[],
-  { forcedIds }: { forcedIds?: (string | undefined)[] } = {},
+  {
+    forcedIds,
+    allowDuplicateIds = false,
+  }: {
+    forcedIds?: (string | undefined)[];
+    allowDuplicateIds?: boolean;
+  } = {},
 ): ChunkLine[] => {
   const lines = entries.map((entry, i) => ({
     id: forcedIds?.[i] ?? generate(RECORD_KSUID_RESOURCE).toString(),
     entry: stripNullBytes(entry),
   }));
-  // I-PG: row ids are unique within a dataset (the legacy PG PK). Minted ids can't
-  // collide, but caller-supplied `forcedIds` can — reject the duplicate at the
-  // id-assignment chokepoint rather than silently creating a ghost row.
-  // Within-batch only: a cross-batch collision needs an O(rowCount) scan the edit
-  // create-on-miss path already guards.
+  // I-PG: reject duplicate caller IDs before writing ghost rows. Retry preparation
+  // retains them only to verify content before deduplicating. This is within-batch;
+  // cross-batch collisions need the edit/create-on-miss path's scan.
   const seen = new Set<string>();
   for (const { id } of lines) {
-    if (seen.has(id)) {
+    if (seen.has(id) && !allowDuplicateIds) {
       throw new DuplicateRecordIdError(id);
     }
 

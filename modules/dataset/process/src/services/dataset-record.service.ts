@@ -397,16 +397,35 @@ export class DatasetRecordService {
       return content.batchCreateRecords({ dataset, input: parsed });
     }
 
-    return this.lockedRecords({ dataset, columns }, (records) =>
-      records.createMany({
+    return this.lockedRecords({ dataset, columns }, async (records) => {
+      const written = await records.createMany({
         datasetId: dataset.id,
         projectId: parsed.projectId,
         entries: parsed.entries.map((entry) => ({
           id: entry.id ?? this.deps.generateId(),
           ...sanitizedEntry(Object.fromEntries(columns.map((c) => [c, entry[c] ?? null]))),
         })),
-      }),
-    );
+        skipDuplicates: parsed.skipDuplicates ?? false,
+        verifyExisting: parsed.verifyExisting ?? false,
+      });
+      if (!parsed.readBackExisting) {
+        return written;
+      }
+
+      // Preserve explicit readback for callers requesting their deterministic ids.
+      const requestedIds = parsed.entries.flatMap((entry) =>
+        entry.id === undefined ? [] : [entry.id],
+      );
+      if (requestedIds.length !== parsed.entries.length) {
+        return written;
+      }
+
+      return records.findByIds({
+        datasetId: dataset.id,
+        projectId: parsed.projectId,
+        ids: requestedIds,
+      });
+    });
   }
 
   async createRecords(input: CreateDatasetRecordsInput): Promise<DatasetRecord[]> {
