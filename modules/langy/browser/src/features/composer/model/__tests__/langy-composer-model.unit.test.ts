@@ -33,6 +33,41 @@ describe("given the composer has no model yet", () => {
     });
   });
 
+  describe("when the first served provider lists an old generation first", () => {
+    const bedrock = [
+      "bedrock/us.anthropic.claude-sonnet-4-20250514-v1:0",
+      "bedrock/us.amazon.nova-pro-v1:0",
+      "bedrock/global.anthropic.claude-sonnet-4-5-20250929-v1:0",
+      "bedrock/us.anthropic.claude-opus-4-1-20250805-v1:0",
+      "bedrock/global.anthropic.claude-opus-4-6-v1",
+      "bedrock/us.anthropic.claude-haiku-4-5-20251001-v1:0",
+      "gemini/gemini-3.7-flash",
+    ];
+
+    /** @scenario "A default naming a provider nobody connected never reaches the composer" */
+    it("seeds that provider's newest model, not the first in its list", () => {
+      expect(
+        resolveComposerModel({
+          current: "",
+          resolvedDefault: "openai/gpt-6.1-terra",
+          resolvedDefaultSettled: true,
+          reachable: bedrock,
+        }),
+      ).toBe("bedrock/global.anthropic.claude-opus-4-6-v1");
+    });
+
+    it("snaps a model the project stopped serving to the same newest model", () => {
+      expect(
+        resolveComposerModel({
+          current: "openai/gpt-6.1-terra",
+          resolvedDefault: "openai/gpt-6.1-terra",
+          resolvedDefaultSettled: true,
+          reachable: bedrock,
+        }),
+      ).toBe("bedrock/global.anthropic.claude-opus-4-6-v1");
+    });
+  });
+
   describe("when no default resolves", () => {
     it("seeds the first model the project's providers serve", () => {
       expect(

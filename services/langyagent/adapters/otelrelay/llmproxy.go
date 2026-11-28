@@ -577,17 +577,23 @@ func decodeProviderErrorBody(peeked []byte, status int, contentType string) herr
 	if cause, ok := accountCauseReason(status, peeked); ok {
 		e.Reasons = append(e.Reasons, herr.E{Code: cause})
 	}
+	if providererr.ModelRetired(status, peeked) {
+		e.Reasons = append(e.Reasons, herr.E{Code: ErrProviderModelRetired})
+	}
 	return e
 }
 
-// The account-level causes a provider body names in prose only (Anthropic's
-// spent balance is a 400 invalid_request_error), classified here so the panel
-// can say which one it was while the sentence itself stays behind.
+// The causes a provider body names in prose only (Anthropic's spent balance is
+// a 400 invalid_request_error, Bedrock's retired model a bare 404), classified
+// here so the panel can say which one it was while the sentence stays behind.
 const (
 	// ErrProviderOutOfCredit marks a provider account with no credit or quota left.
 	ErrProviderOutOfCredit = herr.Code("llm_provider_out_of_credit")
 	// ErrProviderKeyRejected marks a key the provider refused on a status other than 401 or 403.
 	ErrProviderKeyRejected = herr.Code("llm_provider_key_rejected")
+	// ErrProviderModelRetired marks a model the provider retired (Bedrock's 404
+	// "reached the end of its life"): another model fixes it, a retry never does.
+	ErrProviderModelRetired = herr.Code("llm_provider_model_retired")
 )
 
 func accountCauseReason(status int, body []byte) (herr.Code, bool) {

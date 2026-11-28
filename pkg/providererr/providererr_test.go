@@ -56,3 +56,29 @@ func TestKeyRejected(t *testing.T) {
 		})
 	}
 }
+
+const bedrockEndOfLife = "This model version has reached the end of its life. Please refer to the AWS documentation for more details."
+
+func TestModelRetired(t *testing.T) {
+	cases := []struct {
+		name   string
+		status int
+		body   string
+		want   bool
+	}{
+		{"bedrock end-of-life 404, native body", 404, `{"message":"` + bedrockEndOfLife + `"}`, true},
+		{"bedrock end-of-life 404, gateway envelope", 404, `{"error":{"type":"provider_error","code":"provider_error","message":"` + bedrockEndOfLife + `","meta":{"status":404,"provider":"bedrock"}}}`, true},
+		{"bedrock end-of-life with the AWS SDK's capital Message", 404, `{"Message":"` + bedrockEndOfLife + `"}`, true},
+		{"groq decommissioned model code", 400, `{"error":{"message":"redacted","type":"invalid_request_error","code":"model_decommissioned"}}`, true},
+		{"a model the key has no access to", 404, `{"error":{"type":"not_found_error","message":"model: claude-x"}}`, false},
+		{"bedrock unknown model id", 400, `{"message":"The provided model identifier is invalid."}`, false},
+		{"end of life on a 5xx", 503, `{"message":"` + bedrockEndOfLife + `"}`, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if got := ModelRetired(c.status, []byte(c.body)); got != c.want {
+				t.Fatalf("ModelRetired(%d, %s) = %v, want %v", c.status, c.body, got, c.want)
+			}
+		})
+	}
+}

@@ -787,3 +787,36 @@ func TestDecodeProviderErrorBody_GatewayGenericEnvelopeKeepsStatusReason(t *test
 		}
 	})
 }
+
+// Bedrock's answer for a model AWS retired, as the gateway forwards it.
+const bedrockEndOfLifeMessage = "This model version has reached the end of its life. Please refer to the AWS documentation for more details."
+
+func TestDecodeProviderErrorBody_NamesARetiredModel(t *testing.T) {
+	tests := []struct {
+		name string
+		body string
+		want []herr.Code
+	}{
+		{
+			name: "the gateway's generic envelope around Bedrock's message",
+			body: `{"error":{"type":"provider_error","code":"provider_error","message":"` + bedrockEndOfLifeMessage + `","meta":{"status":404,"provider":"bedrock"}}}`,
+			want: []herr.Code{"provider_error", "upstream_not_found", ErrProviderModelRetired},
+		},
+		{
+			name: "Bedrock's native body",
+			body: `{"message":"` + bedrockEndOfLifeMessage + `"}`,
+			want: []herr.Code{"upstream_not_found", ErrProviderModelRetired},
+		},
+	}
+	for _, tc := range tests {
+		t.Run(tc.name, func(t *testing.T) {
+			e := decodeProviderErrorBody([]byte(tc.body), http.StatusNotFound, "application/json")
+			if got := reasonCodes(e); !slices.Equal(got, tc.want) {
+				t.Fatalf("reasons = %v, want %v", got, tc.want)
+			}
+			if _, ok := e.Meta["message"]; ok {
+				t.Error("provider prose must not enter handled-error metadata")
+			}
+		})
+	}
+}
