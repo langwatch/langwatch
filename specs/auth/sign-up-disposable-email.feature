@@ -15,7 +15,7 @@ Feature: Sign-up refuses disposable email addresses
   @unit
   Scenario: A new address on a disposable email domain is refused
     Given the installation refuses disposable email addresses
-    When "sam@euploading.com" signs up
+    When "sam@mailinator.com" signs up
     Then the sign-up is refused as a disposable address
 
   @unit
@@ -27,29 +27,29 @@ Feature: Sign-up refuses disposable email addresses
   @unit
   Scenario: A disposable domain is refused whatever its case and on any subdomain
     Given the installation refuses disposable email addresses
-    When "Sam@EUploading.COM" or "sam@mx.euploading.com" signs up
+    When "Sam@Mailinator.COM" or "sam@mx.mailinator.com" signs up
     Then the sign-up is refused as a disposable address
-    But "sam@noteuploading.com" is admitted
+    But "sam@lookalikemailinator.com" is admitted
 
   @unit
   Scenario: An invited address on a disposable domain is admitted
     Given the installation refuses disposable email addresses
-    And "contractor@euploading.com" holds a pending invitation to an organization
-    When "contractor@euploading.com" signs up
+    And "contractor@mailinator.com" holds a pending invitation to an organization
+    When "contractor@mailinator.com" signs up
     Then the account can be created
 
   @unit
   Scenario: An address in ADMIN_EMAILS on a disposable domain is admitted
     Given the installation refuses disposable email addresses
-    And ADMIN_EMAILS names "ops@euploading.com"
-    When "ops@euploading.com" signs up
+    And ADMIN_EMAILS names "ops@mailinator.com"
+    When "ops@mailinator.com" signs up
     Then the account can be created
 
   @unit
   Scenario: A disposable domain listed in SIGN_UP_ALLOWED_DOMAINS is admitted
     Given the installation refuses disposable email addresses
-    And SIGN_UP_ALLOWED_DOMAINS lists "euploading.com"
-    When "sam@euploading.com" signs up
+    And SIGN_UP_ALLOWED_DOMAINS lists "mailinator.com"
+    When "sam@mailinator.com" signs up
     Then the account can be created
 
   @unit
@@ -57,14 +57,14 @@ Feature: Sign-up refuses disposable email addresses
     Given SIGN_UP_MODE is "invite_only" and ADMIN_EMAILS is empty
     And the installation refuses disposable email addresses
     And the installation has no accounts yet
-    When "founder@euploading.com" signs up
+    When "founder@mailinator.com" signs up
     Then the sign-up is refused as a disposable address
     But "founder@acme.com" is admitted as the first account
 
   @unit
   Scenario: An installation that allows disposable addresses admits them
     Given SIGN_UP_DISPOSABLE_EMAILS is "allow"
-    When "sam@euploading.com" signs up
+    When "sam@mailinator.com" signs up
     Then the account can be created
 
   @unit
@@ -76,36 +76,36 @@ Feature: Sign-up refuses disposable email addresses
 
   @unit
   Scenario: A disposable address is refused before a confirmation link is sent
-    Given the sign-up policy refuses "sam@euploading.com" as a disposable address
-    When "sam@euploading.com" asks for a sign-up confirmation link
+    Given the sign-up policy refuses "sam@mailinator.com" as a disposable address
+    When "sam@mailinator.com" asks for a sign-up confirmation link
     Then the request is refused with "auth_sign_up_disposable_email"
     And no confirmation email is sent
 
   @unit
   Scenario: A disposable address submitting the registration form writes no account
-    Given the sign-up policy refuses "sam@euploading.com" as a disposable address
-    When "sam@euploading.com" submits the registration form
+    Given the sign-up policy refuses "sam@mailinator.com" as a disposable address
+    When "sam@mailinator.com" submits the registration form
     Then the registration is refused with "auth_sign_up_disposable_email"
     And the address proof is not spent
 
   @unit
   Scenario: A first sign-in through an identity provider from a disposable address creates no account
-    Given the sign-up policy refuses "sam@euploading.com" as a disposable address
-    When "sam@euploading.com" signs in through an identity provider for the first time
+    Given the sign-up policy refuses "sam@mailinator.com" as a disposable address
+    When "sam@mailinator.com" signs in through an identity provider for the first time
     Then no account is created
     And the sign-in error page shows "auth_sign_up_disposable_email"
 
   @unit
   Scenario: An existing account on a disposable domain is sent to sign in
-    Given an account already holds "sam@euploading.com"
+    Given an account already holds "sam@mailinator.com"
     And the sign-up policy would refuse that address as a disposable address
-    When "sam@euploading.com" reaches the front door
+    When "sam@mailinator.com" reaches the front door
     Then it is sent to sign in to its account
     And the sign-up policy is not asked
 
   @integration
   Scenario: A refusal after the address is confirmed does not say the address is confirmed
-    Given "sam@euploading.com" opened its confirmation link
+    Given "sam@mailinator.com" opened its confirmation link
     And the sign-up policy now refuses that address as a disposable address
     When the sign-up screen shows the refusal
     Then it does not read "Your email is confirmed"

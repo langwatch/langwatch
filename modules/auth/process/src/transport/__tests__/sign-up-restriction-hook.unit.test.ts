@@ -54,7 +54,7 @@ describe("user.create.before", () => {
         verdict: { allowed: false, reason: "disposable_email" },
       });
 
-      await expect(create("sam@euploading.com")).rejects.toMatchObject({
+      await expect(create("sam@mailinator.com")).rejects.toMatchObject({
         body: { code: "auth_sign_up_disposable_email" },
       });
     });

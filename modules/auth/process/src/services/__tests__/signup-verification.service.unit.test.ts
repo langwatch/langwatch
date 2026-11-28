@@ -542,7 +542,7 @@ describe("given a signed-out sign-up asking for a new account's link", () => {
       const harness = makeService({ signUpRefused: "disposable_email" });
 
       await expect(
-        harness.service.requestNewAccountVerification({ email: "sam@euploading.com" }),
+        harness.service.requestNewAccountVerification({ email: "sam@mailinator.com" }),
       ).rejects.toMatchObject({ code: "auth_sign_up_disposable_email" });
       expect(harness.mail.sent).toEqual([]);
       expect(harness.budgets).toEqual([]);

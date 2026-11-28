@@ -291,7 +291,7 @@ describe("SignUpPolicyService", () => {
     /** @scenario "A new address on a disposable email domain is refused" */
     it("refuses a new address on a disposable domain", async () => {
       await expect(
-        policy().checkSignUp({ email: "sam@euploading.com", hasAnyAccount: accounts > 0 }),
+        policy().checkSignUp({ email: "sam@mailinator.com", hasAnyAccount: accounts > 0 }),
       ).resolves.toEqual({ allowed: false, reason: "disposable_email" });
     });
 
@@ -305,40 +305,44 @@ describe("SignUpPolicyService", () => {
 
     /** @scenario "A disposable domain is refused whatever its case and on any subdomain" */
     it("refuses any case or subdomain of a listed domain, and no look-alike", async () => {
-      for (const email of ["Sam@EUploading.COM", "sam@mx.euploading.com", " sam@fldubai.com "]) {
+      for (const email of [
+        "Sam@Mailinator.COM",
+        "sam@mx.mailinator.com",
+        " sam@guerrillamail.com ",
+      ]) {
         await expect(policy().checkSignUp({ email, hasAnyAccount: accounts > 0 })).resolves.toEqual(
           { allowed: false, reason: "disposable_email" },
         );
       }
       await expect(
-        policy().checkSignUp({ email: "sam@noteuploading.com", hasAnyAccount: accounts > 0 }),
+        policy().checkSignUp({ email: "sam@lookalikemailinator.com", hasAnyAccount: accounts > 0 }),
       ).resolves.toEqual({ allowed: true, via: "open" });
     });
 
     /** @scenario "An invited address on a disposable domain is admitted" */
     it("admits an invited address on a disposable domain", async () => {
-      repository.invited.add("contractor@euploading.com");
+      repository.invited.add("contractor@mailinator.com");
 
       await expect(
-        policy().checkSignUp({ email: "contractor@euploading.com", hasAnyAccount: accounts > 0 }),
+        policy().checkSignUp({ email: "contractor@mailinator.com", hasAnyAccount: accounts > 0 }),
       ).resolves.toEqual({ allowed: true, via: "invitation" });
     });
 
     /** @scenario "A disposable domain listed in SIGN_UP_ALLOWED_DOMAINS is admitted" */
     it("admits a disposable domain the operator lists in SIGN_UP_ALLOWED_DOMAINS", async () => {
-      settings = { ...settings, allowedDomains: ["euploading.com"] };
+      settings = { ...settings, allowedDomains: ["mailinator.com"] };
 
       await expect(
-        policy().checkSignUp({ email: "sam@euploading.com", hasAnyAccount: accounts > 0 }),
+        policy().checkSignUp({ email: "sam@mailinator.com", hasAnyAccount: accounts > 0 }),
       ).resolves.toEqual({ allowed: true, via: "open" });
     });
 
     /** @scenario "An address in ADMIN_EMAILS on a disposable domain is admitted" */
     it("admits a disposable address the operator lists in ADMIN_EMAILS", async () => {
-      settings = { ...settings, adminEmails: ["Ops@EUploading.com"] };
+      settings = { ...settings, adminEmails: ["Ops@Mailinator.com"] };
 
       await expect(
-        policy().checkSignUp({ email: "ops@euploading.com", hasAnyAccount: accounts > 0 }),
+        policy().checkSignUp({ email: "ops@mailinator.com", hasAnyAccount: accounts > 0 }),
       ).resolves.toEqual({ allowed: true, via: "instance_admin" });
     });
 
@@ -351,7 +355,7 @@ describe("SignUpPolicyService", () => {
       /** @scenario "The first account on an empty invite-only installation is refused on a disposable domain" */
       it("refuses a disposable first account before the first-account window", async () => {
         await expect(
-          policy().checkSignUp({ email: "founder@euploading.com", hasAnyAccount: accounts > 0 }),
+          policy().checkSignUp({ email: "founder@mailinator.com", hasAnyAccount: accounts > 0 }),
         ).resolves.toEqual({ allowed: false, reason: "disposable_email" });
         await expect(
           policy().checkSignUp({ email: "founder@acme.com", hasAnyAccount: accounts > 0 }),
@@ -364,7 +368,7 @@ describe("SignUpPolicyService", () => {
     /** @scenario "An installation that allows disposable addresses admits them" */
     it("admits an address on a disposable domain", async () => {
       await expect(
-        policy().checkSignUp({ email: "sam@euploading.com", hasAnyAccount: accounts > 0 }),
+        policy().checkSignUp({ email: "sam@mailinator.com", hasAnyAccount: accounts > 0 }),
       ).resolves.toEqual({ allowed: true, via: "open" });
       expect(repository.reads + reads).toBe(0);
     });

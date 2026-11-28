@@ -131,7 +131,7 @@ describe("registering through auth's door", () => {
         reason: "disposable_email",
       });
 
-      await expect(service.register(signUp({ email: "sam@euploading.com" }))).rejects.toMatchObject(
+      await expect(service.register(signUp({ email: "sam@mailinator.com" }))).rejects.toMatchObject(
         { code: "auth_sign_up_disposable_email" },
       );
       expect(auth.claimSignUpAddressProof).not.toHaveBeenCalled();

@@ -119,7 +119,7 @@ describe("SignUpEnrollmentService", () => {
       const { service } = enrollment({ decision: UNKNOWN, signUpRefused: "disposable_email" });
 
       await expect(
-        service.getEnrollment({ email: "sam@euploading.com", addressProof: "proof" }),
+        service.getEnrollment({ email: "sam@mailinator.com", addressProof: "proof" }),
       ).rejects.toMatchObject({ code: "auth_sign_up_disposable_email" });
     });
 
@@ -132,7 +132,7 @@ describe("SignUpEnrollmentService", () => {
       });
 
       await expect(
-        service.getEnrollment({ email: "sam@euploading.com", addressProof: "proof" }),
+        service.getEnrollment({ email: "sam@mailinator.com", addressProof: "proof" }),
       ).resolves.toMatchObject({ outcome: "existing_account" });
       expect(asked.policyFor).toEqual([]);
     });

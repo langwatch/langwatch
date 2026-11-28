@@ -19,10 +19,10 @@ describe("refusesDisposableEmails", () => {
 describe("isDisposableEmailDomain", () => {
   describe("when the domain or one of its parents is listed", () => {
     it("matches whatever the case and on any subdomain", () => {
-      expect(isDisposableEmailDomain({ domain: "euploading.com" })).toBe(true);
-      expect(isDisposableEmailDomain({ domain: "EUploading.COM" })).toBe(true);
-      expect(isDisposableEmailDomain({ domain: "a.b.euploading.com" })).toBe(true);
-      expect(isDisposableEmailDomain({ domain: "euploading.com." })).toBe(true);
+      expect(isDisposableEmailDomain({ domain: "mailinator.com" })).toBe(true);
+      expect(isDisposableEmailDomain({ domain: "Mailinator.COM" })).toBe(true);
+      expect(isDisposableEmailDomain({ domain: "a.b.mailinator.com" })).toBe(true);
+      expect(isDisposableEmailDomain({ domain: "mailinator.com." })).toBe(true);
       expect(isDisposableEmailDomain({ domain: "mailinator.com" })).toBe(true);
     });
   });
@@ -31,7 +31,7 @@ describe("isDisposableEmailDomain", () => {
     it("does not match a permanent domain, a look-alike, a bare suffix or nothing", () => {
       expect(isDisposableEmailDomain({ domain: "acme.com" })).toBe(false);
       expect(isDisposableEmailDomain({ domain: "gmail.com" })).toBe(false);
-      expect(isDisposableEmailDomain({ domain: "noteuploading.com" })).toBe(false);
+      expect(isDisposableEmailDomain({ domain: "lookalikemailinator.com" })).toBe(false);
       expect(isDisposableEmailDomain({ domain: "com" })).toBe(false);
       expect(isDisposableEmailDomain({ domain: "" })).toBe(false);
     });
