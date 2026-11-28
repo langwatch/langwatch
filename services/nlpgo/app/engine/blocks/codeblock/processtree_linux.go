@@ -228,7 +228,8 @@ func killAndReap(claimed []procEntry, selfPid int) {
 
 // killClaimed kills proc through a pidfd, once /proc confirms the pid still
 // names the process the sweep read: a pid the kernel handed to a new process
-// in between is never sent the signal. Where pidfds are refused, a plain kill.
+// in between is never sent the signal. Where pidfds are refused, or the
+// signal through one is, a plain kill after the same check.
 func killClaimed(proc procEntry) {
 	fd, err := unix.PidfdOpen(proc.pid, 0)
 	if errors.Is(err, unix.ESRCH) {
@@ -239,10 +240,21 @@ func killClaimed(proc procEntry) {
 		return
 	}
 	defer unix.Close(fd)
-	if now, ok := readProcEntry(proc.pid); !ok || now.startTicks != proc.startTicks {
+	if !stillNames(proc) {
 		return
 	}
-	_ = unix.PidfdSendSignal(fd, unix.SIGKILL, nil, 0)
+	if err := pidfdSendSignal(fd, unix.SIGKILL, nil, 0); err != nil && !errors.Is(err, unix.ESRCH) && stillNames(proc) {
+		_ = syscall.Kill(proc.pid, syscall.SIGKILL)
+	}
+}
+
+// pidfdSendSignal is unix.PidfdSendSignal; a test refuses it to reach the fallback.
+var pidfdSendSignal = unix.PidfdSendSignal
+
+// stillNames reports whether proc.pid is still the process the sweep read.
+func stillNames(proc procEntry) bool {
+	now, ok := readProcEntry(proc.pid)
+	return ok && now.startTicks == proc.startTicks
 }
 
 func pidsOf(entries []procEntry) []int {
